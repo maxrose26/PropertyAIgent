@@ -23,12 +23,12 @@ SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_eff
 class Owner:
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings):
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
-        self.connections=0;self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[]
+        self.connections=0;self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
 
     @contextmanager
     def connection(self):
         self.check()
-        if self.connections>=13:raise ValueError('ADMIN_CONNECTION_BOUND')
+        if self.connections>=(13 if self.diagnostic_mode else 11):raise ValueError('ADMIN_CONNECTION_BOUND')
         self.connections+=1;self.emit('admin_connection_intent',dict(ordinal=self.connections))
         c=None
         try:
@@ -42,7 +42,8 @@ class Owner:
 
     def q(self,c,statement,params=None,*,effect=False):
         self.check()
-        if self.commands>=240:raise ValueError('ADMIN_COMMAND_BOUND')
+        cap=240 if self.diagnostic_mode else 232 if self.tearing_down else 200
+        if self.commands>=cap:raise ValueError('ADMIN_COMMAND_BOUND')
         self.commands+=1
         if effect:self.emit('admin_effect_intent',dict(command=self.commands))
         started=time.monotonic()
@@ -74,6 +75,9 @@ class Owner:
             ctl=rows[0][0];self.emit('control_observed',dict(global_stop=ctl.get('global_stop'),manual_stop=ctl.get('manual_stop'),hard_stop_generation=ctl.get('hard_stop_generation',0),grant_count=len(ctl['grants'])))
             if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=0 or ctl['grants'] or ctl.get('bolton_exceptions'):raise ValueError('EXACT_STORAGE_STOP_STATE')
             self.original_control=ctl
+            password_access=self.q(c,"SELECT has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT') AND has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT')")[0][0]
+            self.emit('password_boolean_read_permission',dict(permitted=password_access))
+            if password_access is not True:raise ValueError('EXISTING_PASSWORD_BOOLEAN_READ_UNAVAILABLE')
             roles=self.q(c,"SELECT rolname,rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(['ingestion_worker_login','ingestion_storage_login'],))
             self.emit('existing_login_state',dict(roles=roles))
             if roles!=[('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
@@ -135,6 +139,7 @@ class Owner:
         return bindings
 
     def teardown(self,github):
+        self.tearing_down=True
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
@@ -159,6 +164,7 @@ class Owner:
 
     def diagnostics(self):
         """Read-only actual state, within remaining13/240 administrative caps."""
+        self.diagnostic_mode=True
         statements=[('BEGIN READ ONLY',None),
           ("SELECT rolname,rolcanlogin,rolpassword IS NULL,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(list(ROLES),)),
           ('SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),)),

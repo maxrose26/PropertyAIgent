@@ -87,9 +87,13 @@ class DatabaseBudget:
         # Reserve eight slots for finite rollback/closure; no commit after stop.
         if self.statements>=self.statement_cap-(0 if cleanup else 8):raise Denied('DRIVER_STATEMENT_BOUND')
         self.statements+=1;self.kinds[kind]=self.kinds.get(kind,0)+1
-    def engine(self,url,*,ssl=None):
+    def engine(self,url,*,ssl=None,hostaddr=None):
         import psycopg
         u,role=runtime_principal(url,ssl)
+        if any(k.startswith('PG') for k in __import__('os').environ):raise Denied('LIBPQ_ENVIRONMENT_OVERRIDE')
+        if u.host!='127.0.0.1':
+            import ipaddress
+            if not hostaddr or ipaddress.ip_address(hostaddr).version!=4:raise Denied('PINNED_REVIEWED_ADDRESS_REQUIRED')
         budget=self
         class Cursor(psycopg.Cursor):
             def execute(self,query,params=None,**kwargs):
@@ -111,7 +115,7 @@ class DatabaseBudget:
             budget.attempts+=1
             c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,
                 connect_timeout=3,prepare_threshold=None,cursor_factory=Cursor,autocommit=True,
-                options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**(ssl or {}))
+                options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**({'hostaddr':hostaddr} if hostaddr else {}),**(ssl or {}))
             budget.opened.append(c)
             try:
                 with c.cursor() as q:

@@ -16,7 +16,7 @@ def test_exact_pooler_routing_username_and_runtime_transaction_mode(role):
     url=f'postgresql://{role}.{PROJECT}:placeholder@{HOST}:5432/postgres'
     u,actual=runtime_principal(url,trust())
     assert u.username==role+'.'+PROJECT and actual==role
-    budget=DatabaseBudget();engine=budget.engine(url,ssl=trust())
+    budget=DatabaseBudget();engine=budget.engine(url,ssl=trust(),hostaddr='192.0.2.1')
     assert engine.get_execution_options()=={}
     # Engine construction is lazy: this regression must never connect.
     assert budget.attempts==0 and budget.statements==0

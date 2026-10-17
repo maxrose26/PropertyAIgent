@@ -42,7 +42,7 @@ class GitHub:
         data=self.call('GET',REPO+'/environments/stage4-production-canary/secrets?per_page=100')
         if not isinstance(data,dict) or type(data.get('total_count')) is not int or not 0<=data['total_count']<=100 or not isinstance(data.get('secrets'),list):raise Uncertain('SECRET_NAMES_BOUND')
         names=[x['name'] for x in data['secrets']]
-        if any(not isinstance(n,str) for n in names):raise Uncertain('SECRET_NAMES_SHAPE')
+        if any(not isinstance(n,str) for n in names) or len(names)!=data['total_count'] or len(set(names))!=len(names):raise Uncertain('SECRET_NAMES_SHAPE_OR_INCOMPLETE_PAGE')
         return names
 
     def put_secret(self,name,value):

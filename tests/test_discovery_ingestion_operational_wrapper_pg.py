@@ -30,14 +30,17 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
         boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER CREATEROLE CREATEDB BYPASSRLS NOINHERIT PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
         boot.execute(sql.SQL('GRANT USAGE,CREATE ON SCHEMA public TO {} WITH GRANT OPTION').format(sql.Identifier(role)))
         boot.execute(sql.SQL('GRANT CONNECT ON DATABASE ingestion_provisioning_test TO {} WITH GRANT OPTION').format(sql.Identifier(role)))
+        # Match the existing, accepted production read-only reconciliation
+        # capability: only boolean password-removal checks are ever selected.
+        boot.execute(sql.SQL('GRANT SELECT(rolname,rolpassword) ON pg_catalog.pg_authid TO {}').format(sql.Identifier(role)))
         try:
             # Accepted storage state is fixture setup only, not another storage
             # acceptance suite or production installation.
             with connector() as c:
                 c.execute((PACKAGE/'install.sql').read_text())
-                c.execute("SELECT public.ingestion_raise_stop('STORAGE_TEST_STOP')")
                 c.execute('REVOKE ingestion_worker FROM ingestion_worker_login')
                 c.execute('REVOKE ingestion_storage_operator FROM ingestion_storage_login')
+            boot.execute("SELECT public.ingestion_raise_stop('STORAGE_TEST_STOP')")
             journal=Journal(tmp_path/'actual-wrapper');holder={}
             github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=metadata.cli)
             def uri(r,p):return URL.create('postgresql+psycopg',username=r,password=p,host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False)
@@ -46,9 +49,11 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert len(source_calls)==1 and len(runner.capture['records'])==60 and len(runner.plans)==12
             assert runner.screen(pause_after=1)=='PAUSED_CLOSED_NO_SOURCE_REPLAY'
             checkpoint=(journal.root/'progress.json').read_bytes()
-            # Reconstruct queue-processing controller from durable state and
-            # existing in-memory credential handoff, not another source call.
+            # Reconstruct a fresh controller from the verified durable state;
+            # credential/administrative counters remain in the living trusted
+            # owner's RAM, not a file or a new credential mapping invocation.
             state=json.loads(checkpoint);assert state['capture_sha256']==__import__('app.ingestion.ledger',fromlist=['digest']).digest(runner.capture)
+            runner=Runner.resume(runner);holder['runner']=runner
             assert runner.screen()=='SCREENING_COMPLETE' and len(source_calls)==1
             result=runner.finish()
             assert result['status']=='REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED' and result['cleanup']=='CLOSED'

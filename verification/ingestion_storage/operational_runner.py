@@ -46,16 +46,26 @@ class Journal:
         temp.replace(self.root/name);self.sync_dir()
         if (self.root/name).read_bytes()!=raw:raise Uncertain('CHECKPOINT_READBACK')
 
+    def progress(self):
+        state=json.loads((self.root/'progress.json').read_bytes());previous='0'*64;sealed=None
+        for i,line in enumerate(self.file.read_bytes().splitlines()):
+            event=json.loads(line);sha=event.pop('sha256')
+            if event['sequence']!=i or event['previous_sha256']!=previous or hashlib.sha256(canonical(event)).hexdigest()!=sha:raise Uncertain('AUDIT_CHAIN_BINDING')
+            previous=sha
+            if event['event']=='progress_saved':sealed=event['payload']['sha256']
+        if previous!=self.head or digest(state)!=sealed:raise Uncertain('DURABLE_PROGRESS_SEAL')
+        return state
+
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
     def __init__(self,registration,journal,connector,*,source_reader,github,
-                 url_factory,identity='postgres',ssl=None,memory=None):
+                 url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
-        self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0
+        self.started=started if started is not None else time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0;self.hostaddr=hostaddr
         self.expiry=datetime.fromisoformat(registration['expires_at'])
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings)
-        self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False
+        self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
     def check(self):
         now=time.monotonic()
@@ -95,16 +105,17 @@ class Runner:
         allocation=batch_allocation(slots,self.receipts,sealed_sha256=digest(self.receipts),slot_key=key)
         remaining=allocation['remaining']
         if remaining['driver_statements']<80 or remaining['connection_attempts']<2:raise Denied('INSUFFICIENT_NEXT_SLOT_RESERVATION')
-        budget=DatabaseBudget(slot_key=key,connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'])
+        prior=self.receipts.get(key,{})
+        budget=DatabaseBudget(slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'])
         engines=[];started=time.monotonic();success=False
         try:
-            engines=[budget.engine(self.owner.urls[r],ssl=self.ssl) for r in ROLES]
+            engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.hostaddr) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])
             yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,WindowConfig('bolton','RECEIVED',date(2026,10,16),date(2026,10,16),0),QUALIFICATION)}),budget
             success=True
         finally:
             account=budget.close(engines);elapsed=time.monotonic()-started
-            receipt=dict(database=account,supervised_seconds=elapsed,cleanup=account['cleanup'])
+            receipt=dict(database=account,supervised_seconds=prior.get('supervised_seconds',0)+elapsed,cleanup=account['cleanup'])
             self.receipts[key]=receipt;self.emit('slot_closed',dict(key=key,receipt=receipt,success=success))
             if account['cleanup']!='CLOSED':self.closed=False;raise Uncertain('RUNTIME_DATABASE_CLOSURE')
             batch_allocation(slots,self.receipts,sealed_sha256=digest(self.receipts),slot_key=key)
@@ -145,7 +156,7 @@ class Runner:
     def screen(self,*,pause_after=None):
         # A planned pause is an offline rehearsal injection, not a production
         # CLI option. Resume verifies durable progress and uses no source client.
-        saved=json.loads((self.journal.root/'progress.json').read_bytes())
+        saved=self.journal.progress()
         if saved['capture_sha256']!=digest(self.capture) or saved['receipts_sha256']!=digest(self.receipts) or saved['receipts']!=self.receipts:raise Uncertain('DURABLE_PROGRESS_BINDING')
         delivered=0
         for plan in self.plans:
@@ -160,18 +171,55 @@ class Runner:
             if pause_after is not None and delivered==pause_after:return 'PAUSED_CLOSED_NO_SOURCE_REPLAY'
         return 'SCREENING_COMPLETE'
 
+    @classmethod
+    def resume(cls,previous):
+        """Fresh bounded queue execution with an existing secure RAM handoff.
+
+        The finite owner supervisor remains alive. Losing that supervisor or
+        its credentials is reconciliation-required, never remapping/replay.
+        """
+        import copy
+        previous.check();state=previous.journal.progress()
+        if not previous.closed or state['receipts']!=previous.receipts or not previous.owner.urls:raise Uncertain('RESUME_CLOSURE_ACCOUNTING_OR_CREDENTIAL_HANDOFF')
+        current=object.__new__(cls);current.__dict__=previous.__dict__.copy()
+        current.owner=copy.copy(previous.owner);current.owner.check=current.check;current.github.check=current.check
+        current.receipts=json.loads(json.dumps(state['receipts']))
+        def no_source(_):raise Denied('RETAINED_EXECUTION_CANNOT_REFETCH')
+        current.source_reader=no_source
+        with current.phase_as('runtime'):
+            with current.slot(current.capture_key,current.capture_bindings,AUTHORITY+'_CAPTURE') as (co,budget):
+                root=co.ledger.get(current.capture_key)
+                if root['state']!='COMPLETE' or digest(root['checkpoint'])!=state['capture_sha256']:raise Uncertain('CAPTURE_CHECKPOINT_IDENTITY')
+                current.capture=root['checkpoint']
+        current.plans=batch_plans(current.capture_key,current.capture)
+        if current.plans!=state['plans']:raise Uncertain('EXACT_RECOVERED_BATCH_MEMBERSHIP')
+        current.emit('retained_execution_reconstructed',dict(capture_sha256=state['capture_sha256'],source_calls=0,counters_carried=True))
+        current.save_progress();return current
+
     def finish(self):
         with self.phase_as('teardown'):self.owner.teardown(self.github)
         self.emit('required_access_disabled',dict(roles=list(ROLES),authorities=self.owner.authorities))
         self.check()
         outcome='CAPTURED_PROCESSING_BLOCKED' if self.capture['kind']!='LISTING_RECEIPT_V1' else 'REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED'
-        result=dict(status=outcome,rows=len(self.capture.get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture),slot_receipts=self.receipts,admin=dict(connections=self.owner.connections,commands=self.owner.commands,returned_data_value_bytes=self.owner.returned_bytes),unit_facts='UNKNOWN_OUTSIDE_SCOPE',application_writes=0,source_observations=1,cleanup='CLOSED',historical_uncertainty_preserved=True)
+        result=dict(status='ACCESS_DISABLED_FINAL_CLOSURE_PENDING',rows=len(self.capture.get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture),slot_receipts=self.receipts,admin=dict(connections=self.owner.connections,commands=self.owner.commands,returned_data_value_bytes=self.owner.returned_bytes),unit_facts='UNKNOWN_OUTSIDE_SCOPE',application_writes=0,source_observations=1,cleanup='CLOSURE_PENDING',historical_uncertainty_preserved=True)
         self.emit('required_result',result)
         # The sealed execution chain is archived separately from the publisher's
         # acknowledgement suffix; final owner output supplies that suffix hash.
         self.journal.save('final-result.json',result)
         self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/completed',expected_head=self.evidence_head)
         if self.memory is not None:result.update(self.memory.close())
+        after=owned_resources()
+        if after['children'] or after['socket_fds']-self.baseline['socket_fds']:raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+        result.update(status=outcome,cleanup='CLOSED',native_memory_proof=self.memory is not None)
+        from collections import Counter
+        from app.ingestion.listing_screening import screen_row
+        screens=[screen_row(row) for row in self.capture.get('records',[])]
+        usable=sum(x['proposal_usable'] for x in screens)
+        if self.capture['kind']=='LISTING_RECEIPT_V1':
+            if not screens:outcome='DISCOVERY_EXPLICIT_ZERO_ACCESS_DISABLED_SCREENING_NOT_EXERCISED'
+            elif usable<len(screens):outcome='PARTIAL_PROPOSAL_COVERAGE_ACCESS_DISABLED'
+        result.update(status=outcome,usable_proposals=usable,screening_dispositions=dict(Counter(x['disposition'] for x in screens)),citation_leads=sum(len(x['citations']['occurrences']) for x in screens),source_resources=self.capture.get('resources'),supervised_seconds=time.monotonic()-self.started,runtime_supervised_seconds=self.runtime_seconds,github_cli_invocations=self.github.requests)
+        self.emit('final_closure_verified',dict(status=outcome,cleanup='CLOSED',native_memory_proof=self.memory is not None,new_sockets=0,live_children=0))
         result.update(evidence_commit=self.evidence_head,audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)
         self.journal.save('final-result.json',result)
         return result
@@ -195,6 +243,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--registration',type=Path,required=True);p.add_argument('--registration-sha256',required=True);a=p.parse_args()
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_LINUX_SECURE_TTY_REQUIRED')
     if any(os.environ.get(k) for k in ('GH_TOKEN','GITHUB_TOKEN','GH_DEBUG','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN')):raise SystemExit('EXISTING_KEYRING_AUTH_ONLY')
+    if any(k.startswith('PG') for k in os.environ):raise SystemExit('LIBPQ_ENVIRONMENT_OVERRIDE')
     if a.registration.is_symlink() or a.registration.stat().st_size>32768:raise SystemExit('REGISTRATION_BOUND')
     r=validate_registration(a.registration.read_bytes(),a.registration_sha256)
     from .operational_memory import OperationalMemory
@@ -205,36 +254,52 @@ def main():
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
     from verification.discovery.route_validation import validate_route
-    raw=secure_migration_input();u=validate_route(raw);ca,_=verified_trust()
-    selected=sorted({x[4][0] for x in socket.getaddrinfo(u.host,u.port,family=socket.AF_INET,type=socket.SOCK_STREAM)})[0]
-    import psycopg
-    def connect():return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
-    holder={}
-    github=GitHub(journal.emit,lambda:holder['runner'].check())
-    from .operational_source import read
-    def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source)
-    def url(role,password):return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
-    runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory);holder['runner']=runner
-    baseline=owned_resources()
+    raw=secure_migration_input();started=time.monotonic();runner=None
     signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Uncertain('HARD_JOB_DEADLINE')));signal.alarm(475)
     try:
+        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+        u=validate_route(raw)
+        if not isinstance(u.password,str) or not u.password:raise ValueError('EXPLICIT_MIGRATION_PASSWORD_REQUIRED')
+        ca,_=verified_trust()
+        # Hard DNS timeout in a credential-free exec, not an unbounded libc
+        # lookup inside a thread that could survive its timeout.
+        command=[sys.executable,'-c',"import socket,json;print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo('aws-0-eu-west-2.pooler.supabase.com',5432,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"]
+        dns=subprocess.run(command,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3)
+        addresses=json.loads(dns.stdout)
+        if dns.returncode or not isinstance(addresses,list) or not 1<=len(addresses)<=32:raise ValueError('BOUND_DNS_RESULT')
+        import ipaddress
+        if any(ipaddress.ip_address(x).version!=4 for x in addresses):raise ValueError('REVIEWED_IPV4_ONLY')
+        selected=addresses[0]
+        import psycopg
+        def connect():return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
+        holder={};github=GitHub(journal.emit,lambda:holder['runner'].check())
+        from .operational_source import read
+        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source)
+        def url(role,password):return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
+        runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
         runner.setup();runner.capture_once()
         if runner.plans:runner.screen()
         result=runner.finish()
-        after=owned_resources()
-        if after['children'] or after['socket_fds']-baseline['socket_fds']:raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
         print(json.dumps(result,sort_keys=True))
-    except BaseException:
+    except BaseException as exc:
         # No automatic credential reset, compensating cleanup or write retry.
         # Actual read-only diagnostics may be collected within reserves only.
-        runner.diagnosing=True
         diagnostics={'status':'NOT_OBSERVED'}
+        import re
+        code=str(exc) if isinstance(exc,(Denied,Uncertain,ValueError)) and re.fullmatch('[A-Z0-9_]{1,100}',str(exc)) else 'REDACTED_EXECUTION_FAILURE'
+        sqlstate=getattr(getattr(exc,'orig',exc),'sqlstate',None)
+        sqlstate=sqlstate if isinstance(sqlstate,str) and re.fullmatch('[A-Z0-9]{5}',sqlstate) else None
         try:
+            if runner is None:raise ValueError('NO_CONNECTION_ATTEMPTED')
+            runner.diagnosing=True
             diagnostics=runner.owner.diagnostics()
             names=github.names();journal.emit('failure_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
         except BaseException:journal.emit('failure_diagnostics_incomplete',dict(status='UNKNOWN_NO_MUTATION'))
-        journal.emit('stopped',dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',roles=list(ROLES),secret_names=list(SECRETS.values()),diagnostics=diagnostics))
-        print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',audit=str(journal.file),audit_sha256=hashlib.sha256(journal.file.read_bytes()).hexdigest())))
+        closure={'status':'UNKNOWN'}
+        try:closure=memory.close()
+        except BaseException:pass
+        journal.emit('stopped',dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=code,sqlstate=sqlstate,roles=list(ROLES),secret_names=list(SECRETS.values()),diagnostics=diagnostics,owned_cleanup=closure))
+        print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=code,sqlstate=sqlstate,audit=str(journal.file),audit_sha256=hashlib.sha256(journal.file.read_bytes()).hexdigest())))
         raise SystemExit(1) from None
     finally:signal.alarm(0)
 
