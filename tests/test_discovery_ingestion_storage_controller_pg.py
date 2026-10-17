@@ -153,3 +153,45 @@ def test_process_death_leaves_durable_seed_checkpoint_and_no_replay(fixture,tmp_
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()==(0,)
     with pytest.raises(FileExistsError):c.Journal(root,'b'*64)
+
+
+def test_uncertain_revocation_commit_does_not_delete_secrets(fixture,tmp_path):
+    boot,connect,registration,secrets_boundary,store,calls=fixture
+    class LostRevocation:
+        def __init__(self,native):self.native=native;self.revoking=False
+        def __getattr__(self,key):return getattr(self.native,key)
+        def execute(self,statement,params=None):
+            if isinstance(statement,str) and 'ALTER ROLE ingestion_worker_login NOLOGIN PASSWORD NULL' in statement:self.revoking=True
+            result=self.native.execute(statement,params)
+            if self.revoking and isinstance(statement,str) and statement.strip()=='COMMIT;':raise psycopg.OperationalError('disposable revocation acknowledgement lost')
+            return result
+    journal=c.Journal(tmp_path/'revocation-uncertain','b'*64)
+    with pytest.raises(psycopg.OperationalError):c.execute_sequence(lambda role,pw:LostRevocation(connect(role,pw)),secrets_boundary,registration,journal.append,migration_identity='provisioning_migrator')
+    journal.close()
+    assert calls==[('set',c.SECRETS[0]),('set',c.SECRETS[1])]
+    assert len(store)==2 and boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
+    events=[json.loads(line) for line in (journal.root/'events.jsonl').read_text().splitlines()]
+    assert not any(e['event']=='checkpoint' and e['payload']['phase']=='revocation' and e['payload']['state']=='VERIFIED' for e in events)
+
+
+def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_property):
+    boot,connect,registration,secrets_boundary,store,calls=fixture
+    # Exercise the real worker process, resource limits, private pipe protocol
+    # and supervisor. Only source-free fixture transport/secret boundaries and
+    # fixed fixture principal differ; no production DNS/GitHub/DB is contacted.
+    real_sequence=c.execute_sequence
+    def fixture_sequence(*args,**kwargs):
+        return real_sequence(*args,**kwargs,migration_identity='provisioning_migrator')
+    monkeypatch.setattr(c,'execute_sequence',fixture_sequence)
+    monkeypatch.setattr(c,'local_preflight',lambda:None)
+    monkeypatch.setattr(c,'production_transport',lambda raw,address,root:connect)
+    monkeypatch.setattr(c,'production_secrets',secrets_boundary)
+    monkeypatch.setattr(c.socket,'getaddrinfo',lambda *a,**k:[(2,1,6,'',('127.0.0.1',5432))])
+    journal=c.Journal(tmp_path/'supervised-controller','b'*64)
+    result=c.supervise('postgresql://postgres.zcikcfgpblzuzpanpdqd:DISPOSABLE_FIXTURE_ONLY@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',registration,journal)
+    journal.close()
+    assert result['status']=='STORAGE_ACCEPTED_ACCESS_DISABLED' and result['cleanup']=='CLOSED'
+    assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
+    assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()==(0,)
+    assert boot.execute("SELECT count(*) FROM pg_authid WHERE rolname=ANY(%s) AND NOT rolcanlogin AND rolpassword IS NULL",(list(c.ROLE_NAMES),)).fetchone()==(2,)
+    record_property('supervised_controller_result',json.dumps(result,sort_keys=True))

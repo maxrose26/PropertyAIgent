@@ -32,7 +32,7 @@ PACKAGE = Path('docs/design/ingestion-provisioning-20261016')
 MANIFEST = Path('docs/design/ingestion-readiness-20261016/three-items.json')
 LIMITS = dict(mapping.LIMITS, storage_commands=40, storage_connections=8,
               storage_active_seconds=30, provisioning_seconds=90,
-              storage_seconds=120, teardown_seconds=30, teardown_commands=10)
+              storage_seconds=120, teardown_seconds=30, teardown_commands=10, teardown_active_seconds=10)
 FILES = ['verification/ingestion_storage/storage_controller.py',
          'verification/ingestion_storage/owner-requirements.txt',
          'verification/stage1-requirements.lock',
@@ -145,6 +145,7 @@ class Budget:
     teardown_commands: int = 0
     active: float = 0
     storage_active: float = 0
+    teardown_active: float = 0
     returned_data_value_bytes: int = 0
     open_connections: int = 0
 
@@ -165,7 +166,7 @@ class Budget:
         return dict(phase=self.phase, connections=self.connections, commands=self.commands,
                     storage_commands=self.storage_commands, storage_connections=self.storage_connections,
                     teardown_commands=self.teardown_commands, active_seconds=self.active,
-                    storage_active_seconds=self.storage_active,
+                    storage_active_seconds=self.storage_active, teardown_active_seconds=self.teardown_active,
                     returned_database_data_value_bytes=self.returned_data_value_bytes,
                     elapsed_seconds=self.clock()-self.started, open_connections=self.open_connections)
 
@@ -194,6 +195,9 @@ class Budget:
         if self.phase=='storage':
             self.storage_active+=elapsed
             if self.storage_active>30: raise Stop('STORAGE_ACTIVE_LIMIT')
+        if self.phase=='teardown':
+            self.teardown_active+=elapsed
+            if self.teardown_active>10: raise Stop('TEARDOWN_ACTIVE_LIMIT')
         self.check()
 
     def account(self, rows):
@@ -396,7 +400,7 @@ def execute_sequence(connect, secret_operation, registration, emit, *, fault=Non
         checkpoint('storage','VERIFIED')
         budget.enter('teardown');checkpoint('revocation','INTENT')
         with connection('migration') as c:
-            c.execute("SET idle_in_transaction_session_timeout='10s'")
+            c.execute("SET statement_timeout='10s'")
             script(c,'revoke.sql')
             # No pg_authid access or verifier retrieval. Password NULL is proven
             # by the exact acknowledged revocation transaction; independent
@@ -505,9 +509,10 @@ def production_secrets(operation,name,value):
 
 def worker(pipe, raw, registration, aggregate_started):
     os.setsid()
+    sys.dont_write_bytecode=True
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     resource.setrlimit(resource.RLIMIT_FSIZE,(0,0))
-    # Audit belongs to parent; neither worker nor gh may create local files.
+    # Audit belongs to parent; file payload writes are disabled in worker/gh.
     resource.setrlimit(resource.RLIMIT_AS,(256*1024**2,256*1024**2))
     for fd in (1,2):
         null=os.open(os.devnull,os.O_WRONLY);os.dup2(null,fd);os.close(null)
