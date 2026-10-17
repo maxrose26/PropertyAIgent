@@ -1,0 +1,105 @@
+{
+  "candidate": "023e352473cf5a6b2851eb0af18130f97de36dc0",
+  "tree": "258c35bf37859e9f5bfd4c453e2e953ba15e0ccf",
+  "integrated": "dc8d266224097c35cc1475964b0fd7a54f31490e",
+  "candidate_checks": [
+    {
+      "name": "web",
+      "id": 117456965631,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053578754/job/117456965631"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "id": 117456965465,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053578754/job/117456965465"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "id": 117456914437,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582446/job/117456914437"
+    },
+    {
+      "name": "native",
+      "id": 117456914330,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582763/job/117456914330"
+    },
+    {
+      "name": "web",
+      "id": 117456914289,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582446/job/117456914289"
+    },
+    {
+      "name": "offline",
+      "id": 117456914182,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582763/job/117456914182"
+    },
+    {
+      "name": "restricted-provisioning",
+      "id": 117456913619,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582473/job/117456913619"
+    },
+    {
+      "name": "postgres-admission",
+      "id": 117456913557,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582473/job/117456913557"
+    },
+    {
+      "name": "offline",
+      "id": 117456913386,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053582473/job/117456913386"
+    }
+  ],
+  "post_merge_checks": [
+    {
+      "name": "postgres-admission",
+      "id": 117457722270,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858794/job/117457722270"
+    },
+    {
+      "name": "restricted-provisioning",
+      "id": 117457722237,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858794/job/117457722237"
+    },
+    {
+      "name": "native",
+      "id": 117457722138,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858845/job/117457722138"
+    },
+    {
+      "name": "offline",
+      "id": 117457721949,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858794/job/117457721949"
+    },
+    {
+      "name": "offline",
+      "id": 117457721936,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858845/job/117457721936"
+    },
+    {
+      "name": "web",
+      "id": 117457721781,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858713/job/117457721781"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "id": 117457721661,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39053858713/job/117457721661"
+    }
+  ]
+}

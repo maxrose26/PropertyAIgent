@@ -1,0 +1,12 @@
+{
+  "predecessor_registration_sha256": "802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279",
+  "predecessor_status": "CONSUMED_FAILED_BEFORE_DB",
+  "historical_cleanup": "UNCERTAIN",
+  "reported_live_survivors": 0,
+  "predecessor_audit_sha256": "f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0",
+  "successor_registration_sha256": "cfc38625cca22de33d973f42851d3ea908d0b35f2a9e2ccc7e7000e52b42b082",
+  "successor_status": "UNUSED_AT_PUBLICATION",
+  "revision": "dc8d266224097c35cc1475964b0fd7a54f31490e",
+  "expires_at": "2026-10-18T08:54:58.469465Z",
+  "production_invoked": false
+}
