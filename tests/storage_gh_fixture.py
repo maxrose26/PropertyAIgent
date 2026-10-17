@@ -74,12 +74,15 @@ def real_gh_store(tmp_path):
                     else:return self.answer(400)
                 else:
                     size=int(self.headers.get('Content-Length','0'))
-                    if not 0<size<16384:return self.answer(400)
+                    if not 0<size<16384:
+                        requests.append(('BAD_LENGTH',prefix));return self.answer(400)
                     body=self.rfile.read(size)
                 payload=json.loads(body)
-                if payload.get('key_id')!='disposable-key':return self.answer(400)
+                if payload.get('key_id')!='disposable-key':
+                    requests.append(('BAD_KEY_ID',prefix));return self.answer(400)
                 encrypted=base64.b64decode(payload['encrypted_value'],validate=True)
-                if len(encrypted)<80:return self.answer(400)
+                if len(encrypted)<80:
+                    requests.append(('BAD_CIPHERTEXT_LENGTH',prefix));return self.answer(400)
                 ciphertexts[name]=encrypted
                 return self.answer(201)
             if method=='DELETE' and name in ciphertexts:
@@ -147,7 +150,7 @@ def real_gh_store(tmp_path):
                 not_found=b'404' in text,connection_error=b'connect' in text,
                 stderr_sha256=hashlib.sha256(result.stderr).hexdigest())
             from verification.ingestion_storage.storage_controller import Stop
-            category='CERTIFICATE' if diagnostic['certificate_error'] else 'AUTH' if diagnostic['authentication_error'] else 'NOT_FOUND' if diagnostic['not_found'] else 'CONNECT' if diagnostic['connection_error'] else 'OTHER'
+            category='FILE_SIZE' if b'file too large' in text or b'file size' in text else 'EOF' if b'eof' in text else 'HTTP_BAD_REQUEST' if b'400' in text else 'EXIT_SIGNAL' if result.returncode<0 else 'CERTIFICATE' if diagnostic['certificate_error'] else 'AUTH' if diagnostic['authentication_error'] else 'NOT_FOUND' if diagnostic['not_found'] else 'CONNECT' if diagnostic['connection_error'] else 'OTHER'
             raise Stop('GH_FIXTURE_'+category)
         return result
     def metadata(command,seconds=10):return cli(command).stdout
