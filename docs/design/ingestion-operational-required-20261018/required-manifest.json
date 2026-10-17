@@ -1,0 +1,90 @@
+{
+  "status": "PREPARED_REQUIRED_SCOPE_NOT_AUTHORISED",
+  "project": "zcikcfgpblzuzpanpdqd",
+  "revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "scope": {
+    "kind": "DISCOVERY_SCOPE",
+    "council": "bolton",
+    "start": "2026-10-16",
+    "end": "2026-10-16",
+    "semantics": "RECEIVED"
+  },
+  "contract": "bolton-received-idox-coordinator-v1",
+  "qualification_sha256": "1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2",
+  "observations": 1,
+  "source": {
+    "requests": 10,
+    "received_body_bytes": 3000000,
+    "response_bytes": 500000,
+    "worker_seconds": 45,
+    "pages": 6,
+    "rows": 60
+  },
+  "runtime": {
+    "batches": 12,
+    "rows_per_batch": 5,
+    "driver_commands": 1040,
+    "connections": 40,
+    "returned_data_value_bytes": 4194304,
+    "supervised_seconds": 300
+  },
+  "administrative_proposal": {
+    "driver_commands": 240,
+    "connections": 13,
+    "returned_data_value_bytes": 1048576,
+    "supervised_seconds": 240
+  },
+  "memory": {
+    "controller_bytes": 268435456,
+    "source_bytes": 1073741824,
+    "aggregate_bytes": 1610612736,
+    "swap_bytes": 0
+  },
+  "output": {
+    "worker_audit": 524288,
+    "local_audit": 1048576,
+    "total": 2097152
+  },
+  "job_seconds": 480,
+  "github_cli_invocations": 40,
+  "stop": {
+    "global_stop": {
+      "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+      "run": "38884069913"
+    },
+    "manual_stop": "STORAGE_TEST_STOP",
+    "hard_stop_generation": 0,
+    "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"
+  },
+  "roles": [
+    "ingestion_worker_login",
+    "ingestion_effect_login"
+  ],
+  "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "controller_sha256": "2ee4ceb436b8e26cfd4c31fedf6fb4a21f67bb3627da04e8f7868c7dfdea626c",
+  "application_writes": 0,
+  "unit_facts": "UNKNOWN_OUTSIDE_SCOPE",
+  "retries": 0,
+  "hashes": {
+    ".github/workflows/stage4-discovery-offline.yml": "393b6c8be577d073fa43ef3489deabd90630a3194ed352744923567ed125a661",
+    "verification/ingestion_storage/operational_controller.py": "e21ff1c20132824853196ac82f91e2c35b6a67b2e7313493f709213f4a2b74e0",
+    "verification/ingestion_storage/operational_runner.py": "2ee4ceb436b8e26cfd4c31fedf6fb4a21f67bb3627da04e8f7868c7dfdea626c",
+    "verification/ingestion_storage/operational_owner.py": "7b36269cd01705da101f8682fb6ac330402d7b8340d97c1130fcf6cb9d75adb5",
+    "verification/ingestion_storage/operational_publication.py": "62ab2159b0df7d3333da405575db20aa8a23d27ad4c43a17129742dc6a146c22",
+    "verification/ingestion_storage/operational_memory.py": "62df5ce533a0de22f269bf9877418dbf79842f958b4f097d1407bd2bea79f697",
+    "verification/ingestion_storage/operational_source.py": "680f0c1257a8a0aa5f2382dc37327b4386f494b31172367c489660d030c3dba9",
+    "verification/ingestion_storage/operational_supervisor.py": "eef25533d5866517bdfade998de58d2cc08ac552c01e8b7def6c092a6b1c6713",
+    "docs/design/ingestion-operational-20261016/worker.sql": "5379dcc4e80e592c10f2d593ef327554fc63de5aebc8c0c9002755f8712f38d4",
+    "docs/design/ingestion-operational-required-20261018/activate.sql": "1d3c0ed5c1d275049a16fc1aa90003855b96d28c085dee0ec7ad611326dd8fb7",
+    "tests/storage_gh_fixture.py": "a5decdbe36640d1b486edb99009105f4c8756142ca367d29ba5c9fc7f3df1edb",
+    "tests/test_ingestion_operational_pooler_identity.py": "292fe224871c898fb9434697084a4e39d91fbda1a0307a9b0c047c741df70070",
+    "tests/test_discovery_ingestion_operational_wrapper.py": "7662d8933fc3a11595d3a9560c51952150b2397cd85cee7a2671c4bcb07660c0",
+    "tests/test_discovery_ingestion_operational_wrapper_pg.py": "19eadbe4f58fdbae014be09a61ffa10cc4798b282d4e1d3062a88621f1858068",
+    "verification/ingestion_storage/operational_ci_scope.sh": "a12de35a993ba7cc192f7bcb42c168e8665ad83c1167878d93594c825f36bb3f",
+    "tests/test_discovery_ingestion_operational_memory_native.py": "c2a4c6a1e11105a223318f6fcf8244cebc3f54078785e0c83594220a22e26a5a",
+    "verification/ingestion_storage/operational-requirements.txt": "63424199e9954df453f36f13f6a10ef61080aa07556b47e58f141bce1da947e0",
+    "verification/ingestion_storage/tls_trust.py": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+  }
+}

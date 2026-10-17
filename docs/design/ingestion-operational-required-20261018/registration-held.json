@@ -1,0 +1,55 @@
+{
+  "status": "HELD_NOT_AUTHORISED_NOT_REGISTERED",
+  "authority": "AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018",
+  "revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "scope": {
+    "kind": "DISCOVERY_SCOPE",
+    "council": "bolton",
+    "start": "2026-10-16",
+    "end": "2026-10-16",
+    "semantics": "RECEIVED"
+  },
+  "roles": [
+    "ingestion_worker_login",
+    "ingestion_effect_login"
+  ],
+  "controller_sha256": "2ee4ceb436b8e26cfd4c31fedf6fb4a21f67bb3627da04e8f7868c7dfdea626c",
+  "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+  "manifest_sha256": "8d9c2028bbe3c0af93122d6e35a917a87c87fa1600186098d855c167ffb12ca3",
+  "hashes": {
+    ".github/workflows/stage4-discovery-offline.yml": "393b6c8be577d073fa43ef3489deabd90630a3194ed352744923567ed125a661",
+    "verification/ingestion_storage/operational_controller.py": "e21ff1c20132824853196ac82f91e2c35b6a67b2e7313493f709213f4a2b74e0",
+    "verification/ingestion_storage/operational_runner.py": "2ee4ceb436b8e26cfd4c31fedf6fb4a21f67bb3627da04e8f7868c7dfdea626c",
+    "verification/ingestion_storage/operational_owner.py": "7b36269cd01705da101f8682fb6ac330402d7b8340d97c1130fcf6cb9d75adb5",
+    "verification/ingestion_storage/operational_publication.py": "62ab2159b0df7d3333da405575db20aa8a23d27ad4c43a17129742dc6a146c22",
+    "verification/ingestion_storage/operational_memory.py": "62df5ce533a0de22f269bf9877418dbf79842f958b4f097d1407bd2bea79f697",
+    "verification/ingestion_storage/operational_source.py": "680f0c1257a8a0aa5f2382dc37327b4386f494b31172367c489660d030c3dba9",
+    "verification/ingestion_storage/operational_supervisor.py": "eef25533d5866517bdfade998de58d2cc08ac552c01e8b7def6c092a6b1c6713",
+    "docs/design/ingestion-operational-20261016/worker.sql": "5379dcc4e80e592c10f2d593ef327554fc63de5aebc8c0c9002755f8712f38d4",
+    "docs/design/ingestion-operational-required-20261018/activate.sql": "1d3c0ed5c1d275049a16fc1aa90003855b96d28c085dee0ec7ad611326dd8fb7",
+    "tests/storage_gh_fixture.py": "a5decdbe36640d1b486edb99009105f4c8756142ca367d29ba5c9fc7f3df1edb",
+    "tests/test_ingestion_operational_pooler_identity.py": "292fe224871c898fb9434697084a4e39d91fbda1a0307a9b0c047c741df70070",
+    "tests/test_discovery_ingestion_operational_wrapper.py": "7662d8933fc3a11595d3a9560c51952150b2397cd85cee7a2671c4bcb07660c0",
+    "tests/test_discovery_ingestion_operational_wrapper_pg.py": "19eadbe4f58fdbae014be09a61ffa10cc4798b282d4e1d3062a88621f1858068",
+    "verification/ingestion_storage/operational_ci_scope.sh": "a12de35a993ba7cc192f7bcb42c168e8665ad83c1167878d93594c825f36bb3f",
+    "tests/test_discovery_ingestion_operational_memory_native.py": "c2a4c6a1e11105a223318f6fcf8244cebc3f54078785e0c83594220a22e26a5a",
+    "verification/ingestion_storage/operational-requirements.txt": "63424199e9954df453f36f13f6a10ef61080aa07556b47e58f141bce1da947e0",
+    "verification/ingestion_storage/tls_trust.py": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+  },
+  "risk_acceptance": "PROPOSED_ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE",
+  "expires_at": null,
+  "evidence_head": null,
+  "evidence_directory": "docs/design/ingestion-operational-execution-required-20261018",
+  "release_requires": [
+    "GROUPED_REQUIRED_PRODUCTION_APPROVAL",
+    "EXACT_NEW_WORKER_EFFECT_CREDENTIAL_RISK_ACCEPTANCE",
+    "OPERATIONAL_SQL_PERMISSIONS_AND_ADMINISTRATIVE_BUDGET_APPROVAL",
+    "OWNER_CONTROLLED_EXACT_BOLTON_EXCEPTION",
+    "UNUSED_ONCE_STATE_AND_HISTORY",
+    "OWNER_CHOSEN_ORIGINAL_EXPIRY_WITHIN_24_HOURS",
+    "CURRENT_EVIDENCE_HEAD_AND_EXACT_HEAD_CHECKS",
+    "RELEASED_REGISTRATION_SHA256"
+  ]
+}

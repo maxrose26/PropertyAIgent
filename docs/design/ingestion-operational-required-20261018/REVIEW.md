@@ -1,0 +1,11 @@
+# Independent review and production hold
+
+Reviewer: `operational_independent_review`, separate read-only agent explicitly requested for this implementation. Final exact-candidate verdict **PASS** for `406db539584625a97adafb939e8e5abde0767df5`, tree `8482c3d62c79bcbdb6ce91b1b8075751bcaf9893`. All seventeen selected code/SQL/test/workflow Git blobs were independently compared with the remote tree. All nineteen manifest file hashes and the external handoff/held-registration package were also checked. The merged tree is unchanged.
+
+Findings resolved before acceptance: effective table/column/TRUNCATE and broker-read denials; bounded DNS and expiry recheck; fixed-address/TLS/libpq-environment guards; migration ADMIN versus SELECT separation; existing boolean password-read privilege check; sequence privilege planner guard; complete unique secret metadata; cumulative recovery counters; committed-path archive readback; temporary administrative-capability readback; and no durable CLOSED claim before native closure. Real gh, actual restricted PostgreSQL logins and native source-placement proof passed hosted validation.
+
+The production hold remains. The held registration has invalid approval status, no expiry and no evidence head; it cannot invoke the runner. The external owner script accepts only a future exact blob SHA/hash and pins the integrated revision/tree. No credential, operational grant, stop exception or live execution was issued during preparation.
+
+Accepted limitations: wrapper reconstruction is between completed batches while the trusted owner supervisor retains credentials in RAM. Intrabatch crash recovery and whole-supervisor loss remain fenced/manual reconciliation cases, not automatic replay. Durable execution-core publication precedes final closure, and its local acknowledgement/closure suffix must subsequently be archived and reconciled. Native startup/source probe peaks are distinguished from the full PostgreSQL wrapper's non-exported peak. Optional writer activation requires its independent nominee and permission binding and does not block the required runner.
+
+All nine exact-candidate and seven post-merge checks passed. Full identities, resource counters, original ZIP digests/member hashes, failure observations and native proofs accompany this record. No production validation is implied by disposable success.

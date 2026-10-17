@@ -1,0 +1,103 @@
+{
+  "members": {
+    "provisioning.xml": "699c442cb31285082fc68a46e3c6833a2c34de143f3e6f28eda8f3f8126ba294",
+    "kernel-memory.xml": "d47a0d104da46af7bed9e10d21a8397698bc03959761e980c19aa501b83583b9",
+    "operational-wrapper.xml": "b2c2f36729bbe890240a0dd1e5926b3e8a1321252f596a86dc482e999bda35d4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-0/supervisor.json": "fb5bc7b9f06b7b5c9f89586de2c4ff72600c6783778ba18390dad2e7b87a9c80",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-0/worker-result.json": "259b3654789a6cd9528e90b365b2e62a84917fe0fc2d00091ee295795552c3b4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-10/supervisor.json": "032d7585786b2316b4f45fcc86dbd471cf2dec3abeef7505478973403b19f24c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-10/worker-result.json": "edef8c833d6a57a72c5e6edce92f92181f1bfffa597ea98c4fc5a65f10e76332",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-11/supervisor.json": "d01f965d97ca25e4efa5737eeba4fbfe847644865e87add207a90efb744d8a63",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-11/worker-result.json": "662ac235be0a4c000c41442d0d96ea3e4182f02c94ad6c4bb8d2a8adff645d92",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-2/supervisor.json": "5b61153498bae1be7b339a2821cc463faeff238017ced77a24699b893f1feed7",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-2/worker-result.json": "79a9fe59a35a148e6afba6d55cf9973b0902905a3fb50873591dd42cb96a84e9",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-3/supervisor.json": "a2f261015c6b79b5ae3c4e9b0cdc25e858feac46ba57af47c5d9e68e9cd26446",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-3/worker-result.json": "f1e2eef154b38f8205df867db6f7ddda2db8af6721dec5eb29089081f5dccd88",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-4/supervisor.json": "080e3bcb01bca82b8db13cc49d830a882c01de169a584453e20720292a596ae3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-4/worker-result.json": "be4549410a384b5232a6f23d40a0f0602da20f3fd6d835008841433bdc95e375",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-5/supervisor.json": "54f09deb74e2950cca27a0a4b195c8dbf0521cd25e2b03670edc9f1ca7383b1f",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-5/worker-result.json": "7d46a1746e6935361bd5d7cded37bcac1e81679c406b798f8c1fc39db64e3993",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-6/supervisor.json": "3b82f47c3855c28f469ee3fabb623d0831168572b352c94ce3eedce2ade0005b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-6/worker-result.json": "cbf55b2adfc936effeb44cf620ab1af64568ca57a7450080793ad5781c323a8b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-7/supervisor.json": "39cc411e3b898c9d52acddb008f116ff475c044b43d479546584e4844db3954a",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-7/worker-result.json": "4e9775b212f48941d35b388271dc09bcdaa1f0dd5beb74f67caf024a3296b4b5",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-8/supervisor.json": "3fcfe11c59caaffcdf86144635b544f6dcd0521240f8a256435906e1bec23000",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-8/worker-result.json": "863d193c17286b11f8019a3e9d7f6cba95f961516a5f22f89e5136f0c70734f0",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-9/supervisor.json": "cc0c2c06db685fc85e80e4bf92d2eed91bc3d67c278848256b088143090ce1d2",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-9/worker-result.json": "60c191e0b87618fe80b6f9bee209d61f4cbadab16eb09dd30660530e61d0b5dd",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-duplicate/supervisor.json": "e076af986860b84f2a41c11cd62a0ac90609f482f762a5593fb2581e656b133d",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-duplicate/worker-result.json": "853624df86a3292fd134b8c408213e00716a409d9015f0d331e797e7372f9824",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-interrupted/supervisor.json": "e5d9c501c91b56d42791947bc88935093e31dc871ad595019a4496e1a0f95e34",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-interrupted/worker-result.json": "2022a237f51c4c33704ec719729ce7549ed6d7ec89435357906139e3aa7361f3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-recovery/supervisor.json": "0c74da4530630854fe54f069e4e8f49ddd66447706b632bb3a49ae50a05094e4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-recovery/worker-result.json": "d7c8d5f1baf2523ab1787b7713ca94fe18e0e9373cff94b3b6dba256e463481d",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-resumed/supervisor.json": "b9f56ab51762ab1a052768c39a1c010453c3e7a1492255a205415a86eee0fb38",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-resumed/worker-result.json": "b0b021e11adab2fab88717b5000aadbcd6be88b20eff93bee21832544cc67b9a",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/retained-capture.json": "3a4de680334fb3ac4fe281e658bb53273a3f25e1e8612be7d7ec9e313a858e17",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/supervisor.json": "62c5e6afade6a9a1aeb700f92ca9d742146d9288abeb5fb9c7dc2d2ac58a18db",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/worker-result.json": "c896164f2bf61f44ccafb627ff539d74bbb544b6197871fdbe0a715c71e2e283",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-0/supervisor.json": "fb5bc7b9f06b7b5c9f89586de2c4ff72600c6783778ba18390dad2e7b87a9c80",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-0/worker-result.json": "259b3654789a6cd9528e90b365b2e62a84917fe0fc2d00091ee295795552c3b4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-10/supervisor.json": "032d7585786b2316b4f45fcc86dbd471cf2dec3abeef7505478973403b19f24c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-10/worker-result.json": "edef8c833d6a57a72c5e6edce92f92181f1bfffa597ea98c4fc5a65f10e76332",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-11/supervisor.json": "d01f965d97ca25e4efa5737eeba4fbfe847644865e87add207a90efb744d8a63",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-11/worker-result.json": "662ac235be0a4c000c41442d0d96ea3e4182f02c94ad6c4bb8d2a8adff645d92",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-2/supervisor.json": "5b61153498bae1be7b339a2821cc463faeff238017ced77a24699b893f1feed7",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-2/worker-result.json": "79a9fe59a35a148e6afba6d55cf9973b0902905a3fb50873591dd42cb96a84e9",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-3/supervisor.json": "a2f261015c6b79b5ae3c4e9b0cdc25e858feac46ba57af47c5d9e68e9cd26446",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-3/worker-result.json": "f1e2eef154b38f8205df867db6f7ddda2db8af6721dec5eb29089081f5dccd88",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-4/supervisor.json": "080e3bcb01bca82b8db13cc49d830a882c01de169a584453e20720292a596ae3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-4/worker-result.json": "be4549410a384b5232a6f23d40a0f0602da20f3fd6d835008841433bdc95e375",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-5/supervisor.json": "54f09deb74e2950cca27a0a4b195c8dbf0521cd25e2b03670edc9f1ca7383b1f",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-5/worker-result.json": "7d46a1746e6935361bd5d7cded37bcac1e81679c406b798f8c1fc39db64e3993",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-6/supervisor.json": "3b82f47c3855c28f469ee3fabb623d0831168572b352c94ce3eedce2ade0005b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-6/worker-result.json": "cbf55b2adfc936effeb44cf620ab1af64568ca57a7450080793ad5781c323a8b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-7/worker-result.json": "4e9775b212f48941d35b388271dc09bcdaa1f0dd5beb74f67caf024a3296b4b5",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-7/supervisor.json": "39cc411e3b898c9d52acddb008f116ff475c044b43d479546584e4844db3954a",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-8/supervisor.json": "3fcfe11c59caaffcdf86144635b544f6dcd0521240f8a256435906e1bec23000",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-8/worker-result.json": "863d193c17286b11f8019a3e9d7f6cba95f961516a5f22f89e5136f0c70734f0",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-9/supervisor.json": "cc0c2c06db685fc85e80e4bf92d2eed91bc3d67c278848256b088143090ce1d2",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-9/worker-result.json": "60c191e0b87618fe80b6f9bee209d61f4cbadab16eb09dd30660530e61d0b5dd",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-duplicate/supervisor.json": "e076af986860b84f2a41c11cd62a0ac90609f482f762a5593fb2581e656b133d",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-duplicate/worker-result.json": "853624df86a3292fd134b8c408213e00716a409d9015f0d331e797e7372f9824",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-interrupted/supervisor.json": "e5d9c501c91b56d42791947bc88935093e31dc871ad595019a4496e1a0f95e34",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-interrupted/worker-result.json": "2022a237f51c4c33704ec719729ce7549ed6d7ec89435357906139e3aa7361f3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-recovery/supervisor.json": "0c74da4530630854fe54f069e4e8f49ddd66447706b632bb3a49ae50a05094e4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-recovery/worker-result.json": "d7c8d5f1baf2523ab1787b7713ca94fe18e0e9373cff94b3b6dba256e463481d",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-resumed/supervisor.json": "b9f56ab51762ab1a052768c39a1c010453c3e7a1492255a205415a86eee0fb38",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-resumed/worker-result.json": "b0b021e11adab2fab88717b5000aadbcd6be88b20eff93bee21832544cc67b9a",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/retained-capture.json": "3a4de680334fb3ac4fe281e658bb53273a3f25e1e8612be7d7ec9e313a858e17",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/worker-result.json": "c896164f2bf61f44ccafb627ff539d74bbb544b6197871fdbe0a715c71e2e283",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/supervisor.json": "62c5e6afade6a9a1aeb700f92ca9d742146d9288abeb5fb9c7dc2d2ac58a18db"
+  },
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "26",
+      "time": "14.415",
+      "timestamp": "2026-10-17T23:36:04.848000+00:00",
+      "hostname": "runnervm8k3b6"
+    }
+  ],
+  "properties": [
+    {
+      "name": "required_wrapper",
+      "value": "{\"admin\": {\"commands\": 117, \"connections\": 6, \"returned_data_value_bytes\": 92626}, \"admin_supervised_seconds\": 0.7912174759999999, \"aggregate\": {\"connection_attempts\": 27, \"driver_statements\": 814, \"returned_data_value_bytes\": 1658525}, \"audit_bytes\": 105598, \"effective_denials\": 16, \"github_cli_invocations\": 25, \"runtime_supervised_seconds\": 2.703400017000007, \"source_observations\": 1, \"status\": \"REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED\", \"stored_query_text_retrieved\": false}"
+    },
+    {
+      "name": "required_failure",
+      "value": "{\"fault\": \"mapping_lost_ack\", \"source_calls\": 0, \"mapping_calls\": 1, \"actual_roles\": [[\"ingestion_effect_login\", false, true, false, false, false, false, false], [\"ingestion_worker_login\", false, false, false, false, false, false, false]], \"subsequent_mutations\": false}"
+    },
+    {
+      "name": "required_failure",
+      "value": "{\"fault\": \"teardown_lost_ack\", \"source_calls\": 1, \"delete_requests\": 1, \"actual_roles\": [[\"ingestion_effect_login\", false, true, false, false, false, false, false], [\"ingestion_worker_login\", false, true, false, false, false, false, false]], \"subsequent_mutations\": false}"
+    },
+    {
+      "name": "required_failure",
+      "value": "{\"fault\": \"closure_failure\", \"durable_cleanup\": \"CLOSURE_PENDING\", \"false_closed\": false}"
+    }
+  ]
+}

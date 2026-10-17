@@ -1,0 +1,215 @@
+{
+  "status": "INTEGRATED_OFFLINE_VALIDATED_PRODUCTION_HELD",
+  "pr": 126,
+  "candidate": "406db539584625a97adafb939e8e5abde0767df5",
+  "candidate_tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "integrated_revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "integrated_tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "parent_revision": "7cf8d32547b63d485de872afc2f717c3dce55322",
+  "integration_message": "Integrate reviewed finite capture and queued screening runner [skip render]",
+  "independent_review": "PASS_EXACT_CANDIDATE_AND_EXTERNAL_HELD_PACKAGE",
+  "candidate_checks": [
+    {
+      "id": 117533716169,
+      "name": "web",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564347/job/117533716169"
+    },
+    {
+      "id": 117533716063,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564347/job/117533716063"
+    },
+    {
+      "id": 117533605225,
+      "name": "web",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079560422/job/117533605225"
+    },
+    {
+      "id": 117533605118,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079560422/job/117533605118"
+    },
+    {
+      "id": 117533567781,
+      "name": "restricted-provisioning",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564348/job/117533567781"
+    },
+    {
+      "id": 117533567768,
+      "name": "offline",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564336/job/117533567768"
+    },
+    {
+      "id": 117533567757,
+      "name": "offline",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564348/job/117533567757"
+    },
+    {
+      "id": 117533567738,
+      "name": "native",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564336/job/117533567738"
+    },
+    {
+      "id": 117533567692,
+      "name": "postgres-admission",
+      "head_sha": "406db539584625a97adafb939e8e5abde0767df5",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079564348/job/117533567692"
+    }
+  ],
+  "postmerge_checks": [
+    {
+      "id": 117534270504,
+      "name": "offline",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807514/job/117534270504"
+    },
+    {
+      "id": 117534270370,
+      "name": "restricted-provisioning",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807470/job/117534270370"
+    },
+    {
+      "id": 117534270353,
+      "name": "native",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807514/job/117534270353"
+    },
+    {
+      "id": 117534270326,
+      "name": "offline",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807470/job/117534270326"
+    },
+    {
+      "id": 117534270262,
+      "name": "web",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807440/job/117534270262"
+    },
+    {
+      "id": 117534270159,
+      "name": "postgres-admission",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807470/job/117534270159"
+    },
+    {
+      "id": 117534270084,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39079807440/job/117534270084"
+    }
+  ],
+  "candidate_discovery": {
+    "run_id": 39079564348,
+    "run_number": 185,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "postmerge_discovery": {
+    "run_id": 39079807470,
+    "run_number": 186,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "artifacts": [
+    {
+      "id": 12118208059,
+      "name": "discovery-pg-406db539584625a97adafb939e8e5abde0767df5",
+      "size": 1188,
+      "digest": "sha256:2a6cc1e3e157450322fe9d80610e2ab92769d523fbd22df285d4cc5ec2a7eb71",
+      "expires_at": "2027-01-15T23:34:43Z"
+    },
+    {
+      "id": 12118163150,
+      "name": "discovery-offline-406db539584625a97adafb939e8e5abde0767df5",
+      "size": 16208,
+      "digest": "sha256:33cb1fc6922089ceb0e7b7c09fd26fe870b44881bf94c0dc136a4d9dcea78cc4",
+      "expires_at": "2027-01-15T23:34:43Z"
+    },
+    {
+      "id": 12118127269,
+      "name": "ingestion-provisioning-disposable-406db539584625a97adafb939e8e5abde0767df5",
+      "size": 67056,
+      "digest": "sha256:308474c2320a8ddf9dfb5f0de93d308c0597c9d81a509e6f87d38fcf45263343",
+      "expires_at": "2026-10-31T23:36:23Z"
+    },
+    {
+      "id": 12118920258,
+      "name": "ingestion-provisioning-disposable-ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "size": 66978,
+      "digest": "sha256:fa413ee0ef421925d9cebe89f71298eb83e96e7d9a32d544a8bab67a134c99b4",
+      "expires_at": "2026-10-31T23:40:38Z"
+    },
+    {
+      "id": 12118731070,
+      "name": "discovery-offline-ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "size": 16225,
+      "digest": "sha256:23b41157a827017d78e039a731d826773a1cd560504a210fdd1e07a7c0b801c6",
+      "expires_at": "2027-01-15T23:38:33Z"
+    },
+    {
+      "id": 12118542192,
+      "name": "discovery-pg-ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+      "size": 1193,
+      "digest": "sha256:2391465fa6c921ca1408933d8bb32fd588a1d237c6f9a7354c05be87b5a476ee",
+      "expires_at": "2027-01-15T23:38:33Z"
+    }
+  ],
+  "required_manifest_sha256": "8d9c2028bbe3c0af93122d6e35a917a87c87fa1600186098d855c167ffb12ca3",
+  "registration": "HELD_NO_EXECUTABLE_REGISTRATION_ISSUED",
+  "production_execution": "NOT_AUTHORISED_NOT_RUN",
+  "deployment": "SUPPRESSED_WITH_SKIP_RENDER_NO_DEPLOY_COMMAND_NO_RENDER_CONFIGURATION_CHANGE",
+  "render_service_state": "NOT_REATTESTED_CONNECTOR_REQUIRES_SELECTED_WORKSPACE",
+  "storage": "ACCEPTED_ACCESS_DISABLED_14446a64073bd190aff40b337b3111d515408282",
+  "stage4": "OPEN",
+  "optional_writer": "SEPARATE_ACCEPTED_DISPOSABLE_SEAM_NOMINEE_PERMISSION_BINDING_HELD",
+  "historical_uncertainty": "PRESERVED",
+  "protected_application_ids": [
+    1504,
+    1505,
+    1506,
+    1507,
+    1508
+  ]
+}
