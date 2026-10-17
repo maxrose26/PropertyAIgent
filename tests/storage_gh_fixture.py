@@ -84,7 +84,7 @@ def real_gh_store(tmp_path):
                 if len(encrypted)<80:
                     requests.append(('BAD_CIPHERTEXT_LENGTH',prefix));return self.answer(400)
                 ciphertexts[name]=encrypted
-                return self.answer(201)
+                return self.answer(201,{})
             if method=='DELETE' and name in ciphertexts:
                 del ciphertexts[name];return self.answer(204)
             return self.answer(404)
