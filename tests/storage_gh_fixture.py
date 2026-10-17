@@ -125,7 +125,8 @@ def real_gh_store(tmp_path):
             if command[1:3]==['api','user']:
                 # Public fixed GET with synthetic auth only; no credential or
                 # secret value has entered this subprocess. Bound diagnostics.
-                raise AssertionError('DISPOSABLE_GH_USER_STARTUP: '+result.stderr.decode(errors='replace')[:1000].replace('disposable_fixture_only','[fixture]'))
+                print('DISPOSABLE_GH_USER_STARTUP: '+result.stderr.decode(errors='replace')[:1000].replace('disposable_fixture_only','[fixture]'),flush=True)
+                raise AssertionError('DISPOSABLE_GH_USER_STARTUP')
             # Fixture-only diagnostic categories; no raw CLI output or values.
             import hashlib
             text=result.stderr.lower()
