@@ -3,10 +3,11 @@
 Never print raw exceptions, connection strings, passwords, SCRAM verifiers or
 GitHub CLI output. The CLI handles encryption to the existing environment key.
 Python cannot guarantee erasure of strings from process memory. No files/core
-are produced by this helper. Preserve the previously blocked entrypoint in git
+credential files are produced by this helper; its consumption record is
+credential-free. Preserve the previously blocked entrypoint in git
 history; the old provider-attestation flag does not admit this method.
 """
-import argparse,getpass,hashlib,json,os,secrets,socket,subprocess,sys
+import argparse,getpass,hashlib,json,os,secrets,socket,subprocess,sys,warnings
 from pathlib import Path
 from datetime import datetime,timezone,timedelta
 from urllib.parse import quote
@@ -41,6 +42,14 @@ def validate_binding(binding,revision,now=None):
  return binding
 
 
+def secure_migration_input():
+ # A TTY alone does not prove echo control works. Abort rather than permit
+ # getpass's warning-driven fallback to ordinary echoed input.
+ with warnings.catch_warnings():
+  warnings.simplefilter('error',getpass.GetPassWarning)
+  return getpass.getpass('Existing migration credential URL (hidden; never paste into chat): ')
+
+
 def put_secret(name,value,runner=subprocess.run):
  # gh uses the environment public key/sealed-box API; plaintext goes only stdin.
  result=runner(['gh','secret','set',name,'--repo',REPO,'--env',ENVIRONMENT],input=value.encode(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20,check=False,env={**os.environ,'GH_HOST':'github.com','GH_DEBUG':'','GH_PROMPT_DISABLED':'1'})
@@ -49,8 +58,8 @@ def put_secret(name,value,runner=subprocess.run):
 
 def install_mapping(connection,*,attested=False,risk_binding=None,revision=None,runner=subprocess.run,password_factory=None):
  if not attested and risk_binding is None:raise ValueError('EXPLICIT_RISK_ACCEPTANCE_REQUIRED')
- # The low-level primitive is retained solely for the existing disposable PG
- # rehearsal. No owner flag or direct import admits a production connection.
+ # Historical attested=True admits only the existing disposable fixture.
+ # Production requires the exact reviewed residual-risk registration instead.
  info=connection.info
  disposable=(info.host,info.port,info.dbname,info.user)==('127.0.0.1',5432,'ingestion_provisioning_test','provisioning_migrator')
  if not disposable:
@@ -104,7 +113,7 @@ def main():
  def deadline(signum,frame):raise TimeoutError('OWNER_MAPPING_DEADLINE')
  baseline=None
  try:
-  raw=getpass.getpass('Existing migration credential URL (hidden; never paste into chat): ')
+  raw=secure_migration_input()
   resource.setrlimit(resource.RLIMIT_AS,(256*1024**2,256*1024**2));resource.setrlimit(resource.RLIMIT_FSIZE,(0,0))
   baseline=owned_resources()
   if baseline['children']:raise ValueError('UNEXPECTED_OWNED_CHILD')

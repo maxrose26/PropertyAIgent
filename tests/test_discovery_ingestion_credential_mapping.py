@@ -106,3 +106,14 @@ def test_production_password_factory_override_is_rejected_before_sql():
  c=connection();c.info.host='aws-0-eu-west-2.pooler.supabase.com';c.info.dbname='postgres';c.info.user='postgres.zcikcfgpblzuzpanpdqd';c.pgconn.ssl_in_use=True
  with pytest.raises(ValueError,match='ENTROPY_FACTORY'):install_mapping(c,risk_binding=binding(),revision='a'*40,password_factory=lambda:'bad')
  c.execute.assert_not_called()
+
+
+def test_hidden_prompt_never_uses_echoing_fallback(monkeypatch):
+ import warnings,getpass
+ fallback=MagicMock()
+ def prompt(*args,**kwargs):
+  warnings.warn('terminal echo unavailable',getpass.GetPassWarning)
+  fallback()
+ monkeypatch.setattr(credential_mapping.getpass,'getpass',prompt)
+ with pytest.raises(getpass.GetPassWarning):credential_mapping.secure_migration_input()
+ fallback.assert_not_called()
