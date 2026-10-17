@@ -19,12 +19,20 @@ def memory_group(monkeypatch):
         pytest.fail('Disposable delegated cgroup required; do not count a skip as validation')
     root = Path(root)
     assert root.is_relative_to('/sys/fs/cgroup')
+    import secrets
+    root = root / ('case-' + secrets.token_hex(6))
+    root.mkdir()
+    root.joinpath('memory.max').write_text(str(m.LIMIT))
+    root.joinpath('memory.swap.max').write_text('0')
+    root.joinpath('memory.oom.group').write_text('1')
+    root.joinpath('cgroup.subtree_control').write_text('+memory')
     group = m.WorkerMemory.create_under(root)
     from verification.ingestion_storage import storage_controller as c
     monkeypatch.setattr(c.WorkerMemory, 'create', classmethod(lambda cls: group))
     yield group
     if not group.closed:
         group.close(time.monotonic() + 2)
+    root.rmdir()
 
 
 def test_real_gh_startup_under_kernel_memory_limit(memory_group, record_property):
@@ -89,3 +97,14 @@ while True:
 def test_missing_enforcement_fails_closed(tmp_path):
     with pytest.raises((OSError, m.MemoryUnavailable)):
         m.WorkerMemory.create_under(tmp_path)
+
+
+if __name__ == '__main__':
+    # Invoked only by disposable CI in a systemd scope constrained BEFORE exec.
+    group = m.WorkerMemory.create()
+    if sys.argv[1] == 'startup':
+        test_real_gh_startup_under_kernel_memory_limit(group, lambda k,v:print(k,v,flush=True))
+    elif sys.argv[1] == 'excess':
+        test_real_gh_and_descendant_excess_killed_together(group, lambda k,v:print(k,v,flush=True))
+    else:
+        raise SystemExit('INVALID_DISPOSABLE_MODE')

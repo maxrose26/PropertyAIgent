@@ -68,6 +68,8 @@ class WorkerMemory:
     @classmethod
     def create_under(cls, root):
         # Also used by disposable tests with an independently delegated root.
+        if 'memory' not in root.joinpath('cgroup.subtree_control').read_text().split():
+            raise MemoryUnavailable('MEMORY_DELEGATION_REQUIRED')
         path = root / 'worker'
         path.mkdir()
         try:
@@ -95,15 +97,28 @@ class WorkerMemory:
                 or not self.path.joinpath('cgroup.kill').exists()):
             raise MemoryUnavailable('MEMORY_ENFORCEMENT_LOST')
         events = values(self.path / 'memory.events')
+        outer = self.path.parent
+        if (outer.joinpath('memory.max').read_text().strip() != str(LIMIT)
+                or outer.joinpath('memory.swap.max').read_text().strip() != '0'
+                or outer.joinpath('memory.oom.group').read_text().strip() != '1'):
+            raise MemoryUnavailable('OUTER_MEMORY_ENFORCEMENT_LOST')
+        outer_events = values(outer / 'memory.events')
         return dict(kernel_memory_peak_bytes=int(self.path.joinpath('memory.peak').read_text()),
                     kernel_memory_current_bytes=int(self.path.joinpath('memory.current').read_text()),
                     kernel_memory_oom=events['oom'], kernel_memory_oom_kill=events['oom_kill'],
                     kernel_memory_max_events=events['max'],
-                    kernel_memory_populated=values(self.path / 'cgroup.events')['populated'])
+                    kernel_memory_populated=values(self.path / 'cgroup.events')['populated'],
+                    outer_memory_peak_bytes=int(outer.joinpath('memory.peak').read_text()),
+                    outer_memory_current_bytes=int(outer.joinpath('memory.current').read_text()),
+                    outer_memory_max_events=outer_events['max'],
+                    outer_memory_oom=outer_events['oom'], outer_memory_oom_kill=outer_events['oom_kill'])
 
     def close(self, deadline):
         # Do not make containment cleanup depend on successful accounting.
-        forced = bool(values(self.path / 'cgroup.events')['populated'])
+        try:
+            forced = bool(values(self.path / 'cgroup.events')['populated'])
+        except BaseException:
+            forced = True
         if forced:
             self.path.joinpath('cgroup.kill').write_text('1')
         while values(self.path / 'cgroup.events')['populated']:

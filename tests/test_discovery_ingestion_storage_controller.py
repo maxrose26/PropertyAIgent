@@ -69,6 +69,8 @@ def test_registration_rejects_expiry_scope_and_hash_drift():
         limits=c.LIMITS,retired_mapping_sha256=c.RETIRED_BINDING,
         consumed_controller_sha256=c.CONSUMED_CONTROLLER_BINDING,
         memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
+        prior_audit_sha256=c.PRIOR_AUDIT_SHA256,
+        prior_supervised_seconds=c.PRIOR_SUPERVISED_SECONDS,
         expires_at=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),
         hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in FILES})
     assert validate_registration(canonical(registration),'a'*40)==registration
@@ -106,3 +108,16 @@ def test_metadata_preflight_rejects_environment_and_existing_later_page_secret(m
     assert len(calls)==2
     monkeypatch.setenv('GH_TOKEN','DISPOSABLE_TEST_SENTINEL')
     with pytest.raises(Stop,match='KEYRING_AUTH_REQUIRED'):c.local_preflight()
+
+
+def test_missing_kernel_enforcement_stops_before_worker_and_effects(monkeypatch,tmp_path):
+    from verification.ingestion_storage import storage_controller as c
+    def unavailable(cls):
+        raise c.MemoryUnavailable('MEMORY_DELEGATION_REQUIRED')
+    monkeypatch.setattr(c.WorkerMemory,'create',classmethod(unavailable))
+    journal=c.Journal(tmp_path/'unavailable','a'*64)
+    result=c.supervise('not-a-credential',{},journal)
+    journal.close()
+    assert result['reason']=='MEMORY_DELEGATION_REQUIRED'
+    assert result['status']=='STOP_RECONCILE_NO_RETRY'
+    assert result['worker_exit'] is None and result['cleanup']=='UNCERTAIN'

@@ -29,6 +29,8 @@ from .memory_enforcement import WorkerMemory, owner_scope, MemoryUnavailable
 AUTHORITY = mapping.AUTHORITY
 CONTROLLER = 'verification.ingestion_storage.storage_controller'
 CONSUMED_CONTROLLER_BINDING = '802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279'
+PRIOR_AUDIT_SHA256 = 'f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0'
+PRIOR_SUPERVISED_SECONDS = 0.11050213100043038
 RETIRED_BINDING = 'e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d'
 PACKAGE = Path('docs/design/ingestion-provisioning-20261016')
 MANIFEST = Path('docs/design/ingestion-readiness-20261016/three-items.json')
@@ -48,7 +50,7 @@ FILES = ['verification/ingestion_storage/storage_controller.py',
 ROLE_NAMES = tuple(mapping.MAPPINGS)
 SECRETS = tuple(mapping.MAPPINGS.values())
 CONTROL_KEY = '0' * 64
-SUPERVISED_SECONDS = 240
+SUPERVISED_SECONDS = 240 - PRIOR_SUPERVISED_SECONDS
 CLOSURE_SECONDS = 2
 
 
@@ -111,7 +113,9 @@ def validate_registration(body, revision, now=None):
                   method='CLIENT_GENERATED_SCRAM_SHA_256_MEMORY_TO_PROTECTED_SECRET',
                   revision=revision, limits=LIMITS, retired_mapping_sha256=RETIRED_BINDING,
                   consumed_controller_sha256=CONSUMED_CONTROLLER_BINDING,
-                  memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO')
+                  memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
+                  prior_audit_sha256=PRIOR_AUDIT_SHA256,
+                  prior_supervised_seconds=PRIOR_SUPERVISED_SECONDS)
     if set(value)!=set(expected)|{'expires_at','hashes'} or any(value.get(k)!=v for k,v in expected.items()):
         raise Stop('EXACT_STORAGE_BINDING_REQUIRED')
     expiry=datetime.fromisoformat(value['expires_at'])
@@ -575,7 +579,7 @@ def supervise(raw, registration, journal):
             if time.monotonic()-phase_started>={'provisioning':90,'storage':120,'teardown':28}[phase]: raise Stop('PHASE_DEADLINE')
             if (journal.root/'STOP').exists(): raise Stop('OWNER_STOP')
             memory=group.snapshot()
-            if memory['kernel_memory_max_events'] or memory['kernel_memory_oom'] or memory['kernel_memory_oom_kill']:
+            if any(memory[k] for k in ('kernel_memory_max_events','kernel_memory_oom','kernel_memory_oom_kill','outer_memory_max_events','outer_memory_oom','outer_memory_oom_kill')):
                 raise Stop('KERNEL_MEMORY_LIMIT')
             try:
                 process=psutil.Process(p.pid)
@@ -640,7 +644,7 @@ def supervise(raw, registration, journal):
         memory={}
         try:
             if group is not None: memory=group.close(started+SUPERVISED_SECONDS)
-            if memory.get('kernel_memory_max_events') or memory.get('kernel_memory_oom') or memory.get('kernel_memory_oom_kill'):
+            if any(memory.get(k) for k in ('kernel_memory_max_events','kernel_memory_oom','kernel_memory_oom_kill','outer_memory_max_events','outer_memory_oom','outer_memory_oom_kill')):
                 reason='KERNEL_MEMORY_LIMIT'
             if memory.get('kernel_memory_forced_cleanup'): reason=reason or 'OWNED_PROCESS_REQUIRED_KILL'
             if memory.get('kernel_memory_accounting_uncertain'): reason='MEMORY_CLEANUP_UNCERTAIN'
@@ -692,6 +696,9 @@ def main():
         if int(Path('/proc/self/stat').read_text().split(' ',1)[0])!=os.getpid(): raise Stop('PROCESS_NAMESPACE_UNSUPPORTED')
         # Availability is checked before credential entry or authority use.
         owner_scope()
+        prior=Path.home()/'.local/state/propertyaigent/storage-acceptance-once-20261016/events.jsonl'
+        if prior.is_symlink() or prior.stat().st_size!=1573 or hashlib.sha256(prior.read_bytes()).hexdigest()!=PRIOR_AUDIT_SHA256:
+            raise Stop('PRIOR_ATTEMPT_EVIDENCE_REQUIRED')
         root=Path.home()/'.local/state/propertyaigent/storage-acceptance-memory-successor-20261017'
         journal=Journal(root,args.binding_sha256)
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))
