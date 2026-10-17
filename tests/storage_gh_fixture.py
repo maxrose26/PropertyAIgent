@@ -60,9 +60,23 @@ def real_gh_store(tmp_path):
             name=path.removeprefix(prefix+'/')
             if name not in names:return self.answer(404,{'message':'DISPOSABLE_UNKNOWN_PATH'})
             if method=='PUT':
-                size=int(self.headers.get('Content-Length','0'))
-                if not 0<size<16384:return self.answer(400)
-                payload=json.loads(self.rfile.read(size))
+                if self.headers.get('Transfer-Encoding','').lower()=='chunked':
+                    body=bytearray()
+                    for _ in range(32):
+                        line=self.rfile.readline(80)
+                        size=int(line.strip(),16)
+                        if size==0:
+                            if self.rfile.readline(3)!=b'\r\n':return self.answer(400)
+                            break
+                        if size<0 or len(body)+size>=16384:return self.answer(400)
+                        body.extend(self.rfile.read(size))
+                        if self.rfile.read(2)!=b'\r\n':return self.answer(400)
+                    else:return self.answer(400)
+                else:
+                    size=int(self.headers.get('Content-Length','0'))
+                    if not 0<size<16384:return self.answer(400)
+                    body=self.rfile.read(size)
+                payload=json.loads(body)
                 if payload.get('key_id')!='disposable-key':return self.answer(400)
                 encrypted=base64.b64decode(payload['encrypted_value'],validate=True)
                 if len(encrypted)<80:return self.answer(400)
