@@ -487,7 +487,7 @@ def test_successor_registration_is_accepted_with_verified_predecessor(bound,tmp_
 
 
 @pytest.mark.parametrize('change,code',[
-    (dict(attempt=3),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt=True),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt='2'),'PROBE_ATTEMPT_NOT_AUTHORISED'),
+    (dict(attempt=3),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt=True),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt='2'),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt=2.0),'PROBE_ATTEMPT_NOT_AUTHORISED'),
     (dict(authority=AUTHORITY),'EXACT_PROBE_APPROVAL_REQUIRED'),(dict(state_directory=ap.STATE),'EXACT_PROBE_APPROVAL_REQUIRED'),(dict(state_directory='elsewhere'),'EXACT_PROBE_APPROVAL_REQUIRED'),
     (dict(predecessor=None),'PREDECESSOR_BINDING'),(dict(predecessor={'attempt':1}),'PREDECESSOR_BINDING'),
 ])
@@ -567,3 +567,37 @@ def test_hidden_input_inside_a_user_scope_keeps_the_terminal():
     out,status=_pty_run(['systemd-run','--user','--scope','--quiet',f'--unit=propertyaigent-hidden-input-check-{os.getpid()}',sys.executable,'-I','-B','-c',code],'SCOPE-SYNTHETIC-SECRET')
     if 'Failed to connect' in out or 'Failed to start' in out:pytest.skip('no user systemd manager in this environment')
     assert 'TTY=TrueTrue' in out and 'RESULT=22' in out and 'SCOPE-SYNTHETIC-SECRET' not in out
+
+
+def test_the_consumed_first_attempt_cannot_start_again(tmp_path,monkeypatch):
+    state=tmp_path/'.local/state/propertyaigent';(state/ap.STATE).mkdir(parents=True)
+    _main_setup(tmp_path,monkeypatch,url(),probe_registration())
+    with pytest.raises(FileExistsError):ap.main()                                                                             # attempt 1's namespace already exists: nothing can run under it
+
+
+def test_predecessor_directory_must_be_a_real_child_of_the_state_root(tmp_path):
+    root=tmp_path/'state';pred=make_predecessor(root);reg=dict(probe_registration(),predecessor=pred,attempt=2)
+    real=root/ap.STATE;moved=tmp_path/'moved';real.rename(moved);real.symlink_to(moved,target_is_directory=True)
+    with pytest.raises(ValueError,match='PREDECESSOR_EVIDENCE'):ap.verify_predecessor(reg,root)
+
+
+def test_successor_render_binds_the_real_predecessor_files(tmp_path):
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('render_registration',PACKAGE/'render_registration.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    root=tmp_path/'state';pred=make_predecessor(root)
+    reg=module.render(root=Path('.').resolve(),minutes=60,attempt=2,state_root=root)
+    assert reg['attempt']==2 and reg['predecessor']==pred and reg['state_directory']==ap.probe_namespace(2)['state_directory'] and reg['authority']==ap.probe_namespace(2)['authority']
+    first=module.render(root=Path('.').resolve(),minutes=60,attempt=1)
+    assert first['attempt']==1 and first['predecessor'] is None and first['authority']==AUTHORITY
+    with pytest.raises(ValueError,match='PROBE_ATTEMPT_NOT_AUTHORISED'):module.render(root=Path('.').resolve(),attempt=3)
+
+
+def test_owner_script_refuses_without_a_terminal_and_with_bad_arguments_before_touching_anything(tmp_path):
+    script=str(PACKAGE/'owner-run.sh');good=['a'*40,'b'*40,'c'*64,'2']
+    env={'PATH':'/usr/bin:/bin','HOME':str(tmp_path)}
+    no_tty=subprocess.run(['bash',script,*good],stdin=subprocess.DEVNULL,capture_output=True,text=True,env=env,timeout=30)
+    assert no_tty.returncode==2 and 'VISIBLE_INTERACTIVE_TTY_REQUIRED' in no_tty.stderr+no_tty.stdout
+    for bad in ([], good[:3], ['A'*40]+good[1:], good[:3]+['x']):
+        out=subprocess.run(['bash',script,*bad],stdin=subprocess.DEVNULL,capture_output=True,text=True,env=env,timeout=30)
+        assert out.returncode==2 and 'USAGE' in out.stdout+out.stderr
+    assert list(tmp_path.iterdir())==[]                                                                                       # nothing created under HOME

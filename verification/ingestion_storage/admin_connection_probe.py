@@ -198,14 +198,14 @@ def validate_probe_registration(body,sha):
     r=json.loads(body)
     if not isinstance(r,dict) or set(r)!=REGISTRATION_KEYS:raise ValueError('REGISTRATION_EXACT_KEYS')
     attempt=r['attempt']
-    if isinstance(attempt,bool) or attempt not in ATTEMPTS:raise ValueError('PROBE_ATTEMPT_NOT_AUTHORISED')
+    if type(attempt) is not int or attempt not in ATTEMPTS:raise ValueError('PROBE_ATTEMPT_NOT_AUTHORISED')
     namespace=ATTEMPTS[attempt]
     if r['mode']!=MODE or r['authority']!=namespace['authority'] or r['status']!=STATUS or r['state_directory']!=namespace['state_directory']:raise ValueError('EXACT_PROBE_APPROVAL_REQUIRED')
     predecessor=r['predecessor']
     if namespace['predecessor'] is None:
         if predecessor is not None:raise ValueError('PREDECESSOR_BINDING')
     else:
-        if not isinstance(predecessor,dict) or set(predecessor)!=PREDECESSOR_KEYS or predecessor['attempt']!=namespace['predecessor'] or predecessor['state_directory']!=ATTEMPTS[namespace['predecessor']]['state_directory'] \
+        if not isinstance(predecessor,dict) or set(predecessor)!=PREDECESSOR_KEYS or type(predecessor['attempt']) is not int or predecessor['attempt']!=namespace['predecessor'] or predecessor['state_directory']!=ATTEMPTS[namespace['predecessor']]['state_directory'] \
            or not all(isinstance(predecessor[k],str) and len(predecessor[k])==64 for k in ('events_sha256','final_result_sha256')):raise ValueError('PREDECESSOR_BINDING')
     if r['limits']!=LIMITS or r['absent_capabilities']!=list(ABSENT_CAPABILITIES) or r['statement_sha256']!=hashlib.sha256(STATEMENT.encode()).hexdigest():raise ValueError('PROBE_LIMITS_OR_BOUNDARY_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
@@ -226,11 +226,15 @@ def verify_predecessor(r,state_root):
     """Positive evidence that the predecessor attempt stopped before any connection and closed: exact file hashes plus the recorded outcome. Read-only."""
     predecessor=r['predecessor']
     if predecessor is None:return None
-    directory=Path(state_root)/predecessor['state_directory']
+    root=Path(state_root);directory=root/predecessor['state_directory']
+    if directory.is_symlink() or not directory.is_dir() or directory.resolve().parent!=root.resolve():raise ValueError('PREDECESSOR_EVIDENCE')
+    contents={}
     for name,key in (('events.jsonl','events_sha256'),('final-result.json','final_result_sha256')):
         path=directory/name
-        if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=predecessor[key]:raise ValueError('PREDECESSOR_EVIDENCE')
-    recorded=json.loads((directory/'final-result.json').read_bytes())
+        if path.is_symlink() or not path.is_file():raise ValueError('PREDECESSOR_EVIDENCE')
+        contents[name]=path.read_bytes()                                                            # read once: the bytes hashed are the bytes parsed
+        if hashlib.sha256(contents[name]).hexdigest()!=predecessor[key]:raise ValueError('PREDECESSOR_EVIDENCE')
+    recorded=json.loads(contents['final-result.json'])
     if recorded.get('status')!='STOP_RECONCILE_NO_RETRY' or recorded.get('cleanup')!='CLOSED' or recorded.get('failure',{}).get('stage')!='SESSION_INPUT' \
        or recorded.get('outcome',{}).get('administrative_connection')!='NOT_ATTEMPTED' or recorded.get('closure_components',{}).get('overall')!='CLOSED':raise ValueError('PREDECESSOR_OUTCOME')
     return dict(attempt=predecessor['attempt'],final_result_sha256=predecessor['final_result_sha256'],stage=recorded['failure']['stage'],closure=recorded['closure_components']['overall'])
