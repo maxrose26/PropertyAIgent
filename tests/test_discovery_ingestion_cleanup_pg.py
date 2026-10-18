@@ -70,8 +70,12 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
                         # Real failed PostgreSQL handshake, disposable login only.
                         # This chosen fixture failure says nothing about the
                         # historical production connection's unknown cause.
-                        psycopg.connect(**{**info,'user':role,'password':'disposable-intentionally-wrong'},
-                            autocommit=True,connect_timeout=3,prepare_threshold=None)
+                        try:
+                            unexpected=psycopg.connect(**{**info,'user':role,'password':'disposable-intentionally-wrong'},
+                                autocommit=True,connect_timeout=3,prepare_threshold=None)
+                        except psycopg.OperationalError:
+                            injected.append('native_handshake_failure');raise
+                        unexpected.close()
                         raise AssertionError('DISPOSABLE_BAD_PASSWORD_WAS_ACCEPTED')
                     self.c=connect()
                 @property
@@ -115,6 +119,7 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
             else:
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['cleanup']=='UNCERTAIN'
                 if fault=='connection_failure':
+                    assert injected==['native_handshake_failure'] and result['exception_class']=='OperationalError'
                     assert worker.connections==1 and worker.commands==worker.deletes==0
                     assert worker.opened==worker.closed==0 and result['phase']=='DATABASE_CONNECT_1'
                 if fault in {'changed_grant','associated_session'}:
