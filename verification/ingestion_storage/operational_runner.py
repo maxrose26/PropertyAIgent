@@ -29,11 +29,12 @@ MATRIX_AUTHORITY='AUTHORISE_INGESTION_RESTRICTED_CONNECTION_MATRIX_ONCE_20261018
 MATRIX_STATE='operational-restricted-connection-matrix-once-20261018'
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
-# Ordering invariants (tested): job + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total < admin_diagnostic, so that when a stop arrives at the
-# very end of the pre-teardown allowance, teardown and failure diagnostics still have their own reserved administrative time. work alarm (session) > job (runner).
-MATRIX_DEADLINES=dict(job=170,diagnostic_total=225,diagnostic_window=40,admin_diagnostic=130,admin_pre=60,admin_total=100,runtime_total=60)
+# Ordering invariants (tested): job + diagnostic_window <= work alarm (session), so a Runner-detected stop at the job limit still has its full failure window before the one-shot work alarm;
+# work alarm + diagnostic_window <= diagnostic_total <= active window - reporting, so a stop CAUSED by the alarm also keeps a full window; admin_pre < admin_total < admin_diagnostic, so a stop at the
+# very end of the pre-teardown allowance still leaves teardown and failure diagnostics their own administrative time.
+MATRIX_DEADLINES=dict(job=170,diagnostic_total=255,diagnostic_window=40,admin_diagnostic=130,admin_pre=60,admin_total=100,runtime_total=60)
 DEFAULT_DEADLINES=dict(job=450,diagnostic_total=475,diagnostic_window=25,admin_diagnostic=240,admin_pre=210,admin_total=240,runtime_total=300)
-MATRIX_TIMING=dict(input_seconds=120,active_seconds=240,work_seconds=200,diagnostic_seconds=25,report_seconds=5,outer_seconds=380)
+MATRIX_TIMING=dict(input_seconds=120,active_seconds=270,work_seconds=215,diagnostic_seconds=25,report_seconds=5,outer_seconds=420)
 QUALIFICATION='1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2'
 CONTRACT='bolton-received-idox-coordinator-v1'
 

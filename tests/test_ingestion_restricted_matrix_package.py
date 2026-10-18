@@ -194,7 +194,7 @@ def test_owner_script_refuses_without_a_terminal_and_with_bad_arguments(tmp_path
 
 def test_owner_script_has_only_the_one_read_only_github_call_and_no_credential_path():
     text=(PACKAGE/'owner-run.sh').read_text()
-    assert '@@' not in text and text.index('VISIBLE_INTERACTIVE_TTY_REQUIRED')<text.index('systemd-run') and 'RuntimeMaxSec=410s' in text and 'timeout 10s systemctl' in text and 'controller_exit_status' in text
+    assert '@@' not in text and text.index('VISIBLE_INTERACTIVE_TTY_REQUIRED')<text.index('systemd-run') and 'RuntimeMaxSec=450s' in text and 'timeout 10s systemctl' in text and 'controller_exit_status' in text
     gh_lines=[l for l in text.splitlines() if ' gh ' in l and not l.lstrip().startswith('#')]
     assert gh_lines==['test "$(timeout 15s gh api user --jq .login)" = maxrose26']
     for forbidden in ('secret set','curl','psql','read -s','getpass','PASSWORD','DATABASE_URL','git switch','operational_publication','--method'):assert forbidden not in text,forbidden
@@ -210,9 +210,13 @@ def test_package_separates_the_diagnostic_allowance_from_execution_authority():
 
 def test_deadlines_are_ordered_so_teardown_keeps_its_own_time(tmp_path):
     d=orr.MATRIX_DEADLINES;t=orr.MATRIX_TIMING
-    assert d['admin_pre']<d['admin_total']<d['admin_diagnostic'] and d['job']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
-    assert d['job']<t['work_seconds']<t['active_seconds'] and t['input_seconds']+t['active_seconds']+t['report_seconds']<=t['outer_seconds'] and t['outer_seconds']+30<=410
-    assert d['runtime_total']>=rm.LIMITS['matrix_seconds']
+    assert d['admin_pre']<d['admin_total']<d['admin_diagnostic']
+    # a Runner-detected stop at the job limit keeps its FULL failure window before the one-shot session work alarm ...
+    assert d['job']+d['diagnostic_window']<=t['work_seconds']
+    # ... and a stop caused by the alarm itself also keeps a full window before the runner's total and the hard active deadline
+    assert t['work_seconds']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
+    assert t['input_seconds']+t['active_seconds']+t['report_seconds']<=t['outer_seconds'] and t['outer_seconds']+30<=450 and d['runtime_total']>=rm.LIMITS['matrix_seconds']
+    assert d['admin_diagnostic']<=d['diagnostic_window']+d['admin_pre']+30+d['admin_total']      # administrative allowance is not the binding limit beyond the failure window
 
 
 class _Clock:
