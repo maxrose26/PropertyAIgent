@@ -420,12 +420,13 @@ def run_session(journal, memory, expiry, reader, prepare, *, outer_started=None,
     from verification.ingestion_storage.tls_trust import owned_resources
     resources=resources or owned_resources
     outer_started=time.monotonic() if outer_started is None else outer_started
-    baseline=resources(); worker=None; active_started=None; input_started=time.monotonic()
+    baseline=None; worker=None; active_started=None; input_started=time.monotonic()
     input_seconds=0.0; phase='SECURE_CREDENTIAL_INPUT'; credential=None; hard=None
     try:
         remaining=timing['outer_seconds']-(time.monotonic()-outer_started)-timing['active_seconds']
         if remaining<=0: raise Stop('OUTER_CLOSURE_RESERVE')
         arm_deadline(min(timing['credential_input_seconds'],remaining),'SECURE_INPUT_DEADLINE')
+        baseline=resources()
         journal.emit('credential_input_started',{'maximum_seconds':timing['credential_input_seconds'],
                      'database_and_secret_operations_permitted':False})
         credential=reader()
@@ -478,8 +479,8 @@ def run_session(journal, memory, expiry, reader, prepare, *, outer_started=None,
         return finalise(journal,result,outer_started=outer_started,active_started=active_started,
                         input_seconds=input_seconds,output=output)
     finally:
-        hard.close()
         signal.setitimer(signal.ITIMER_REAL,0)
+        hard.close()
 
 
 def main():
@@ -518,12 +519,12 @@ def main():
         if path.is_symlink() or path.stat().st_size>2048 or hashlib.sha256(path.read_bytes()).hexdigest()!=sha:
             raise SystemExit('CONSUMED_PREDECESSOR_EVIDENCE_CHANGED')
     memory=Memory()
+    from verification.ingestion_storage.credential_mapping import secure_migration_input
     journal=Journal(state/'operational-safety-cleanup-timing-successor-20261018')
     journal.emit('consumed',dict(authority=AUTHORITY,registration_sha256=args.registration_sha256,
                  original_audit_sha256=ORIGINAL_AUDIT_SHA256,limits=LIMITS,timing=TIMING,
                  consumed_predecessor_registration_sha256=PREDECESSOR_REGISTRATION))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
-    from verification.ingestion_storage.credential_mapping import secure_migration_input
     def prepare(raw,active_started):
         from verification.ingestion_storage.tls_trust import verified_trust
         from verification.discovery.route_validation import validate_route
