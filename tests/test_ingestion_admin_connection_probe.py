@@ -27,7 +27,8 @@ def url(user='postgres.zcikcfgpblzuzpanpdqd'):return f'postgresql://{user}:{quot
 def probe_registration(**changes):
     r=dict(mode=MODE,authority=AUTHORITY,status=ap.STATUS,expires_at=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat(),revision='a'*40,tree='b'*40,hashes={},
            controller_sha256='c'*64,ca_sha256=PEM_SHA256,evidence_directory='docs/design/ingestion-admin-connection-probe-20261018',limits=dict(LIMITS),
-           absent_capabilities=list(ap.ABSENT_CAPABILITIES),statement_sha256=hashlib.sha256(STATEMENT.encode()).hexdigest())
+           absent_capabilities=list(ap.ABSENT_CAPABILITIES),statement_sha256=hashlib.sha256(STATEMENT.encode()).hexdigest(),
+           attempt=1,state_directory=ap.STATE,predecessor=None)
     r.update(changes);return r
 
 
@@ -389,11 +390,13 @@ def test_rendered_registration_validates_against_the_actual_checkout(monkeypatch
         monkeypatch.setattr(sys,'argv',['x','--minutes','121']);exec(compile((PACKAGE/'render_registration.py').read_text(),'r','exec'),{'__name__':'__main__','__file__':str((PACKAGE/'render_registration.py').resolve())})
 
 
-def test_owner_script_is_an_unreleased_template_with_no_forbidden_capability():
+def test_owner_script_takes_bound_arguments_requires_a_visible_tty_and_has_no_forbidden_capability():
     text=(PACKAGE/'owner-run.sh').read_text()
-    assert '@@APPROVED_COMMIT_40_HEX@@' in text and 'PLACEHOLDERS_NOT_APPROVED' in text                      # cannot run until the owner approves exact values
-    for forbidden in ('gh ','gh api','secret set','curl','psql','operational_runner','credential_mapping','CONNECTION_DIAGNOSTIC_ONLY'):assert forbidden not in text,forbidden
-    assert 'admin_connection_probe' in text and 'RuntimeMaxSec=200s' in text and 'MemoryMax=1610612736' in text and 'timeout 10s systemctl' in text
+    assert '@@' not in text and 'USAGE: owner-run.sh <commit40> <tree40> <registration-sha256> <attempt>' in text                  # parameters are arguments, nothing is substituted into the script
+    assert text.index('VISIBLE_INTERACTIVE_TTY_REQUIRED')<text.index('verify_predecessor')<text.index('systemd-run')               # TTY refusal and read-only checks precede anything that consumes the namespace
+    for forbidden in ('gh ','gh api','secret set','curl','psql','operational_runner','credential_mapping','CONNECTION_DIAGNOSTIC_ONLY','read -s','getpass','PASSWORD','DATABASE_URL','git switch'):assert forbidden not in text,forbidden
+    assert 'admin_connection_probe' in text and 'RuntimeMaxSec=200s' in text and 'MemoryMax=1610612736' in text and 'timeout 10s systemctl' in text and 'sha256sum' in text and 'controller_exit_status' in text
+    assert subprocess.run(['bash','-n',str(PACKAGE/'owner-run.sh')]).returncode==0
 
 
 def test_manifest_forbids_release_and_execution():
@@ -451,3 +454,116 @@ def test_early_outcome_derives_not_attempted_from_the_connection_count():
     ok=Progress();assert oo.early_outcome(dict(reason_code='ROUTE_HOST_MISMATCH'),closure,ok)['administrative_connection']=='NOT_ATTEMPTED'
     ok.database_connection_calls=1;assert oo.early_outcome(dict(reason_code='ROUTE_HOST_MISMATCH'),closure,ok)['administrative_connection']=='UNKNOWN'
     assert oo.early_outcome(dict(reason_code='X'),closure,None)['administrative_connection']=='UNKNOWN'
+
+
+# --- successor attempt: configurable but narrowly bound namespace, verified predecessor ---------------------------------------------------------------------------------
+
+PREDECESSOR_FINAL=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='CLOSED',failure=dict(stage='SESSION_INPUT'),outcome=dict(administrative_connection='NOT_ATTEMPTED'),closure_components=dict(overall='CLOSED'))
+
+
+def make_predecessor(state_root,final=None):
+    d=state_root/ap.ATTEMPTS[1]['state_directory'];d.mkdir(parents=True)
+    (d/'events.jsonl').write_text('{"e":1}\n');(d/'final-result.json').write_text(json.dumps(final or PREDECESSOR_FINAL))
+    return dict(attempt=1,state_directory=ap.STATE,events_sha256=hashlib.sha256((d/'events.jsonl').read_bytes()).hexdigest(),final_result_sha256=hashlib.sha256((d/'final-result.json').read_bytes()).hexdigest())
+
+
+def successor(state_root,**changes):
+    n=ap.probe_namespace(2);r=probe_registration(attempt=2,authority=n['authority'],state_directory=n['state_directory'],predecessor=make_predecessor(state_root))
+    r.update(changes);return r
+
+
+def test_namespaces_are_a_two_entry_table_and_distinct():
+    assert set(ap.ATTEMPTS)=={1,2} and ap.probe_namespace(1)['state_directory']==ap.STATE and ap.probe_namespace(1)['authority']==AUTHORITY
+    n=ap.probe_namespace(2);assert n['authority']!=AUTHORITY and n['state_directory']!=ap.STATE and n['state_directory'].startswith(ap.STATE) and n['predecessor']==1
+    for bad in (0,3,-1,99):
+        with pytest.raises(ValueError,match='PROBE_ATTEMPT_NOT_AUTHORISED'):ap.probe_namespace(bad)
+
+
+def test_successor_registration_is_accepted_with_verified_predecessor(bound,tmp_path):
+    reg=successor(tmp_path/'state',hashes=bound['hashes'],controller_sha256=bound['controller_sha256'],revision=bound['revision'],tree=bound['tree'])
+    accepted=_validate(reg)
+    assert accepted['attempt']==2 and accepted['state_directory']!=ap.STATE
+    verified=ap.verify_predecessor(accepted,tmp_path/'state');assert verified['stage']=='SESSION_INPUT' and verified['closure']=='CLOSED'
+
+
+@pytest.mark.parametrize('change,code',[
+    (dict(attempt=3),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt=True),'PROBE_ATTEMPT_NOT_AUTHORISED'),(dict(attempt='2'),'PROBE_ATTEMPT_NOT_AUTHORISED'),
+    (dict(authority=AUTHORITY),'EXACT_PROBE_APPROVAL_REQUIRED'),(dict(state_directory=ap.STATE),'EXACT_PROBE_APPROVAL_REQUIRED'),(dict(state_directory='elsewhere'),'EXACT_PROBE_APPROVAL_REQUIRED'),
+    (dict(predecessor=None),'PREDECESSOR_BINDING'),(dict(predecessor={'attempt':1}),'PREDECESSOR_BINDING'),
+])
+def test_successor_registration_rejections(bound,tmp_path,change,code):
+    reg=successor(tmp_path/'state',hashes=bound['hashes'],controller_sha256=bound['controller_sha256'],revision=bound['revision'],tree=bound['tree'])
+    with pytest.raises(ValueError,match=code):_validate({**reg,**change})
+
+
+def test_first_attempt_registration_cannot_claim_a_predecessor_or_the_successor_namespace(bound):
+    n=ap.probe_namespace(2)
+    with pytest.raises(ValueError,match='PREDECESSOR_BINDING'):_validate({**bound,'predecessor':dict(attempt=1,state_directory=ap.STATE,events_sha256='0'*64,final_result_sha256='0'*64)})
+    with pytest.raises(ValueError,match='EXACT_PROBE_APPROVAL_REQUIRED'):_validate({**bound,'state_directory':n['state_directory']})
+
+
+def test_predecessor_evidence_must_match_hash_and_recorded_outcome(tmp_path):
+    root=tmp_path/'state';bound_pred=make_predecessor(root);reg=dict(probe_registration(),predecessor=bound_pred,attempt=2)
+    assert ap.verify_predecessor(reg,root)['final_result_sha256']==bound_pred['final_result_sha256']
+    (root/ap.STATE/'events.jsonl').write_text('tampered')
+    with pytest.raises(ValueError,match='PREDECESSOR_EVIDENCE'):ap.verify_predecessor(reg,root)
+    for label,final in (('connected',dict(PREDECESSOR_FINAL,outcome=dict(administrative_connection='QUALIFIED'))),('uncertain',dict(PREDECESSOR_FINAL,cleanup='UNCERTAIN')),
+                        ('other-stage',dict(PREDECESSOR_FINAL,failure=dict(stage='DNS_RESOLUTION'))),('closure',dict(PREDECESSOR_FINAL,closure_components=dict(overall='UNCERTAIN')))):
+        other=tmp_path/('s-'+label);pred=make_predecessor(other,final)
+        with pytest.raises(ValueError,match='PREDECESSOR_OUTCOME'):ap.verify_predecessor(dict(reg,predecessor=pred),other)
+    with pytest.raises(ValueError,match='PREDECESSOR_EVIDENCE'):ap.verify_predecessor(dict(reg,predecessor=bound_pred),tmp_path/'nowhere')
+    assert ap.verify_predecessor(dict(reg,predecessor=None),tmp_path) is None
+
+
+def test_real_main_uses_the_registered_namespace_and_verifies_the_predecessor(tmp_path,monkeypatch):
+    state=tmp_path/'.local/state/propertyaigent';reg=successor(state)
+    _main_setup(tmp_path,monkeypatch,url(user='postgres'),reg)
+    with pytest.raises(SystemExit) as caught:ap.main()
+    assert caught.value.code==1
+    assert (state/reg['state_directory']/'final-result.json').exists() and 'attempt' in (state/reg['state_directory']/'events.jsonl').read_text()
+    consumed=json.loads((state/ap.STATE/'final-result.json').read_text());assert consumed['cleanup']=='CLOSED'                 # the predecessor evidence is untouched
+    monkeypatch.setattr(sys,'argv',sys.argv)
+    with pytest.raises(FileExistsError):ap.main()                                                                             # second use of the successor namespace cannot start
+
+
+def test_real_main_refuses_a_successor_when_the_predecessor_evidence_is_missing(tmp_path,monkeypatch):
+    reg=successor(tmp_path/'elsewhere');_main_setup(tmp_path,monkeypatch,url(),reg)
+    with pytest.raises(ValueError,match='PREDECESSOR_EVIDENCE'):ap.main()
+    assert not (tmp_path/'.local/state/propertyaigent'/reg['state_directory']).exists()                                         # nothing consumed
+
+
+# --- the hidden prompt really is non-echoing on a pseudo-terminal, including inside a systemd user scope -----------------------------------------------------------------
+
+def _pty_run(argv,send,timeout=20):
+    import pty,select
+    pid,fd=pty.fork()
+    if pid==0:
+        os.execvp(argv[0],argv)
+    out=b'';end=time.monotonic()+timeout;sent=False
+    while time.monotonic()<end:
+        ready,_,_=select.select([fd],[],[],0.2)
+        if ready:
+            try:chunk=os.read(fd,4096)
+            except OSError:break
+            if not chunk:break
+            out+=chunk
+            if not sent and b'hidden' in out:
+                os.write(fd,send.encode()+b'\n');sent=True
+        elif sent and out.count(b'RESULT=')>0:break
+    try:os.close(fd)
+    except OSError:pass
+    _,status=os.waitpid(pid,0);return out.decode(errors='replace'),status
+
+
+def test_hidden_input_does_not_echo_on_a_real_terminal():
+    code="import sys;sys.path.insert(0,'.');from verification.ingestion_storage.admin_connection_probe import hidden_input;v=hidden_input();print('RESULT=%d'%len(v))"
+    out,status=_pty_run([sys.executable,'-I','-B','-c',code],'PTY-SYNTHETIC-SECRET-VALUE')
+    assert 'RESULT=26' in out and 'PTY-SYNTHETIC-SECRET-VALUE' not in out                                                   # received in full, never echoed to the terminal
+
+
+@pytest.mark.skipif(shutil.which('systemd-run') is None or os.environ.get('INGESTION_OPERATIONAL_NATIVE')=='1',reason='user systemd scope required (not the hosted root scope)')
+def test_hidden_input_inside_a_user_scope_keeps_the_terminal():
+    code="import sys;sys.path.insert(0,'.');from verification.ingestion_storage.admin_connection_probe import hidden_input;print('TTY=%s%s'%(sys.stdin.isatty(),sys.stderr.isatty()));v=hidden_input();print('RESULT=%d'%len(v))"
+    out,status=_pty_run(['systemd-run','--user','--scope','--quiet',f'--unit=propertyaigent-hidden-input-check-{os.getpid()}',sys.executable,'-I','-B','-c',code],'SCOPE-SYNTHETIC-SECRET')
+    if 'Failed to connect' in out or 'Failed to start' in out:pytest.skip('no user systemd manager in this environment')
+    assert 'TTY=TrueTrue' in out and 'RESULT=22' in out and 'SCOPE-SYNTHETIC-SECRET' not in out
