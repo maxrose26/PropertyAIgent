@@ -1,0 +1,82 @@
+{
+  "authority": "AUTHORISE_OPERATIONAL_SAFETY_CLEANUP_TIMING_ONCE_20261018",
+  "status": "OWNER_APPROVED_CLEANUP_ONCE",
+  "issued_at": "2026-10-18T08:55:00+00:00",
+  "expires_at": "2026-10-18T22:00:00+00:00",
+  "revision": "acd3f5690b439d7d91b7a7efb9ace79c9098d303",
+  "tree": "3f07eeb8442ef6fe5bf93907a03c357faf602a72",
+  "reviewed_candidate": "158ac2df3329806408cd0d30bb55bafea80af1db",
+  "helper_sha256": "66467e6396fffe6ae4e8a8860f1b22b50a102dbad3814e5d8e4058ca2d72be7b",
+  "helper_blob": "a026c05faee4069be24c6ed2218644e8a8663847",
+  "consumed_predecessor_registration_sha256": "3c10291a1b2e7f3d81f463a619fca177a224259f1ed708f01d8d0a5e935cc377",
+  "consumed_predecessor_result_sha256": "b47bdf072fa87e51157f29fda689dad72b44f49de34f712c5cb680cf751f110d",
+  "consumed_predecessor_audit_sha256": "6bdd6f3616230aad804908319627fc69f5254c11eca8836b119b1052651fbf4e",
+  "original_audit_sha256": "dd7c5814b686c8dd4c23451238d88fa76e095040ac30871e4139936b9d02677f",
+  "original_runtime_revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "original_operational_registration_sha256": "5dd3cc1f5252b80d55d31ec3e98303d5a5fb609f212776d29d65c799819746dc",
+  "reconciliation_evidence": "791557cf84b27c24ec3cf134bbf8af4ca3b5a658",
+  "capture_authority": "AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018_CAPTURE",
+  "capture_key": "48e304a92fbe01bac655be36b1c4d6f8fa29ab11857501911b68929bec790699",
+  "grant_sha256": "d456f1849accfbde3d7c7dfeb576cad8211693c141cc542b6fb2e6363cb95f0c",
+  "roles": [
+    "ingestion_effect_login",
+    "ingestion_worker_login"
+  ],
+  "memberships": [
+    [
+      "ingestion_effect_login",
+      "ingestion_effect_broker"
+    ],
+    [
+      "ingestion_worker_login",
+      "ingestion_worker"
+    ]
+  ],
+  "secret_names": [
+    "INGESTION_WORKER_DATABASE_URL",
+    "INGESTION_EFFECT_DATABASE_URL"
+  ],
+  "preserved_secret": "DATABASE_URL",
+  "endpoint": "aws-0-eu-west-2.pooler.supabase.com:5432/postgres",
+  "username": "postgres.zcikcfgpblzuzpanpdqd",
+  "current_user": "postgres",
+  "tls": {
+    "sslmode": "verify-full",
+    "ca_pem_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+  },
+  "limits": {
+    "connections": 2,
+    "commands": 32,
+    "supervised_seconds": 45,
+    "returned_data_value_bytes": 1048576,
+    "actual_memory_bytes": 268435456,
+    "exported_bytes": 524288,
+    "deletes": 2,
+    "names_reads": 2
+  },
+  "timing": {
+    "setup_seconds": 10,
+    "credential_input_seconds": 300,
+    "active_seconds": 45,
+    "work_seconds": 40,
+    "outer_seconds": 355
+  },
+  "hashes": {
+    "verification/ingestion_storage/__init__.py": "bd77e01897bd2c7626f70a81897c257533f584c6b0dba92df9c8c16c47c1cdd3",
+    "verification/discovery/__init__.py": "018744b0a740962f92519fad48546c49d42e056816c0c7659de5af8c12cf9598",
+    "verification/ingestion_storage/operational_cleanup.py": "66467e6396fffe6ae4e8a8860f1b22b50a102dbad3814e5d8e4058ca2d72be7b",
+    "verification/ingestion_storage/credential_mapping.py": "437d0853cf8797a79c52f1249d922d0e255afd0e3db237045fa854fd80b1c4e7",
+    "verification/ingestion_storage/tls_trust.py": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+    "verification/ingestion_storage/memory_enforcement.py": "97150604f63aded266945f5ead282cc010528a9817fb2504377dfced56331220",
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "verification/discovery/route_validation.py": "fab37617d82da1cc0a2f36c33fbeed0b54165f279073dcc798a209b989760c8b",
+    "app/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/db/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/db/session.py": "fbc0cd65f179b7bc7f3665c3340a30bd74310227c9b65327825b80e488d3a131",
+    "app/db/models.py": "431fc1d420e4724cbd4773cb89107a5d84d112e251db1ab126f82040107077f0"
+  },
+  "credential_method": "EXISTING_MIGRATION_URL_HIDDEN_TTY_NO_NEW_CREDENTIALS",
+  "policy": "REVOKE_ONLY_NO_RETRY_NO_SOURCE_NO_APPLICATION_WRITES",
+  "historical_cleanup": "UNCERTAIN_PRESERVED",
+  "pipeline_retry": "HELD"
+}
