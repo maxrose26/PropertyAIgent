@@ -76,7 +76,10 @@ jobs:
           timeout --kill-after=2s 30s env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_discovery_ingestion_tls_trust.py -q
       - name: Actionable native driver diagnostics and failure closure, loopback only
         run: |
-          timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_actionable_release_binding.py tests/test_ingestion_connection_actionable.py tests/test_discovery_ingestion_operational_failure.py tests/test_ingestion_operational_pooler_identity.py tests/test_ingestion_preparation_stages.py -q --junitxml="$RUNNER_TEMP/connection-actionable.xml"
+          timeout --kill-after=2s 40s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_actionable_release_binding.py tests/test_ingestion_connection_actionable.py tests/test_discovery_ingestion_operational_failure.py tests/test_ingestion_operational_pooler_identity.py -q --junitxml="$RUNNER_TEMP/connection-actionable.xml"
+      - name: Stage-attributed connection preparation, real entrypoint and session, loopback only
+        run: |
+          timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_preparation_stages.py -q --junitxml="$RUNNER_TEMP/preparation-stages.xml"
       - name: Fixed committee caller and field-level B2, network denied
         run: |
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
