@@ -19,6 +19,8 @@ from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
+DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
+DIAGNOSTIC_STATE='operational-actionable-diagnostic-once-20261018'
 QUALIFICATION='1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2'
 CONTRACT='bolton-received-idox-coordinator-v1'
 
@@ -354,7 +356,7 @@ class Runner:
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':'AUTHORISE_INGESTION_RESTRICTED_ROUTE_DIAGNOSTIC_ONCE_20261018'}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
@@ -379,7 +381,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/('operational-route-diagnostic-once-20261018' if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
