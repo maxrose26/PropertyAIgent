@@ -15,8 +15,11 @@ from app.ingestion.batching import capture_once,batch_plans,process_batch
 from verification.discovery.idox_window import WindowConfig
 from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation
 from .operational_publication import GitHub,Uncertain,canonical,BRANCH
+from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
+from .connection_diagnostics import PreparationFailure
+from .operational_preparation import Progress,prepare_connection
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
@@ -28,42 +31,6 @@ def restricted_url(role,password):
     """Same in-memory value goes to protected mapping and native URL parser."""
     if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
     return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
-
-class Journal:
-    def __init__(self,root):
-        self.root=Path(root);self.root.mkdir(mode=0o700,parents=False,exist_ok=False)
-        self.file=self.root/'events.jsonl';self.sequence=0;self.head='0'*64
-        self.file.touch(mode=0o600,exist_ok=False)
-        self.sync_dir()
-    def sync_dir(self):
-        for p in (self.root,self.root.parent):
-            fd=os.open(p,os.O_DIRECTORY);os.fsync(fd);os.close(fd)
-    def emit(self,event,payload):
-        record=dict(sequence=self.sequence,event=event,payload=payload,previous_sha256=self.head)
-        head=hashlib.sha256(canonical(record)).hexdigest();raw=canonical(dict(record,sha256=head))+b'\n'
-        if self.file.stat().st_size+len(raw)>1024**2:raise Uncertain('AUDIT_BOUND')
-        with self.file.open('ab') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        self.sequence+=1;self.head=head
-    def save(self,name,value):
-        if name not in {'progress.json','final-result.json'}:raise ValueError('CHECKPOINT_PATH')
-        raw=canonical(value)
-        if len(raw)>256*1024:raise ValueError('CHECKPOINT_BOUND')
-        persisted=sum(p.stat().st_size for p in self.root.rglob('*') if p.is_file())
-        if persisted+len(raw)>2*1024**2-8192:raise ValueError('CHECKPOINT_COMBINED_OUTPUT_RESERVE')
-        temp=self.root/(name+'.next')
-        with temp.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        temp.replace(self.root/name);self.sync_dir()
-        if (self.root/name).read_bytes()!=raw:raise Uncertain('CHECKPOINT_READBACK')
-
-    def progress(self):
-        state=json.loads((self.root/'progress.json').read_bytes());previous='0'*64;sealed=None
-        for i,line in enumerate(self.file.read_bytes().splitlines()):
-            event=json.loads(line);sha=event.pop('sha256')
-            if event['sequence']!=i or event['previous_sha256']!=previous or hashlib.sha256(canonical(event)).hexdigest()!=sha:raise Uncertain('AUDIT_CHAIN_BINDING')
-            previous=sha
-            if event['event']=='progress_saved':sealed=event['payload']['sha256']
-        if previous!=self.head or digest(state)!=sealed:raise Uncertain('DURABLE_PROGRESS_SEAL')
-        return state
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
@@ -353,6 +320,26 @@ class Runner:
         except BaseException as exc:return self.failed(exc)
 
 
+def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.run,dns_command=None):
+    """The actual credential-dependent preparation of the Runner, in explicit stages. Raises PreparationFailure (fixed stage + fixed reason) and nothing else.
+
+    No database connection is made here: `connect` is only a closure handed to the Runner. Seams (`dns_run`, `dns_command`) exist solely so the real stage code can be
+    exercised against controlled local fixtures; production passes neither."""
+    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command)
+    ca,selected,connect=prepared.ca,prepared.hostaddr,prepared.connect
+    with progress.stage('RUNNER_COMPONENTS'):
+        holder={}
+        try:from .operational_source import read
+        except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
+        github=GitHub(journal.emit,lambda:holder['runner'].check())
+        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
+    with progress.stage('RUNNER_CONSTRUCTION'):
+        try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
+        except (KeyError,TypeError,ValueError,AttributeError):raise PreparationFailure('RUNNER_CONSTRUCTION','RUNNER_CONSTRUCTION_FAILED') from None
+        holder['runner']=runner
+    return runner
+
+
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
@@ -385,30 +372,11 @@ def main():
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
-    from verification.discovery.route_validation import validate_route
     from .operational_outcome import session
-    def prepare(raw,started):
-        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
-        u=validate_route(raw)
-        if not isinstance(u.password,str) or not u.password:raise ValueError('EXPLICIT_MIGRATION_PASSWORD_REQUIRED')
-        ca,_=verified_trust()
-        # Hard DNS timeout in a credential-free exec, not an unbounded libc
-        # lookup inside a thread that could survive its timeout.
-        command=[sys.executable,'-c',"import socket,json;print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo('aws-0-eu-west-2.pooler.supabase.com',5432,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"]
-        dns=subprocess.run(command,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3)
-        addresses=json.loads(dns.stdout)
-        if dns.returncode or not isinstance(addresses,list) or not 1<=len(addresses)<=32:raise ValueError('BOUND_DNS_RESULT')
-        import ipaddress
-        if any(ipaddress.ip_address(x).version!=4 for x in addresses):raise ValueError('REVIEWED_IPV4_ONLY')
-        selected=addresses[0]
-        import psycopg
-        def connect():return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
-        holder={};github=GitHub(journal.emit,lambda:holder['runner'].check())
-        from .operational_source import read
-        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
-        runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
-        return runner
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory)
+    progress=Progress()
+    baseline=owned_resources()
+    prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline)
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
