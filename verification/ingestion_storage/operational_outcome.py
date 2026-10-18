@@ -46,13 +46,20 @@ def finalise(journal,result,*,input_seconds,active_started,output=print):
 def early_accounting(progress,elapsed):
     """Complete preparation / administrative / runtime accounting for an exit BEFORE a Runner exists.
 
-    "No runtime slot" (an empty slot table, slot_state NO_RUNTIME_SLOT_CREATED) is NOT "zero total work": local preparation work (e.g. the DNS subprocess) is
-    reported separately. The zero counters below are structural: no Runner, owner connector, GitHub client or source reader had been invoked."""
-    work=progress.work() if progress is not None else dict(state='PREPARATION_PROGRESS_UNAVAILABLE')
-    return dict(administration=dict(connections=0,commands=0,returned_data_value_bytes=0,supervised_seconds=elapsed,failed_native_connections=0,failed_native_finished=0,
-                                    credential_generations=0,secret_mappings=0,role_changes=0),
-                runtime=dict(slot_receipts={},slot_state='NO_RUNTIME_SLOT_CREATED',supervised_seconds=0),
-                preparation=work,historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
+    Each counter carries its basis: MEASURED (observed by the progress record, so a zero is a measured zero), NOT_STARTED (the producing component was provably never
+    reached because the measured connection count is zero) or UNKNOWN (no progress record, so nothing is claimed). "No runtime slot" is NOT "zero total work"."""
+    if progress is None:
+        unknown=dict(value=None,basis='UNKNOWN')
+        return dict(administration={k:dict(unknown) for k in ('connections','commands','returned_data_value_bytes','failed_native_connections','failed_native_finished',
+                                                               'credential_generations','secret_mappings','role_changes')}|dict(supervised_seconds=elapsed),
+                    runtime=dict(slot_receipts=None,slot_state='UNKNOWN',supervised_seconds=dict(unknown)),preparation=dict(state='PREPARATION_PROGRESS_UNAVAILABLE'),
+                    historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
+    calls=progress.database_connection_calls
+    measured=lambda v:dict(value=v,basis='MEASURED');not_started=dict(value=0,basis='NOT_STARTED') if calls==0 else dict(value=None,basis='UNKNOWN')
+    admin=dict(connections=measured(calls),supervised_seconds=elapsed)
+    for k in ('commands','returned_data_value_bytes','failed_native_connections','failed_native_finished','credential_generations','secret_mappings','role_changes'):admin[k]=dict(not_started)
+    return dict(administration=admin,runtime=dict(slot_receipts={},slot_state='NO_RUNTIME_SLOT_CREATED',supervised_seconds=dict(not_started)),
+                preparation=progress.work(),historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
 
 def early_closure(baseline,proof,progress):

@@ -152,7 +152,7 @@ def test_dns_subprocess_failures_have_exact_reasons(tmp_path,seams,reason,flags)
     result,j,lines,progress,_=run_session(tmp_path,url(),**seams)
     f=result['failure'];assert f['reason_code']==reason and f['flags']==flags and f['phase']=='PREPARATION'
     assert f['stage'] in ('DNS_RESOLUTION','ADDRESS_POLICY') and progress.dns['subprocess_started']
-    assert result['accounting']['preparation']['local_subprocesses']==1                                 # preparation DID work even though no runtime slot exists
+    assert result['accounting']['preparation']['local_subprocesses']==dict(value=1,basis='MEASURED')                                 # preparation DID work even though no runtime slot exists
     assert result['closure_components']['process']['status']=='CLOSED' and result['closure_components']['process']['live_child_count']==0   # the timed-out child was killed and reaped
     assert_secret_safe(j,lines,result)
 
@@ -180,11 +180,12 @@ def test_expired_registration_in_preparation_stage(tmp_path):
 
 def test_every_early_exit_exports_complete_accounting_and_separate_positive_closure(tmp_path):
     result,j,lines,progress,memory=run_session(tmp_path,url(user='postgres'))
-    a=result['accounting']
-    assert a['administration']==dict(connections=0,commands=0,returned_data_value_bytes=0,supervised_seconds=a['administration']['supervised_seconds'],failed_native_connections=0,
-                                     failed_native_finished=0,credential_generations=0,secret_mappings=0,role_changes=0)
-    assert a['runtime']['slot_receipts']=={} and a['runtime']['slot_state']=='NO_RUNTIME_SLOT_CREATED' and a['runtime']['supervised_seconds']==0
-    assert a['preparation']['state']=='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' and a['preparation']['local_subprocesses']==0 and a['historical_accounting_gaps']=='PRESERVED_NOT_RECONSTRUCTED'
+    a=result['accounting'];adm=a['administration']
+    assert adm['connections']==dict(value=0,basis='MEASURED')                                               # a measured zero: the connect closure was never called
+    for k in ('commands','returned_data_value_bytes','failed_native_connections','failed_native_finished','credential_generations','secret_mappings','role_changes'):
+        assert adm[k]==dict(value=0,basis='NOT_STARTED'),k                                                   # provably never reached, not "measured"
+    assert a['runtime']['slot_receipts']=={} and a['runtime']['slot_state']=='NO_RUNTIME_SLOT_CREATED' and a['runtime']['supervised_seconds']==dict(value=0,basis='NOT_STARTED')
+    pw=a['preparation'];assert pw['state']=='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' and pw['local_subprocesses']==dict(value=0,basis='MEASURED') and a['historical_accounting_gaps']=='PRESERVED_NOT_RECONSTRUCTED'
     c=result['closure_components']
     assert c['access']['status']=='NOT_REQUIRED_NO_ACCESS_CREATED' and c['connections']['status']=='NO_CONNECTION_ATTEMPTED'
     assert c['process']['status']=='CLOSED' and c['process']['new_socket_count']==0 and c['outer_scope_removal']=='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT'
@@ -274,3 +275,47 @@ def test_operational_and_storage_connection_paths_differ_only_in_documented_opti
     assert storage['user']==runtime['user']=='ingestion_worker_login.zcikcfgpblzuzpanpdqd' and admin['user']=='postgres.zcikcfgpblzuzpanpdqd'
     assert admin['options']==runtime['options']=='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000'   # the ONLY startup-parameter difference from the accepted storage path
     assert storage['password']=='generated'==runtime['password'] and admin['password']==SECRET
+
+
+def test_unknown_basis_without_progress_record_claims_nothing(tmp_path):
+    j=Journal(tmp_path/'unk');r=session(j,registration()['expires_at'],lambda:'x',lambda raw,started:(_ for _ in ()).throw(RuntimeError('private')),memory=Memory(),output=lambda *a,**k:None,timing=FAST)
+    adm=r['accounting']['administration']
+    assert adm['connections']=={'value':None,'basis':'UNKNOWN'} and r['accounting']['runtime']['slot_state']=='UNKNOWN' and r['cleanup']=='UNCERTAIN'
+
+
+# --- the real main() entrypoint: argument/environment gates, registration binding, session wiring, exit status, final-result file ------------------------------------------
+
+def test_real_main_wires_progress_and_exports_a_stage_attributed_final_result(tmp_path,monkeypatch,capsys):
+    import hashlib,os
+    from verification.ingestion_storage import operational_memory,credential_mapping
+    reg=registration();body=json.dumps(reg).encode();digest=hashlib.sha256(body).hexdigest();path=tmp_path/'reg.json';path.write_bytes(body)
+    for k in [k for k in os.environ if k.startswith('PG') or k in ('GH_TOKEN','GITHUB_TOKEN','GH_DEBUG','GH_HOST')]:monkeypatch.delenv(k)
+    monkeypatch.setenv('HOME',str(tmp_path));monkeypatch.setattr(sys,'platform','linux');monkeypatch.setattr(sys.stdin,'isatty',lambda:True,raising=False);monkeypatch.setattr(sys.stderr,'isatty',lambda:True,raising=False)
+    monkeypatch.setattr(op,'validate_registration',lambda b,sha:dict(reg,authority='synthetic-authority'))
+    monkeypatch.setattr(operational_memory,'OperationalMemory',Memory)
+    monkeypatch.setattr(credential_mapping,'secure_migration_input',lambda:url(host='db.example.invalid'))
+    monkeypatch.setattr(sys,'argv',['x','--registration',str(path),'--registration-sha256',digest])
+    with pytest.raises(SystemExit) as caught:op.main()
+    assert caught.value.code==1                                                                             # a closed failure is still a failed execution
+    final=next((tmp_path/'.local/state/propertyaigent').glob('*/final-result.json'))
+    result=json.loads(final.read_bytes());f=result['failure']
+    assert (f['phase'],f['stage'],f['reason_code']) == ('PREPARATION','ROUTE_VALIDATION','ROUTE_HOST_MISMATCH') and result['cleanup']=='CLOSED'
+    assert result['accounting']['administration']['connections']==dict(value=0,basis='MEASURED') and result['preparation']['completed_stages']==['REGISTRATION_EXPIRY']
+    blob=final.read_text()+(final.parent/'events.jsonl').read_text()+capsys.readouterr().out+capsys.readouterr().err
+    for forbidden in (SECRET,'db.example.invalid','postgresql://','Traceback'):assert forbidden not in blob
+
+
+# --- hosted-only: REAL native cgroup memory object under the systemd scope (skipped locally; runs in the restricted-provisioning wrapper step) ---------------------------
+
+@pytest.mark.skipif(__import__('os').environ.get('INGESTION_OPERATIONAL_NATIVE')!='1',reason='requires the hosted systemd operational scope')
+@pytest.mark.parametrize('fault',['route','dns_timeout','dns_exit'])
+def test_native_memory_and_process_closure_on_early_failure(tmp_path,fault):
+    from verification.ingestion_storage.operational_memory import OperationalMemory
+    native=OperationalMemory()
+    raw,seams={'route':(url(user='postgres'),{}),'dns_timeout':(url(),python_dns('import time;time.sleep(30)',dns_run=FAKE_DNS_RUN(.3))),'dns_exit':(url(),python_dns('import sys;sys.exit(4)'))}[fault]
+    result,j,lines,progress,_=run_session(tmp_path,raw,memory=native,**seams)
+    c=result['closure_components']
+    assert result['failure']['phase']=='PREPARATION' and result['accounting']['administration']['connections']==dict(value=0,basis='MEASURED')
+    assert c['process']['status']=='CLOSED' and c['process']['live_child_count']==0 and c['process']['new_socket_count']==0 and result['cleanup']=='CLOSED'
+    m=c['process']['memory'];assert m['owned_groups_removed'] is True and m['owned_survivors']==0                 # positive kernel evidence, not an absence of errors
+    assert_secret_safe(j,lines,result)

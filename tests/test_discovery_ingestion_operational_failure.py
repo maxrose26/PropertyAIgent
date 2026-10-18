@@ -33,10 +33,11 @@ def test_shared_session_reports_every_early_exit(tmp_path,fault):
         calls.append('prepare');raise RuntimeError(raw)
     expiry=EXPIRY() if fault!='expired' else (datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat()
     timing=dict(input_seconds=.05,active_seconds=.5,work_seconds=.3,diagnostic_seconds=.1,report_seconds=.1,outer_seconds=1)
-    result=session(j,expiry,reader,prepare,output=lambda x,**kw:lines.append(x),timing=timing)
+    from verification.ingestion_storage.operational_preparation import Progress
+    result=session(j,expiry,reader,prepare,output=lambda x,**kw:lines.append(x),timing=timing,progress=Progress())
     assert result['status']=='STOP_RECONCILE_NO_RETRY'
     assert json.loads((j.root/'final-result.json').read_bytes())==result
-    assert result['accounting']['administration']['connections']==0
+    assert result['accounting']['administration']['connections']=={'value':0,'basis':'MEASURED'}   # measured zero; without a progress record it is UNKNOWN (see preparation_stages)
     assert result['authority_invalidation']=='NOT_REQUIRED_NO_AUTHORITY'
     assert len(lines)==1 and 'never_export_this_credential' not in lines[0] and 'never_export_this_credential' not in j.file.read_text()
     assert calls==([] if fault in ('input_timeout','expired') else ['prepare'])

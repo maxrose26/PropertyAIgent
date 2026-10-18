@@ -27,7 +27,7 @@ class Progress:
     def __init__(self):
         self.current=None;self.completed=[];self.started=time.monotonic()
         self.dns=dict(subprocess_started=False,subprocess_completed=False,exit_code=None,stdout_bytes=None,address_count=None)
-        self.database_connection_calls=0;self.github_calls=0;self.source_requests=0
+        self.database_connection_calls=0
 
     @contextmanager
     def stage(self,name):
@@ -42,14 +42,17 @@ class Progress:
 
     def report(self):
         return dict(current_stage=self.current,completed_stages=list(self.completed),dns=dict(self.dns),
-                    database_connection_calls=self.database_connection_calls,github_calls=self.github_calls,source_requests=self.source_requests,
+                    database_connection_calls=self.database_connection_calls,
                     elapsed_seconds=round(time.monotonic()-self.started,6))
 
     def work(self):
-        """Total work performed, distinct from the (empty) runtime slot table."""
-        return dict(database_connections=self.database_connection_calls,database_statements=0,github_cli_invocations=self.github_calls,source_requests=self.source_requests,
-                    local_subprocesses=1 if self.dns['subprocess_started'] else 0,state='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK'
-                    if not (self.database_connection_calls or self.github_calls or self.source_requests) else 'UNEXPECTED_WORK_RECORDED')
+        """Total work performed, distinct from the (empty) runtime slot table. Bases: the DNS subprocess and the connect closure are MEASURED here; the GitHub client,
+        source reader and statements are structurally NOT_STARTED because preparation never invokes them (they are handed to the Runner uninvoked)."""
+        started=bool(self.dns['subprocess_started'])
+        return dict(database_connections=dict(value=self.database_connection_calls,basis='MEASURED'),
+                    database_statements=dict(value=0,basis='NOT_STARTED'),github_cli_invocations=dict(value=0,basis='NOT_STARTED'),source_requests=dict(value=0,basis='NOT_STARTED'),
+                    local_subprocesses=dict(value=1 if started else 0,basis='MEASURED'),
+                    state='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' if not self.database_connection_calls else 'DATABASE_CONNECT_CALLED_DURING_PREPARATION')
 
 
 def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIMEOUT_SECONDS):
