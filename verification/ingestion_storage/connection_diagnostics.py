@@ -37,13 +37,41 @@ def classify_native(original, state):
     matched={code for code,pattern in PATTERNS if re.search(pattern,message,re.I)}
     return (matched.pop(),'LOCAL_ALLOWLIST') if len(matched)==1 else ('UNKNOWN','NONE')
 
-PHASES = {'ROUTE_VALIDATION','DRIVER_CONNECT','SERVER_IDENTITY','ENGINE_CHECKOUT','EXECUTION'}
+PHASES = {'PREPARATION','ROUTE_VALIDATION','DRIVER_CONNECT','SERVER_IDENTITY','ENGINE_CHECKOUT','EXECUTION'}
+# Ordered client-side preparation boundaries (before any database connection). SESSION_INPUT/REGISTRATION_EXPIRY precede preparation proper.
+STAGES = ('SESSION_INPUT','REGISTRATION_EXPIRY','ROUTE_VALIDATION','PASSWORD_PRESENCE','CA_TRUST','DNS_RESOLUTION','ADDRESS_POLICY','DRIVER_IMPORT',
+          'RUNNER_COMPONENTS','RUNNER_CONSTRUCTION')
+PREPARATION_REASONS = frozenset({'REGISTRATION_EXPIRED','PASSWORD_ABSENT','UNEXPECTED_EXCEPTION','DNS_TIMEOUT','DNS_SUBPROCESS_SPAWN_FAILED','DNS_NONZERO_EXIT',
+    'DNS_OUTPUT_BOUND','DNS_EMPTY_OUTPUT','DNS_MALFORMED_OUTPUT','DNS_NO_ADDRESS','DNS_TOO_MANY_ADDRESSES','DNS_INVALID_ADDRESS','REVIEWED_IPV4_ONLY',
+    'ROUTE_DRIVER_MISMATCH','ROUTE_HOST_MISMATCH','ROUTE_PORT_MISMATCH','ROUTE_DATABASE_MISMATCH','ROUTE_USERNAME_MISMATCH','ROUTE_QUERY_FORBIDDEN',
+    'ROUTE_MALFORMED_INPUT','REVIEWED_CA_MISSING','REVIEWED_CA_HASH_MISMATCH','REVIEWED_CA_NOT_SIGNING_CA','REVIEWED_CA_VALIDITY_REVIEW_REQUIRED',
+    'REVIEWED_CA_DER_MISMATCH','DRIVER_IMPORT_FAILED','COMPONENT_IMPORT_FAILED','RUNNER_CONSTRUCTION_FAILED'})
 KINDS = {'OperationalError','InterfaceError','ProgrammingError','InternalError',
          'InvalidPassword','InvalidAuthorizationSpecification','ConnectionTimeout',
-         'Denied','ValueError','TimeoutError','ConnectionRefusedError','OSError'}
+         'Denied','ValueError','TimeoutError','ConnectionRefusedError','OSError',
+         # preparation-stage classes (class names only; never messages)
+         'RouteRejection','JSONDecodeError','TimeoutExpired','ImportError','ModuleNotFoundError','FileNotFoundError','InvalidSignature','KeyError','AttributeError','TypeError',
+         'PreparationFailure','Uncertain'}
+
+
+def kind_of(exc):
+    kind=type(getattr(exc,'orig',exc)).__name__
+    return kind if kind in KINDS else 'OTHER'
+
+
+class PreparationFailure(Exception):
+    """A preparation boundary failed. Carries ONLY a fixed stage, a fixed reason and bounded non-secret flags; str() is the fixed codes."""
+    def __init__(self,stage,reason,**flags):
+        if stage not in STAGES or reason not in PREPARATION_REASONS:raise ValueError('PREPARATION_CODE')
+        self.stage=stage;self.reason=reason
+        self.flags={k:v for k,v in flags.items() if k in {'exit_code','exception_kind'} and (v is None or isinstance(v,int) and not isinstance(v,bool) and -255<=v<=255 or k=='exception_kind' and v in KINDS|{'OTHER'})}
+        super().__init__(stage+':'+reason)
 
 def safe_failure(exc, phase):
     if phase not in PHASES: raise ValueError('DIAGNOSTIC_PHASE')
+    if isinstance(exc,PreparationFailure):
+        return dict(phase='PREPARATION',stage=exc.stage,exception_kind='PreparationFailure',sqlstate=None,reason_code=exc.reason,classification_source='FIXED_PREPARATION_CODE',
+                    failed_native_connection_finished=False,underlying_cause='UNDETERMINED',message_exported=False,flags=dict(exc.flags))
     original = getattr(exc, 'orig', exc)
     kind = type(original).__name__
     state = getattr(original, 'sqlstate', None)

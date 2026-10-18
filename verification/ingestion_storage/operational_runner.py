@@ -17,6 +17,8 @@ from .operational_controller import DatabaseBudget,ControllerLedger,batch_alloca
 from .operational_publication import GitHub,Uncertain,canonical,BRANCH
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
+from .connection_diagnostics import PreparationFailure
+from .operational_preparation import Progress,resolve_addresses,CA_REASONS
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
@@ -353,6 +355,46 @@ class Runner:
         except BaseException as exc:return self.failed(exc)
 
 
+def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.run,dns_command=None):
+    """The actual credential-dependent preparation of the Runner, in explicit stages. Raises PreparationFailure (fixed stage + fixed reason) and nothing else.
+
+    No database connection is made here: `connect` is only a closure handed to the Runner. Seams (`dns_run`, `dns_command`) exist solely so the real stage code can be
+    exercised against controlled local fixtures; production passes neither."""
+    with progress.stage('REGISTRATION_EXPIRY'):
+        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise PreparationFailure('REGISTRATION_EXPIRY','REGISTRATION_EXPIRED')
+    with progress.stage('ROUTE_VALIDATION'):
+        from verification.discovery.route_validation import validate_route,RouteRejection
+        try:u=validate_route(raw)
+        except RouteRejection as rejection:raise PreparationFailure('ROUTE_VALIDATION','ROUTE_'+rejection.code) from None
+    with progress.stage('PASSWORD_PRESENCE'):
+        if not isinstance(u.password,str) or not u.password:raise PreparationFailure('PASSWORD_PRESENCE','PASSWORD_ABSENT')
+    with progress.stage('CA_TRUST'):
+        try:ca,_=verified_trust()
+        except ValueError as exc:
+            # The reviewed trust module raises only fixed REVIEWED_CA_* codes; anything else stays an unclassified exception.
+            if str(exc) in CA_REASONS:raise PreparationFailure('CA_TRUST',str(exc)) from None
+            raise
+    with progress.stage('DNS_RESOLUTION'):
+        selected=resolve_addresses(progress,command=dns_command,run=dns_run)
+    with progress.stage('DRIVER_IMPORT'):
+        try:import psycopg
+        except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
+    def connect():
+        progress.database_connection_calls+=1
+        return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
+    with progress.stage('RUNNER_COMPONENTS'):
+        holder={}
+        try:from .operational_source import read
+        except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
+        github=GitHub(journal.emit,lambda:holder['runner'].check())
+        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
+    with progress.stage('RUNNER_CONSTRUCTION'):
+        try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
+        except (KeyError,TypeError,ValueError,AttributeError):raise PreparationFailure('RUNNER_CONSTRUCTION','RUNNER_CONSTRUCTION_FAILED') from None
+        holder['runner']=runner
+    return runner
+
+
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
@@ -385,30 +427,11 @@ def main():
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
-    from verification.discovery.route_validation import validate_route
     from .operational_outcome import session
-    def prepare(raw,started):
-        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
-        u=validate_route(raw)
-        if not isinstance(u.password,str) or not u.password:raise ValueError('EXPLICIT_MIGRATION_PASSWORD_REQUIRED')
-        ca,_=verified_trust()
-        # Hard DNS timeout in a credential-free exec, not an unbounded libc
-        # lookup inside a thread that could survive its timeout.
-        command=[sys.executable,'-c',"import socket,json;print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo('aws-0-eu-west-2.pooler.supabase.com',5432,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"]
-        dns=subprocess.run(command,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3)
-        addresses=json.loads(dns.stdout)
-        if dns.returncode or not isinstance(addresses,list) or not 1<=len(addresses)<=32:raise ValueError('BOUND_DNS_RESULT')
-        import ipaddress
-        if any(ipaddress.ip_address(x).version!=4 for x in addresses):raise ValueError('REVIEWED_IPV4_ONLY')
-        selected=addresses[0]
-        import psycopg
-        def connect():return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
-        holder={};github=GitHub(journal.emit,lambda:holder['runner'].check())
-        from .operational_source import read
-        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
-        runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
-        return runner
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory)
+    progress=Progress()
+    baseline=owned_resources()
+    prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline)
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
