@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
@@ -75,21 +75,36 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             with pytest.raises(psycopg.Error,match=reason):c.execute(activation)
                     finally:boot.execute(undo)
             runner.owner.install=install_with_ambient_negatives
-            if fault=='reuse_installed_success':
+            if fault in {'reuse_installed_success','diagnostic_only'}:
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
                 original_install()
                 boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN PASSWORD NULL')
                 boot.execute('ALTER ROLE ingestion_effect_login NOLOGIN PASSWORD NULL')
-                boot.execute('REVOKE ingestion_worker FROM ingestion_worker_login')
-                boot.execute('REVOKE ingestion_effect_broker FROM ingestion_effect_login')
+                with connector() as migration:
+                    migration.execute('REVOKE ingestion_worker FROM ingestion_worker_login GRANTED BY CURRENT_USER')
+                    migration.execute('REVOKE ingestion_effect_broker FROM ingestion_effect_login GRANTED BY CURRENT_USER')
                 ctl=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
                 ctl['hard_stop_generation']=1;ctl['last_hard_stop']='OPERATIONAL_FIRST_CONNECTION_FAILURE_CLEANUP_20261018'
                 boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
                 runner.owner.reuse_installed=True
                 from app.ingestion.ledger import digest
                 runner.owner.baseline_control_sha256=digest(ctl)
+                if fault=='diagnostic_only':
+                    from verification.ingestion_storage.operational_outcome import session
+                    runner.r['mode']='CONNECTION_DIAGNOSTIC_ONLY';runner.owner.apply_policy=False
+                    lines=[]
+                    result=session(journal,registration['expires_at'],lambda:'hidden fixture input',lambda raw,started:runner,output=lambda line,**kw:lines.append(line))
+                    assert result['status']=='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED' and result['cleanup']=='CLOSED'
+                    actual=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                    assert actual==ctl and not runner.owner.authorities and not source_calls
+                    assert set(ciphertexts)=={'DATABASE_URL'}
+                    assert not boot.execute("SELECT count(*) FROM public.ingestion_work_attempts").fetchone()[0]
+                    assert boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>repeat('0',64)").fetchone()[0]==0
+                    record_property('restricted_route_diagnostic',json.dumps(dict(accounting=result['accounting'],status=result['status'],execution_grants=0,source_calls=0,ledger_changed=False)))
+                    return
+
             if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack'}:
                 from verification.ingestion_storage.operational_outcome import session
                 from verification.ingestion_storage.tls_trust import verified_trust
@@ -142,7 +157,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 lines=[]
                 result=session(journal,registration['expires_at'],lambda:'disposable hidden input',lambda raw,started:runner,output=lambda line,**kw:lines.append(line))
                 assert result['status']=='STOP_RECONCILE_NO_RETRY'
-                saved=json.loads((journal.root/'final-result.json').read_bytes());assert saved==result and len(lines)==1
+                saved=json.loads((journal.root/'final-result.json').read_bytes());assert saved==json.loads(json.dumps(result)) and len(lines)==1
                 assert 'private connection URL' not in journal.file.read_text() and 'disposable hidden input' not in lines[0]
                 assert result['accounting']['administration']['connections_opened']==result['accounting']['administration']['connections_closed']
                 ctl=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]

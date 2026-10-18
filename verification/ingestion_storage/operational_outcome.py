@@ -10,26 +10,37 @@ TIMING=dict(input_seconds=300,active_seconds=480,work_seconds=450,diagnostic_sec
 def finalise(journal,result,*,input_seconds,active_started,output=print):
     result['phase_timing']=dict(credential_input_seconds=input_seconds,
         active_seconds_before_reporting=0 if active_started is None else time.monotonic()-active_started)
+    saved=False
     try:
-        journal.save('final-result.json',result)
         raw=canonical(result)
+        current=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
+        prior=journal.root/'final-result.json'
+        projected=current-(prior.stat().st_size if prior.exists() else 0)+len(raw)
         receipt=dict(result,audit=str(journal.file),audit_sha256=hashlib.sha256(journal.file.read_bytes()).hexdigest(),
-            audit_chain_head=journal.head,result_sha256=hashlib.sha256(raw).hexdigest())
-        if len(canonical(receipt))>256*1024:raise ValueError('FINAL_RESULT_BOUND')
-        receipt['persisted_evidence_bytes']=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
-        receipt['terminal_json_bytes']=0;receipt['exported_bytes']=receipt['persisted_evidence_bytes']
+            audit_chain_head=journal.head,result_sha256=hashlib.sha256(raw).hexdigest(),
+            persisted_evidence_bytes=projected,terminal_json_bytes=0,exported_bytes=projected)
         for _ in range(10):
             line=json.dumps(receipt,sort_keys=True);size=len(line.encode())+1
             if receipt['terminal_json_bytes']==size:break
-            receipt['terminal_json_bytes']=size;receipt['exported_bytes']=receipt['persisted_evidence_bytes']+size
+            receipt['terminal_json_bytes']=size;receipt['exported_bytes']=projected+size
         else:raise ValueError('OUTPUT_ACCOUNTING')
-        if receipt['exported_bytes']>2*1024**2-8192:raise ValueError('COMBINED_OUTPUT_BOUND')
+        if size>256*1024 or receipt['exported_bytes']>2*1024**2-8192:raise ValueError('COMBINED_OUTPUT_BOUND')
+        # Both persisted replacement and terminal are checked before either effect.
+        journal.save('final-result.json',result);saved=True
         output(line,flush=True)
     except BaseException:
-        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason='FINAL_EVIDENCE_OR_OUTPUT_UNCERTAIN',
+        fallback=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason='FINAL_EVIDENCE_OR_OUTPUT_UNCERTAIN',
             accounting=result.get('accounting',{}),audit=str(journal.file))
-        try:output(json.dumps(result,sort_keys=True),flush=True)
+        try:
+            payload=json.dumps(fallback,sort_keys=True)
+            current=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
+            prior=journal.root/'final-result.json'
+            projected=current-(prior.stat().st_size if prior.exists() else 0)+len(canonical(fallback))
+            if projected+len(payload.encode())+1>2*1024**2:raise ValueError('FALLBACK_BOUND')
+            if not saved:journal.save('final-result.json',fallback)
+            output(payload,flush=True)
         except BaseException:pass
+        result=fallback
     return result
 
 def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMING):
@@ -59,8 +70,10 @@ def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMI
         try:journal.emit('stopped_before_runner',result)
         except BaseException:pass
     finally:raw=None
-    end=min(outer+timing['outer_seconds'],(active+timing['active_seconds']) if active is not None else time.monotonic()+timing['report_seconds'])
-    if hard is None:hard=HardDeadline(end)
+    end=min(outer+timing['outer_seconds'],time.monotonic()+timing['report_seconds'],(active+timing['active_seconds']) if active is not None else float('inf'))
+    reporting_hard=HardDeadline(end)
+    if hard is not None:hard.close()
+    hard=reporting_hard
     try:
         arm_deadline(max(.001,end-time.monotonic()),'FINAL_REPORT_DEADLINE')
         return finalise(journal,result,input_seconds=input_seconds,active_started=active,output=output)

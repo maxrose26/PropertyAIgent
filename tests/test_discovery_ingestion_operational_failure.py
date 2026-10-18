@@ -53,3 +53,32 @@ def test_uncertain_admin_effect_forbids_automatic_invalidation():
     o.authorities=['EXACT'];o.effect_uncertain=True
     assert o.invalidate_failure()=='UNCERTAIN_RECONCILE'
     assert o.connections==0
+
+
+def test_full_result_not_written_before_combined_output_bound(tmp_path):
+    j=Journal(tmp_path/'bound')
+    (j.root/'retained').write_bytes(b'x'*(2*1024**2-16000))
+    result=finalise(j,dict(status='FAILED',accounting={},large='x'*20000),input_seconds=0,active_started=None,output=lambda *a,**k:None)
+    assert result['reason']=='FINAL_EVIDENCE_OR_OUTPUT_UNCERTAIN'
+    saved=json.loads((j.root/'final-result.json').read_bytes())
+    assert 'large' not in saved
+    assert sum(p.stat().st_size for p in j.root.iterdir())<2*1024**2
+
+
+def test_active_session_blocked_final_output_has_hard_reporting_deadline(tmp_path):
+    import subprocess,sys
+    script=r"""
+import time,sys
+from verification.ingestion_storage.operational_runner import Journal
+from verification.ingestion_storage.operational_outcome import session
+from datetime import datetime,timezone,timedelta
+j=Journal(sys.argv[1])
+class Worker:
+ def execute(self):return {'status':'FAILED','cleanup':'UNCERTAIN','accounting':{}}
+def blocked(*a,**k):time.sleep(30)
+session(j,(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat(),lambda:'hidden',lambda raw,started:Worker(),output=blocked,timing=dict(input_seconds=1,active_seconds=10,work_seconds=8,diagnostic_seconds=1,report_seconds=.1,outer_seconds=12))
+"""
+    began=time.monotonic()
+    r=subprocess.run([sys.executable,'-c',script,str(tmp_path/'blocked')],capture_output=True,timeout=3)
+    assert r.returncode==124 and time.monotonic()-began<3
+    assert (tmp_path/'blocked'/'final-result.json').exists()

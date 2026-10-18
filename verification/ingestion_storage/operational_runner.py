@@ -41,6 +41,8 @@ class Journal:
         if name not in {'progress.json','final-result.json'}:raise ValueError('CHECKPOINT_PATH')
         raw=canonical(value)
         if len(raw)>256*1024:raise ValueError('CHECKPOINT_BOUND')
+        persisted=sum(p.stat().st_size for p in self.root.rglob('*') if p.is_file())
+        if persisted+len(raw)>2*1024**2-8192:raise ValueError('CHECKPOINT_COMBINED_OUTPUT_RESERVE')
         temp=self.root/(name+'.next')
         with temp.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
         temp.replace(self.root/name);self.sync_dir()
@@ -61,7 +63,7 @@ class Runner:
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
-        self.started=started if started is not None else time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0;self.hostaddr=hostaddr
+        self.operation_phase='INITIALISATION';self.started=started if started is not None else time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0;self.hostaddr=hostaddr
         self.expiry=datetime.fromisoformat(registration['expires_at'])
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings)
@@ -82,7 +84,7 @@ class Runner:
         if (self.journal.root/'STOP').exists():raise Denied('OWNER_STOP')
         if self.memory is not None:self.memory.snapshot()
         size=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
-        if size>2*1024**2-16384:raise Denied('COMBINED_OUTPUT_CLOSURE_RESERVE')
+        if size>2*1024**2-128*1024:raise Denied('COMBINED_OUTPUT_CLOSURE_RESERVE')
 
     @contextmanager
     def phase_as(self,name):
@@ -126,22 +128,27 @@ class Runner:
     def setup(self):
         account=self.github.call('GET','user')
         if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
-        self.owner.preflight();self.owner.install();self.owner.map_and_activate(self.github,url_factory=self.url_factory)
+        self.operation_phase='ADMIN_PREFLIGHT';self.owner.preflight()
+        self.operation_phase='ADMIN_INSTALL_OR_REUSE';self.owner.install()
+        self.operation_phase='CREDENTIAL_MAPPING_ACTIVATION';self.owner.map_and_activate(self.github,url_factory=self.url_factory)
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256'])
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key']
         # Validate BOTH real restricted logins before any source grant exists.
         # This slot's counters carry into capture; it cannot reset allowances.
+        self.operation_phase='RESTRICTED_CONNECTION_QUALIFICATION'
         with self.phase_as('runtime'):
             with self.slot(self.capture_key,{},'NO_EXECUTION_AUTHORITY') as (_,budget):
                 for engine in budget.engines:
                     with engine.connect():pass
         self.emit('restricted_connections_verified_before_authority',dict(capture_key=self.capture_key))
         if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':return
+        self.operation_phase='AUTHORITY_REGISTRATION'
         self.capture_bindings=self.owner.register([root],AUTHORITY+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.emit('required_setup_committed',dict(capture_key=self.capture_key))
 
     def capture_once(self):
+        self.operation_phase='SOURCE_CAPTURE_RETENTION'
         if self.capture is not None:raise Denied('CAPTURE_ALREADY_RETAINED_NO_SOURCE_REPLAY')
         with self.phase_as('runtime'):
             with self.slot(self.capture_key,self.capture_bindings,AUTHORITY+'_CAPTURE') as (co,budget):
@@ -173,6 +180,7 @@ class Runner:
         self.journal.save('progress.json',state);self.emit('progress_saved',dict(sha256=digest(state)))
 
     def screen(self,*,pause_after=None):
+        self.operation_phase='RETAINED_QUEUE_SCREENING'
         # A planned pause is an offline rehearsal injection, not a production
         # CLI option. Resume verifies durable progress and uses no source client.
         saved=self.journal.progress()
@@ -216,6 +224,7 @@ class Runner:
         current.save_progress();return current
 
     def finish(self):
+        self.operation_phase='TEARDOWN_PUBLICATION_CLOSURE'
         with self.phase_as('teardown'):self.owner.teardown(self.github)
         self.emit('required_access_disabled',dict(roles=list(ROLES),authorities=self.owner.authorities))
         self.check()
@@ -243,6 +252,11 @@ class Runner:
         self.journal.save('final-result.json',result)
         return result
 
+    def observe_source(self,event,payload):
+        if event not in {'source_supervisor_observed','source_worker_resource_observed'}:raise ValueError('SOURCE_RESOURCE_EVENT')
+        self.source_resources[event]=payload
+        self.emit(event,{'actual':payload})
+
     def accounting(self):
         now=time.monotonic()
         admin=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
@@ -257,6 +271,7 @@ class Runner:
         """Shared production/rehearsal exit, independent of ledger construction."""
         from .connection_diagnostics import safe_failure
         self.diagnosing=True;self.diagnostic_started=time.monotonic()
+        failed_phase=self.operation_phase
         diagnostics={};invalidation='UNCERTAIN_RECONCILE';access='UNRECONCILED'
         # A known failure may invoke the fixed safety disposition. An uncertain
         # admin mutation is never automatically replayed or compensated.
@@ -281,7 +296,7 @@ class Runner:
             if self.memory is not None:closure=self.memory.close()
         except BaseException:pass
         result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',
-            failure=safe_failure(exc,'EXECUTION'),authority_invalidation=invalidation,
+            failure=safe_failure(exc,'EXECUTION'),operation_phase=failed_phase,authority_invalidation=invalidation,
             access=access,diagnostics=diagnostics,owned_cleanup=closure,
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
@@ -300,7 +315,7 @@ class Runner:
                 return dict(status='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED',cleanup='CLOSED',accounting=self.accounting(),owned_cleanup=proof,source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD')
             self.capture_once()
             if self.plans:self.screen()
-            return self.finish()
+            result=self.finish();result['accounting']=self.accounting();return result
         except BaseException as exc:return self.failed(exc)
 
 
@@ -356,7 +371,7 @@ def main():
         def connect():return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
         holder={};github=GitHub(journal.emit,lambda:holder['runner'].check())
         from .operational_source import read
-        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source)
+        def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
         def url(role,password):return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
         runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
         return runner

@@ -35,8 +35,10 @@ class Owner:
         try:
             c=self.connector();self.connection_active+=time.monotonic()-began;self.opened+=1;self.emit('admin_connection_open',dict(ordinal=self.connections))
             yield c
-        except BaseException:
+        except BaseException as exc:
             if c is None:self.connection_active+=time.monotonic()-began
+            from .connection_diagnostics import safe_failure
+            self.emit('admin_connection_failed',dict(ordinal=self.connections,**safe_failure(exc,'DRIVER_CONNECT' if c is None else 'EXECUTION')))
             raise
         finally:
             if c is not None:
@@ -183,13 +185,14 @@ class Owner:
         self.tearing_down=True
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
-            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-            for authority in self.authorities:
-                ctl['grants'][authority]['expires_at']=0
-                if authority in ctl.get('bolton_exceptions',{}):ctl['bolton_exceptions'][authority]['expires_at']=0
-            self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
-            self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+            if self.authorities:
+                self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+                ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
+                for authority in self.authorities:
+                    ctl['grants'][authority]['expires_at']=0
+                    if authority in ctl.get('bolton_exceptions',{}):ctl['bolton_exceptions'][authority]['expires_at']=0
+                self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
+                self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             for role,capability in ROLES.items():
                 self.q(c,sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(role)),effect=True)
                 self.q(c,sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(capability),sql.Identifier(role)),effect=True)
