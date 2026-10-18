@@ -1,0 +1,40 @@
+{
+  "sha": "3113e0155ef29b344a44ff0483045f38b666afb0",
+  "node_id": "C_kwDOToZJi9oAKDMxMTNlMDE1NWVmMjliMzQ0YTQ0ZmYwNDgzMDQ1ZjM4YjY2NmFmYjA",
+  "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/3113e0155ef29b344a44ff0483045f38b666afb0",
+  "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/3113e0155ef29b344a44ff0483045f38b666afb0",
+  "author": {
+    "name": "maxrose26",
+    "email": "maxrose26@gmail.com",
+    "date": "2026-10-18T15:14:47Z"
+  },
+  "committer": {
+    "name": "GitHub",
+    "email": "noreply@github.com",
+    "date": "2026-10-18T15:14:47Z"
+  },
+  "tree": {
+    "sha": "0c51773453e9c88aca2ad25b7cf2c194e0acdade",
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/trees/0c51773453e9c88aca2ad25b7cf2c194e0acdade"
+  },
+  "message": "Integrate reviewed unused actionable diagnostic authority and audit binding [skip render]\n\nPreserve approved tree0c51773453e9c88aca2ad25b7cf2c194e0acdade. No deployment, permissions, routing, credential lifecycle or budget changes.",
+  "parents": [
+    {
+      "sha": "6bb68733441d487f556179ee3845c3b28aaff2f3",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/6bb68733441d487f556179ee3845c3b28aaff2f3",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/6bb68733441d487f556179ee3845c3b28aaff2f3"
+    },
+    {
+      "sha": "8fd3c0d91caa09f50a00eb8d6bec5027743288c4",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/8fd3c0d91caa09f50a00eb8d6bec5027743288c4",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/8fd3c0d91caa09f50a00eb8d6bec5027743288c4"
+    }
+  ],
+  "verification": {
+    "verified": true,
+    "reason": "valid",
+    "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq1OJnCRC1aQ7uu5UhlAAAiHkQABKEe7AmcHJLy0bDfJqzSSpl\njPtdEHMqy2MFZiJ01seD4/qF6PTqZbBC8dsKyopDaQ+bKXj0hcOz2jtQgYEo8PwO\nvF1tbYdpYhPWoFjIntRUhBRn6j3T/he0QJyx1fgxnU8ElDHLI8APq1KSkAsLnhuo\n+v27qbmLn5GiDLnsjkBVqC48PQX0c2rviOLGFLzHDJN8RrAAK3zysKeXGLG6NgOo\nf+b1DVchl4UnKs9lYRwRq7CpgSabFX438bFD3kkr2m2ZPkQvsymEWGexsMaloKUV\nZal/RrwjprSP0gQpc1fzMyFkw6Iekb/GYrYrQXvnqR7D8l2CjgiPQQFuMudB6bYq\nzcJCDiiQbl/f6tXuJB0jLohgcHjOcQzvnEB2jTGZMxR3jnXq313szVWuFLH4Ukbt\nFvclU67pjtIv+WEk8Hd90nkTyAI6Zcm++OVhN3gPrxyqTjrO/25SJGV9aD3PHpfQ\nSVGefoY317pGRXUKyondIwCN+v5ElegS+07Ssj48TrfKDTx6ip/67hJD+MsxeA15\nnf9H7ZpvfPgYPqtgOOnFTbNDPTuEwyUPKhUNmEWLTnpa8Q5JyNpmR+26pKCB4cCE\nGauzq7z94kCF3yYtquFq6HNQQGBFdWc58MHrVhgJRM8VLq3DzXepddF2oC/UXjXK\n15Sy7cXBBuIyL1EqnmxY\n=X7Jy\n-----END PGP SIGNATURE-----\n",
+    "payload": "tree 0c51773453e9c88aca2ad25b7cf2c194e0acdade\nparent 6bb68733441d487f556179ee3845c3b28aaff2f3\nparent 8fd3c0d91caa09f50a00eb8d6bec5027743288c4\nauthor maxrose26 <maxrose26@gmail.com> 1792336487 +0100\ncommitter GitHub <noreply@github.com> 1792336487 +0100\n\nIntegrate reviewed unused actionable diagnostic authority and audit binding [skip render]\n\nPreserve approved tree0c51773453e9c88aca2ad25b7cf2c194e0acdade. No deployment, permissions, routing, credential lifecycle or budget changes.",
+    "verified_at": "2026-10-18T15:14:48Z"
+  }
+}

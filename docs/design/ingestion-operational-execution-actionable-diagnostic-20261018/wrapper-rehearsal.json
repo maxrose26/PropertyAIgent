@@ -1,0 +1,15 @@
+{
+  "credentials_read": 0,
+  "duplicate_state_denied": true,
+  "exact_integrated_revision": "3113e0155ef29b344a44ff0483045f38b666afb0",
+  "full_wrapper_pre_effect_rehearsal": "PASS",
+  "historical_audit_untouched": true,
+  "metadata_calls": 4,
+  "metadata_transport": "OFFLINE_STUB",
+  "outer_download_calls": 1,
+  "production_connections": 0,
+  "real_bash_git_validator": true,
+  "registration_sha256": "76e9a1dced8a6a4aa148e140e2eba719d7b37fad38a93ac1f942b109ddbdfbe2",
+  "secret_operations": 0,
+  "systemd_boundary": "INTERCEPTED_EXIT77_NO_EXECUTION"
+}
