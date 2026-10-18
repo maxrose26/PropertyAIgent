@@ -24,6 +24,7 @@ SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_eff
 class Owner:
     # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
     DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
+    limits=DEFAULT_LIMITS      # class default for any Owner not built through __init__
 
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}

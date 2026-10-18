@@ -11,7 +11,9 @@ Each entry: exactly one connection attempt and, only if it connects, exactly one
 next entry begins (the logins carry CONNECTION LIMIT 1, so an unclosed connection would invalidate every later entry).
 """
 import time
+from app.ingestion.ledger import Denied
 from .connection_diagnostics import safe_failure
+from .operational_cleanup import Stop
 from .operational_preparation import STARTUP_OPTIONS
 from .tls_trust import owned_resources
 
@@ -37,7 +39,7 @@ INTERPRETATION=dict(scope='CONFIGURATION_SPECIFIC_OBSERVATIONS_AT_ONE_POINT_IN_T
 class MatrixStop(Exception):
     """A global stop with a fixed code; str() is the fixed code only."""
     CODES=frozenset({'UNCLASSIFIED_FAILURE','SECURITY_CLASS_FAILURE','UNEXPECTED_IDENTITY','CLOSURE_UNCERTAIN','CONNECTION_BUDGET_EXHAUSTED','STATEMENT_BUDGET_EXHAUSTED','RETURNED_BYTES_EXHAUSTED',
-                     'MATRIX_TIME_EXHAUSTED','MATRIX_ORDER_VIOLATION','RESPONSE_SHAPE','NON_CONTINUABLE_FAILURE'})
+                     'MATRIX_TIME_EXHAUSTED','MATRIX_ORDER_VIOLATION','RESPONSE_SHAPE','NON_CONTINUABLE_FAILURE','CAPACITY_AFTER_OWN_CONNECTION','DEADLINE_OR_BUDGET_DENIAL'})
     def __init__(self,code):
         if code not in self.CODES:raise ValueError('MATRIX_CODE')
         self.code=code;super().__init__(code)
@@ -54,7 +56,7 @@ class Matrix:
         self.connect=connect
         self.entries=[dict(ordinal=i+1,role=role,startup_options=variant,outcome='NOT_REACHED') for i,(role,variant) in enumerate(ENTRIES)]
         self.attempts=0;self.statements=0;self.returned_bytes=0;self.started=None;self.stopped=None
-        self.last_closed=None
+        self.last_closed=None;self.connected_roles=set()
 
     # ---- accounting -------------------------------------------------------------------------------------------------------------------------------------
     def accounting(self):
@@ -113,10 +115,10 @@ class Matrix:
         kwargs.update(runner.ssl or {})
         before=self.resources()['socket_fds']
         began=self.clock();record.update(intervals_at_attempt=self.intervals(role,began),outcome='ATTEMPTING')
-        runner.emit('matrix_entry_intent',dict(ordinal=record['ordinal'],role=role,startup_options=variant,**record['intervals_at_attempt']))
         self.attempts+=1
         connection=None;failure=None;verified=False;statement_count=0
         try:
+            runner.emit('matrix_entry_intent',dict(ordinal=record['ordinal'],role=role,startup_options=variant,**record['intervals_at_attempt']))
             connection=self.connect(**kwargs)
             record['connection_established']=True
             statement_count=1;self.statements+=1
@@ -137,6 +139,11 @@ class Matrix:
                 verified=True
         except MatrixStop:
             raise
+        except (KeyboardInterrupt,SystemExit):
+            raise
+        except (Stop,Denied):
+            self.stopped='DEADLINE_OR_BUDGET_DENIAL';record['outcome']='STOPPED_DURING_ENTRY'
+            raise MatrixStop('DEADLINE_OR_BUDGET_DENIAL') from None
         except BaseException as exc:
             failure=safe_failure(exc,'DRIVER_CONNECT' if connection is None else 'EXECUTION')
             exc.__context__=None;exc.__cause__=None
@@ -163,10 +170,11 @@ class Matrix:
                           sqlstate=failure.get('sqlstate'),reason_code=reason,classification_source=failure.get('classification_source'),underlying_cause='UNDETERMINED'))
             runner.emit('matrix_entry_outcome',dict(ordinal=record['ordinal'],outcome=record['outcome'],**record['failure']))
             if reason in SECURITY_CLASS:self.stop('SECURITY_CLASS_FAILURE')
+            if reason=='CONNECTION_CAPACITY' and role in self.connected_roles:self.stop('CAPACITY_AFTER_OWN_CONNECTION')      # possible residue of our own previous entry (CONNECTION LIMIT 1) or pooler retention: ambiguous, so a stop
             if record['outcome']=='FAILED_UNCLASSIFIED':self.stop('UNCLASSIFIED_FAILURE')
             if reason not in CONTINUABLE:self.stop('NON_CONTINUABLE_FAILURE')
             return
         if not verified:
             runner.emit('matrix_entry_outcome',dict(ordinal=record['ordinal'],outcome=record['outcome']));self.stop('UNEXPECTED_IDENTITY')
-        record['outcome']='CONNECTED_IDENTITY_VERIFIED'
+        record['outcome']='CONNECTED_IDENTITY_VERIFIED';self.connected_roles.add(role)
         runner.emit('matrix_entry_outcome',dict(ordinal=record['ordinal'],outcome=record['outcome'],elapsed_seconds=record['elapsed_seconds']))

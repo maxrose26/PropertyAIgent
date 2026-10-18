@@ -11,6 +11,8 @@ from verification.ingestion_storage.restricted_matrix import Matrix,MatrixStop,E
 from verification.ingestion_storage.operational_preparation import STARTUP_OPTIONS
 from verification.ingestion_storage.tls_trust import owned_resources
 from tests.test_ingestion_admin_connection_probe import cluster      # noqa: F401  (disposable logging cluster fixture)
+from app.ingestion.ledger import Denied
+from verification.ingestion_storage.operational_cleanup import Stop
 
 WORKER='ingestion_worker_login';EFFECT='ingestion_effect_login'
 
@@ -248,3 +250,30 @@ def test_matrix_module_has_no_grant_authority_queue_source_or_application_capabi
         elif isinstance(node,ast.Attribute):names.add(node.attr)
         elif isinstance(node,(ast.Import,ast.ImportFrom)):names.update(a.name for a in node.names);names.add(getattr(node,'module','') or '')
     for forbidden in ('register','GitHub','github','put_secret','Coordinator','ledger','source_reader','capture_once','teardown','map_and_activate','install','Application','requests','subprocess'):assert forbidden not in names,forbidden
+
+
+def test_capacity_after_the_matrix_own_connection_to_the_same_login_is_ambiguous_so_it_stops(cluster,roles):
+    real=psycopg.connect;count=[0]
+    def connect(**k):
+        count[0]+=1
+        if count[0]==2:raise psycopg.OperationalError('connection failed: FATAL:  too many connections for role "ingestion_worker_login"')
+        return real(**k)
+    runner,matrix=make(cluster,connect=connect)
+    with pytest.raises(MatrixStop) as stopped:matrix.run()
+    assert stopped.value.code=='CAPACITY_AFTER_OWN_CONNECTION' and matrix.entries[0]['outcome']=='CONNECTED_IDENTITY_VERIFIED' and matrix.entries[1]['outcome']=='FAILED_CLASSIFIED'
+    assert matrix.entries[1]['failure']['reason_code']=='CONNECTION_CAPACITY' and matrix.finalise()['entries'][2]['outcome']=='SKIPPED_GLOBAL_STOP'
+
+
+@pytest.mark.parametrize('raised',[Stop('WORK_CLOSURE_RESERVE'),Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')])
+def test_a_session_deadline_or_denial_during_an_entry_is_a_stop_not_a_connection_failure(cluster,roles,raised):
+    runner,matrix=make(cluster,connect=_connect_with(cluster,{1:raised}))
+    with pytest.raises(MatrixStop) as stopped:matrix.run()
+    assert stopped.value.code=='DEADLINE_OR_BUDGET_DENIAL' and matrix.entries[0]['outcome']=='STOPPED_DURING_ENTRY' and 'failure' not in matrix.entries[0]
+
+
+def test_an_audit_failure_while_recording_intent_is_a_stop_with_closure_recorded(cluster,roles):
+    runner,matrix=make(cluster)
+    def failing(event,payload):raise RuntimeError('audit bound')
+    runner.emit=failing
+    with pytest.raises(RuntimeError):matrix.run()          # an audit failure propagates to the Runner failure path (teardown); the entry still recorded its closure
+    assert matrix.entries[0]['connection_closure']['status']=='CLOSED'

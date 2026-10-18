@@ -39,8 +39,8 @@ The ordered matrix **does not establish** a cause. Options, elapsed time since i
 | Matrix wall time | 60 s | `Matrix` |
 | Administrative connections (TOTAL: preflight, install, mapping/activation, teardown, failure diagnostics) | 4 before diagnostics, **5 total** | `Owner.limits` |
 | Administrative commands (TOTAL) | 44 before teardown, 58 through teardown, **64 total** | `Owner.limits` |
-| Hidden input / active window / outer / systemd backstop | 120 s / 170 s / 310 s / 340 s | session timing, `RuntimeMaxSec` |
-| Runner deadlines | job 150 s; diagnostic total 185 s (25 s window); admin before teardown 60 s, total 75 s, diagnostic 60 s; restricted phase 60 s | `Runner.deadlines` |
+| Hidden input / active window / work alarm / outer / systemd backstop | 120 s / 240 s / 200 s / 380 s / 410 s | session timing, `RuntimeMaxSec` |
+| Runner deadlines | job 170 s; failure window 40 s and diagnostic total 225 s; administrative time before teardown 60 s, through teardown 100 s, including failure diagnostics 130 s; restricted phase 60 s | `Runner.deadlines` (ordering invariants tested, including a stop arriving with the pre-teardown allowance fully spent) |
 | Memory | 256 MiB controller, 1.5 GiB aggregate, no swap | existing `OperationalMemory` + systemd scope |
 | Evidence | 64 KiB persisted per file group; terminal JSON ≤ 256 KiB (existing finaliser also bounds total 2 MiB) | existing journal/finaliser |
 | Credential generation / protected-secret mappings | 2 / 2 (both deleted at teardown) | accepted lifecycle |

@@ -135,6 +135,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         def map_then_exhaust(*a,**k):
                             original_map(*a,**k);runner.owner.commands=runner.owner.limits['commands'][0];raise ValueError('ADMIN_COMMAND_BOUND')
                         runner.owner.map_and_activate=map_then_exhaust
+                    measured_admin={'matrix_success':(4,46),'matrix_classified_continue':(4,46),'matrix_unclassified_stop':(5,52),'matrix_tls_stop':(5,52),'matrix_identity_stop':(5,52),'matrix_budget_stop':(5,52),'matrix_admin_bound_reserve':(5,59),'matrix_close_uncertain':(5,52)}[fault]
                     expected={'matrix_success':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['CONNECTED_IDENTITY_VERIFIED']*4,None,4),
                               'matrix_classified_continue':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED','FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED'],None,4),
                               'matrix_unclassified_stop':('STOP_RECONCILE_NO_RETRY',['CONNECTED_IDENTITY_VERIFIED','FAILED_UNCLASSIFIED','SKIPPED_GLOBAL_STOP','SKIPPED_GLOBAL_STOP'],'UNCLASSIFIED_FAILURE',2),
@@ -160,6 +161,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         # Administrative allowance: TOTAL connections/commands across lifecycle, failure handling and teardown never exceed the proposed 5 / 64.
                         assert runner.owner.connections<=orr.MATRIX_OWNER_LIMITS['connections'][1] and runner.owner.commands<=orr.MATRIX_OWNER_LIMITS['commands'][2]
                         assert runner.owner.opened==runner.owner.closed
+                        assert (runner.owner.connections,runner.owner.commands)==measured_admin       # pinned measurements: drift in the lifecycle fails here, it does not pass silently
                         # Every non-completed entry kept its own closure; teardown disabled access (unless closure was deliberately made uncertain).
                         if fault=='matrix_close_uncertain':
                             assert result['cleanup']=='UNCERTAIN' and result['access']!='DISABLED_VERIFIED'

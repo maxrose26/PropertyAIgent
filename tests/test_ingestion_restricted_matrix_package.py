@@ -56,6 +56,7 @@ def test_rendered_registration_is_accepted_and_binds_the_finite_test(clean_check
     dict(risk_application='ANY_FUTURE_USE'),dict(state_directory='operational-actionable-diagnostic-once-20261018'),
     dict(authority='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'),dict(mode='REQUIRED_CAPTURE_SCREENING'),
     dict(expires_at=(datetime.now(timezone.utc)+timedelta(hours=3)).isoformat()),dict(risk_acceptance='NONE'),dict(roles=['ingestion_worker_login']),
+    dict(execution=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=2,retry=False,state_directory=orr.MATRIX_STATE)),dict(execution=None),
 ])
 def test_registration_rejections(clean_checkout,change):
     reg={**render(),**change}
@@ -193,7 +194,7 @@ def test_owner_script_refuses_without_a_terminal_and_with_bad_arguments(tmp_path
 
 def test_owner_script_has_only_the_one_read_only_github_call_and_no_credential_path():
     text=(PACKAGE/'owner-run.sh').read_text()
-    assert '@@' not in text and text.index('VISIBLE_INTERACTIVE_TTY_REQUIRED')<text.index('systemd-run') and 'RuntimeMaxSec=340s' in text and 'timeout 10s systemctl' in text and 'controller_exit_status' in text
+    assert '@@' not in text and text.index('VISIBLE_INTERACTIVE_TTY_REQUIRED')<text.index('systemd-run') and 'RuntimeMaxSec=410s' in text and 'timeout 10s systemctl' in text and 'controller_exit_status' in text
     gh_lines=[l for l in text.splitlines() if ' gh ' in l and not l.lstrip().startswith('#')]
     assert gh_lines==['test "$(timeout 15s gh api user --jq .login)" = maxrose26']
     for forbidden in ('secret set','curl','psql','read -s','getpass','PASSWORD','DATABASE_URL','git switch','operational_publication','--method'):assert forbidden not in text,forbidden
@@ -205,3 +206,39 @@ def test_package_separates_the_diagnostic_allowance_from_execution_authority():
     for phrase in ('DIAGNOSTIC ALLOWANCE','EXECUTION AUTHORITY','NONE','does not establish','SU-511198','unsent'):assert phrase in text,phrase
     manifest=json.loads((PACKAGE/'MANIFEST.json').read_text())
     assert manifest['status']=='PREPARED_FOR_REVIEW_NOT_RELEASED' and manifest['execution_authority']=='NONE' and {'registration release','execution','credential generation','mapping','activation','connection'}<=set(manifest['forbidden_in_this_package'])
+
+
+def test_deadlines_are_ordered_so_teardown_keeps_its_own_time(tmp_path):
+    d=orr.MATRIX_DEADLINES;t=orr.MATRIX_TIMING
+    assert d['admin_pre']<d['admin_total']<d['admin_diagnostic'] and d['job']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
+    assert d['job']<t['work_seconds']<t['active_seconds'] and t['input_seconds']+t['active_seconds']+t['report_seconds']<=t['outer_seconds'] and t['outer_seconds']+30<=410
+    assert d['runtime_total']>=rm.LIMITS['matrix_seconds']
+
+
+class _Clock:
+    pass
+
+
+def _runner_for_check(tmp_path):
+    reg={**render(),'expires_at':(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()}
+    j=Journal(tmp_path/('c%d'%time.monotonic_ns()))
+    return Runner(reg,j,lambda:None,source_reader=None,github=FakeGitHub(),url_factory=lambda r,p:None)
+
+
+def test_teardown_and_diagnostics_have_administrative_time_after_the_pre_teardown_allowance_is_spent(tmp_path):
+    r=_runner_for_check(tmp_path);now=time.monotonic()
+    # normal phase: the pre-teardown allowance is the protective limit
+    r.started=now;r.phase='admin';r.phase_started=now;r.admin_seconds=59.0;r.check()
+    r.admin_seconds=61.0
+    with pytest.raises(Exception) as caught:r.check()
+    assert 'ADMIN_TEARDOWN_RESERVE' in str(caught.value)
+    # a failure arrived with the pre-teardown allowance fully consumed: teardown and diagnostics are still permitted inside their reserved time
+    r.diagnosing=True;r.diagnostic_started=now;r.phase='teardown';r.phase_started=now;r.admin_seconds=60.0;r.started=now-60.0
+    r.check()
+    r.admin_seconds=orr.MATRIX_DEADLINES['admin_total']-1;r.check()
+    r.admin_seconds=orr.MATRIX_DEADLINES['admin_diagnostic']-1;r.check()
+    r.admin_seconds=orr.MATRIX_DEADLINES['admin_diagnostic']+1
+    with pytest.raises(Exception) as caught:r.check()
+    assert 'DIAGNOSTIC_RESERVE_EXHAUSTED' in str(caught.value)
+    # the capture-run defaults were not touched
+    d=Runner.__new__(Runner);assert d.deadlines['admin_pre']==210 and d.deadlines['admin_total']==240 and d.deadlines['job']==450

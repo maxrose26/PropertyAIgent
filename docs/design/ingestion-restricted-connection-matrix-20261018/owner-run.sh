@@ -40,7 +40,7 @@ printf '%s\n' \
 set +e
 systemd-run --user --scope \
   --unit=propertyaigent-operational-once \
-  -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=340s \
+  -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=410s \
   "$PY" -I -B -c \
   'import os,runpy,sys; sys.path.insert(0,os.getcwd()); runpy.run_module("verification.ingestion_storage.operational_runner",run_name="__main__")' \
   --registration "$REGISTRATION" --registration-sha256 "$REGISTRATION_SHA256"
