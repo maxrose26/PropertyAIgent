@@ -71,6 +71,9 @@ def test_delayed_input_does_not_spend_active_budget_or_permit_effects(tmp_path):
     assert result['phase_timing']['credential_input_seconds']>=.08 and calls==['prepare']
     assert result['accounting']['connections']==result['accounting']['commands']==result['accounting']['deletes']==0
     assert len(printed)==1 and json.loads((j.root/'final-result.json').read_bytes())==result
+    terminal=json.dumps(printed[0],sort_keys=True)+'\n'
+    assert printed[0]['terminal_json_bytes']==len(terminal.encode())
+    assert printed[0]['exported_bytes']==printed[0]['persisted_evidence_bytes']+len(terminal.encode())
     assert 'hidden-fixture-value' not in j.file.read_text()
 
 def test_input_timeout_saves_and_displays_without_connecting(tmp_path):

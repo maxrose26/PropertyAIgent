@@ -394,9 +394,23 @@ def finalise(journal, result, *, outer_started, active_started, input_seconds, o
     try:
         receipt=journal.save(result)
         now=time.monotonic()
-        output(json.dumps(dict(result, **receipt, audit=str(journal.file),
+        payload=dict(result, **receipt, audit=str(journal.file),
             active_seconds_after_audit_flush=0.0 if active_started is None else now-active_started,
-            total_seconds_after_audit_flush=now-outer_started), sort_keys=True), flush=True)
+            total_seconds_after_audit_flush=now-outer_started)
+        payload['persisted_evidence_bytes']=payload.pop('exported_bytes')
+        payload['terminal_json_bytes']=0; payload['exported_bytes']=payload['persisted_evidence_bytes']
+        for _ in range(10):
+            line=json.dumps(payload,sort_keys=True)
+            size=len(line.encode())+1
+            if payload['terminal_json_bytes']==size: break
+            payload['terminal_json_bytes']=size
+            payload['exported_bytes']=payload['persisted_evidence_bytes']+size
+        else: raise Stop('OUTPUT_ACCOUNTING_BOUND')
+        # Leave room for a failed partial output, a small fallback, and the
+        # owner's bounded post-exit local scope receipt. No effects are retried.
+        if size>65536 or payload['exported_bytes']>LIMITS['exported_bytes']-8192:
+            raise Stop('TERMINAL_EVIDENCE_BOUND')
+        output(line,flush=True)
         return result
     except BaseException:
         fallback=dict(status='STOP_RECONCILE_NO_RETRY', cleanup='UNCERTAIN',
