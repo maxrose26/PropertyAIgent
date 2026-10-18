@@ -177,8 +177,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     finally:
                         [c.close() for c in leaked]
                     record_property('restricted_matrix',json.dumps(dict(fault=fault,status=result['status'],outcomes=outcomes,global_stop=stop,admin_connections=runner.owner.connections,admin_commands=runner.owner.commands,
-                                    admin_opened=runner.owner.opened,admin_closed=runner.owner.closed,matrix_accounting=result['matrix']['accounting'],access=result['access'],cleanup=result['cleanup'])))
-                    print('MATRIX_MEASURE',fault,'admin_connections',runner.owner.connections,'admin_commands',runner.owner.commands,'cleanup',result['cleanup'],'access',result['access'])
+                                    admin_opened=runner.owner.opened,admin_closed=runner.owner.closed,matrix_accounting=result['matrix']['accounting'],access=result.get("access"),cleanup=result["cleanup"])))
+                    print('MATRIX_MEASURE',fault,'admin_connections',runner.owner.connections,'admin_commands',runner.owner.commands,"cleanup",result["cleanup"],"access",result.get("access"))
                     return
 
                 if fault=='diagnostic_only':
