@@ -67,6 +67,9 @@ class DatabaseBudget:
     def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
+        self.failed_native_closed=True
+        from .tls_trust import owned_resources
+        self.socket_baseline=owned_resources()['socket_fds']
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
         if type(returned_bytes) is not int or not 0<returned_bytes<=4*1024**2:raise Denied('DATABASE_BYTE_CEILING')
         self.returned_cap=returned_bytes
@@ -123,8 +126,13 @@ class DatabaseBudget:
                 options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**({'hostaddr':hostaddr} if hostaddr else {}),**(ssl or {}))
             except BaseException as exc:
                 observation=dict(role=role,attempt=budget.attempts,**safe_failure(exc,phase))
+                budget.failed_native_closed &= observation['failed_native_connection_finished']
                 budget.connection_diagnostics.append(observation);budget.emit('runtime_connection_failed',observation)
-                raise
+                # A timeout traceback can retain psycopg's suspended connect
+                # generator and its native socket. Keep diagnostics, not that
+                # traceback/context. Closure is still measured, never assumed.
+                exc.__context__=None;exc.__cause__=None
+                raise exc.with_traceback(None) from None
             finally:budget.connection_seconds+=time.monotonic()-began
             budget.opened.append(c);budget.emit('runtime_connection_open',dict(role=role,attempt=budget.attempts))
             try:
@@ -149,8 +157,17 @@ class DatabaseBudget:
         for c in self.opened:
             try:c.close()
             except Exception:errors.append('CLOSE')
+        # libpq timeouts may carry no FinishedPGconn snapshot. In that case a
+        # positive /proc socket comparison is required, not a vacuous empty list.
+        socket_proof='UNCERTAIN'
+        try:
+            from .tls_trust import owned_resources
+            if not (owned_resources()['socket_fds']-self.socket_baseline):socket_proof='NO_NEW_OWNED_SOCKETS'
+        except BaseException:pass
+        failed_closed=self.failed_native_closed or socket_proof=='NO_NEW_OWNED_SOCKETS'
         return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=self.previous_opened+len(self.opened),connections_closed_count=self.previous_opened+sum(bool(c.closed) for c in self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
-            connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
+            failed_native_connections_closed=failed_closed,socket_closure=socket_proof,
+            connections_closed=failed_closed and all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and failed_closed and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 
 

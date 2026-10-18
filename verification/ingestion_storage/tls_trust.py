@@ -49,7 +49,16 @@ def owned_resources():
         if target.startswith('socket:['):sockets.add((fd.name,target))
     tasks=list(Path('/proc/self/task').iterdir())
     if len(tasks)>256:raise ValueError('OWNED_THREAD_BOUND')
+    missing_children=False
     for task in tasks:
         try:children.update((task/'children').read_text().split())
-        except FileNotFoundError:continue
+        except FileNotFoundError:missing_children=True
+    if missing_children:
+        # Reuse the accepted process supervisor's PPID graph. Some supported
+        # kernels omit task/children; absence is not evidence of zero children.
+        from app.security.document_process import own_host_pid,descendants,proc_info
+        host=own_host_pid();before=proc_info(host)
+        graph=descendants(host)
+        if proc_info(host)['start']!=before['start']:raise ValueError('OWNED_PROCESS_IDENTITY_CHANGED')
+        children.update(str(pid) for pid in graph if pid!=host)
     return dict(socket_fds=sockets,children=children)

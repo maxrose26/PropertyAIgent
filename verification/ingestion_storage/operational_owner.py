@@ -25,6 +25,7 @@ class Owner:
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings):
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
+        self.failed_native_connections=[]
 
     @contextmanager
     def connection(self):
@@ -38,7 +39,12 @@ class Owner:
         except BaseException as exc:
             if c is None:self.connection_active+=time.monotonic()-began
             from .connection_diagnostics import safe_failure
-            self.emit('admin_connection_failed',dict(ordinal=self.connections,**safe_failure(exc,'DRIVER_CONNECT' if c is None else 'EXECUTION')))
+            observed=safe_failure(exc,'DRIVER_CONNECT' if c is None else 'EXECUTION')
+            if c is None:self.failed_native_connections.append(observed['failed_native_connection_finished'])
+            self.emit('admin_connection_failed',dict(ordinal=self.connections,**observed))
+            if c is None:
+                exc.__context__=None;exc.__cause__=None
+                raise exc.with_traceback(None) from None
             raise
         finally:
             if c is not None:
@@ -70,7 +76,7 @@ class Owner:
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
 
     def accounting(self):
-        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain)
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain)
 
     def preflight(self):
         with self.connection() as c:

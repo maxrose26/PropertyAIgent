@@ -13,7 +13,7 @@ EXPIRY=lambda:(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat()
 def test_diagnostics_never_export_message_or_url(message):
     class OperationalError(Exception):sqlstate='28P01'
     observed=safe_failure(OperationalError(message),'DRIVER_CONNECT')
-    assert observed==dict(phase='DRIVER_CONNECT',exception_kind='OperationalError',sqlstate='28P01',underlying_cause='UNDETERMINED',message_exported=False)
+    assert observed==dict(phase='DRIVER_CONNECT',exception_kind='OperationalError',sqlstate='28P01',underlying_cause='UNDETERMINED',message_exported=False,reason_code='UNKNOWN',classification_source='NONE',failed_native_connection_finished=False)
     assert message not in json.dumps(observed)
 
 def test_unrecognised_exception_names_and_sqlstate_do_not_escape():
