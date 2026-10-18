@@ -56,7 +56,7 @@ class Progress:
         return dict(database_connections=dict(value=self.database_connection_calls,basis='MEASURED'),
                     database_statements=dict(value=0,basis='NOT_STARTED'),github_cli_invocations=dict(value=0,basis='NOT_STARTED'),source_requests=dict(value=0,basis='NOT_STARTED'),
                     dns_subprocesses_spawned=dict(value=1 if spawned else 0,basis='MEASURED',scope='PREPARATION_DNS_CHILD_ONLY'),
-                    state='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' if not self.database_connection_calls else 'DATABASE_CONNECT_CALLED_DURING_PREPARATION')
+                    state='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' if not self.database_connection_calls else 'CONNECT_CLOSURE_INVOKED_AFTER_PREPARATION')
 
 
 def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIMEOUT_SECONDS):

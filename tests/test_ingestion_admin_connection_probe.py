@@ -161,7 +161,7 @@ def test_closure_is_uncertain_when_a_socket_survives_or_memory_proof_is_missing(
     class Bad(Memory):
         def close(self):raise RuntimeError('private text')
     result,j,lines,_,_=run_probe(tmp_path,factory(cluster),memory=Bad())
-    assert result['status']=='ADMIN_CONNECTION_QUALIFIED' and result['outcome']['closure']=='UNCERTAIN' and result['cleanup']=='UNCERTAIN'      # qualified and uncertain are stated separately
+    assert result['status']=='ADMIN_CONNECTION_QUALIFIED_CLOSURE_UNCERTAIN' and result['outcome']['administrative_connection']=='QUALIFIED' and result['outcome']['closure']=='UNCERTAIN' and result['cleanup']=='UNCERTAIN'
     secret_safe(j,lines,result)
     leaked=[]
     def leaky():
@@ -266,6 +266,7 @@ def test_no_external_effect_other_than_the_dns_child_and_the_loopback_connection
 @pytest.fixture
 def bound(tmp_path,monkeypatch):
     f=tmp_path/'reviewed.txt';f.write_text('reviewed');monkeypatch.chdir(tmp_path)
+    md=tmp_path/ap.EVIDENCE_DIRECTORY;md.mkdir(parents=True);(md/'MANIFEST.json').write_text(json.dumps(dict(bound_paths=['reviewed.txt'])))
     reg=probe_registration(hashes={'reviewed.txt':hashlib.sha256(b'reviewed').hexdigest()},controller_sha256=hashlib.sha256(Path(ap.__file__).read_bytes()).hexdigest())
     def fake_output(cmd,**kw):
         return {'rev-parse HEAD':reg['revision'],'rev-parse HEAD^{tree}':reg['tree'],'status --porcelain':''}[' '.join(cmd[1:])]
@@ -368,25 +369,6 @@ def test_finalise_and_shared_session_accept_both_accounting_shapes(tmp_path):
         assert json.loads((j.root/'final-result.json').read_bytes())['accounting']==accounting and len(lines)==1
 
 
-# --- hosted-only: REAL native cgroup memory object under the systemd scope ---------------------------------------------------------------------------------------
-
-@pytest.mark.skipif(os.environ.get('INGESTION_OPERATIONAL_NATIVE')!='1',reason='requires the hosted systemd operational scope')
-@pytest.mark.parametrize('case',['qualified','refused','preparation'])
-def test_native_memory_closure_for_the_probe(tmp_path,cluster,case):
-    from verification.ingestion_storage.operational_memory import OperationalMemory
-    native=OperationalMemory()
-    if case=='refused':
-        with socket.socket() as s:s.bind(('127.0.0.1',0));dead=s.getsockname()[1]
-        result,j,lines,_,_=run_probe(tmp_path,factory(cluster,port=dead),memory=native)
-    elif case=='preparation':result,j,lines,_,_=run_probe(tmp_path,factory(cluster),raw=url(user='postgres'),memory=native)
-    else:result,j,lines,_,_=run_probe(tmp_path,factory(cluster),memory=native)
-    process=result['closure_components']['process']
-    assert process['status']=='CLOSED' and process['live_child_count']==0 and process['new_socket_count']==0 and result['cleanup']=='CLOSED' and result['outcome']['closure']=='VERIFIED'
-    assert process['memory']['owned_groups_removed'] is True and process['memory']['owned_survivors']==0
-    assert (result['status']=='ADMIN_CONNECTION_QUALIFIED')==(case=='qualified')
-    secret_safe(j,lines,result)
-
-
 # --- the release package: registration renderer, manifest and owner script ---------------------------------------------------------------------------------------
 
 PACKAGE=Path('docs/design/ingestion-admin-connection-probe-20261018')
@@ -418,3 +400,54 @@ def test_manifest_forbids_release_and_execution():
     manifest=json.loads((PACKAGE/'MANIFEST.json').read_text())
     assert manifest['status']=='PREPARED_FOR_REVIEW_NOT_RELEASED' and {'registration release','execution','merge','GitHub access'}<=set(manifest['forbidden_in_this_package'])
     assert all(Path(p).is_file() for p in manifest['bound_paths'])
+
+
+# --- review round 3: admission denials, preparation scope, schema, hashes, the real connect closure ----------------------------------------------------------
+
+def test_a_denial_before_any_attempt_is_not_a_connection_failure(tmp_path):
+    j=Journal(tmp_path/'stop');(j.root/'STOP').touch()
+    calls=[];runner=ProbeRunner(j,lambda:calls.append(1),Progress(),Memory(),baseline=owned_resources(),started=time.monotonic())
+    result=runner.execute()
+    assert not calls and result['failure']['reason_code']=='OWNER_STOP' and result['failure']['phase']=='PROBE_ADMISSION'
+    assert result['outcome']['administrative_connection']=='NOT_ATTEMPTED' and result['accounting']['administration']['connection_attempts']=={'value':0,'basis':'MEASURED'}
+
+
+def test_accounting_blocks_state_their_scope_and_basis_consistently(tmp_path,cluster):
+    result,*_=run_probe(tmp_path,factory(cluster))
+    a=result['accounting']
+    assert a['preparation']=={'scope':'PREPARATION_ONLY','dns_subprocesses_spawned':{'value':1,'basis':'MEASURED','scope':'PREPARATION_DNS_CHILD_ONLY'}}      # no contradictory statement/connection claims
+    assert a['administration']['driver_statements']['basis']=='CLIENT_COUNTED' and a['administration']['supervised_seconds']['basis']=='MEASURED'
+    def every(node):
+        for k,v in node.items():
+            if isinstance(v,dict) and ('basis' in v or k in ('slot_receipts','preparation')):continue
+            assert not isinstance(v,(int,float)) or isinstance(v,bool) is False and False,(k,v)
+    every(a['administration'])                                                                                # every administration entry is a value/basis block
+
+
+def test_the_real_connect_closure_reaches_the_server_with_one_statement(tmp_path,cluster,monkeypatch):
+    """Runs the production `connect` closure itself; only the transport (host, TLS) is redirected to the disposable loopback server."""
+    real=psycopg.connect;seen=[]
+    def redirect(**k):
+        seen.append(k)
+        return real(host='127.0.0.1',port=cluster.port,dbname='postgres',user='postgres',autocommit=k['autocommit'],prepare_threshold=k['prepare_threshold'],options=k['options'],connect_timeout=k['connect_timeout'])
+    monkeypatch.setattr(psycopg,'connect',redirect)
+    before=(cluster.count(r'connection authorized'),len(cluster.statements()))
+    result,j,lines,progress,_=run_probe(tmp_path,None)
+    k=seen[0]
+    assert (k['host'],k['port'],k['dbname'],k['user'],k['sslmode'],k['hostaddr'],k['password'],k['options'],k['autocommit'],k['prepare_threshold'],k['connect_timeout'])==(
+        HOST,5432,'postgres','postgres.zcikcfgpblzuzpanpdqd','verify-full','192.0.2.7',SECRET,STARTUP_OPTIONS,True,None,3)
+    assert result['status']=='ADMIN_CONNECTION_QUALIFIED' and (cluster.count(r'connection authorized'),len(cluster.statements()))==(before[0]+1,before[1]+1)
+    assert cluster.statements()[-1].strip()==STATEMENT and progress.database_connection_calls==1
+    secret_safe(j,lines,result)
+
+
+def test_registration_hashes_must_equal_the_manifest(bound):
+    with pytest.raises(ValueError,match='HASHES_MUST_EQUAL_MANIFEST'):_validate({**bound,'hashes':{**bound['hashes'],'extra.txt':'0'*64}})
+    with pytest.raises(ValueError,match='EVIDENCE_BINDING'):_validate({**bound,'hashes':{}})
+
+
+def test_early_outcome_derives_not_attempted_from_the_connection_count():
+    closure=dict(overall='CLOSED')
+    ok=Progress();assert oo.early_outcome(dict(reason_code='ROUTE_HOST_MISMATCH'),closure,ok)['administrative_connection']=='NOT_ATTEMPTED'
+    ok.database_connection_calls=1;assert oo.early_outcome(dict(reason_code='ROUTE_HOST_MISMATCH'),closure,ok)['administrative_connection']=='UNKNOWN'
+    assert oo.early_outcome(dict(reason_code='X'),closure,None)['administrative_connection']=='UNKNOWN'

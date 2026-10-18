@@ -18,9 +18,10 @@ def legacy_counts(accounting):
     return out
 
 
-def early_outcome(failure,closure):
+def early_outcome(failure,closure,progress=None):
     """Truthful, separately stated outcome for an exit before any administrative connection could be attempted."""
-    return dict(preparation='FAILED',administrative_connection='NOT_ATTEMPTED',failure=('CLASSIFIED' if failure.get('reason_code') not in (None,'UNKNOWN','UNEXPECTED_EXCEPTION','FAILURE_EXPORT_UNAVAILABLE') else 'UNCLASSIFIED'),
+    calls=None if progress is None else progress.database_connection_calls
+    return dict(preparation='FAILED',administrative_connection='NOT_ATTEMPTED' if calls==0 else 'UNKNOWN',failure=('CLASSIFIED' if failure.get('reason_code') not in (None,'UNKNOWN','UNEXPECTED_EXCEPTION','FAILURE_EXPORT_UNAVAILABLE') else 'UNCLASSIFIED'),
                 closure='VERIFIED' if closure.get('overall')=='CLOSED' else 'UNCERTAIN',route_qualified=False,worker_authentication_qualified=False)
 
 
@@ -70,12 +71,12 @@ def early_accounting(progress,elapsed):
     if progress is None:
         unknown=dict(value=None,basis='UNKNOWN')
         return dict(administration={k:dict(unknown) for k in ('connections','commands','returned_data_value_bytes','failed_native_connections','failed_native_finished',
-                                                               'credential_generations','secret_mappings','role_changes')}|dict(supervised_seconds=elapsed),
+                                                               'credential_generations','secret_mappings','role_changes')}|dict(supervised_seconds=dict(value=elapsed,basis='MEASURED')),
                     runtime=dict(slot_receipts=None,slot_state='UNKNOWN',supervised_seconds=dict(unknown)),preparation=dict(state='PREPARATION_PROGRESS_UNAVAILABLE'),
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
     calls=progress.database_connection_calls
     measured=lambda v:dict(value=v,basis='MEASURED');not_started=dict(value=0,basis='NOT_STARTED') if calls==0 else dict(value=None,basis='UNKNOWN')
-    admin=dict(connections=measured(calls),supervised_seconds=elapsed)
+    admin=dict(connections=measured(calls),supervised_seconds=measured(elapsed))
     for k in ('commands','returned_data_value_bytes','failed_native_connections','failed_native_finished','credential_generations','secret_mappings','role_changes'):admin[k]=dict(not_started)
     return dict(administration=admin,runtime=dict(slot_receipts={},slot_state='NO_RUNTIME_SLOT_CREATED',supervised_seconds=dict(not_started)),
                 preparation=progress.work(),historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
@@ -136,7 +137,7 @@ def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMI
                 result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=closure['overall'],closure_components=closure,failure=failure,
                     authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
                     preparation=progress.report() if progress is not None else None,
-                    accounting=early_accounting(progress,elapsed),accounting_schema=ACCOUNTING_SCHEMA,outcome=early_outcome(failure,closure),owned_cleanup=closure['process'],
+                    accounting=early_accounting(progress,elapsed),accounting_schema=ACCOUNTING_SCHEMA,outcome=early_outcome(failure,closure,progress),owned_cleanup=closure['process'],
                     application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
             except BaseException:
                 # The exporter itself failed (for example the driver is unavailable to the classifier). A final result must still exist; nothing is claimed.

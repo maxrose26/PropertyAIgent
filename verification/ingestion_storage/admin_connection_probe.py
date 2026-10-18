@@ -20,7 +20,7 @@ MODE='ADMIN_CONNECTION_PROBE_ONLY'
 AUTHORITY='AUTHORISE_INGESTION_ADMIN_CONNECTION_PROBE_ONCE_20261018'
 STATUS='OWNER_APPROVED_ADMIN_CONNECTION_PROBE_ONCE'
 STATE='operational-admin-connection-probe-once-20261018'
-EVIDENCE_PREFIX='docs/design/ingestion-admin-connection-probe-'
+EVIDENCE_DIRECTORY='docs/design/ingestion-admin-connection-probe-20261018'
 STATEMENT='SELECT current_user'
 EXPECTED_IDENTITY='postgres'
 # Every number below is bound into the registration and enforced in code. Startup `options` (statement_timeout 10 s, lock_timeout 3 s) are inherited unchanged from
@@ -58,7 +58,7 @@ class ProbeRunner:
     def __init__(self,journal,connect,progress,memory,*,baseline,started,stop_file=None):
         self.journal=journal;self.emit=journal.emit;self.connect=connect;self.progress=progress;self.memory=memory;self.baseline=baseline;self.started=started
         self.stop_file=stop_file or journal.root/'STOP'
-        self.attempts=0;self.opened=0;self.closed=0;self.statements=0;self.returned_bytes=0;self.database_seconds=0.0;self.phase='DRIVER_CONNECT';self.conn=None;self.identity_matches=None
+        self.attempts=0;self.opened=0;self.closed=0;self.statements=0;self.returned_bytes=0;self.database_seconds=0.0;self.phase=None;self.conn=None;self.identity_matches=None
 
     def check(self):
         if self.memory is not None:self.memory.snapshot()
@@ -90,9 +90,8 @@ class ProbeRunner:
             self.emit('probe_intent',dict(limits=LIMITS,statement_sha256=hashlib.sha256(STATEMENT.encode()).hexdigest(),absent_capabilities=list(ABSENT_CAPABILITIES)))
             self.check()
             if self.attempts>=LIMITS['connection_attempts']:raise ProbeDenied('CONNECTION_ATTEMPT_BOUND')
-            self.attempts+=1;begun=time.monotonic()
+            self.attempts+=1;begun=time.monotonic();self.phase='DRIVER_CONNECT'
             try:
-                self.phase='DRIVER_CONNECT'
                 self.conn=self.connect();self.opened+=1
                 self.emit('connection_opened',dict(attempt=self.attempts))
                 self.phase='EXECUTION'
@@ -106,10 +105,10 @@ class ProbeRunner:
 
     def accounting(self):
         return dict(administration=dict(connection_attempts=measured(self.attempts),connections_opened=measured(self.opened),connections_closed=measured(self.closed),
-                                        driver_statements=measured(self.statements),rollbacks=measured(0),commits=measured(0),returned_data_value_bytes=measured(self.returned_bytes),
-                                        supervised_seconds=round(self.database_seconds,6),credential_generations=dict(ABSENT),secret_mappings=dict(ABSENT),role_changes=dict(ABSENT),
+                                        driver_statements=dict(value=self.statements,basis='CLIENT_COUNTED',server_observation='TEST_ONLY_NOT_AVAILABLE_IN_PRODUCTION_RESULT'),rollbacks=measured(0),commits=measured(0),returned_data_value_bytes=measured(self.returned_bytes),
+                                        supervised_seconds=measured(round(self.database_seconds,6)),credential_generations=dict(ABSENT),secret_mappings=dict(ABSENT),role_changes=dict(ABSENT),
                                         function_installations=dict(ABSENT),grants_or_exceptions=dict(ABSENT),queue_mutations=dict(ABSENT),council_requests=dict(ABSENT)),
-                    runtime=dict(slot_receipts={},slot_state='NO_RUNTIME_SLOT_CREATED',supervised_seconds=dict(ABSENT)),preparation=self.progress.work(),
+                    runtime=dict(slot_receipts={},slot_state='NO_RUNTIME_SLOT_CREATED',supervised_seconds=dict(ABSENT)),preparation=dict(scope='PREPARATION_ONLY',dns_subprocesses_spawned=self.progress.work()['dns_subprocesses_spawned']),
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
     def closure(self):
@@ -138,7 +137,7 @@ class ProbeRunner:
         if self.identity_matches:
             outcome=dict(preparation='COMPLETED',administrative_connection='QUALIFIED',failure='NONE',closure='VERIFIED' if verified else 'UNCERTAIN',
                          scope='ADMIN_ROLE_CONNECTION_ONLY',worker_authentication_qualified=False,route_qualified_for_restricted_roles=False)
-            return dict(status='ADMIN_CONNECTION_QUALIFIED',outcome=outcome,identity_observation='MATCHES_EXPECTED_ADMIN_ROLE',**self.common(components))
+            return dict(status='ADMIN_CONNECTION_QUALIFIED' if verified else 'ADMIN_CONNECTION_QUALIFIED_CLOSURE_UNCERTAIN',outcome=outcome,identity_observation='MATCHES_EXPECTED_ADMIN_ROLE',**self.common(components))
         failure=dict(phase='EXECUTION',exception_kind='OTHER',sqlstate=None,reason_code='ADMIN_IDENTITY_UNEXPECTED',classification_source='FIXED_PROBE_CODE',
                      failed_native_connection_finished=False,underlying_cause='UNDETERMINED',message_exported=False)
         outcome=dict(preparation='COMPLETED',administrative_connection='FAILED_CLASSIFIED',failure='CLASSIFIED',closure='VERIFIED' if verified else 'UNCERTAIN',
@@ -149,16 +148,18 @@ class ProbeRunner:
         try:self.close_connection()
         except BaseException:pass
         components=self.closure()
+        admitted=self.attempts>0
         if isinstance(exc,ProbeDenied):
-            failure=dict(phase=self.phase,exception_kind='OTHER',sqlstate=None,reason_code=exc.code,classification_source='FIXED_PROBE_CODE',
+            failure=dict(phase=self.phase if admitted else 'PROBE_ADMISSION',exception_kind='OTHER',sqlstate=None,reason_code=exc.code,classification_source='FIXED_PROBE_CODE',
                          failed_native_connection_finished=False,underlying_cause='UNDETERMINED',message_exported=False)
         else:
-            try:failure=safe_failure(exc,self.phase)
+            try:failure=safe_failure(exc,self.phase or 'PREPARATION')
             except BaseException:
-                failure=dict(phase=self.phase,exception_kind='OTHER',sqlstate=None,reason_code='UNKNOWN',classification_source='NONE',failed_native_connection_finished=False,
+                failure=dict(phase=self.phase or 'PROBE_ADMISSION',exception_kind='OTHER',sqlstate=None,reason_code='UNKNOWN',classification_source='NONE',failed_native_connection_finished=False,
                              underlying_cause='UNDETERMINED',message_exported=False)
         classified=failure.get('reason_code') not in (None,'UNKNOWN')
-        outcome=dict(preparation='COMPLETED',administrative_connection='FAILED_CLASSIFIED' if classified else 'FAILED_UNCLASSIFIED',failure='CLASSIFIED' if classified else 'UNCLASSIFIED',
+        attempt_state=('FAILED_CLASSIFIED' if classified else 'FAILED_UNCLASSIFIED') if admitted else 'NOT_ATTEMPTED'
+        outcome=dict(preparation='COMPLETED',administrative_connection=attempt_state,failure='CLASSIFIED' if classified else 'UNCLASSIFIED',
                      closure='VERIFIED' if components['overall']=='CLOSED' else 'UNCERTAIN',scope='ADMIN_ROLE_CONNECTION_ONLY',worker_authentication_qualified=False,
                      route_qualified_for_restricted_roles=False)
         result=dict(status='STOP_RECONCILE_NO_RETRY',outcome=outcome,failure=failure,**self.common(components))
@@ -190,7 +191,9 @@ def validate_probe_registration(body,sha):
     if r['limits']!=LIMITS or r['absent_capabilities']!=list(ABSENT_CAPABILITIES) or r['statement_sha256']!=hashlib.sha256(STATEMENT.encode()).hexdigest():raise ValueError('PROBE_LIMITS_OR_BOUNDARY_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
     if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=2):raise ValueError('PROBE_EXPIRY')
-    if not isinstance(r['hashes'],dict) or not r['hashes'] or not str(r['evidence_directory']).startswith(EVIDENCE_PREFIX):raise ValueError('EVIDENCE_BINDING')
+    if r['evidence_directory']!=EVIDENCE_DIRECTORY or not isinstance(r['hashes'],dict) or not r['hashes']:raise ValueError('EVIDENCE_BINDING')
+    manifest=json.loads((Path(EVIDENCE_DIRECTORY)/'MANIFEST.json').read_text())
+    if set(r['hashes'])!=set(manifest['bound_paths']):raise ValueError('HASHES_MUST_EQUAL_MANIFEST')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
