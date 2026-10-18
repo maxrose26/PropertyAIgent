@@ -66,7 +66,13 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
             injected=[]
             class Connection:
                 def __init__(self):
-                    if fault=='connection_failure':raise psycopg.OperationalError('DISPOSABLE_CONNECTION_FAILURE')
+                    if fault=='connection_failure':
+                        # Real failed PostgreSQL handshake, disposable login only.
+                        # This chosen fixture failure says nothing about the
+                        # historical production connection's unknown cause.
+                        psycopg.connect(**{**info,'user':role,'password':'disposable-intentionally-wrong'},
+                            autocommit=True,connect_timeout=3,prepare_threshold=None)
+                        raise AssertionError('DISPOSABLE_BAD_PASSWORD_WAS_ACCEPTED')
                     self.c=connect()
                 @property
                 def closed(self):return self.c.closed
