@@ -86,6 +86,9 @@ jobs:
       - name: Restricted connection matrix, server-observed, disposable PostgreSQL only
         run: |
           timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_restricted_matrix.py tests/test_ingestion_restricted_matrix_package.py -v --junitxml="$RUNNER_TEMP/restricted-matrix.xml"
+      - name: Matrix cleanup, exactly-bound session end and exact secret deletion, disposable PostgreSQL and real gh fixture only
+        run: |
+          timeout --kill-after=2s 120s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_matrix_cleanup.py -v --junitxml="$RUNNER_TEMP/matrix-cleanup.xml"
       - name: Fixed committee caller and field-level B2, network denied
         run: |
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
