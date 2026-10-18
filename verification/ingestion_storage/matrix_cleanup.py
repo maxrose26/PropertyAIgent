@@ -26,7 +26,7 @@ ROLES=('ingestion_effect_login','ingestion_worker_login')
 SECRETS=('INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL')
 PRESERVED='DATABASE_URL'
 SECRET_PATH='repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets'
-IDENT_SQL='SELECT current_user,session_user'
+IDENT_SQL="SELECT current_user,session_user,pg_catalog.pg_has_role(current_user,'pg_read_all_stats','MEMBER'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','MEMBER')"
 STATE_SQL="""SELECT jsonb_build_object(
  'roles',(SELECT coalesce(jsonb_agg(jsonb_build_array(r.rolname,r.rolcanlogin,a.rolpassword IS NULL,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication) ORDER BY r.rolname),'[]'::jsonb)
   FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s)),
@@ -52,7 +52,7 @@ class Halt(RuntimeError):
     """A fixed-code stop; str() is the code only."""
     CODES=frozenset({'COMMAND_BOUND','CONNECTION_BOUND','ACTIVE_SECONDS_BOUND','TERMINATION_BOUND','GITHUB_BOUND','EXACT_ROUTE_REQUIRED','STATEMENT_NOT_ALLOWED','RESPONSE_SHAPE',
                      'UNEXPECTED_ADMIN_IDENTITY','ROLES_NOT_DISABLED_NO_CHANGE','TERMINATION_RESPONSE_UNEXPECTED','DELETE_ACK_UNCERTAIN','NAMES_READBACK_UNCERTAIN','CLOSE_UNCERTAIN',
-                     'RETURNED_BYTES_BOUND','FINAL_STATE_NOT_VERIFIED'})
+                     'RETURNED_BYTES_BOUND','FINAL_STATE_NOT_VERIFIED','SESSION_VISIBILITY_INSUFFICIENT'})
     def __init__(self,code):
         if code not in self.CODES:raise ValueError('HALT_CODE')
         self.code=code;super().__init__(code)
@@ -69,7 +69,7 @@ class Cleanup:
         self.baseline=baseline;self.started=started if started is not None else clock();self.clock=clock;self.sleep=sleep
         self.connections=0;self.opened=0;self.closed=0;self.commands=0;self.returned=0;self.db_seconds=0.0;self.terminations=0;self.github=dict(requests=0,deletions=0,reads=0)
         self.disposition=dict(roles='UNVERIFIED',memberships='UNVERIFIED',sessions='UNVERIFIED',termination='NOT_ATTEMPTED',secrets_deleted='NOT_ATTEMPTED',secrets_absent='UNVERIFIED',database_url='UNVERIFIED')
-        self.readbacks={};self.termination=dict(attempted=False);self.deleted=[];self.phase='START'
+        self.readbacks={};self.termination=dict(attempted=False);self.deleted=[];self.phase='START';self.can_signal=False
 
     # ---- bounded primitives ---------------------------------------------------------------------------------------------------------------------------
     def check(self):
@@ -123,7 +123,9 @@ class Cleanup:
     def read_state(self,c,label):
         value=self.q(c,label,STATE_SQL,(list(ROLES),list(ROLES),list(ROLES)))
         if len(value)!=1 or len(value[0])!=1 or not isinstance(value[0][0],dict) or set(value[0][0])!={'roles','memberships','sessions'}:raise Halt('RESPONSE_SHAPE')
-        state=value[0][0];self.readbacks[label]=dict(roles=state['roles'],memberships=state['memberships'],sessions=[dict(pid=s['pid'],usename=s['usename'],state=s['state'],backend_start=s['backend_start']) for s in state['sessions']])
+        state=value[0][0]
+        if any(s.get('pid') is None or s.get('usename') is None or s.get('state') is None or s.get('backend_start') is None for s in state['sessions']):raise Halt('SESSION_VISIBILITY_INSUFFICIENT')
+        self.readbacks[label]=dict(roles=state['roles'],memberships=state['memberships'],sessions=[dict(pid=s['pid'],usename=s['usename'],state=s['state'],backend_start=s['backend_start']) for s in state['sessions']])
         self.emit('access_readback',dict(label=label,**self.readbacks[label]));return state
 
     def check_disabled(self,state,*,require_no_sessions):
@@ -145,7 +147,7 @@ class Cleanup:
         gh['requests']+=1;self.phase='GITHUB_'+method;self.emit('github_intent',dict(method=method,path=path))
         command=['gh','api','--method',method,path]+(['--include','--silent'] if method=='DELETE' else [])
         try:
-            result=self.github_runner(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+            result=self.github_runner(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=max(1.0,min(8.0,LIMITS['active_seconds']-10-(self.clock()-self.started)-2)))
             if result.returncode or len(result.stdout)+len(result.stderr)>65536:raise ValueError('ack')
             if method=='DELETE':
                 if re.findall(rb'^HTTP/\S+\s+(\d{3})(?:\s|$)',result.stdout,re.M)!=[b'204']:raise ValueError('ack')
@@ -160,6 +162,8 @@ class Cleanup:
     # ---- the cleanup ------------------------------------------------------------------------------------------------------------------------------------
     def terminate_if_exactly_the_target(self,c,first):
         sessions=first['sessions'];target=self.target
+        if sessions and not self.can_signal:
+            self.termination=dict(attempted=False,outcome='SIGNAL_PRIVILEGE_ABSENT_NOT_TERMINATED');self.disposition['termination']='PRIVILEGE_ABSENT_NOT_TERMINATED';self.emit('session_discrepancy',self.termination);return
         if not sessions:
             self.termination=dict(attempted=False,outcome='TARGET_ALREADY_ABSENT');self.disposition['termination']='NOT_NEEDED_NO_SESSION';return
         match=[s for s in sessions if s['pid']==target['pid'] and s['usename']==target['role']]
@@ -176,6 +180,12 @@ class Cleanup:
         self.termination=dict(attempted=True,pid=observed['pid'],role=observed['usename'],state_at_observation=observed['state'],observed_backend_start=observed['backend_start'])
         self.emit('termination_intent',dict(self.termination))
         response=self.q(c,'terminate_exact_session',TERMINATE_SQL,(observed['pid'],observed['usename'],observed['backend_start']))
+        if response==[]:
+            # the statement matched no row: the session exited (or no longer matches) between the re-read and the signal. Re-read; never assume.
+            gone=self.read_state(c,'after_unmatched_termination')
+            if gone['sessions']==[]:
+                self.termination['outcome']='EXITED_BEFORE_SIGNAL_ABSENT';self.disposition['termination']='EXITED_BEFORE_SIGNAL_VERIFIED_ABSENT';return
+            self.termination['outcome']='NO_MATCH_SESSIONS_REMAIN_NOT_TERMINATED';self.disposition['termination']='DISCREPANCY_NOT_TERMINATED';self.emit('session_discrepancy',self.termination);return
         if response!=[(True,)]:
             self.termination['outcome']='SIGNAL_NOT_ACCEPTED';self.disposition['termination']='UNVERIFIED';raise Halt('TERMINATION_RESPONSE_UNEXPECTED')
         self.termination['signal_acknowledged']=True;self.emit('termination_acknowledged',dict(pid=observed['pid']))
@@ -190,11 +200,15 @@ class Cleanup:
         try:
             with self.connection() as c:
                 ident=self.q(c,'admin_identity',IDENT_SQL)
-                if ident!=[('postgres','postgres')]:raise Halt('UNEXPECTED_ADMIN_IDENTITY')
+                if len(ident)!=1 or ident[0][:2]!=('postgres','postgres'):raise Halt('UNEXPECTED_ADMIN_IDENTITY')
+                if ident[0][2] is not True:raise Halt('SESSION_VISIBILITY_INSUFFICIENT')      # without it an unseen session would read as none
+                self.can_signal=ident[0][3] is True
                 first=self.read_state(c,'before_cleanup')
                 if not self.check_disabled(first,require_no_sessions=False):raise Halt('ROLES_NOT_DISABLED_NO_CHANGE')
                 self.terminate_if_exactly_the_target(c,first)
-            # the secret names are removed whenever the logins are verified disabled, independently of the session outcome
+            # the secret names are removed whenever the logins were verified disabled, independently of the session outcome. The FIRST reads only gate this; every closure claim below
+            # is re-derived from the FINAL readback alone, so a failed or missing final read can never leave a stale 'verified' behind.
+            for k in ('roles','memberships','sessions'):self.disposition[k]='UNVERIFIED'
             self.phase='SECRET_DELETION'
             for name in SECRETS:self.api('DELETE',SECRET_PATH+'/'+name)
             self.disposition['secrets_deleted']='ACKNOWLEDGED_204_BOTH'
@@ -206,7 +220,7 @@ class Cleanup:
             self.emit('secret_names_observed',dict(temporary_absent=self.disposition['secrets_absent']=='VERIFIED',preserved_present=PRESERVED in names,count=len(names)))
             with self.connection() as c:
                 ident=self.q(c,'admin_identity_final',IDENT_SQL)
-                if ident!=[('postgres','postgres')]:raise Halt('UNEXPECTED_ADMIN_IDENTITY')
+                if len(ident)!=1 or ident[0][:2]!=('postgres','postgres') or ident[0][2] is not True:raise Halt('UNEXPECTED_ADMIN_IDENTITY')
                 final=self.read_state(c,'final_state')
                 self.check_disabled(final,require_no_sessions=True)
             return self.finish()

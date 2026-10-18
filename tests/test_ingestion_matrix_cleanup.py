@@ -130,8 +130,8 @@ def test_pid_reuse_is_defeated_by_the_backend_start_predicate(cluster,tmp_path,w
         return state
     monkeypatch.setattr(Cleanup,'read_state',lying)
     result=clean.execute()
-    assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['failure']['reason_code']=='TERMINATION_RESPONSE_UNEXPECTED' and w.alive(pid)
-    assert result['termination']['attempted'] is True and result['termination'].get('outcome')=='SIGNAL_NOT_ACCEPTED' and set(ciphertexts)>={'DATABASE_URL',*SECRETS}      # stopped: secrets untouched
+    assert w.alive(pid) and result['termination']['attempted'] is True and result['termination']['outcome']=='NO_MATCH_SESSIONS_REMAIN_NOT_TERMINATED'      # the predicate matched nothing: the session was NOT signalled
+    assert result['status']=='RESTRICTED_MATRIX_CLEANUP_INCOMPLETE_RECONCILE' and result['cleanup']=='UNCERTAIN' and result['closure_components']['access']['sessions']=='PRESENT'
 
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
@@ -266,3 +266,66 @@ def test_module_has_no_role_membership_ledger_or_credential_statement():
     for forbidden in ('ALTER ','GRANT ','REVOKE ','CREATE ','DROP ','INSERT ','UPDATE ','DELETE FROM','COMMIT','pg_authid.rolpassword','pg_stat_activity.query',' query'):
         assert forbidden not in sql.replace('a.rolpassword IS NULL','').replace('ON a.rolname','') ,forbidden
     assert 'secret set' not in text and "'PUT'" not in text and 'POST' not in text
+
+
+@pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+def test_a_failed_final_read_can_never_leave_a_stale_verified_claim(cluster,tmp_path,world,real_gh_store,monkeypatch):
+    metadata,_,ciphertexts,_=real_gh_store;w=world(hold=());clean,journal=build(cluster,tmp_path,metadata,ciphertexts,3175259)
+    real=Cleanup.read_state
+    def failing(self,c,label):
+        if label=='final_state':raise psycopg.OperationalError('connection timeout expired')
+        return real(self,c,label)
+    monkeypatch.setattr(Cleanup,'read_state',failing)
+    result=clean.execute()
+    assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['cleanup']=='UNCERTAIN' and result['access']=='UNRECONCILED'
+    a=result['closure_components']['access'];assert (a['roles'],a['memberships'],a['sessions'])==('UNVERIFIED',)*3 and a['secrets_absent']=='VERIFIED'      # what WAS proven stays proven, nothing more
+    assert set(ciphertexts)=={'DATABASE_URL'}
+
+
+def _ident_with(monkeypatch,flags):
+    real=Cleanup.q
+    def q(self,c,label,statement,params=None):
+        rows=real(self,c,label,statement,params)
+        return [('postgres','postgres',flags[0],flags[1])] if statement==mc.IDENT_SQL else rows
+    monkeypatch.setattr(Cleanup,'q',q)
+
+
+@pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+def test_without_statistics_visibility_nothing_is_changed(cluster,tmp_path,world,real_gh_store,monkeypatch):
+    metadata,_,ciphertexts,_=real_gh_store;w=world();pid=w.pid();clean,journal=build(cluster,tmp_path,metadata,ciphertexts,pid)
+    _ident_with(monkeypatch,(False,True));result=clean.execute()
+    assert result['failure']['reason_code']=='SESSION_VISIBILITY_INSUFFICIENT' and w.alive(pid) and set(ciphertexts)>={'DATABASE_URL',*SECRETS} and result['accounting']['github']['requests']['value']==0
+
+
+@pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+def test_without_the_signal_privilege_no_termination_is_attempted_and_nothing_escalates(cluster,tmp_path,world,real_gh_store,monkeypatch):
+    metadata,_,ciphertexts,_=real_gh_store;w=world();pid=w.pid();clean,journal=build(cluster,tmp_path,metadata,ciphertexts,pid)
+    _ident_with(monkeypatch,(True,False));result=clean.execute()
+    assert result['termination']['outcome']=='SIGNAL_PRIVILEGE_ABSENT_NOT_TERMINATED' and w.alive(pid) and result['accounting']['database']['session_terminations']['value']==0
+    assert result['cleanup']=='UNCERTAIN' and result['closure_components']['access']['sessions']=='PRESENT' and set(ciphertexts)=={'DATABASE_URL'}
+
+
+@pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+def test_a_session_that_exits_just_before_the_signal_is_reread_not_assumed(cluster,tmp_path,world,real_gh_store,monkeypatch):
+    metadata,_,ciphertexts,_=real_gh_store;w=world();pid=w.pid();clean,journal=build(cluster,tmp_path,metadata,ciphertexts,pid)
+    real=Cleanup.q
+    def exits_first(self,c,label,statement,params=None):
+        if statement==mc.TERMINATE_SQL:
+            w.held[0][1].close();time.sleep(.3)                                                 # the session leaves between the re-read and the signal
+        return real(self,c,label,statement,params)
+    monkeypatch.setattr(Cleanup,'q',exits_first)
+    result=clean.execute()
+    assert result['termination']['outcome']=='EXITED_BEFORE_SIGNAL_ABSENT' and result['status']=='RESTRICTED_MATRIX_CLEANUP_VERIFIED' and set(ciphertexts)=={'DATABASE_URL'}
+
+
+def test_rows_with_hidden_columns_are_refused_rather_than_read_as_none(cluster,tmp_path,world,monkeypatch):
+    w=world(hold=());clean,journal=build(cluster,tmp_path,None,{},1,runner=lambda *a,**k:None,present=False)
+    real=Cleanup.q
+    def hidden(self,c,label,statement,params=None):
+        rows=real(self,c,label,statement,params)
+        if statement==mc.STATE_SQL:rows[0][0]['sessions']=[dict(pid=5,usename=WORKER,state=None,backend_start=None)]
+        return rows
+    monkeypatch.setattr(Cleanup,'q',hidden)
+    with admin(cluster) as c:
+        with pytest.raises(Halt) as caught:clean.read_state(c,'x')
+    assert caught.value.code=='SESSION_VISIBILITY_INSUFFICIENT'
