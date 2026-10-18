@@ -1,0 +1,159 @@
+{
+  "status": "FAILED_REQUIRED_OPERATIONAL_ACCEPTANCE_RECONCILED_CLEANUP_PENDING",
+  "revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "authority": "AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018",
+  "registration_sha256": "5dd3cc1f5252b80d55d31ec3e98303d5a5fb609f212776d29d65c799819746dc",
+  "registration_disposition": "CONSUMED_NO_RETRY_NO_REPLACEMENT",
+  "original_audit": {
+    "bytes": 44272,
+    "sha256": "dd7c5814b686c8dd4c23451238d88fa76e095040ac30871e4139936b9d02677f",
+    "git_blob": "1774de0d8ad6b47f37bd524a5dfeae0e6eba6eb2",
+    "events": 175,
+    "chain_head": "cb86102ae32d0e91c8b1acd36b95f60cf7e4a35c28fecabe8cd359a4e678f679",
+    "all_chain_links_verified": true
+  },
+  "final_result_file": "NOT_CREATED_FAILURE_PRECEDED_FINISH",
+  "completed": [
+    "MIGRATION_PREFLIGHT",
+    "OPERATIONAL_FUNCTION_INSTALL_ACKNOWLEDGED",
+    "TWO_PASSWORD_MAPPING_ACKNOWLEDGEMENTS",
+    "RESTRICTED_ACTIVATION",
+    "CAPTURE_ITEM_GRANT_EXCEPTION_REGISTRATION_COMMITTED",
+    "ACTUAL_FAILURE_READBACKS"
+  ],
+  "source_observations": 0,
+  "captured_rows": 0,
+  "screening_batches": 0,
+  "application_writes": 0,
+  "factual_writes": 0,
+  "first_runtime_slot": {
+    "connection_attempts": 1,
+    "driver_statements": 0,
+    "returned_data_value_bytes": 0,
+    "supervised_seconds": 0.6363665150001907,
+    "reported_cleanup": "CLOSED",
+    "native_connect_before_first_cursor": "FAILED_CAUSE_UNDETERMINED"
+  },
+  "observed_diagnostics": {
+    "begin": [],
+    "control": [
+      [
+        {
+          "global_stop": {
+            "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+            "run": "38884069913"
+          },
+          "hard_stop_generation": 0,
+          "manual_stop": "STORAGE_TEST_STOP",
+          "unexpired_grants": 1
+        }
+      ]
+    ],
+    "memberships": [
+      [
+        "ingestion_worker_login",
+        "ingestion_worker",
+        false,
+        true,
+        false
+      ],
+      [
+        "ingestion_effect_login",
+        "ingestion_effect_broker",
+        false,
+        true,
+        false
+      ]
+    ],
+    "roles": [
+      [
+        "ingestion_effect_login",
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      [
+        "ingestion_worker_login",
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    ],
+    "rollback": [],
+    "sessions": []
+  },
+  "temporary_secret_names_present": {
+    "INGESTION_WORKER_DATABASE_URL": true,
+    "INGESTION_EFFECT_DATABASE_URL": true
+  },
+  "database_url_preserved": true,
+  "cleanup": "UNCERTAIN_PRESERVED",
+  "owned_cleanup": {
+    "memory": {
+      "aggregate": {
+        "current_bytes": 65515520,
+        "events": {
+          "high": 0,
+          "low": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_group_kill": 0,
+          "oom_kill": 0
+        },
+        "peak_bytes": 77312000
+      },
+      "controller": {
+        "current_bytes": 6389760,
+        "events": {
+          "high": 0,
+          "low": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_group_kill": 0,
+          "oom_kill": 0
+        },
+        "peak_bytes": 18186240
+      },
+      "source": {
+        "current_bytes": 0,
+        "events": {
+          "high": 0,
+          "low": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_group_kill": 0,
+          "oom_kill": 0
+        },
+        "peak_bytes": 0
+      }
+    },
+    "owned_groups_removed": true,
+    "owned_survivors": 0
+  },
+  "unacknowledged_logged_admin_effects": [],
+  "administrative_connections_observed": 5,
+  "administrative_connections_closed": 5,
+  "administrative_commands_reconstructed_from_exact_code": 87,
+  "github_cli_invocations": 5,
+  "accounting_limitations": [
+    "ADMIN_ACTUAL_SECONDS_NOT_EXPORTED",
+    "ADMIN_RETURNED_DATA_VALUE_BYTES_NOT_EXPORTED",
+    "FULL_FAILURE_SOCKET_INVENTORY_NOT_EXPORTED",
+    "ACTUAL_ORIGINAL_EXCEPTION_CLASS_AND_SAFE_CONNECT_PHASE_NOT_EXPORTED"
+  ],
+  "exception_invalidation_gap": "RUNTIME_CONNECTION_FAILURE_BEFORE_LEDGER_INITIALISATION_DID_NOT_RAISE_SQL_HARD_STOP; HARD_STOP_GENERATION_ZERO_AND_ONE_UNEXPIRED_GRANT_REMAIN",
+  "cause": "UNDETERMINED_NO_GUESS_FROM_REDACTED_EXECUTION_FAILURE",
+  "next_action": "REVIEW_FINITE_CLEANUP_ONLY_ALLOWANCE_NO_REPLAY_NO_SOURCE_CALLS",
+  "storage": "PREVIOUS_STORAGE_ACCEPTANCE_PRESERVED",
+  "stage4": "OPEN",
+  "optional_writer": "HELD"
+}
