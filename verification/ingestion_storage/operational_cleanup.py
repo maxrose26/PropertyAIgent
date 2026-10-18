@@ -119,16 +119,16 @@ class Memory:
 STATE_SQL = """SELECT jsonb_build_object(
  'roles',(SELECT jsonb_agg(jsonb_build_array(r.rolname,r.rolcanlogin,a.rolpassword IS NULL,
  r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication) ORDER BY r.rolname)
- FROM pg_roles r JOIN pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s)),
+ FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s)),
  'memberships',(SELECT coalesce(jsonb_agg(jsonb_build_array(m.member::regrole::text,
  m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option,m.grantor::regrole::text)
  ORDER BY m.member::regrole::text,m.roleid::regrole::text),'[]'::jsonb)
- FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])),
+ FROM pg_catalog.pg_auth_members m WHERE m.member=ANY(%s::regrole[])),
  'sessions',(SELECT coalesce(jsonb_agg(jsonb_build_object('pid',pid,'usename',usename,'state',state)
- ORDER BY pid),'[]'::jsonb) FROM pg_stat_activity WHERE usename=ANY(%s)))"""
+ ORDER BY pid),'[]'::jsonb) FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s)))"""
 RECORDS_SQL = """SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY w.key),'[]'::jsonb),
- (SELECT count(*) FROM ingestion_work_attempts) FROM
- (SELECT * FROM ingestion_work_items WHERE key<>repeat('0',64) ORDER BY key LIMIT 5) w"""
+ (SELECT count(*) FROM public.ingestion_work_attempts) FROM
+ (SELECT * FROM public.ingestion_work_items WHERE key<>repeat('0',64) ORDER BY key LIMIT 5) w"""
 
 class Cleanup:
     def __init__(self, connector, journal, *, github_runner=subprocess.run,
@@ -278,7 +278,7 @@ class Cleanup:
         if not set(SECRETS)<=names or 'DATABASE_URL' not in names:
             raise Stop('UNEXPECTED_INITIAL_SECRET_NAMES')
         with self.connection() as c:
-            flags=self.q(c,'migration_identity',"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT') AND has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT') FROM pg_roles WHERE rolname=current_user")[0]
+            flags=self.q(c,'migration_identity',"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT') AND has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT') FROM pg_catalog.pg_roles WHERE rolname=current_user")[0]
             self.emit('migration_identity_observed', {'flags':list(flags)})
             if flags!=(self.identity,self.identity,False,True,True,True,True): raise Stop('MIGRATION_CONTRACT')
             self.q(c,'begin_cleanup','BEGIN',effect=True)
@@ -390,7 +390,7 @@ def main():
             return psycopg.connect(host=url.host,hostaddr=addresses[0],port=url.port,dbname=url.database,
                 user=url.username,password=url.password,sslmode='verify-full',sslrootcert=str(ca),
                 autocommit=True,prepare_threshold=None,connect_timeout=3,
-                options='-c statement_timeout=2000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000')
+                options='-c statement_timeout=2000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000 -c search_path=pg_catalog,public')
         worker=Cleanup(connector,journal,memory=memory,started=began)
         result=worker.execute(); proof=memory.close(); current=owned_resources()
         if current['children'] or current['socket_fds']-baseline['socket_fds'] or worker.opened!=worker.closed:
@@ -412,9 +412,13 @@ def main():
                     actual_readbacks=worker.readbacks if worker else {},
                     acknowledged_secret_deletions=worker.secret_deletions if worker else [])
         journal.emit('stopped',result)
-    finally: signal.alarm(0)
-    receipt=journal.save(result)
-    print(json.dumps(dict(result,**receipt,audit=str(journal.file),supervised_seconds_after_audit_flush=time.monotonic()-began),sort_keys=True))
+    try:
+        receipt=journal.save(result)
+        elapsed=time.monotonic()-began
+        if elapsed>=45: raise Stop('FINAL_OUTPUT_DEADLINE')
+        print(json.dumps(dict(result,**receipt,audit=str(journal.file),supervised_seconds_after_audit_flush=elapsed),sort_keys=True),flush=True)
+    finally:
+        signal.alarm(0)
     raise SystemExit(0 if result['cleanup']=='CLOSED' else 1)
 
 if __name__=='__main__': main()
