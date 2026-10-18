@@ -20,6 +20,16 @@ MODE='ADMIN_CONNECTION_PROBE_ONLY'
 AUTHORITY='AUTHORISE_INGESTION_ADMIN_CONNECTION_PROBE_ONCE_20261018'
 STATUS='OWNER_APPROVED_ADMIN_CONNECTION_PROBE_ONCE'
 STATE='operational-admin-connection-probe-once-20261018'
+# Narrowly bound, single-use namespaces. Attempt 1 is CONSUMED (input-window stop, recorded); attempt 2 is the one successor. There is no open-ended counter: an attempt
+# number outside this table is rejected, and a successor is valid only against verified predecessor evidence.
+ATTEMPTS={1:dict(authority=AUTHORITY,state_directory=STATE,predecessor=None),
+          2:dict(authority=AUTHORITY+'_SUCCESSOR_2',state_directory=STATE+'-successor-2',predecessor=1)}
+PREDECESSOR_KEYS=frozenset({'attempt','state_directory','events_sha256','final_result_sha256'})
+
+
+def probe_namespace(attempt):
+    if attempt not in ATTEMPTS:raise ValueError('PROBE_ATTEMPT_NOT_AUTHORISED')
+    return dict(ATTEMPTS[attempt])
 EVIDENCE_DIRECTORY='docs/design/ingestion-admin-connection-probe-20261018'
 STATEMENT='SELECT current_user'
 EXPECTED_IDENTITY='postgres'
@@ -31,7 +41,7 @@ LIMITS=dict(connection_attempts=1,driver_statements=1,rollbacks=0,commits=0,retu
 TIMING=dict(input_seconds=LIMITS['hidden_input_seconds'],active_seconds=LIMITS['active_seconds'],work_seconds=35,diagnostic_seconds=5,report_seconds=LIMITS['final_report_seconds'],outer_seconds=180)
 ABSENT_CAPABILITIES=('credential_generation','protected_secret_mapping','github_access','role_or_membership_change','function_installation','grant_or_exception_issuance',
                      'queue_or_ledger_mutation','council_or_source_request','restricted_worker_authentication','application_writer')
-REGISTRATION_KEYS=frozenset({'mode','authority','status','expires_at','revision','tree','hashes','controller_sha256','ca_sha256','evidence_directory','limits','absent_capabilities','statement_sha256'})
+REGISTRATION_KEYS=frozenset({'mode','authority','status','expires_at','revision','tree','hashes','controller_sha256','ca_sha256','evidence_directory','limits','absent_capabilities','statement_sha256','attempt','state_directory','predecessor'})
 PROBE_REASONS=frozenset({'CONNECTION_ATTEMPT_BOUND','STATEMENT_BOUND','RESPONSE_BOUND','RESPONSE_SHAPE','ACTIVE_WINDOW_EXHAUSTED','OWNER_STOP','STATEMENT_UNEXPECTED'})
 
 
@@ -187,7 +197,16 @@ def validate_probe_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
     if not isinstance(r,dict) or set(r)!=REGISTRATION_KEYS:raise ValueError('REGISTRATION_EXACT_KEYS')
-    if r['mode']!=MODE or r['authority']!=AUTHORITY or r['status']!=STATUS:raise ValueError('EXACT_PROBE_APPROVAL_REQUIRED')
+    attempt=r['attempt']
+    if type(attempt) is not int or attempt not in ATTEMPTS:raise ValueError('PROBE_ATTEMPT_NOT_AUTHORISED')
+    namespace=ATTEMPTS[attempt]
+    if r['mode']!=MODE or r['authority']!=namespace['authority'] or r['status']!=STATUS or r['state_directory']!=namespace['state_directory']:raise ValueError('EXACT_PROBE_APPROVAL_REQUIRED')
+    predecessor=r['predecessor']
+    if namespace['predecessor'] is None:
+        if predecessor is not None:raise ValueError('PREDECESSOR_BINDING')
+    else:
+        if not isinstance(predecessor,dict) or set(predecessor)!=PREDECESSOR_KEYS or type(predecessor['attempt']) is not int or predecessor['attempt']!=namespace['predecessor'] or predecessor['state_directory']!=ATTEMPTS[namespace['predecessor']]['state_directory'] \
+           or not all(isinstance(predecessor[k],str) and len(predecessor[k])==64 for k in ('events_sha256','final_result_sha256')):raise ValueError('PREDECESSOR_BINDING')
     if r['limits']!=LIMITS or r['absent_capabilities']!=list(ABSENT_CAPABILITIES) or r['statement_sha256']!=hashlib.sha256(STATEMENT.encode()).hexdigest():raise ValueError('PROBE_LIMITS_OR_BOUNDARY_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
     if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=2):raise ValueError('PROBE_EXPIRY')
@@ -203,6 +222,24 @@ def validate_probe_registration(body,sha):
     return r
 
 
+def verify_predecessor(r,state_root):
+    """Positive evidence that the predecessor attempt stopped before any connection and closed: exact file hashes plus the recorded outcome. Read-only."""
+    predecessor=r['predecessor']
+    if predecessor is None:return None
+    root=Path(state_root);directory=root/predecessor['state_directory']
+    if directory.is_symlink() or not directory.is_dir() or directory.resolve().parent!=root.resolve():raise ValueError('PREDECESSOR_EVIDENCE')
+    contents={}
+    for name,key in (('events.jsonl','events_sha256'),('final-result.json','final_result_sha256')):
+        path=directory/name
+        if path.is_symlink() or not path.is_file():raise ValueError('PREDECESSOR_EVIDENCE')
+        contents[name]=path.read_bytes()                                                            # read once: the bytes hashed are the bytes parsed
+        if hashlib.sha256(contents[name]).hexdigest()!=predecessor[key]:raise ValueError('PREDECESSOR_EVIDENCE')
+    recorded=json.loads(contents['final-result.json'])
+    if recorded.get('status')!='STOP_RECONCILE_NO_RETRY' or recorded.get('cleanup')!='CLOSED' or recorded.get('failure',{}).get('stage')!='SESSION_INPUT' \
+       or recorded.get('outcome',{}).get('administrative_connection')!='NOT_ATTEMPTED' or recorded.get('closure_components',{}).get('overall')!='CLOSED':raise ValueError('PREDECESSOR_OUTCOME')
+    return dict(attempt=predecessor['attempt'],final_result_sha256=predecessor['final_result_sha256'],stage=recorded['failure']['stage'],closure=recorded['closure_components']['overall'])
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--registration',type=Path,required=True);p.add_argument('--registration-sha256',required=True);a=p.parse_args()
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_LINUX_SECURE_TTY_REQUIRED')
@@ -213,8 +250,9 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory()                                                  # positive kernel enforcement BEFORE any credential is read
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/STATE)                                                # exclusive create: a second use of the same authority cannot start
-    journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
+    verify_predecessor(r,state)
+    journal=Journal(state/r['state_directory'])                                 # exclusive create: a second use of the same authority cannot start
+    journal.emit('consumed',dict(authority=r['authority'],attempt=r['attempt'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     progress=Progress();baseline=owned_resources()
     prepare=lambda raw,started:prepare_probe(r,raw,started,journal=journal,memory=memory,progress=progress,baseline=baseline)
