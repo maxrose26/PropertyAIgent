@@ -22,6 +22,11 @@ AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 QUALIFICATION='1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2'
 CONTRACT='bolton-received-idox-coordinator-v1'
 
+def restricted_url(role,password):
+    """Same in-memory value goes to protected mapping and native URL parser."""
+    if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
+    return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
+
 class Journal:
     def __init__(self,root):
         self.root=Path(root);self.root.mkdir(mode=0o700,parents=False,exist_ok=False)
@@ -72,6 +77,11 @@ class Runner:
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
     def check(self):
+        # Diagnosis may use its reporting reserve, never a weaker memory group.
+        # Once native groups are removed, only local final reporting is allowed.
+        if self.memory is not None:
+            if hasattr(self,'memory_closure'):raise Denied('RESOURCE_ENVELOPE_CLOSED_NO_MORE_OPERATIONS')
+            self.memory.snapshot()
         now=time.monotonic()
         if self.diagnosing:
             admin_now=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
@@ -82,7 +92,6 @@ class Runner:
         if self.phase=='teardown' and self.admin_seconds+now-self.phase_started>=240:raise Denied('ADMIN_TOTAL_BOUND')
         if self.phase=='runtime' and self.runtime_seconds+now-self.phase_started>=300:raise Denied('RUNTIME_TOTAL_BOUND')
         if (self.journal.root/'STOP').exists():raise Denied('OWNER_STOP')
-        if self.memory is not None:self.memory.snapshot()
         size=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
         if size>2*1024**2-128*1024:raise Denied('COMBINED_OUTPUT_CLOSURE_RESERVE')
 
@@ -235,9 +244,9 @@ class Runner:
         # acknowledgement suffix; final owner output supplies that suffix hash.
         self.journal.save('final-result.json',result)
         self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/completed',expected_head=self.evidence_head)
-        if self.memory is not None:result.update(self.memory.close())
-        after=owned_resources()
-        if after['children'] or after['socket_fds']-self.baseline['socket_fds']:raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+        components=self.closure('DISABLED_VERIFIED')
+        result.update(closure_components=components)
+        if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
         result.update(status=outcome,cleanup='CLOSED',native_memory_proof=self.memory is not None)
         from collections import Counter
         from app.ingestion.listing_screening import screen_row
@@ -267,6 +276,33 @@ class Runner:
                     active_seconds=now-self.started,
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
+    def closure(self,access):
+        """Same positive checks on success/failure; no automatic process kill.
+
+        This is controller/owned-resource closure, not evidence that the outer
+        systemd scope has disappeared after this process exits.
+        """
+        process=dict(status='UNCERTAIN',native_memory_proof=self.memory is not None)
+        try:
+            if self.memory is not None:
+                if not hasattr(self,'memory_closure'):self.memory_closure=self.memory.close()
+                proof=self.memory_closure
+                process['memory']=proof
+                group_closed=proof.get('owned_groups_removed') is True and proof.get('owned_survivors')==0
+            else:group_closed=True # disposable-only; production requires native memory at entry
+            after=owned_resources()
+            process.update(new_socket_count=len(after['socket_fds']-self.baseline['socket_fds']),live_child_count=len(after['children']))
+            if group_closed and process['new_socket_count']==0 and process['live_child_count']==0:process['status']='CLOSED'
+        except BaseException:pass
+        a=self.owner.accounting()
+        failed_admin_closed=(a.get('failed_native_connections',0)==a.get('failed_native_finished',0) or process.get('new_socket_count')==0)
+        connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and
+            all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
+        connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
+        safe=access=='DISABLED_VERIFIED' and not a['uncertain_effect'] and not self.github.mutation_uncertain
+        overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
+        return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
+
     def failed(self,exc):
         """Shared production/rehearsal exit, independent of ledger construction."""
         from .connection_diagnostics import safe_failure
@@ -291,13 +327,10 @@ class Runner:
             self.emit('failure_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
         except BaseException:
             diagnostics['completion']='INCOMPLETE_RECONCILE'
-        closure={'status':'UNKNOWN'}
-        try:
-            if self.memory is not None:closure=self.memory.close()
-        except BaseException:pass
-        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',
+        components=self.closure(access)
+        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,
             failure=safe_failure(exc,'EXECUTION'),operation_phase=failed_phase,authority_invalidation=invalidation,
-            access=access,diagnostics=diagnostics,owned_cleanup=closure,
+            access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:self.emit('stopped',result)
@@ -309,10 +342,9 @@ class Runner:
             self.setup()
             if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':
                 with self.phase_as('teardown'):self.owner.teardown(self.github)
-                proof=self.memory.close() if self.memory is not None else {'status':'DISPOSABLE_NO_MEMORY_PROOF'}
-                after=owned_resources()
-                if after['children'] or after['socket_fds']-self.baseline['socket_fds']:raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
-                return dict(status='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED',cleanup='CLOSED',accounting=self.accounting(),owned_cleanup=proof,source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD')
+                components=self.closure('DISABLED_VERIFIED')
+                if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+                return dict(status='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),owned_cleanup=components['process'],source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD')
             self.capture_once()
             if self.plans:self.screen()
             result=self.finish();result['accounting']=self.accounting();return result
@@ -372,10 +404,11 @@ def main():
         holder={};github=GitHub(journal.emit,lambda:holder['runner'].check())
         from .operational_source import read
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
-        def url(role,password):return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
-        runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
+        runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
         return runner
     result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory)
-    raise SystemExit(0 if result.get('cleanup')=='CLOSED' else 1)
+    # A cleanly closed failure remains a failed execution; never signal success
+    # or permit an owner to confuse cleanup with route qualification.
+    raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
 
 if __name__=='__main__':main()

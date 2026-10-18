@@ -74,6 +74,9 @@ jobs:
       - name: Disposable loopback TLS trust and failed-handle cleanup
         run: |
           timeout --kill-after=2s 30s env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_discovery_ingestion_tls_trust.py -q
+      - name: Actionable native driver diagnostics and failure closure, loopback only
+        run: |
+          timeout --kill-after=2s 40s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_connection_actionable.py tests/test_discovery_ingestion_operational_failure.py tests/test_ingestion_operational_pooler_identity.py -q --junitxml="$RUNNER_TEMP/connection-actionable.xml"
       - name: Fixed committee caller and field-level B2, network denied
         run: |
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
@@ -87,6 +90,7 @@ jobs:
           path: |
             ${{ runner.temp }}/discovery.xml
             ${{ runner.temp }}/unit-acceptance.xml
+            ${{ runner.temp }}/connection-actionable.xml
   postgres-admission:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
