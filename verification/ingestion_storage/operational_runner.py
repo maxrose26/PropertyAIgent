@@ -77,6 +77,11 @@ class Runner:
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
     def check(self):
+        # Diagnosis may use its reporting reserve, never a weaker memory group.
+        # Once native groups are removed, only local final reporting is allowed.
+        if self.memory is not None:
+            if hasattr(self,'memory_closure'):raise Denied('RESOURCE_ENVELOPE_CLOSED_NO_MORE_OPERATIONS')
+            self.memory.snapshot()
         now=time.monotonic()
         if self.diagnosing:
             admin_now=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
@@ -87,7 +92,6 @@ class Runner:
         if self.phase=='teardown' and self.admin_seconds+now-self.phase_started>=240:raise Denied('ADMIN_TOTAL_BOUND')
         if self.phase=='runtime' and self.runtime_seconds+now-self.phase_started>=300:raise Denied('RUNTIME_TOTAL_BOUND')
         if (self.journal.root/'STOP').exists():raise Denied('OWNER_STOP')
-        if self.memory is not None:self.memory.snapshot()
         size=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
         if size>2*1024**2-128*1024:raise Denied('COMBINED_OUTPUT_CLOSURE_RESERVE')
 

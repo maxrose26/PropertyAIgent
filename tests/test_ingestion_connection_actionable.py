@@ -194,6 +194,18 @@ def test_unknown_socket_inspection_does_not_certify_failed_admin_attempt(monkeyp
     proof=r.closure('DISABLED_VERIFIED')
     assert proof['overall']=='UNCERTAIN' and proof['connections']['status']=='UNCERTAIN'
 
+def test_no_checked_operations_after_native_memory_groups_removed():
+    from app.ingestion.ledger import Denied
+    r=Runner.__new__(Runner);r.memory=object();r.memory_closure={'owned_groups_removed':True};r.diagnosing=True
+    with pytest.raises(Denied,match='RESOURCE_ENVELOPE_CLOSED_NO_MORE_OPERATIONS'):r.check()
+
+def test_diagnostic_mode_still_requires_native_memory_enforcement():
+    r=Runner.__new__(Runner);r.diagnosing=True
+    class Memory:
+        def snapshot(self):raise ValueError('ENFORCEMENT_UNAVAILABLE')
+    r.memory=Memory()
+    with pytest.raises(ValueError,match='ENFORCEMENT_UNAVAILABLE'):r.check()
+
 @pytest.mark.parametrize('uncertain',[False,True])
 def test_actual_failure_handler_keeps_result_failed_and_separates_closure(tmp_path,uncertain):
     from verification.ingestion_storage.operational_runner import Journal
