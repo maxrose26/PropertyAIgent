@@ -1,13 +1,14 @@
 """Focused cleanup of accepted-storage/failed-setup fixture, no source calls."""
 from copy import deepcopy
 from datetime import datetime
-import json,os,secrets,subprocess
+import json,os,secrets,subprocess,time
+from datetime import timedelta,timezone
 from pathlib import Path
 import psycopg,pytest
 from psycopg import sql
 from tests.storage_gh_fixture import real_gh_store
 from verification.ingestion_storage.operational_cleanup import (Cleanup,Journal,Stop,Memory,ROLES,
-    CAPTURE_KEY,CAPTURE_AUTHORITY,GRANT_SHA256,REVISION,SECRETS,digest)
+    CAPTURE_KEY,CAPTURE_AUTHORITY,GRANT_SHA256,REVISION,SECRETS,digest,run_session)
 
 def grant_fixture():
     from verification.ingestion_storage.operational_owner import item,SCOPE
@@ -24,7 +25,7 @@ def grant_fixture():
     return root,g,e
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','changed_grant','commit_lost_ack','delete_lost_ack','associated_session'])
+@pytest.mark.parametrize('fault',['success','changed_grant','connection_failure','commit_lost_ack','delete_lost_ack','associated_session'])
 def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_gh_store,fault):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('disposable PostgreSQL17 required')
@@ -64,7 +65,9 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
                 held=psycopg.connect(**{**info,'user':'ingestion_worker_login','password':'disposable-only'},autocommit=True)
             injected=[]
             class Connection:
-                def __init__(self):self.c=connect()
+                def __init__(self):
+                    if fault=='connection_failure':raise psycopg.OperationalError('DISPOSABLE_CONNECTION_FAILURE')
+                    self.c=connect()
                 @property
                 def closed(self):return self.c.closed
                 def close(self):self.c.close()
@@ -79,9 +82,21 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
                     injected.append(True);raise subprocess.TimeoutExpired(['gh','DISPOSABLE_ACK_LOSS'],1)
                 return result
             memory=Memory() if os.environ.get('INGESTION_CLEANUP_NATIVE')=='1' else None
-            worker=Cleanup(Connection,Journal(tmp_path/'cleanup-once'),github_runner=cli,identity=role,memory=memory)
+            journal=Journal(tmp_path/'cleanup-once');holder=[]
+            def reader():
+                count=len(requests)
+                time.sleep(.04)
+                assert len(requests)==count and not holder
+                return 'disposable-input-never-exported'
+            def prepare(credential,started):
+                worker=Cleanup(Connection,journal,github_runner=cli,identity=role,memory=memory,started=started)
+                holder.append(worker);return worker
+            result=run_session(journal,memory,datetime.now(timezone.utc)+timedelta(minutes=5),reader,prepare)
+            worker=holder[0]
+            saved=json.loads((journal.root/'final-result.json').read_bytes())
+            assert saved==result and saved['phase_timing']['credential_input_seconds']>=.04
+            assert 'disposable-input-never-exported' not in journal.file.read_text()
             if fault=='success':
-                result=worker.execute()
                 assert worker.connections==2 and worker.commands<=32 and worker.returned<=1048576
                 assert worker.deletes==2 and worker.reads==2 and worker.opened==worker.closed==2
                 assert set(ciphertexts)=={'DATABASE_URL'}
@@ -92,7 +107,10 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
                 assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()[0]==5
                 assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()[0]==0
             else:
-                with pytest.raises(Stop):worker.execute()
+                assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['cleanup']=='UNCERTAIN'
+                if fault=='connection_failure':
+                    assert worker.connections==1 and worker.commands==worker.deletes==0
+                    assert worker.opened==worker.closed==0 and result['phase']=='DATABASE_CONNECT_1'
                 if fault in {'changed_grant','associated_session'}:
                     assert worker.connections==1 and worker.deletes==0
                     assert all(row[0] for row in boot.execute('SELECT rolcanlogin FROM pg_roles WHERE rolname=ANY(%s)',(ROLES,)))
@@ -100,7 +118,7 @@ def test_revoke_only_non_superuser_native_cleanup(tmp_path,record_property,real_
                 if fault=='delete_lost_ack':
                     assert worker.deletes==1 and worker.reads==1 and len(injected)==1
                     assert set(ciphertexts)=={'DATABASE_URL',SECRETS[1]}
-            record_property('cleanup_result',json.dumps(dict(fault=fault,accounting=worker.accounting(),memory=memory.close() if memory else None,deleted=worker.secret_deletions,readbacks=worker.readbacks),sort_keys=True))
+            record_property('cleanup_result',json.dumps(dict(fault=fault,accounting=worker.accounting(),memory=memory.close() if memory else None,deleted=worker.secret_deletions,readbacks=worker.readbacks,phase_timing=result['phase_timing'],status=result['status']),sort_keys=True))
         finally:
             if held:held.close()
             boot.execute('DROP TABLE IF EXISTS public.ingestion_work_attempts,public.ingestion_work_items CASCADE')

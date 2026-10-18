@@ -17,10 +17,11 @@ import signal
 import subprocess
 import sys
 import time
+import threading
 
 REVISION = 'ad8d5211afcc635c5bc50f4963adde4f31b4ef62'
 TREE = '8482c3d62c79bcbdb6ce91b1b8075751bcaf9893'
-AUTHORITY = 'AUTHORISE_OPERATIONAL_SAFETY_CLEANUP_ONCE_20261018'
+AUTHORITY = 'AUTHORISE_OPERATIONAL_SAFETY_CLEANUP_TIMING_ONCE_20261018'
 CAPTURE_AUTHORITY = 'AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018_CAPTURE'
 CAPTURE_KEY = '48e304a92fbe01bac655be36b1c4d6f8fa29ab11857501911b68929bec790699'
 GRANT_SHA256 = 'd456f1849accfbde3d7c7dfeb576cad8211693c141cc542b6fb2e6363cb95f0c'
@@ -28,7 +29,12 @@ ORIGINAL_AUDIT_SHA256 = 'dd7c5814b686c8dd4c23451238d88fa76e095040ac30871e4139936
 ORIGINAL_CHAIN = 'cb86102ae32d0e91c8b1acd36b95f60cf7e4a35c28fecabe8cd359a4e678f679'
 ORIGINAL_REGISTRATION = '5dd3cc1f5252b80d55d31ec3e98303d5a5fb609f212776d29d65c799819746dc'
 STOP = {'reason': 'CONSUMED_SALFORD_GLOBAL_STOP', 'run': '38884069913'}
-SCOPE = 'propertyaigent-operational-cleanup-20261018.scope'
+SCOPE = 'propertyaigent-operational-cleanup-timing-20261018.scope'
+TIMING = dict(setup_seconds=10, credential_input_seconds=300, active_seconds=45,
+              work_seconds=40, outer_seconds=355)
+PREDECESSOR_REGISTRATION = '3c10291a1b2e7f3d81f463a619fca177a224259f1ed708f01d8d0a5e935cc377'
+PREDECESSOR_RESULT = 'b47bdf072fa87e51157f29fda689dad72b44f49de34f712c5cb680cf751f110d'
+PREDECESSOR_AUDIT = '6bdd6f3616230aad804908319627fc69f5254c11eca8836b119b1052651fbf4e'
 ROLES = ['ingestion_effect_login', 'ingestion_worker_login']
 MEMBERSHIPS = [('ingestion_effect_login', 'ingestion_effect_broker'), ('ingestion_worker_login', 'ingestion_worker')]
 SECRETS = ['INGESTION_WORKER_DATABASE_URL', 'INGESTION_EFFECT_DATABASE_URL']
@@ -154,7 +160,7 @@ class Cleanup:
     def check(self):
         if self.expiry is not None and datetime.now(timezone.utc)>=self.expiry:
             raise Stop('CLEANUP_EXPIRED')
-        if time.monotonic()-self.started >= 42: raise Stop('CLOSURE_RESERVE')
+        if time.monotonic()-self.started >= TIMING['work_seconds']: raise Stop('CLOSURE_RESERVE')
         if self.memory is not None: self.memory.snapshot()
         if sum(p.stat().st_size for p in self.journal.root.iterdir() if p.is_file()) > 384*1024:
             raise Stop('EXPORTED_OUTPUT_RESERVE')
@@ -234,7 +240,7 @@ class Cleanup:
         if method=='DELETE': command+=['--include','--silent']
         try:
             result=self.github_runner(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,timeout=min(3,max(.01,42-(time.monotonic()-self.started))))
+                                      stderr=subprocess.PIPE,timeout=min(3,max(.01,TIMING['work_seconds']-(time.monotonic()-self.started))))
             if result.returncode or len(result.stdout)+len(result.stderr)>65536:
                 raise Stop('GITHUB_ACK_UNCERTAIN')
             if method=='DELETE':
@@ -346,10 +352,141 @@ def verify_original(path):
     if len(events)!=175 or previous!=ORIGINAL_CHAIN or events[0]['payload']['registration_sha256']!=ORIGINAL_REGISTRATION:
         raise Stop('ORIGINAL_ATTEMPT_BINDING')
 
+def arm_deadline(seconds, reason):
+    def expired(*_): raise Stop(reason)
+    signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, max(.001, seconds))
+
+
+def zero_accounting():
+    return dict(connections=0, commands=0, returned_data_value_bytes=0,
+                database_active_seconds=0.0, supervised_seconds=0.0,
+                connections_opened=0, connections_closed=0, deletes=0, names_reads=0)
+
+
+class HardDeadline:
+    """A blocked final output cannot turn a caught signal into extra runtime.
+
+    Uses no subprocess, credential or network capability. The systemd scope
+    remains the independent outer containment if this interpreter cannot run.
+    """
+    def __init__(self, end):
+        self.cancelled=threading.Event()
+        def watch():
+            if not self.cancelled.wait(max(0,end-time.monotonic())): os._exit(124)
+        self.thread=threading.Thread(target=watch,name='cleanup-hard-deadline',daemon=True)
+        self.thread.start()
+
+    def close(self):
+        self.cancelled.set(); self.thread.join(timeout=.1)
+        if self.thread.is_alive(): os._exit(124)
+
+
+def finalise(journal, result, *, outer_started, active_started, input_seconds, output=print):
+    """One bounded result attempt; deadline/output failure never raises a second traceback.
+
+    The caller keeps the finalisation deadline armed. Existing persisted evidence
+    is never overwritten if a late failure makes its receipt uncertain.
+    """
+    result['phase_timing'] = dict(credential_input_seconds=input_seconds,
+        active_seconds_before_finalisation=0.0 if active_started is None else time.monotonic()-active_started,
+        total_seconds_before_finalisation=time.monotonic()-outer_started)
+    try:
+        receipt=journal.save(result)
+        now=time.monotonic()
+        output(json.dumps(dict(result, **receipt, audit=str(journal.file),
+            active_seconds_after_audit_flush=0.0 if active_started is None else now-active_started,
+            total_seconds_after_audit_flush=now-outer_started), sort_keys=True), flush=True)
+        return result
+    except BaseException:
+        fallback=dict(status='STOP_RECONCILE_NO_RETRY', cleanup='UNCERTAIN',
+            reason='FINAL_EVIDENCE_OR_OUTPUT_UNCERTAIN',
+            prior_status=result.get('status'), audit=str(journal.file),
+            accounting=result.get('accounting',zero_accounting()),
+            phase_timing=result['phase_timing'])
+        # One small output attempt only; no evidence replay or compensating effect.
+        try: output(json.dumps(fallback,sort_keys=True),flush=True)
+        except BaseException: pass
+        return fallback
+
+
+def run_session(journal, memory, expiry, reader, prepare, *, outer_started=None,
+                timing=TIMING, resources=None, output=print):
+    """Shared production/rehearsal phase controller; no CLI timing/route override.
+
+    reader only obtains hidden local input. prepare is not called until input
+    ends and validity is checked again; source/SQL/secret effects live in Cleanup.
+    """
+    from verification.ingestion_storage.tls_trust import owned_resources
+    resources=resources or owned_resources
+    outer_started=time.monotonic() if outer_started is None else outer_started
+    baseline=resources(); worker=None; active_started=None; input_started=time.monotonic()
+    input_seconds=0.0; phase='SECURE_CREDENTIAL_INPUT'; credential=None; hard=None
+    try:
+        remaining=timing['outer_seconds']-(time.monotonic()-outer_started)-timing['active_seconds']
+        if remaining<=0: raise Stop('OUTER_CLOSURE_RESERVE')
+        arm_deadline(min(timing['credential_input_seconds'],remaining),'SECURE_INPUT_DEADLINE')
+        journal.emit('credential_input_started',{'maximum_seconds':timing['credential_input_seconds'],
+                     'database_and_secret_operations_permitted':False})
+        credential=reader()
+        input_seconds=time.monotonic()-input_started
+        # Check once more before route resolution, connector creation or any API.
+        if datetime.now(timezone.utc)>=expiry: raise Stop('CLEANUP_EXPIRED')
+        journal.emit('credential_input_completed',{'elapsed_seconds':input_seconds})
+        active_started=time.monotonic(); phase='ACTIVE_PREPARATION'
+        hard=HardDeadline(min(active_started+timing['active_seconds'],outer_started+timing['outer_seconds']))
+        arm_deadline(min(timing['work_seconds'],timing['outer_seconds']-(active_started-outer_started)),
+                     'ACTIVE_WORK_DEADLINE')
+        journal.emit('active_cleanup_started',{'maximum_seconds':timing['active_seconds'],
+                     'work_seconds':timing['work_seconds'],'finalisation_reserve_seconds':timing['active_seconds']-timing['work_seconds']})
+        worker=prepare(credential,active_started)
+        credential=None
+        result=worker.execute()
+        proof=memory.close() if memory is not None else {'status':'DISPOSABLE_NO_MEMORY_PROOF'}
+        current=resources()
+        if (current['children'] or current['socket_fds']-baseline['socket_fds']
+            or worker.opened!=worker.closed): raise Stop('OWNED_RESOURCE_CLOSURE')
+        result.update(cleanup='CLOSED',memory=proof,new_sockets=0,live_children=0,accounting=worker.accounting())
+        journal.emit('closure_verified',result)
+    except BaseException as exc:
+        if active_started is None: input_seconds=time.monotonic()-input_started
+        reason=str(exc) if isinstance(exc,Stop) and re.fullmatch('[A-Z0-9_]{1,100}',str(exc)) else 'SAFE_CLEANUP_FAILURE'
+        native=getattr(exc,'orig',exc); code=getattr(native,'sqlstate',None)
+        code=code if isinstance(code,str) and re.fullmatch('[A-Z0-9]{5}',code) else None
+        proof={'status':'UNKNOWN'}
+        try:
+            if memory is not None: proof=memory.close()
+        except BaseException: pass
+        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=reason,sqlstate=code,
+            exception_class=type(native).__name__ if re.fullmatch('[A-Za-z0-9_]{1,80}',type(native).__name__) else 'UNKNOWN',
+            phase=worker.phase if worker else phase,memory=proof,
+            accounting=worker.accounting() if worker else zero_accounting(),
+            database_commit=worker.db_commit if worker else 'NOT_ATTEMPTED',
+            actual_readbacks=worker.readbacks if worker else {},
+            acknowledged_secret_deletions=worker.secret_deletions if worker else [])
+        try: journal.emit('stopped',result)
+        except BaseException: result['audit_stop_record']='UNCERTAIN'
+    finally:
+        credential=None
+    # Input failure also gets a finite five-second finalisation reserve, taken
+    # from the unused active allowance; no database/GitHub work becomes eligible.
+    end=(active_started+timing['active_seconds']) if active_started is not None else time.monotonic()+(timing['active_seconds']-timing['work_seconds'])
+    end=min(end,outer_started+timing['outer_seconds'])
+    if hard is None: hard=HardDeadline(end)
+    arm_deadline(end-time.monotonic(),'FINALISATION_DEADLINE')
+    try:
+        return finalise(journal,result,outer_started=outer_started,active_started=active_started,
+                        input_seconds=input_seconds,output=output)
+    finally:
+        hard.close()
+        signal.setitimer(signal.ITIMER_REAL,0)
+
+
 def main():
     began=time.monotonic()
     p=argparse.ArgumentParser(); p.add_argument('--registration',type=Path,required=True)
     p.add_argument('--registration-sha256',required=True); args=p.parse_args()
+    arm_deadline(TIMING['setup_seconds'],'SETUP_DEADLINE')
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty(): raise SystemExit('SECURE_LINUX_TTY_REQUIRED')
     forbidden=('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN','GH_DEBUG','GH_CONFIG_DIR',
                'GH_HTTP_UNIX_SOCKET','SSL_CERT_FILE','SSL_CERT_DIR','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy')
@@ -359,34 +496,39 @@ def main():
     raw=args.registration.read_bytes(); reg=json.loads(raw)
     if (hashlib.sha256(raw).hexdigest()!=args.registration_sha256 or reg.get('authority')!=AUTHORITY
         or reg.get('status')!='OWNER_APPROVED_CLEANUP_ONCE' or reg.get('limits')!=LIMITS
+        or reg.get('timing')!=TIMING or reg.get('consumed_predecessor_registration_sha256')!=PREDECESSOR_REGISTRATION
         or reg.get('helper_sha256')!=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         or reg.get('original_audit_sha256')!=ORIGINAL_AUDIT_SHA256): raise SystemExit('EXACT_CLEANUP_BINDING')
     expiry=datetime.fromisoformat(reg['expires_at'])
     from datetime import timedelta
     now=datetime.now(timezone.utc)
     if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=24): raise SystemExit('CLEANUP_EXPIRED')
-    if (subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=REVISION
-        or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=TREE
-        or subprocess.check_output(['git','status','--porcelain'],text=True).strip()): raise SystemExit('CLEAN_APPROVED_CHECKOUT')
+    if (not re.fullmatch('[0-9a-f]{40}',reg.get('revision','')) or not re.fullmatch('[0-9a-f]{40}',reg.get('tree',''))
+        or subprocess.check_output(['git','rev-parse','HEAD'],text=True,timeout=2).strip()!=reg['revision']
+        or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True,timeout=2).strip()!=reg['tree']
+        or subprocess.check_output(['git','status','--porcelain'],text=True,timeout=2).strip()): raise SystemExit('CLEAN_APPROVED_CHECKOUT')
     for name,sha in reg['hashes'].items():
         path=Path(name)
         if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest()!=sha: raise SystemExit('DEPENDENCY_HASH')
     state=Path.home()/'.local/state/propertyaigent'
     verify_original(state/'operational-capture-queue-once-20261018/events.jsonl')
-    memory=Memory(); baseline=__import__('verification.ingestion_storage.tls_trust',fromlist=['owned_resources']).owned_resources()
-    journal=Journal(state/'operational-safety-cleanup-once-20261018')
+    predecessor=state/'operational-safety-cleanup-once-20261018'
+    for name,sha in [('events.jsonl',PREDECESSOR_AUDIT),('final-result.json',PREDECESSOR_RESULT)]:
+        path=predecessor/name
+        if path.is_symlink() or path.stat().st_size>2048 or hashlib.sha256(path.read_bytes()).hexdigest()!=sha:
+            raise SystemExit('CONSUMED_PREDECESSOR_EVIDENCE_CHANGED')
+    memory=Memory()
+    journal=Journal(state/'operational-safety-cleanup-timing-successor-20261018')
     journal.emit('consumed',dict(authority=AUTHORITY,registration_sha256=args.registration_sha256,
-                 original_audit_sha256=ORIGINAL_AUDIT_SHA256,limits=LIMITS))
-    resource.setrlimit(resource.RLIMIT_CORE,(0,0)); worker=None
-    signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Stop('HARD_CLEANUP_DEADLINE')))
-    signal.setitimer(signal.ITIMER_REAL,max(.001,45-(time.monotonic()-began)))
-    try:
-        from verification.ingestion_storage.credential_mapping import secure_migration_input
-        from verification.ingestion_storage.tls_trust import verified_trust,owned_resources,failure_evidence
+                 original_audit_sha256=ORIGINAL_AUDIT_SHA256,limits=LIMITS,timing=TIMING,
+                 consumed_predecessor_registration_sha256=PREDECESSOR_REGISTRATION))
+    resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+    from verification.ingestion_storage.credential_mapping import secure_migration_input
+    def prepare(raw,active_started):
+        from verification.ingestion_storage.tls_trust import verified_trust
         from verification.discovery.route_validation import validate_route
-        url=validate_route(secure_migration_input())
+        url=validate_route(raw)
         if not url.password: raise Stop('EXPLICIT_EXISTING_MIGRATION_PASSWORD_REQUIRED')
-        if datetime.now(timezone.utc)>=expiry: raise Stop('CLEANUP_EXPIRED')
         ca,_=verified_trust()
         dns=subprocess.run([sys.executable,'-I','-B','-c',"import socket,json;print(json.dumps(sorted({r[4][0] for r in socket.getaddrinfo('aws-0-eu-west-2.pooler.supabase.com',5432,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"],
              env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3)
@@ -399,34 +541,17 @@ def main():
                 user=url.username,password=url.password,sslmode='verify-full',sslrootcert=str(ca),
                 autocommit=True,prepare_threshold=None,connect_timeout=3,
                 options='-c statement_timeout=2000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000 -c search_path=pg_catalog,public')
-        worker=Cleanup(connector,journal,memory=memory,started=began,expiry=expiry)
-        result=worker.execute(); proof=memory.close(); current=owned_resources()
-        if current['children'] or current['socket_fds']-baseline['socket_fds'] or worker.opened!=worker.closed:
-            raise Stop('OWNED_RESOURCE_CLOSURE')
-        result.update(cleanup='CLOSED',memory=proof,new_sockets=0,live_children=0,accounting=worker.accounting())
-        journal.emit('closure_verified',result)
-    except BaseException as exc:
-        reason=str(exc) if isinstance(exc,Stop) and re.fullmatch('[A-Z0-9_]{1,100}',str(exc)) else 'SAFE_CLEANUP_FAILURE'
-        native=getattr(exc,'orig',exc); code=getattr(native,'sqlstate',None)
-        code=code if isinstance(code,str) and re.fullmatch('[A-Z0-9]{5}',code) else None
-        proof={'status':'UNKNOWN'}
-        try: proof=memory.close()
-        except BaseException: pass
-        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=reason,sqlstate=code,
-                    exception_class=type(native).__name__ if re.fullmatch('[A-Za-z0-9_]{1,80}',type(native).__name__) else 'UNKNOWN',
-                    phase=worker.phase if worker else 'BEFORE_CONNECTOR',memory=proof,
-                    accounting=worker.accounting() if worker else {'supervised_seconds':time.monotonic()-began},
-                    database_commit=worker.db_commit if worker else 'NOT_ATTEMPTED',
-                    actual_readbacks=worker.readbacks if worker else {},
-                    acknowledged_secret_deletions=worker.secret_deletions if worker else [])
-        journal.emit('stopped',result)
-    try:
-        receipt=journal.save(result)
-        elapsed=time.monotonic()-began
-        if elapsed>=45: raise Stop('FINAL_OUTPUT_DEADLINE')
-        print(json.dumps(dict(result,**receipt,audit=str(journal.file),supervised_seconds_after_audit_flush=elapsed),sort_keys=True),flush=True)
-    finally:
-        signal.alarm(0)
-    raise SystemExit(0 if result['cleanup']=='CLOSED' else 1)
+        return Cleanup(connector,journal,memory=memory,started=active_started,expiry=expiry)
+    result=run_session(journal,memory,expiry,secure_migration_input,prepare,outer_started=began)
+    raise SystemExit(0 if result['status']=='SAFETY_CLEANUP_ACCESS_DISABLED' and result['cleanup']=='CLOSED' else 1)
 
-if __name__=='__main__': main()
+if __name__=='__main__':
+    try: main()
+    except SystemExit: raise
+    except BaseException:
+        # Before run_session no DB/secret path is callable. Never print a raw
+        # exception or cause a second exception while reporting setup failure.
+        try: print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',
+                       phase='SETUP',reason='SETUP_NOT_COMPLETED')),flush=True)
+        except BaseException: pass
+        raise SystemExit(1)
