@@ -1,0 +1,40 @@
+{
+  "sha": "b9e6bd639ad1f1a472c35f339b70f8f524c08ac4",
+  "node_id": "C_kwDOToZJi9oAKGI5ZTZiZDYzOWFkMWYxYTQ3MmMzNWYzMzliNzBmOGY1MjRjMDhhYzQ",
+  "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/b9e6bd639ad1f1a472c35f339b70f8f524c08ac4",
+  "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/b9e6bd639ad1f1a472c35f339b70f8f524c08ac4",
+  "author": {
+    "name": "maxrose26",
+    "email": "maxrose26@gmail.com",
+    "date": "2026-10-18T13:54:11Z"
+  },
+  "committer": {
+    "name": "GitHub",
+    "email": "noreply@github.com",
+    "date": "2026-10-18T13:54:11Z"
+  },
+  "tree": {
+    "sha": "a9d28fcf3994d2105c79b15e8f717f752d591e3c",
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/trees/a9d28fcf3994d2105c79b15e8f717f752d591e3c"
+  },
+  "message": "Integrate reviewed restricted-connection qualification and failure-safe outcomes [skip render]\n\nOwner-approved exact PR128 candidate 07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d; reviewed tree a9d28fcf3994d2105c79b15e8f717f752d591e3c. Deployment suppressed. Only a separately registered diagnostic-only execution is authorised; capture, screening, source calls, application writes and scheduling remain held.",
+  "parents": [
+    {
+      "sha": "acd3f5690b439d7d91b7a7efb9ace79c9098d303",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/acd3f5690b439d7d91b7a7efb9ace79c9098d303",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/acd3f5690b439d7d91b7a7efb9ace79c9098d303"
+    },
+    {
+      "sha": "07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d"
+    }
+  ],
+  "verification": {
+    "verified": true,
+    "reason": "valid",
+    "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq1M+DCRC1aQ7uu5UhlAAAgHsQADARYLO19h806AuXE3aQkNfu\nyDRDCbTYA9cqmNKXT8zWyNeaiyP7t2eri21K9wKjG8e7R7W+BSvIqs6M6lL3Pwp+\nCXy1ArfxyPHJb0DRQXm6FW/qVDpfUct7VlqGOAinGX/BnzSMTVcrmjNjf/P63TUm\nbjOGPB+HPmtom0jcANoG3leZlMGNO1EWRBkMYl7YYt+SKYuRku4zvdcFQUjqiyPZ\nY+QEy/ngJzhHAiHCi7C8Km5gG8RuFoebx1sGKEE5CsD+wm5r6imK3b4QoF3bccrs\nmwiVd+Cv/YUibkU/soIdhCBf9GfFae0HJO1CUvkXybU6H6X6jLZ9oiPf4hYn4tRj\nKbAeJUl7ymBcOjFmuxkIiqBZRZ+W9xAFeXHAEUBmcBmRko+oiqZ1plbOqTd1LWVM\nPQYaDRpYosFH47p9KHKI+c7gzMkQbo2/5MSdvpSyI3Jh+sAhBs9pw89TFQZwnEel\nSNBoJZ9s0e2nrBsOhew76c0aI6aWePidJghpjFc6uzdJ1W6lXGI/d0V7tmTxtHeS\nNaFpxWTWTr1RB9q3EirCyRCVJK0fArift6/GeiB9vYZei9dR1D8Y7zG3E5TiWAwr\ns1U+XTCRVPlAx7HQX3XK4Bo4aD2BQWG3JVddUP6bcrfiOV2aAfsOlAHI7ivE5O6z\nYOphWIo66nIhXsUJDeow\n=JbYl\n-----END PGP SIGNATURE-----\n",
+    "payload": "tree a9d28fcf3994d2105c79b15e8f717f752d591e3c\nparent acd3f5690b439d7d91b7a7efb9ace79c9098d303\nparent 07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d\nauthor maxrose26 <maxrose26@gmail.com> 1792331651 +0100\ncommitter GitHub <noreply@github.com> 1792331651 +0100\n\nIntegrate reviewed restricted-connection qualification and failure-safe outcomes [skip render]\n\nOwner-approved exact PR128 candidate 07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d; reviewed tree a9d28fcf3994d2105c79b15e8f717f752d591e3c. Deployment suppressed. Only a separately registered diagnostic-only execution is authorised; capture, screening, source calls, application writes and scheduling remain held.",
+    "verified_at": "2026-10-18T13:54:12Z"
+  }
+}
