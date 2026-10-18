@@ -132,9 +132,10 @@ RECORDS_SQL = """SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY w.key),'[]'::jso
 
 class Cleanup:
     def __init__(self, connector, journal, *, github_runner=subprocess.run,
-                 identity='postgres', memory=None, started=None):
+                 identity='postgres', memory=None, started=None, expiry=None):
         self.connector=connector; self.journal=journal; self.github_runner=github_runner
         self.identity=identity; self.memory=memory
+        self.expiry=expiry
         self.started=time.monotonic() if started is None else started
         self.connections=0; self.commands=0; self.returned=0; self.database_active=0.0
         self.opened=0; self.closed=0; self.deletes=0; self.reads=0
@@ -151,6 +152,8 @@ class Cleanup:
         self.journal.emit(event, dict(payload, accounting=self.accounting()))
 
     def check(self):
+        if self.expiry is not None and datetime.now(timezone.utc)>=self.expiry:
+            raise Stop('CLEANUP_EXPIRED')
         if time.monotonic()-self.started >= 42: raise Stop('CLOSURE_RESERVE')
         if self.memory is not None: self.memory.snapshot()
         if sum(p.stat().st_size for p in self.journal.root.iterdir() if p.is_file()) > 384*1024:
@@ -160,6 +163,7 @@ class Cleanup:
     def connection(self):
         self.check()
         if self.connections >= 2: raise Stop('CONNECTION_BOUND')
+        self.phase='DATABASE_CONNECT_'+str(self.connections+1)
         self.connections += 1; self.emit('connection_intent', {'ordinal':self.connections})
         c=None; began=time.monotonic()
         try:
@@ -395,7 +399,7 @@ def main():
                 user=url.username,password=url.password,sslmode='verify-full',sslrootcert=str(ca),
                 autocommit=True,prepare_threshold=None,connect_timeout=3,
                 options='-c statement_timeout=2000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000 -c search_path=pg_catalog,public')
-        worker=Cleanup(connector,journal,memory=memory,started=began)
+        worker=Cleanup(connector,journal,memory=memory,started=began,expiry=expiry)
         result=worker.execute(); proof=memory.close(); current=owned_resources()
         if current['children'] or current['socket_fds']-baseline['socket_fds'] or worker.opened!=worker.closed:
             raise Stop('OWNED_RESOURCE_CLOSURE')

@@ -47,3 +47,12 @@ def test_no_new_authorities_credentials_or_effect_routes():
     assert 'pg_terminate_backend' not in source and 'ingestion_worker_step(' not in source
     assert 'source_reader' not in source and 'verify-full' in source
 
+def test_expiry_after_startup_blocks_next_database_and_secret_effect(tmp_path):
+    from datetime import datetime,timezone,timedelta
+    called=[]
+    worker=Cleanup(lambda:called.append('connect'),Journal(tmp_path/'expiry'),
+        github_runner=lambda *a,**k:called.append('github'),expiry=datetime.now(timezone.utc)-timedelta(seconds=1))
+    with pytest.raises(Stop,match='CLEANUP_EXPIRED'):worker.q(None,'blocked','ALTER ROLE ingestion_worker_login NOLOGIN',effect=True)
+    with pytest.raises(Stop,match='CLEANUP_EXPIRED'):worker.api('DELETE',SECRET_PATH+'/'+SECRETS[0])
+    assert not called and worker.commands==worker.deletes==0
+
