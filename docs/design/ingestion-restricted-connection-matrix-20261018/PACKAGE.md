@@ -47,7 +47,22 @@ The ordered matrix **does not establish** a cause. Options, elapsed time since i
 | GitHub API (owner preparation) | 1 read-only identity call in `owner-run.sh`; lifecycle calls as accepted | script / `GitHub` budget |
 
 ## Administrative allowance is sufficient for the complete lifecycle and failure handling (measured, not inferred)
-MEASURED_TABLE_PLACEHOLDER
+Measured in the hosted restricted PG17 fixture with the real `Runner`, real `Owner`, real `GitHub` client against the real Linux `gh` fixture, real teardown SQL and the real matrix (hosted job `restricted-provisioning`, test ids `...[matrix_*-operational]`, lines `MATRIX_MEASURE` in the job log):
+
+| Scenario (injected, real wrapper) | Admin connections | Admin commands | Result |
+|---|---|---|---|
+| All four entries connect (`matrix_success`) | 4 | 46 | completed, access disabled, cleanup CLOSED |
+| Classified failures at entries 1 and 3, matrix continues (`matrix_classified_continue`) | 4 | 46 | completed, access disabled, CLOSED |
+| Unclassified failure at entry 2 (`matrix_unclassified_stop`) | 5 | 52 | stop, entries 3-4 skipped, teardown ran, CLOSED |
+| TLS-integrity failure at entry 1 (`matrix_tls_stop`) | 5 | 52 | stop, teardown ran, CLOSED |
+| Unexpected identity at entry 1 (`matrix_identity_stop`) | 5 | 52 | stop, teardown ran, CLOSED |
+| Connection budget exhausted before entry 3 (`matrix_budget_stop`) | 5 | 52 | stop, teardown ran, CLOSED |
+| Connection left open at entry 1 (`matrix_close_uncertain`) | 5 | 52 | stop, cleanup **UNCERTAIN**, access `UNRECONCILED` (not reported closed) |
+| Normal command allowance exhausted right after mapping (`matrix_admin_bound_reserve`; counter forced to 44, then real teardown + diagnostics) | 5 | 59 | stop, teardown completed inside the reserved allowance, CLOSED |
+
+Derived components (from the rows above): preflight + install + mapping/activation = **37** commands over 3 connections; teardown = **9** commands over 1 connection; failure diagnostics = **6** commands over 1 connection. Therefore the worst real path (stop after mapping: 37 + 9 + 6) is **52 commands / 5 connections**; the success path is 46 / 4. Ceilings: 44 before teardown (margin 7 over 37), 58 through teardown (margin 12 over 46, and 14 reserved against 9 needed), 64 total (margin 12 over 52); connections 4 before diagnostics, 5 total. The sufficiency of these ceilings is shown by the measured failure-handling paths above, not inferred from the successful path. A failure earlier than mapping (preflight or install) uses fewer commands because it skips mapping and, with no temporary credentials, teardown (covered by the local wrapper test with recording fakes).
+
+Every row also asserts, after the run: no authority, no grant, no exception, no source call, no queue row, no application write; the control row unchanged; both logins `NOLOGIN` with NULL password, no capability membership, no session; both temporary secrets deleted; administrative connections opened = closed.
 
 ## What this package changes in code (nothing else)
 - `restricted_matrix.py` (new): the four-entry matrix.

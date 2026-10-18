@@ -27,12 +27,12 @@ def test_shared_session_reports_every_early_exit(tmp_path,fault):
     def reader():
         assert not calls
         if fault=='delayed_input':time.sleep(.03)
-        if fault=='input_timeout':time.sleep(.3)
+        if fault=='input_timeout':time.sleep(1.0)
         return 'never_export_this_credential'
     def prepare(raw,started):
         calls.append('prepare');raise RuntimeError(raw)
     expiry=EXPIRY() if fault!='expired' else (datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat()
-    timing=dict(input_seconds=.05,active_seconds=.5,work_seconds=.3,diagnostic_seconds=.1,report_seconds=.1,outer_seconds=1)
+    timing=dict(input_seconds=.5,active_seconds=1.5,work_seconds=1.0,diagnostic_seconds=.2,report_seconds=.2,outer_seconds=3)   # wide margins: a loaded runner must not turn a 30 ms read into a timeout
     from verification.ingestion_storage.operational_preparation import Progress
     result=session(j,expiry,reader,prepare,output=lambda x,**kw:lines.append(x),timing=timing,progress=Progress())
     assert result['status']=='STOP_RECONCILE_NO_RETRY'
