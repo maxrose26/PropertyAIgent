@@ -1,0 +1,2 @@
+controller_exit_status=0
+scope_readback_exit_status=124
