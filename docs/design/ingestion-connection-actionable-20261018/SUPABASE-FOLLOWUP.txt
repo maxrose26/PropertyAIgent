@@ -1,0 +1,16 @@
+Prepared follow-up for existing Supabase ticket SU-511198 — DO NOT SEND WITHOUT EXPLICIT MESSAGING AUTHORITY
+
+Project: zcikcfgpblzuzpanpdqd
+Existing session-pooler endpoint: aws-0-eu-west-2.pooler.supabase.com, port 5432, database postgres.
+Custom restricted logins: ingestion_worker_login, ingestion_effect_login.
+Routing usernames: ingestion_worker_login.zcikcfgpblzuzpanpdqd and ingestion_effect_login.zcikcfgpblzuzpanpdqd.
+
+A finite test on 18 October 2026 successfully connected the existing migration principal through this endpoint with verified TLS. After acknowledged custom-role password/membership/activation operations, the first restricted handshake failed before any SQL, with Psycopg OperationalError and no SQLSTATE. We did not retain arbitrary driver text. The second restricted role was not attempted. Both custom logins are now disabled, passwords and memberships removed, associated sessions empty, and temporary secret mappings removed.
+
+Psycopg 3.3.6, SQLAlchemy 2.1.1. connect_timeout=3, prepare_threshold=None, autocommit=True at native connect. Existing provider CA and sslmode=verify-full. A single selected IPv4 is supplied as hostaddr while host remains the certificate-verified pooler hostname.
+Startup options: -c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000.
+Offline synthetic checks preserve generated password bytes through SCRAM generation, URL encoding/parsing, protected mapping and native driver parameters; these do not establish the production cause.
+
+Can you confirm whether these exact custom-role routing usernames and startup options are supported on this project's session pooler, and identify any project-side routing/authentication prerequisite or sanitised fixed error category that explains a custom-role handshake rejection while the migration principal connects? If request correlation is indispensable, please specify the minimum non-secret timestamp/identifier required; do not request passwords, connection strings, SCRAM verifiers, query text or raw logs.
+
+No credential, permission, endpoint, logging or subscription change is requested. Please answer on the existing ticket; no new ticket is required.

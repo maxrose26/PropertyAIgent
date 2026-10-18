@@ -1,0 +1,14 @@
+{
+  "discovery.xml": {
+    "sha256": "1b28b6eb7ee0684a491ef2d6d43fdd0dc2ebfb845c4105f557356c8258d63bbe",
+    "bytes": 144755
+  },
+  "unit-acceptance.xml": {
+    "sha256": "ae3e303212b3ac86ca0cfed9697774e554fdd003b5db4f606ea1a1cfc7a9d1e8",
+    "bytes": 3500
+  },
+  "connection-actionable.xml": {
+    "sha256": "b8541ef032f1d1aafad2ee20188f873487ac657ec9a8aca4f1fadd2286878d68",
+    "bytes": 9804
+  }
+}
