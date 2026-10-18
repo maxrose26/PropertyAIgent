@@ -22,7 +22,11 @@ ROLES={'ingestion_worker_login':'ingestion_worker','ingestion_effect_login':'ing
 SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_effect_login':'INGESTION_EFFECT_DATABASE_URL'}
 
 class Owner:
-    def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings):
+    # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
+    DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
+
+    def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
+        self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
         self.failed_native_connections=[]
@@ -30,7 +34,7 @@ class Owner:
     @contextmanager
     def connection(self):
         self.check()
-        if self.connections>=(13 if self.diagnostic_mode else 11):raise ValueError('ADMIN_CONNECTION_BOUND')
+        if self.connections>=(self.limits['connections'][1] if self.diagnostic_mode else self.limits['connections'][0]):raise ValueError('ADMIN_CONNECTION_BOUND')
         self.connections+=1;self.emit('admin_connection_intent',dict(ordinal=self.connections))
         c=None;began=time.monotonic()
         try:
@@ -54,7 +58,7 @@ class Owner:
 
     def q(self,c,statement,params=None,*,effect=False):
         self.check()
-        cap=240 if self.diagnostic_mode else 232 if self.tearing_down else 200
+        normal,teardown,diagnostic=self.limits['commands'];cap=diagnostic if self.diagnostic_mode else teardown if self.tearing_down else normal
         if self.commands>=cap:raise ValueError('ADMIN_COMMAND_BOUND')
         self.commands+=1
         if effect:self.emit('admin_effect_intent',dict(command=self.commands))
@@ -162,10 +166,12 @@ class Owner:
                 verifier=c.pgconn.encrypt_password(password.encode(),role.encode(),algorithm=b'scram-sha-256').decode()
                 self.q(c,'BEGIN',effect=True)
                 self.q(c,sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(verifier),sql.Literal(self.expiry.isoformat())),effect=True)
-                self.q(c,'COMMIT',effect=True)
-                url=url_factory(role,password);github.put_secret(name,url);self.urls[role]=url
+                self.q(c,'COMMIT',effect=True);self.timeline.setdefault(role,{})['password_committed']=time.monotonic()
+                url=url_factory(role,password);github.put_secret(name,url);self.urls[role]=url;self.timeline[role]['mapped']=time.monotonic()
                 del password,verifier,url
             self.script(c,PKG/'activate.sql')
+            stamp=time.monotonic()
+            for role in ROLES:self.timeline.setdefault(role,{})['activated']=stamp
 
     def register(self,items,authority,*,capture_key,source_calls,prepared=()):
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}

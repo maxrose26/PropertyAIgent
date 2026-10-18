@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
@@ -75,7 +75,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             with pytest.raises(psycopg.Error,match=reason):c.execute(activation)
                     finally:boot.execute(undo)
             runner.owner.install=install_with_ambient_negatives
-            if fault in {'reuse_installed_success','diagnostic_only'}:
+            if fault in {'reuse_installed_success','diagnostic_only'} or fault.startswith('matrix_'):
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
@@ -105,6 +105,81 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         assert requests==before_requests
                     finally:boot.execute(undo)
                     record_property('fixture_negative_preflight',json.dumps(probe.accounting()))
+
+                if fault.startswith('matrix_'):
+                    from verification.ingestion_storage import operational_runner as orr, restricted_matrix as rm
+                    from verification.ingestion_storage.operational_outcome import session
+                    runner.r['mode']=orr.MATRIX_MODE;runner.matrix_mode=True;runner.deadlines=dict(orr.MATRIX_DEADLINES)
+                    runner.owner.limits=dict(orr.MATRIX_OWNER_LIMITS);runner.owner.apply_policy=False
+                    real_connect=psycopg.connect;calls=[];leaked=[]
+                    plan={'matrix_classified_continue':{1:psycopg.errors.InvalidPassword('password authentication failed for user "x"'),3:psycopg.OperationalError('connection timeout expired')},
+                          'matrix_unclassified_stop':{2:RuntimeError('private text must never escape')},'matrix_tls_stop':{1:psycopg.OperationalError('SSL error: certificate verify failed')}}.get(fault,{})
+                    def guarded(*a,**k):
+                        if k.get('user') not in ROLES:return real_connect(*a,**k)
+                        calls.append((k['user'],k.get('options')))
+                        if len(calls) in plan:raise plan[len(calls)]
+                        connection=real_connect(*a,**k)
+                        if fault=='matrix_close_uncertain' and len(calls)==1:
+                            leaked.append(connection)
+                            class Leaky:
+                                closed=False
+                                def execute(self,statement):return connection.execute(statement)
+                                def close(self):pass
+                            return Leaky()
+                        return connection
+                    monkeypatch.setattr(psycopg,'connect',guarded)
+                    if fault=='matrix_identity_stop':monkeypatch.setattr(rm,'EXPECTED_FLAGS',(True,True,False,False,False,False))
+                    if fault=='matrix_budget_stop':monkeypatch.setitem(rm.LIMITS,'connection_attempts',2)
+                    if fault=='matrix_admin_bound_reserve':
+                        original_map=runner.owner.map_and_activate
+                        def map_then_exhaust(*a,**k):
+                            original_map(*a,**k);runner.owner.commands=runner.owner.limits['commands'][0];raise ValueError('ADMIN_COMMAND_BOUND')
+                        runner.owner.map_and_activate=map_then_exhaust
+                    expected={'matrix_success':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['CONNECTED_IDENTITY_VERIFIED']*4,None,4),
+                              'matrix_classified_continue':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED','FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED'],None,4),
+                              'matrix_unclassified_stop':('STOP_RECONCILE_NO_RETRY',['CONNECTED_IDENTITY_VERIFIED','FAILED_UNCLASSIFIED','SKIPPED_GLOBAL_STOP','SKIPPED_GLOBAL_STOP'],'UNCLASSIFIED_FAILURE',2),
+                              'matrix_tls_stop':('STOP_RECONCILE_NO_RETRY',['FAILED_CLASSIFIED']+['SKIPPED_GLOBAL_STOP']*3,'SECURITY_CLASS_FAILURE',1),
+                              'matrix_identity_stop':('STOP_RECONCILE_NO_RETRY',['IDENTITY_UNEXPECTED']+['SKIPPED_GLOBAL_STOP']*3,'UNEXPECTED_IDENTITY',1),
+                              'matrix_budget_stop':('STOP_RECONCILE_NO_RETRY',['CONNECTED_IDENTITY_VERIFIED']*2+['SKIPPED_GLOBAL_STOP']*2,'CONNECTION_BUDGET_EXHAUSTED',2),
+                              'matrix_admin_bound_reserve':('STOP_RECONCILE_NO_RETRY',['SKIPPED_GLOBAL_STOP']*4,'LIFECYCLE_STOP_BEFORE_MATRIX_COMPLETE',0),
+                              'matrix_close_uncertain':('STOP_RECONCILE_NO_RETRY',['CLOSURE_UNCERTAIN']+['SKIPPED_GLOBAL_STOP']*3,'CLOSURE_UNCERTAIN',1)}[fault]
+                    lines=[]
+                    result=session(journal,registration['expires_at'],lambda:'disposable hidden input',lambda raw,started:runner,output=lambda line,**kw:lines.append(line),timing=orr.MATRIX_TIMING)
+                    status,outcomes,stop,attempted=expected
+                    try:
+                        assert result['status']==status and [e['outcome'] for e in result['matrix']['entries']]==outcomes and result['matrix']['global_stop']==stop and len(calls)==attempted
+                        assert result['matrix']['accounting']['connection_attempts']['value']==attempted
+                        assert result['matrix']['interpretation']['execution_authority']=='NONE' and 'CREDENTIAL_CACHING' in result['matrix']['interpretation']['not_established']
+                        assert json.loads((journal.root/'final-result.json').read_bytes())==json.loads(json.dumps(result)) and len(lines)==1
+                        assert 'private text must never escape' not in json.dumps(result) and 'private text must never escape' not in journal.file.read_text() and 'postgresql://' not in json.dumps(result)
+                        # No authority, grant, exception, source call, queue row or application write on ANY path.
+                        assert not runner.owner.authorities and not source_calls and result['application_writes']==0 and result['pipeline_retry']=='HELD' and result['stage4']=='OPEN'
+                        actual=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                        assert actual==ctl and boot.execute("SELECT count(*) FROM public.ingestion_work_attempts").fetchone()[0]==0
+                        assert boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>repeat('0',64)").fetchone()[0]==0
+                        # Administrative allowance: TOTAL connections/commands across lifecycle, failure handling and teardown never exceed the proposed 5 / 64.
+                        assert runner.owner.connections<=orr.MATRIX_OWNER_LIMITS['connections'][1] and runner.owner.commands<=orr.MATRIX_OWNER_LIMITS['commands'][2]
+                        assert runner.owner.opened==runner.owner.closed
+                        # Every non-completed entry kept its own closure; teardown disabled access (unless closure was deliberately made uncertain).
+                        if fault=='matrix_close_uncertain':
+                            assert result['cleanup']=='UNCERTAIN' and result['access']!='DISABLED_VERIFIED'
+                        else:
+                            assert result['cleanup']=='CLOSED' and set(ciphertexts)=={'DATABASE_URL'}
+                            assert boot.execute("SELECT rolname,rolcanlogin,rolpassword IS NULL FROM pg_catalog.pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(list(ROLES),)).fetchall()==[('ingestion_effect_login',False,True),('ingestion_worker_login',False,True)]
+                            assert not boot.execute("SELECT 1 FROM pg_auth_members WHERE member=ANY(%s::regrole[])",(list(ROLES),)).fetchall() and not boot.execute("SELECT 1 FROM pg_stat_activity WHERE usename=ANY(%s)",(list(ROLES),)).fetchall()
+                            if status=='STOP_RECONCILE_NO_RETRY':assert result['access']=='DISABLED_VERIFIED'
+                        if fault=='matrix_success':
+                            assert runner.owner.connections==4                                                    # preflight, install, mapping/activation, teardown
+                            assert [c[1] for c in calls]==[None,rm.STARTUP_OPTIONS,None,rm.STARTUP_OPTIONS] and [c[0] for c in calls]==['ingestion_worker_login']*2+['ingestion_effect_login']*2
+                            stamps=[e['intervals_at_attempt'] for e in result['matrix']['entries']]
+                            assert all(s['since_password_committed_seconds']>=s['since_mapping_acknowledged_seconds']>=s['since_activation_committed_seconds']>=0 for s in stamps)
+                            assert result['matrix']['accounting']['identity_statements']['value']==4 and result['matrix']['accounting']['rollbacks']['value']==0
+                    finally:
+                        [c.close() for c in leaked]
+                    record_property('restricted_matrix',json.dumps(dict(fault=fault,status=result['status'],outcomes=outcomes,global_stop=stop,admin_connections=runner.owner.connections,admin_commands=runner.owner.commands,
+                                    admin_opened=runner.owner.opened,admin_closed=runner.owner.closed,matrix_accounting=result['matrix']['accounting'],access=result['access'],cleanup=result['cleanup'])))
+                    print('MATRIX_MEASURE',fault,'admin_connections',runner.owner.connections,'admin_commands',runner.owner.commands,'cleanup',result['cleanup'],'access',result['access'])
+                    return
 
                 if fault=='diagnostic_only':
                     from verification.ingestion_storage.operational_outcome import session

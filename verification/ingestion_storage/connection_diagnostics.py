@@ -19,7 +19,7 @@ PATTERNS = (
     ('ROUTING_IDENTITY_REJECTED', r'\btenant or user not found\b'),
     ('AUTHORIZATION_REJECTED', r'\bno pg_hba.conf entry\b'),
     ('PERMISSION_DENIED', r'permission denied for database'),
-    ('CONNECTION_CAPACITY', r'(?:too many clients already|max client connections reached)'),
+    ('CONNECTION_CAPACITY', r'(?:too many clients already|too many connections for (?:role|database)|max client connections reached)'),
     ('CONNECTION_TIMEOUT', r'(?:\btimeout expired\b|\bconnection timeout expired\b)'),
     ('CONNECTION_REFUSED', r'\bconnection refused\b'),
     ('DNS_LOOKUP_FAILED', r'could not translate host name'),

@@ -24,6 +24,14 @@ from .operational_preparation import Progress,prepare_connection
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
 DIAGNOSTIC_STATE='operational-actionable-diagnostic-once-20261018'
+MATRIX_MODE='RESTRICTED_CONNECTION_MATRIX_ONLY'
+MATRIX_AUTHORITY='AUTHORISE_INGESTION_RESTRICTED_CONNECTION_MATRIX_ONCE_20261018'
+MATRIX_STATE='operational-restricted-connection-matrix-once-20261018'
+# Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
+MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
+MATRIX_DEADLINES=dict(job=150,diagnostic_total=185,diagnostic_window=25,admin_diagnostic=60,admin_pre=60,admin_total=75,runtime_total=60)
+DEFAULT_DEADLINES=dict(job=450,diagnostic_total=475,diagnostic_window=25,admin_diagnostic=240,admin_pre=210,admin_total=240,runtime_total=300)
+MATRIX_TIMING=dict(input_seconds=120,active_seconds=170,work_seconds=150,diagnostic_seconds=25,report_seconds=5,outer_seconds=310)
 QUALIFICATION='1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2'
 CONTRACT='bolton-received-idox-coordinator-v1'
 
@@ -34,15 +42,19 @@ def restricted_url(role,password):
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
+    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
         self.operation_phase='INITIALISATION';self.started=started if started is not None else time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0;self.hostaddr=hostaddr
         self.expiry=datetime.fromisoformat(registration['expires_at'])
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings)
+        self.matrix_mode=registration.get('mode')==MATRIX_MODE
+        self.deadlines=dict(MATRIX_DEADLINES if self.matrix_mode else DEFAULT_DEADLINES)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else None)
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode')!='CONNECTION_DIAGNOSTIC_ONLY'
+        self.owner.apply_policy=registration.get('mode') not in ('CONNECTION_DIAGNOSTIC_ONLY',MATRIX_MODE)
+        self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
     def check(self):
@@ -54,12 +66,12 @@ class Runner:
         now=time.monotonic()
         if self.diagnosing:
             admin_now=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
-            if now-self.started>=475 or now-self.diagnostic_started>=25 or admin_now>=240:raise Denied('DIAGNOSTIC_RESERVE_EXHAUSTED')
+            if now-self.started>=self.deadlines['diagnostic_total'] or now-self.diagnostic_started>=self.deadlines['diagnostic_window'] or admin_now>=self.deadlines['admin_diagnostic']:raise Denied('DIAGNOSTIC_RESERVE_EXHAUSTED')
             return
-        if datetime.now(timezone.utc)>=self.expiry or now-self.started>=450:raise Denied('EXPIRY_OR_JOB_CLOSURE_RESERVE')
-        if self.phase=='admin' and self.admin_seconds+now-self.phase_started>=210:raise Denied('ADMIN_TEARDOWN_RESERVE')
-        if self.phase=='teardown' and self.admin_seconds+now-self.phase_started>=240:raise Denied('ADMIN_TOTAL_BOUND')
-        if self.phase=='runtime' and self.runtime_seconds+now-self.phase_started>=300:raise Denied('RUNTIME_TOTAL_BOUND')
+        if datetime.now(timezone.utc)>=self.expiry or now-self.started>=self.deadlines['job']:raise Denied('EXPIRY_OR_JOB_CLOSURE_RESERVE')
+        if self.phase=='admin' and self.admin_seconds+now-self.phase_started>=self.deadlines['admin_pre']:raise Denied('ADMIN_TEARDOWN_RESERVE')
+        if self.phase=='teardown' and self.admin_seconds+now-self.phase_started>=self.deadlines['admin_total']:raise Denied('ADMIN_TOTAL_BOUND')
+        if self.phase=='runtime' and self.runtime_seconds+now-self.phase_started>=self.deadlines['runtime_total']:raise Denied('RUNTIME_TOTAL_BOUND')
         if (self.journal.root/'STOP').exists():raise Denied('OWNER_STOP')
         size=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
         if size>2*1024**2-128*1024:raise Denied('COMBINED_OUTPUT_CLOSURE_RESERVE')
@@ -124,6 +136,19 @@ class Runner:
         self.operation_phase='AUTHORITY_REGISTRATION'
         self.capture_bindings=self.owner.register([root],AUTHORITY+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.emit('required_setup_committed',dict(capture_key=self.capture_key))
+
+    def setup_matrix(self):
+        """Accepted credential lifecycle up to restricted-connection qualification, then the four-entry matrix. No authority, grant, exception, source or queue step exists on this path."""
+        from .restricted_matrix import Matrix
+        self.matrix=Matrix(self)
+        account=self.github.call('GET','user')
+        if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
+        self.operation_phase='ADMIN_PREFLIGHT';self.owner.preflight()
+        self.operation_phase='ADMIN_INSTALL_OR_REUSE';self.owner.install()
+        self.operation_phase='CREDENTIAL_MAPPING_ACTIVATION';self.owner.map_and_activate(self.github,url_factory=self.url_factory)
+        self.operation_phase='RESTRICTED_CONNECTION_MATRIX'
+        with self.phase_as('runtime'):self.matrix.run()
+        self.emit('restricted_matrix_completed',dict(accounting=self.matrix.accounting()))
 
     def capture_once(self):
         self.operation_phase='SOURCE_CAPTURE_RETENTION'
@@ -265,7 +290,7 @@ class Runner:
         except BaseException:pass
         a=self.owner.accounting()
         failed_admin_closed=(a.get('failed_native_connections',0)==a.get('failed_native_finished',0) or process.get('new_socket_count')==0)
-        connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and
+        connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and (getattr(self,"matrix",None) is None or self.matrix.closed_ok()) and
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
         safe=access=='DISABLED_VERIFIED' and not a['uncertain_effect'] and not self.github.mutation_uncertain
@@ -302,12 +327,20 @@ class Runner:
             access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+        if getattr(self,"matrix",None) is not None:result["matrix"]=self.matrix.finalise()
         try:self.emit('stopped',result)
         except BaseException:result['audit_stop_record']='UNCERTAIN'
         return result
 
     def execute(self):
         try:
+            if self.matrix_mode:
+                self.setup_matrix()
+                with self.phase_as('teardown'):self.owner.teardown(self.github)
+                components=self.closure('DISABLED_VERIFIED')
+                if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+                return dict(status='RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),matrix=self.matrix.finalise(),owned_cleanup=components['process'],
+                            source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
             self.setup()
             if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':
                 with self.phase_as('teardown'):self.owner.teardown(self.github)
@@ -343,11 +376,16 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
+    if r.get('mode')==MATRIX_MODE:
+        from .restricted_matrix import ENTRIES,LIMITS as MX
+        # The residual-risk acceptance is applied to THIS finite test only and carries no execution authority.
+        if (r.get('matrix')!=[list(e) for e in ENTRIES] or r.get('matrix_limits')!=MX or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_RESTRICTED_CONNECTION_MATRIX_ONLY'
+            or r.get('owner_limits')!=dict(connections=list(MATRIX_OWNER_LIMITS['connections']),commands=list(MATRIX_OWNER_LIMITS['commands'])) or r.get('state_directory')!=MATRIX_STATE):raise ValueError('MATRIX_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=24):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode')==MATRIX_MODE else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -368,7 +406,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -376,7 +414,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline)
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=MATRIX_TIMING) if r['mode']==MATRIX_MODE else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
