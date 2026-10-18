@@ -129,7 +129,7 @@ def test_ca_failures(tmp_path,monkeypatch,arrange,reason):
 
 
 def test_unclassified_exception_keeps_its_stage_and_stays_unknown(tmp_path,monkeypatch):
-    monkeypatch.setattr(op,'verified_trust',lambda:(_ for _ in ()).throw(RuntimeError('private text '+SECRET)))
+    monkeypatch.setattr(__import__("verification.ingestion_storage.operational_preparation",fromlist=["x"]),"verified_trust",lambda:(_ for _ in ()).throw(RuntimeError('private text '+SECRET)))
     result,j,lines,_,_=run_session(tmp_path,url())
     f=result['failure'];assert (f['stage'],f['reason_code'],f['flags'])==('CA_TRUST','UNEXPECTED_EXCEPTION',{'exception_kind':'OTHER'})
     assert_secret_safe(j,lines,result)

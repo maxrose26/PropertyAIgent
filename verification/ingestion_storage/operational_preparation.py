@@ -7,8 +7,12 @@ allow-listed exception class name (else OTHER). A stage name identifies WHERE pr
 """
 import ipaddress,json,subprocess,sys,time
 from contextlib import contextmanager
+from datetime import datetime,timezone
+from types import SimpleNamespace
 from .connection_diagnostics import PreparationFailure,STAGES,kind_of
+from .tls_trust import verified_trust
 
+STARTUP_OPTIONS='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000'
 DNS_HOST='aws-0-eu-west-2.pooler.supabase.com'
 DNS_PORT=5432
 DNS_TIMEOUT_SECONDS=3
@@ -82,3 +86,33 @@ def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIM
         except ValueError:raise PreparationFailure('DNS_RESOLUTION','DNS_INVALID_ADDRESS') from None
     if any(a.version!=4 for a in parsed):raise PreparationFailure('DNS_RESOLUTION','REVIEWED_IPV4_ONLY')
     return sorted(str(a) for a in parsed)[0]
+
+
+def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None):
+    """The credential-dependent, connection-free preparation shared by every operational path: expiry, exact route, password presence, reviewed CA, bounded DNS, driver import.
+
+    Returns the parsed route, the CA path, the selected address and a `connect` closure. No connection is made here; `connect` only counts and opens when a caller invokes it.
+    The startup options are the previously reviewed values and are deliberately unchanged."""
+    with progress.stage('REGISTRATION_EXPIRY'):
+        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise PreparationFailure('REGISTRATION_EXPIRY','REGISTRATION_EXPIRED')
+    with progress.stage('ROUTE_VALIDATION'):
+        from verification.discovery.route_validation import validate_route,RouteRejection
+        try:u=validate_route(raw)
+        except RouteRejection as rejection:raise PreparationFailure('ROUTE_VALIDATION','ROUTE_'+rejection.code) from None
+    with progress.stage('PASSWORD_PRESENCE'):
+        if not isinstance(u.password,str) or not u.password:raise PreparationFailure('PASSWORD_PRESENCE','PASSWORD_ABSENT')
+    with progress.stage('CA_TRUST'):
+        try:ca,_=verified_trust()
+        except ValueError as exc:
+            # The reviewed trust module raises only fixed REVIEWED_CA_* codes; anything else stays an unclassified exception.
+            if str(exc) in CA_REASONS:raise PreparationFailure('CA_TRUST',str(exc)) from None
+            raise
+    with progress.stage('DNS_RESOLUTION'):
+        selected=resolve_addresses(progress,command=dns_command,run=dns_run)
+    with progress.stage('DRIVER_IMPORT'):
+        try:import psycopg
+        except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
+    def connect():
+        progress.database_connection_calls+=1
+        return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options=STARTUP_OPTIONS)
+    return SimpleNamespace(route=u,ca=ca,hostaddr=selected,connect=connect)

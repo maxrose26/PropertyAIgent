@@ -5,6 +5,25 @@ from .operational_cleanup import HardDeadline,arm_deadline
 from .operational_publication import canonical
 from .connection_diagnostics import safe_failure,PreparationFailure
 
+ACCOUNTING_SCHEMA='VALUE_BASIS_V2'
+
+
+def legacy_counts(accounting):
+    """Project a value/basis accounting block to the historical flat-integer shape (None where the value is not known). Historical blocks pass through unchanged."""
+    def flat(x):return x.get('value') if isinstance(x,dict) and 'basis' in x else x
+    if not isinstance(accounting,dict):return accounting
+    out={}
+    for key,block in accounting.items():
+        out[key]={k:flat(v) for k,v in block.items()} if isinstance(block,dict) and key in ('administration','runtime') else block
+    return out
+
+
+def early_outcome(failure,closure):
+    """Truthful, separately stated outcome for an exit before any administrative connection could be attempted."""
+    return dict(preparation='FAILED',administrative_connection='NOT_ATTEMPTED',failure=('CLASSIFIED' if failure.get('reason_code') not in (None,'UNKNOWN','UNEXPECTED_EXCEPTION','FAILURE_EXPORT_UNAVAILABLE') else 'UNCLASSIFIED'),
+                closure='VERIFIED' if closure.get('overall')=='CLOSED' else 'UNCERTAIN',route_qualified=False,worker_authentication_qualified=False)
+
+
 TIMING=dict(input_seconds=300,active_seconds=480,work_seconds=450,diagnostic_seconds=25,report_seconds=5,outer_seconds=790)
 
 def finalise(journal,result,*,input_seconds,active_started,output=print):
@@ -117,13 +136,13 @@ def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMI
                 result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=closure['overall'],closure_components=closure,failure=failure,
                     authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
                     preparation=progress.report() if progress is not None else None,
-                    accounting=early_accounting(progress,elapsed),owned_cleanup=closure['process'],
+                    accounting=early_accounting(progress,elapsed),accounting_schema=ACCOUNTING_SCHEMA,outcome=early_outcome(failure,closure),owned_cleanup=closure['process'],
                     application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
             except BaseException:
                 # The exporter itself failed (for example the driver is unavailable to the classifier). A final result must still exist; nothing is claimed.
                 result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',failure=dict(phase='PREPARATION',stage=where,exception_kind='OTHER',sqlstate=None,reason_code='FAILURE_EXPORT_UNAVAILABLE',
                     classification_source='FIXED_PREPARATION_CODE',message_exported=False,flags={}),authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
-                    accounting=early_accounting(None,elapsed),application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+                    accounting=early_accounting(None,elapsed),accounting_schema=ACCOUNTING_SCHEMA,outcome=dict(preparation='UNKNOWN',administrative_connection='UNKNOWN',failure='UNCLASSIFIED',closure='UNCERTAIN',route_qualified=False,worker_authentication_qualified=False),application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:journal.emit('stopped_before_runner',result)
         except BaseException:pass
     finally:raw=None

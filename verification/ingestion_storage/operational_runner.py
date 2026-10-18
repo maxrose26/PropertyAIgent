@@ -15,10 +15,11 @@ from app.ingestion.batching import capture_once,batch_plans,process_batch
 from verification.discovery.idox_window import WindowConfig
 from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation
 from .operational_publication import GitHub,Uncertain,canonical,BRANCH
+from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
 from .connection_diagnostics import PreparationFailure
-from .operational_preparation import Progress,resolve_addresses,CA_REASONS
+from .operational_preparation import Progress,prepare_connection
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
@@ -30,42 +31,6 @@ def restricted_url(role,password):
     """Same in-memory value goes to protected mapping and native URL parser."""
     if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
     return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
-
-class Journal:
-    def __init__(self,root):
-        self.root=Path(root);self.root.mkdir(mode=0o700,parents=False,exist_ok=False)
-        self.file=self.root/'events.jsonl';self.sequence=0;self.head='0'*64
-        self.file.touch(mode=0o600,exist_ok=False)
-        self.sync_dir()
-    def sync_dir(self):
-        for p in (self.root,self.root.parent):
-            fd=os.open(p,os.O_DIRECTORY);os.fsync(fd);os.close(fd)
-    def emit(self,event,payload):
-        record=dict(sequence=self.sequence,event=event,payload=payload,previous_sha256=self.head)
-        head=hashlib.sha256(canonical(record)).hexdigest();raw=canonical(dict(record,sha256=head))+b'\n'
-        if self.file.stat().st_size+len(raw)>1024**2:raise Uncertain('AUDIT_BOUND')
-        with self.file.open('ab') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        self.sequence+=1;self.head=head
-    def save(self,name,value):
-        if name not in {'progress.json','final-result.json'}:raise ValueError('CHECKPOINT_PATH')
-        raw=canonical(value)
-        if len(raw)>256*1024:raise ValueError('CHECKPOINT_BOUND')
-        persisted=sum(p.stat().st_size for p in self.root.rglob('*') if p.is_file())
-        if persisted+len(raw)>2*1024**2-8192:raise ValueError('CHECKPOINT_COMBINED_OUTPUT_RESERVE')
-        temp=self.root/(name+'.next')
-        with temp.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        temp.replace(self.root/name);self.sync_dir()
-        if (self.root/name).read_bytes()!=raw:raise Uncertain('CHECKPOINT_READBACK')
-
-    def progress(self):
-        state=json.loads((self.root/'progress.json').read_bytes());previous='0'*64;sealed=None
-        for i,line in enumerate(self.file.read_bytes().splitlines()):
-            event=json.loads(line);sha=event.pop('sha256')
-            if event['sequence']!=i or event['previous_sha256']!=previous or hashlib.sha256(canonical(event)).hexdigest()!=sha:raise Uncertain('AUDIT_CHAIN_BINDING')
-            previous=sha
-            if event['event']=='progress_saved':sealed=event['payload']['sha256']
-        if previous!=self.head or digest(state)!=sealed:raise Uncertain('DURABLE_PROGRESS_SEAL')
-        return state
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
@@ -360,28 +325,8 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 
     No database connection is made here: `connect` is only a closure handed to the Runner. Seams (`dns_run`, `dns_command`) exist solely so the real stage code can be
     exercised against controlled local fixtures; production passes neither."""
-    with progress.stage('REGISTRATION_EXPIRY'):
-        if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise PreparationFailure('REGISTRATION_EXPIRY','REGISTRATION_EXPIRED')
-    with progress.stage('ROUTE_VALIDATION'):
-        from verification.discovery.route_validation import validate_route,RouteRejection
-        try:u=validate_route(raw)
-        except RouteRejection as rejection:raise PreparationFailure('ROUTE_VALIDATION','ROUTE_'+rejection.code) from None
-    with progress.stage('PASSWORD_PRESENCE'):
-        if not isinstance(u.password,str) or not u.password:raise PreparationFailure('PASSWORD_PRESENCE','PASSWORD_ABSENT')
-    with progress.stage('CA_TRUST'):
-        try:ca,_=verified_trust()
-        except ValueError as exc:
-            # The reviewed trust module raises only fixed REVIEWED_CA_* codes; anything else stays an unclassified exception.
-            if str(exc) in CA_REASONS:raise PreparationFailure('CA_TRUST',str(exc)) from None
-            raise
-    with progress.stage('DNS_RESOLUTION'):
-        selected=resolve_addresses(progress,command=dns_command,run=dns_run)
-    with progress.stage('DRIVER_IMPORT'):
-        try:import psycopg
-        except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
-    def connect():
-        progress.database_connection_calls+=1
-        return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000')
+    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command)
+    ca,selected,connect=prepared.ca,prepared.hostaddr,prepared.connect
     with progress.stage('RUNNER_COMPONENTS'):
         holder={}
         try:from .operational_source import read

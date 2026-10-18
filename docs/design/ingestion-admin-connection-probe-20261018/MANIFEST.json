@@ -1,0 +1,26 @@
+{
+ "package": "ingestion-admin-connection-probe-20261018",
+ "status": "PREPARED_FOR_REVIEW_NOT_RELEASED",
+ "bound_paths": [
+  ".github/workflows/stage4-discovery-offline.yml",
+  "docs/design/ingestion-admin-connection-probe-20261018/PACKAGE.md",
+  "docs/design/ingestion-admin-connection-probe-20261018/owner-run.sh",
+  "docs/design/ingestion-admin-connection-probe-20261018/render_registration.py",
+  "tests/test_ingestion_admin_connection_probe.py",
+  "tests/test_ingestion_preparation_stages.py",
+  "verification/discovery/route_validation.py",
+  "verification/ingestion_storage/admin_connection_probe.py",
+  "verification/ingestion_storage/connection_diagnostics.py",
+  "verification/ingestion_storage/operational_cleanup.py",
+  "verification/ingestion_storage/operational_journal.py",
+  "verification/ingestion_storage/operational_memory.py",
+  "verification/ingestion_storage/operational_outcome.py",
+  "verification/ingestion_storage/operational_preparation.py",
+  "verification/ingestion_storage/operational_publication.py",
+  "verification/ingestion_storage/tls_trust.py",
+  "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt"
+ ],
+ "entrypoint": "verification.ingestion_storage.admin_connection_probe",
+ "state_directory": "operational-admin-connection-probe-once-20261018",
+ "forbidden_in_this_package": ["registration release", "execution", "merge", "credential generation", "GitHub access", "provider ticket submission"]
+}
