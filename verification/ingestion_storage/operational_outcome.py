@@ -104,15 +104,26 @@ def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMI
             try:
                 if memory is not None:proof=memory.close()
             except BaseException:pass
-            # Positive, stage-attributed evidence. An unclassified exception keeps the last STAGE reached (never a guessed cause); deadlines keep their own class.
-            failure=safe_failure(exc,'PREPARATION')
-            if 'stage' not in failure:failure=dict(failure,stage=(progress.current if progress is not None and progress.current else where))
-            closure=early_closure(baseline,proof if (proof is None or proof.get('status')!='UNKNOWN') else dict(owned_groups_removed=False,owned_survivors=None),progress)
-            result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=closure['overall'],closure_components=closure,failure=failure,
-                authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
-                preparation=progress.report() if progress is not None else None,
-                accounting=early_accounting(progress,time.monotonic()-(active if active is not None else input_started)),owned_cleanup=closure['process'],
-                application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+            elapsed=time.monotonic()-(active if active is not None else input_started)
+            try:
+                # The stage is RECORDED, never inferred: the stage in progress, else "between stages" after the last completed one, else where the session itself stopped.
+                failure=safe_failure(exc,'PREPARATION')
+                if 'stage' not in failure:
+                    if progress is not None and progress.current:stage=progress.current
+                    elif progress is not None and progress.completed:stage='AFTER_'+progress.completed[-1]
+                    else:stage=where
+                    failure=dict(failure,stage=stage)
+                closure=early_closure(baseline,proof if (proof is None or proof.get('status')!='UNKNOWN') else dict(owned_groups_removed=False,owned_survivors=None),progress)
+                result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=closure['overall'],closure_components=closure,failure=failure,
+                    authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
+                    preparation=progress.report() if progress is not None else None,
+                    accounting=early_accounting(progress,elapsed),owned_cleanup=closure['process'],
+                    application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+            except BaseException:
+                # The exporter itself failed (for example the driver is unavailable to the classifier). A final result must still exist; nothing is claimed.
+                result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',failure=dict(phase='PREPARATION',stage=where,exception_kind='OTHER',sqlstate=None,reason_code='FAILURE_EXPORT_UNAVAILABLE',
+                    classification_source='FIXED_PREPARATION_CODE',message_exported=False,flags={}),authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',access='NO_ACCESS_CREATED',
+                    accounting=early_accounting(None,elapsed),application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:journal.emit('stopped_before_runner',result)
         except BaseException:pass
     finally:raw=None

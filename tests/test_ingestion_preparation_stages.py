@@ -151,8 +151,8 @@ def test_unclassified_exception_keeps_its_stage_and_stays_unknown(tmp_path,monke
 def test_dns_subprocess_failures_have_exact_reasons(tmp_path,seams,reason,flags):
     result,j,lines,progress,_=run_session(tmp_path,url(),**seams)
     f=result['failure'];assert f['reason_code']==reason and f['flags']==flags and f['phase']=='PREPARATION'
-    assert f['stage'] in ('DNS_RESOLUTION','ADDRESS_POLICY') and progress.dns['subprocess_started']
-    assert result['accounting']['preparation']['local_subprocesses']==dict(value=1,basis='MEASURED')                                 # preparation DID work even though no runtime slot exists
+    assert f['stage']=='DNS_RESOLUTION' and progress.dns['subprocess_started']
+    assert result['accounting']['preparation']['dns_subprocesses_spawned']==dict(value=int(reason!='DNS_SUBPROCESS_SPAWN_FAILED'),basis='MEASURED',scope='PREPARATION_DNS_CHILD_ONLY')                                 # preparation DID work even though no runtime slot exists
     assert result['closure_components']['process']['status']=='CLOSED' and result['closure_components']['process']['live_child_count']==0   # the timed-out child was killed and reaped
     assert_secret_safe(j,lines,result)
 
@@ -185,7 +185,7 @@ def test_every_early_exit_exports_complete_accounting_and_separate_positive_clos
     for k in ('commands','returned_data_value_bytes','failed_native_connections','failed_native_finished','credential_generations','secret_mappings','role_changes'):
         assert adm[k]==dict(value=0,basis='NOT_STARTED'),k                                                   # provably never reached, not "measured"
     assert a['runtime']['slot_receipts']=={} and a['runtime']['slot_state']=='NO_RUNTIME_SLOT_CREATED' and a['runtime']['supervised_seconds']==dict(value=0,basis='NOT_STARTED')
-    pw=a['preparation'];assert pw['state']=='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' and pw['local_subprocesses']==dict(value=0,basis='MEASURED') and a['historical_accounting_gaps']=='PRESERVED_NOT_RECONSTRUCTED'
+    pw=a['preparation'];assert pw['state']=='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' and pw['dns_subprocesses_spawned']==dict(value=0,basis='MEASURED',scope='PREPARATION_DNS_CHILD_ONLY') and a['historical_accounting_gaps']=='PRESERVED_NOT_RECONSTRUCTED'
     c=result['closure_components']
     assert c['access']['status']=='NOT_REQUIRED_NO_ACCESS_CREATED' and c['connections']['status']=='NO_CONNECTION_ATTEMPTED'
     assert c['process']['status']=='CLOSED' and c['process']['new_socket_count']==0 and c['outer_scope_removal']=='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT'
@@ -319,3 +319,29 @@ def test_native_memory_and_process_closure_on_early_failure(tmp_path,fault):
     assert c['process']['status']=='CLOSED' and c['process']['live_child_count']==0 and c['process']['new_socket_count']==0 and result['cleanup']=='CLOSED'
     m=c['process']['memory'];assert m['owned_groups_removed'] is True and m['owned_survivors']==0                 # positive kernel evidence, not an absence of errors
     assert_secret_safe(j,lines,result)
+
+
+# --- review findings: the stage is recorded not inferred; the exporter cannot be the reason nothing is exported ---------------------------------------------------------
+
+def test_interruption_between_stages_is_not_blamed_on_a_completed_stage(tmp_path):
+    j=Journal(tmp_path/'between');progress=Progress()
+    def prepare(raw,started):
+        with progress.stage('ROUTE_VALIDATION'):pass
+        raise KeyboardInterrupt()                                                                           # arrives after a stage completed and before the next begins
+    r=session(j,registration()['expires_at'],lambda:'x',prepare,memory=Memory(),output=lambda *a,**k:None,timing=FAST,progress=progress,baseline=owned_resources())
+    assert r['failure']['stage']=='AFTER_ROUTE_VALIDATION' and progress.current is None
+
+
+def test_a_failing_exporter_still_yields_a_final_result_and_uncertain_closure(tmp_path,monkeypatch):
+    from verification.ingestion_storage import operational_outcome as oo
+    monkeypatch.setattr(oo,'safe_failure',lambda *a:(_ for _ in ()).throw(ImportError('driver unavailable '+SECRET)))
+    result,j,lines,_,_=run_session(tmp_path,url(user='postgres'))
+    assert result['cleanup']=='UNCERTAIN' and result['failure']['reason_code']=='FAILURE_EXPORT_UNAVAILABLE' and result['accounting']['administration']['connections']['basis']=='UNKNOWN'
+    assert_secret_safe(j,lines,result)
+
+
+def test_unclassifiable_early_exit_without_the_driver_still_exports(tmp_path,monkeypatch):
+    monkeypatch.setitem(sys.modules,'psycopg',None)
+    j=Journal(tmp_path/'nodriver')
+    r=session(j,registration()['expires_at'],lambda:(_ for _ in ()).throw(EOFError()),lambda *a:None,memory=Memory(),output=lambda *a,**k:None,timing=FAST,progress=Progress(),baseline=owned_resources())
+    assert (j.root/'final-result.json').exists() and r['status']=='STOP_RECONCILE_NO_RETRY'
