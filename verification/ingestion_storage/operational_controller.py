@@ -66,7 +66,7 @@ class DatabaseBudget:
     """
     def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
-        self.emit=emit or (lambda *_:None);self.connection_diagnostics=[]
+        self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
         if type(returned_bytes) is not int or not 0<returned_bytes<=4*1024**2:raise Denied('DATABASE_BYTE_CEILING')
         self.returned_cap=returned_bytes
@@ -80,7 +80,7 @@ class DatabaseBudget:
         self.returned_bytes=previous.get("returned_data_value_bytes",0)
         if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=self.returned_cap:raise Denied("PRIOR_BYTES_BOUND")
         self.previous_elapsed=elapsed
-        self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.connection_seconds=0.0;self.stop_file=Path(stop_file) if stop_file else None
+        self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.previous_opened=previous.get('connections_opened',0);self.connection_seconds=previous.get('connection_active_seconds',0.0);self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
         if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
     def tick(self,kind,*,cleanup=False):
@@ -149,7 +149,7 @@ class DatabaseBudget:
         for c in self.opened:
             try:c.close()
             except Exception:errors.append('CLOSE')
-        return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=len(self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
+        return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=self.previous_opened+len(self.opened),connections_closed_count=self.previous_opened+sum(bool(c.closed) for c in self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 

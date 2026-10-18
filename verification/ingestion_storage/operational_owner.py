@@ -99,6 +99,10 @@ class Owner:
             if self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
             if self.q(c,"SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login'],))[0][0]:raise ValueError('PREEXISTING_RUNTIME_SESSIONS')
             if self.reuse_installed:
+                exact=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication,r.rolconnlimit FROM pg_roles r JOIN pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
+                self.emit('reused_runtime_flags_observed',dict(rows=exact))
+                if exact!=[(r,False,True,False,False,False,False,False,1) for r in sorted(ROLES)]:raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
+                if self.q(c,'SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))[0][0]!=0:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
                 self.verify_installed(c)
                 return
             if self.q(c,"SELECT to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_effect_login')")[0]!=(None,False):raise ValueError('INSTALLATION_ALREADY_EXISTS_NO_REPLAY')
@@ -125,6 +129,7 @@ class Owner:
                 self.q(c,'GRANT ingestion_worker TO ingestion_worker_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE',effect=True)
                 self.q(c,'GRANT ingestion_effect_broker TO ingestion_effect_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE',effect=True)
                 self.q(c,'COMMIT',effect=True)
+                self.activation_precheck(c)
             return
         with self.connection() as c:
             self.script(c,WORKER)
@@ -136,8 +141,11 @@ class Owner:
             self.q(c,'COMMIT',effect=True)
             # Exercise the exact complete activation gate read-only before any
             # password/secret operation. No unsupported redaction assertion.
-            gate=(PKG/'activate.sql').read_text().split('ALTER ROLE ingestion_worker_login LOGIN;')[0].replace('BEGIN;','BEGIN READ ONLY;',1)+'ROLLBACK;'
-            for statement in split_sql(gate):self.q(c,statement)
+            self.activation_precheck(c)
+
+    def activation_precheck(self,c):
+        gate=(PKG/'activate.sql').read_text().split('ALTER ROLE ingestion_worker_login LOGIN;')[0].replace('BEGIN;','BEGIN READ ONLY;',1)+'ROLLBACK;'
+        for statement in split_sql(gate):self.q(c,statement)
 
     def map_and_activate(self,github,*,url_factory):
         names=github.names()

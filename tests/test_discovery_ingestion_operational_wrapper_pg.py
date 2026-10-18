@@ -79,7 +79,10 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
-                original_install()
+                from verification.ingestion_storage.operational_owner import Owner
+                installer=Owner(connector,lambda *_:None,lambda:None,identity=role,expiry=runner.expiry,bindings=runner.bindings)
+                installer.install()
+                record_property('fixture_installation',json.dumps(installer.accounting()))
                 boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN PASSWORD NULL')
                 boot.execute('ALTER ROLE ingestion_effect_login NOLOGIN PASSWORD NULL')
                 with connector() as migration:
@@ -91,6 +94,18 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 runner.owner.reuse_installed=True
                 from app.ingestion.ledger import digest
                 runner.owner.baseline_control_sha256=digest(ctl)
+                for mutation,undo,expected in [
+                  ('ALTER ROLE ingestion_effect_login BYPASSRLS','ALTER ROLE ingestion_effect_login NOBYPASSRLS','REUSED_RUNTIME_FLAGS_CHANGED'),
+                  ('GRANT ingestion_authority_issuer TO ingestion_effect_login','REVOKE ingestion_authority_issuer FROM ingestion_effect_login GRANTED BY CURRENT_USER','REUSED_RUNTIME_MEMBERSHIPS_CHANGED')]:
+                    probe=Owner(connector,lambda *_:None,lambda:None,identity=role,expiry=runner.expiry,bindings=runner.bindings)
+                    probe.reuse_installed=True;probe.baseline_control_sha256=digest(ctl)
+                    before_requests=list(requests);boot.execute(mutation)
+                    try:
+                        with pytest.raises(ValueError,match=expected):probe.preflight()
+                        assert requests==before_requests
+                    finally:boot.execute(undo)
+                    record_property('fixture_negative_preflight',json.dumps(probe.accounting()))
+
                 if fault=='diagnostic_only':
                     from verification.ingestion_storage.operational_outcome import session
                     runner.r['mode']='CONNECTION_DIAGNOSTIC_ONLY';runner.owner.apply_policy=False
@@ -189,7 +204,19 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 assert not (journal.root/'final-result.json').exists()
                 record_property('required_failure',json.dumps(dict(fault=fault,source_calls=0,mapping_calls=sum(m=='PUT' for m,p in requests),actual_roles=diag['roles'],subsequent_mutations=False)))
                 return
-            runner.setup();runner.capture_once()
+            runner.setup()
+            if fault=='reuse_installed_success':
+                from copy import deepcopy
+                control=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                authority=runner.owner.authorities[-1]
+                allowed=lambda state,subject:boot.execute('SELECT public.ingestion_bolton_allowed(%s::jsonb,%s,%s::jsonb)',(json.dumps(state),authority,json.dumps(subject))).fetchone()[0]
+                from verification.ingestion_storage.operational_owner import SCOPE
+                assert allowed(control,SCOPE) is True
+                assert allowed(control,dict(SCOPE,council='salford')) is False
+                stopped=deepcopy(control);stopped['hard_stop_generation']+=1
+                assert allowed(stopped,SCOPE) is False
+                record_property('fixture_policy_assertion_commands','4')
+            runner.capture_once()
             effective_denials=0
             from sqlalchemy.engine import make_url
             for runtime in runner.owner.urls.values():
