@@ -172,7 +172,9 @@ class Cleanup:
             raise
         finally:
             if c is not None:
+                closing=time.monotonic()
                 c.close()
+                self.database_active+=time.monotonic()-closing
                 if not c.closed: raise Stop('DATABASE_CLOSE_UNCERTAIN')
                 self.closed+=1; self.emit('connection_closed', {'ordinal':self.connections})
 
@@ -341,6 +343,7 @@ def verify_original(path):
         raise Stop('ORIGINAL_ATTEMPT_BINDING')
 
 def main():
+    began=time.monotonic()
     p=argparse.ArgumentParser(); p.add_argument('--registration',type=Path,required=True)
     p.add_argument('--registration-sha256',required=True); args=p.parse_args()
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty(): raise SystemExit('SECURE_LINUX_TTY_REQUIRED')
@@ -370,8 +373,9 @@ def main():
     journal=Journal(state/'operational-safety-cleanup-once-20261018')
     journal.emit('consumed',dict(authority=AUTHORITY,registration_sha256=args.registration_sha256,
                  original_audit_sha256=ORIGINAL_AUDIT_SHA256,limits=LIMITS))
-    resource.setrlimit(resource.RLIMIT_CORE,(0,0)); worker=None; began=time.monotonic()
-    signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Stop('HARD_CLEANUP_DEADLINE')));signal.alarm(45)
+    resource.setrlimit(resource.RLIMIT_CORE,(0,0)); worker=None
+    signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Stop('HARD_CLEANUP_DEADLINE')))
+    signal.setitimer(signal.ITIMER_REAL,max(.001,45-(time.monotonic()-began)))
     try:
         from verification.ingestion_storage.credential_mapping import secure_migration_input
         from verification.ingestion_storage.tls_trust import verified_trust,owned_resources,failure_evidence
