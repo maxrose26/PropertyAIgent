@@ -160,6 +160,19 @@ jobs:
       - name: Required operational kernel groups and real gh startup
         run: |
           timeout --kill-after=2s 30s sudo systemd-run --scope --unit=propertyaigent-operational-once -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill bash verification/ingestion_storage/operational_ci_scope.sh "$(id -u)" "$(id -g)" "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.test_discovery_ingestion_operational_memory_native startup
+      - name: Revoke-only cleanup, restricted PG17 and real gh under256MiB
+        run: |
+          timeout --kill-after=2s 90s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=90s setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_CLEANUP_NATIVE=1 INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_cleanup.py tests/test_discovery_ingestion_cleanup_pg.py -q --basetemp="$RUNNER_TEMP/cleanup-rehearsal" --junitxml="$RUNNER_TEMP/cleanup.xml"
+      - name: Cleanup actual-memory excess kills entire owned scope
+        run: |
+          set +e
+          timeout --kill-after=2s 20s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.test_discovery_ingestion_cleanup_native
+          result=$?
+          set -e
+          test "$result" != 0
+          test "$(sudo systemctl show propertyaigent-operational-cleanup-20261018.scope -p Result --value)" = oom-kill
+          test -z "$(sudo systemctl show propertyaigent-operational-cleanup-20261018.scope -p ControlGroup --value)"
+          sudo systemctl reset-failed propertyaigent-operational-cleanup-20261018.scope
       - name: Operational controller and all descendants killed above256MiB
         run: |
           set +e
@@ -181,5 +194,6 @@ jobs:
             ${{ runner.temp }}/provisioning.xml
             ${{ runner.temp }}/kernel-memory.xml
             ${{ runner.temp }}/operational-wrapper.xml
+            ${{ runner.temp }}/cleanup.xml
             ${{ runner.temp }}/provisioning-rehearsal/**/practical-worker-*/*.json
           retention-days: 14
