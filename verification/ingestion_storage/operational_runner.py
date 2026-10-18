@@ -18,7 +18,7 @@ from .operational_publication import GitHub,Uncertain,canonical,BRANCH
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
 
-AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018'
+AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 QUALIFICATION='1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2'
 CONTRACT='bolton-received-idox-coordinator-v1'
 
@@ -65,12 +65,15 @@ class Runner:
         self.expiry=datetime.fromisoformat(registration['expires_at'])
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings)
-        self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
+        self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
+        self.owner.apply_policy=registration.get('mode')!='CONNECTION_DIAGNOSTIC_ONLY'
+        self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
     def check(self):
         now=time.monotonic()
         if self.diagnosing:
-            if now-self.started>=475 or self.admin_seconds+now-self.phase_started>=240:raise Denied('DIAGNOSTIC_RESERVE_EXHAUSTED')
+            admin_now=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
+            if now-self.started>=475 or now-self.diagnostic_started>=25 or admin_now>=240:raise Denied('DIAGNOSTIC_RESERVE_EXHAUSTED')
             return
         if datetime.now(timezone.utc)>=self.expiry or now-self.started>=450:raise Denied('EXPIRY_OR_JOB_CLOSURE_RESERVE')
         if self.phase=='admin' and self.admin_seconds+now-self.phase_started>=210:raise Denied('ADMIN_TEARDOWN_RESERVE')
@@ -106,7 +109,7 @@ class Runner:
         remaining=allocation['remaining']
         if remaining['driver_statements']<80 or remaining['connection_attempts']<2:raise Denied('INSUFFICIENT_NEXT_SLOT_RESERVATION')
         prior=self.receipts.get(key,{})
-        budget=DatabaseBudget(slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],stop_file=self.journal.root/'STOP')
+        budget=DatabaseBudget(slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],emit=self.emit,stop_file=self.journal.root/'STOP')
         engines=[];started=time.monotonic();success=False
         try:
             engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.hostaddr) for r in ROLES]
@@ -126,14 +129,30 @@ class Runner:
         self.owner.preflight();self.owner.install();self.owner.map_and_activate(self.github,url_factory=self.url_factory)
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256'])
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
-        self.capture_key=root['key'];self.capture_bindings=self.owner.register([root],AUTHORITY+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
+        self.capture_key=root['key']
+        # Validate BOTH real restricted logins before any source grant exists.
+        # This slot's counters carry into capture; it cannot reset allowances.
+        with self.phase_as('runtime'):
+            with self.slot(self.capture_key,{},'NO_EXECUTION_AUTHORITY') as (_,budget):
+                for engine in budget.engines:
+                    with engine.connect():pass
+        self.emit('restricted_connections_verified_before_authority',dict(capture_key=self.capture_key))
+        if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':return
+        self.capture_bindings=self.owner.register([root],AUTHORITY+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.emit('required_setup_committed',dict(capture_key=self.capture_key))
 
     def capture_once(self):
         if self.capture is not None:raise Denied('CAPTURE_ALREADY_RETAINED_NO_SOURCE_REPLAY')
         with self.phase_as('runtime'):
             with self.slot(self.capture_key,self.capture_bindings,AUTHORITY+'_CAPTURE') as (co,budget):
-                def read(row):self.check();return self.source_reader(row)
+                def read(row):
+                    self.check();self.source_attempts+=1
+                    self.source_resources={'status':'ATTEMPTED_ACCOUNTING_UNCERTAIN','attempted_requests':None,'received_body_bytes':None}
+                    self.emit('source_invocation_intent',dict(ordinal=self.source_attempts))
+                    observed=self.source_reader(row)
+                    self.source_resources=dict(status='RETURNED',worker=observed[0].get('resource'),supervisor=observed[1])
+                    self.emit('source_invocation_returned',dict(ordinal=self.source_attempts,resources=self.source_resources))
+                    return observed
                 self.capture=capture_once(co,self.capture_key,read,self.archive,self.check)
         if self.capture['kind']!='LISTING_RECEIPT_V1':
             self.emit('capture_processing_blocked',dict(checkpoint=self.capture));return
@@ -201,7 +220,7 @@ class Runner:
         self.emit('required_access_disabled',dict(roles=list(ROLES),authorities=self.owner.authorities))
         self.check()
         outcome='CAPTURED_PROCESSING_BLOCKED' if self.capture['kind']!='LISTING_RECEIPT_V1' else 'REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED'
-        result=dict(status='ACCESS_DISABLED_FINAL_CLOSURE_PENDING',rows=len(self.capture.get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture),slot_receipts=self.receipts,admin=dict(connections=self.owner.connections,commands=self.owner.commands,returned_data_value_bytes=self.owner.returned_bytes),unit_facts='UNKNOWN_OUTSIDE_SCOPE',application_writes=0,source_observations=1,cleanup='CLOSURE_PENDING',historical_uncertainty_preserved=True)
+        result=dict(status='ACCESS_DISABLED_FINAL_CLOSURE_PENDING',rows=len(self.capture.get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture),slot_receipts=self.receipts,admin=self.owner.accounting(),unit_facts='UNKNOWN_OUTSIDE_SCOPE',application_writes=0,source_observations=1,cleanup='CLOSURE_PENDING',historical_uncertainty_preserved=True)
         self.emit('required_result',result)
         # The sealed execution chain is archived separately from the publisher's
         # acknowledgement suffix; final owner output supplies that suffix hash.
@@ -224,10 +243,73 @@ class Runner:
         self.journal.save('final-result.json',result)
         return result
 
+    def accounting(self):
+        now=time.monotonic()
+        admin=self.admin_seconds+(now-self.phase_started if self.phase!='runtime' else 0)
+        runtime=self.runtime_seconds+(now-self.phase_started if self.phase=='runtime' else 0)
+        return dict(administration=dict(self.owner.accounting(),supervised_seconds=admin),
+                    runtime=dict(slot_receipts=self.receipts,supervised_seconds=runtime),
+                    github_cli_invocations=self.github.requests,
+                    active_seconds=now-self.started,
+                    historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
+
+    def failed(self,exc):
+        """Shared production/rehearsal exit, independent of ledger construction."""
+        from .connection_diagnostics import safe_failure
+        self.diagnosing=True;self.diagnostic_started=time.monotonic()
+        diagnostics={};invalidation='UNCERTAIN_RECONCILE';access='UNRECONCILED'
+        # A known failure may invoke the fixed safety disposition. An uncertain
+        # admin mutation is never automatically replayed or compensated.
+        try:
+            if self.github.mutation_uncertain:
+                invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
+                raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
+            invalidation=self.owner.invalidate_failure()
+            if (invalidation=='ACKNOWLEDGED_READBACK' or (not self.owner.authorities and self.owner.urls and not self.owner.effect_uncertain)):
+                with self.phase_as('teardown'):self.owner.teardown(self.github)
+                access='DISABLED_VERIFIED'
+        except BaseException:
+            if not self.github.mutation_uncertain:invalidation=self.owner.invalidation
+        try:
+            diagnostics=self.owner.diagnostics()
+            names=self.github.names()
+            self.emit('failure_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
+        except BaseException:
+            diagnostics['completion']='INCOMPLETE_RECONCILE'
+        closure={'status':'UNKNOWN'}
+        try:
+            if self.memory is not None:closure=self.memory.close()
+        except BaseException:pass
+        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',
+            failure=safe_failure(exc,'EXECUTION'),authority_invalidation=invalidation,
+            access=access,diagnostics=diagnostics,owned_cleanup=closure,
+            accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
+            application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+        try:self.emit('stopped',result)
+        except BaseException:result['audit_stop_record']='UNCERTAIN'
+        return result
+
+    def execute(self):
+        try:
+            self.setup()
+            if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':
+                with self.phase_as('teardown'):self.owner.teardown(self.github)
+                proof=self.memory.close() if self.memory is not None else {'status':'DISPOSABLE_NO_MEMORY_PROOF'}
+                after=owned_resources()
+                if after['children'] or after['socket_fds']-self.baseline['socket_fds']:raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+                return dict(status='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED',cleanup='CLOSED',accounting=self.accounting(),owned_cleanup=proof,source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD')
+            self.capture_once()
+            if self.plans:self.screen()
+            return self.finish()
+        except BaseException as exc:return self.failed(exc)
+
+
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    if r.get('authority')!=AUTHORITY or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':'AUTHORISE_INGESTION_RESTRICTED_ROUTE_DIAGNOSTIC_ONCE_20261018'}.get(r.get('mode'))
+    if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
+    if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
     if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=24):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
@@ -250,14 +332,13 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/'operational-capture-queue-once-20261018')
-    journal.emit('consumed',dict(authority=AUTHORITY,registration_sha256=a.registration_sha256))
+    journal=Journal(state/('operational-route-diagnostic-once-20261018' if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
     from verification.discovery.route_validation import validate_route
-    raw=secure_migration_input();started=time.monotonic();runner=None
-    signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Uncertain('HARD_JOB_DEADLINE')));signal.alarm(475)
-    try:
+    from .operational_outcome import session
+    def prepare(raw,started):
         if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
         u=validate_route(raw)
         if not isinstance(u.password,str) or not u.password:raise ValueError('EXPLICIT_MIGRATION_PASSWORD_REQUIRED')
@@ -278,30 +359,8 @@ def main():
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source)
         def url(role,password):return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
         runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started);holder['runner']=runner
-        runner.setup();runner.capture_once()
-        if runner.plans:runner.screen()
-        result=runner.finish()
-        print(json.dumps(result,sort_keys=True))
-    except BaseException as exc:
-        # No automatic credential reset, compensating cleanup or write retry.
-        # Actual read-only diagnostics may be collected within reserves only.
-        diagnostics={'status':'NOT_OBSERVED'}
-        import re
-        code=str(exc) if isinstance(exc,(Denied,Uncertain,ValueError)) and re.fullmatch('[A-Z0-9_]{1,100}',str(exc)) else 'REDACTED_EXECUTION_FAILURE'
-        sqlstate=getattr(getattr(exc,'orig',exc),'sqlstate',None)
-        sqlstate=sqlstate if isinstance(sqlstate,str) and re.fullmatch('[A-Z0-9]{5}',sqlstate) else None
-        try:
-            if runner is None:raise ValueError('NO_CONNECTION_ATTEMPTED')
-            runner.diagnosing=True
-            diagnostics=runner.owner.diagnostics()
-            names=github.names();journal.emit('failure_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
-        except BaseException:journal.emit('failure_diagnostics_incomplete',dict(status='UNKNOWN_NO_MUTATION'))
-        closure={'status':'UNKNOWN'}
-        try:closure=memory.close()
-        except BaseException:pass
-        journal.emit('stopped',dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=code,sqlstate=sqlstate,roles=list(ROLES),secret_names=list(SECRETS.values()),diagnostics=diagnostics,owned_cleanup=closure))
-        print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',reason=code,sqlstate=sqlstate,audit=str(journal.file),audit_sha256=hashlib.sha256(journal.file.read_bytes()).hexdigest())))
-        raise SystemExit(1) from None
-    finally:signal.alarm(0)
+        return runner
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory)
+    raise SystemExit(0 if result.get('cleanup')=='CLOSED' else 1)
 
 if __name__=='__main__':main()

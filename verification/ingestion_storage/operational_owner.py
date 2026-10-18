@@ -3,7 +3,8 @@
 No source worker receives this connector. Runtime roles never issue grants or
 release barriers. Storage installation/seeding is deliberately absent.
 """
-import hashlib,json,secrets,time
+import hashlib,json,secrets,time,re
+from copy import deepcopy
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -23,22 +24,25 @@ SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_eff
 class Owner:
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings):
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
-        self.connections=0;self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
+        self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
 
     @contextmanager
     def connection(self):
         self.check()
         if self.connections>=(13 if self.diagnostic_mode else 11):raise ValueError('ADMIN_CONNECTION_BOUND')
         self.connections+=1;self.emit('admin_connection_intent',dict(ordinal=self.connections))
-        c=None
+        c=None;began=time.monotonic()
         try:
-            c=self.connector();self.emit('admin_connection_open',dict(ordinal=self.connections))
+            c=self.connector();self.connection_active+=time.monotonic()-began;self.opened+=1;self.emit('admin_connection_open',dict(ordinal=self.connections))
             yield c
+        except BaseException:
+            if c is None:self.connection_active+=time.monotonic()-began
+            raise
         finally:
             if c is not None:
-                c.close()
+                closing=time.monotonic();c.close();self.connection_active+=time.monotonic()-closing
                 if not c.closed:raise Uncertain('ADMIN_CLOSE_UNCERTAIN')
-                self.emit('admin_connection_closed',dict(ordinal=self.connections))
+                self.closed+=1;self.emit('admin_connection_closed',dict(ordinal=self.connections))
 
     def q(self,c,statement,params=None,*,effect=False):
         self.check()
@@ -56,12 +60,15 @@ class Owner:
             if effect:self.emit('admin_effect_ack',dict(command=self.commands))
             return rows
         except BaseException:
-            if effect:raise Uncertain('ADMIN_EFFECT_UNCERTAIN') from None
+            if effect:self.effect_uncertain=True;raise Uncertain('ADMIN_EFFECT_UNCERTAIN') from None
             raise
         finally:self.active+=time.monotonic()-started
 
     def script(self,c,path):
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
+
+    def accounting(self):
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain)
 
     def preflight(self):
         with self.connection() as c:
@@ -79,7 +86,7 @@ class Owner:
             rows=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")
             ctl=rows[0][0];self.emit('control_observed',dict(global_stop=ctl.get('global_stop'),manual_stop=ctl.get('manual_stop'),hard_stop_generation=ctl.get('hard_stop_generation',0),grant_count=len(ctl['grants'])))
             self.q(c,'ROLLBACK',effect=True)
-            if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=0 or ctl['grants'] or ctl.get('bolton_exceptions'):raise ValueError('EXACT_STORAGE_STOP_STATE')
+            if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or (not self.reuse_installed and (ctl.get('hard_stop_generation',0)!=0 or ctl['grants'] or ctl.get('bolton_exceptions'))) or (self.reuse_installed and digest(ctl)!=self.baseline_control_sha256):raise ValueError('EXACT_STORAGE_STOP_STATE')
             self.original_control=ctl
             password_access=self.q(c,"SELECT has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT') AND has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT')")[0][0]
             self.emit('password_boolean_read_permission',dict(permitted=password_access))
@@ -89,9 +96,34 @@ class Owner:
             if roles!=[('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
             if self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
             if self.q(c,"SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login'],))[0][0]:raise ValueError('PREEXISTING_RUNTIME_SESSIONS')
+            if self.reuse_installed:
+                self.verify_installed(c)
+                return
             if self.q(c,"SELECT to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_effect_login')")[0]!=(None,False):raise ValueError('INSTALLATION_ALREADY_EXISTS_NO_REPLAY')
 
+    def verify_installed(self,c):
+        # Compare the retained reviewed function bodies, owner and search path;
+        # activation separately reuses the exact effective ACL boundary.
+        expected={}
+        for match in re.finditer(r'CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)\(.*?\).*?AS \$(\w*)\$(.*?)\$\2\$;',WORKER.read_text(),re.S):
+            expected[match[1]]=match[3]
+        if len(expected)<5:raise ValueError('REVIEWED_FUNCTION_INVENTORY')
+        rows=self.q(c,"SELECT p.proname,p.prosrc,r.rolname,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname",(list(expected),))
+        self.emit('installed_function_inventory',dict(hashes={n:hashlib.sha256(body.encode()).hexdigest() for n,body,_,_ in rows}))
+        if len(rows)!=len(expected) or any(body!=expected.get(n) or owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for n,body,owner,config in rows):raise ValueError('INSTALLED_FUNCTION_CONTENT_CHANGED')
+        self.expected_generation=1
+
     def install(self):
+        if self.reuse_installed:
+            # No base storage/operational reinstall or role creation. Regrant
+            # only the same reviewed runtime memberships in this finite phase.
+            with self.connection() as c:
+                if self.apply_policy:self.script(c,PKG/'successor-policy.sql')
+                self.q(c,'BEGIN',effect=True)
+                self.q(c,'GRANT ingestion_worker TO ingestion_worker_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE',effect=True)
+                self.q(c,'GRANT ingestion_effect_broker TO ingestion_effect_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE',effect=True)
+                self.q(c,'COMMIT',effect=True)
+            return
         with self.connection() as c:
             self.script(c,WORKER)
             self.q(c,'BEGIN',effect=True)
@@ -129,14 +161,15 @@ class Owner:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-            if ctl['global_stop']!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=0 or authority in ctl['grants']:raise Uncertain('OWNER_REGISTRATION_STATE_CHANGED')
+            if ctl['global_stop']!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=self.expected_generation or authority in ctl['grants']:raise Uncertain('OWNER_REGISTRATION_STATE_CHANGED')
+            self.authorities.append(authority);self.invalidation='REQUIRED'
             for item in items:
                 self.q(c,'INSERT INTO public.ingestion_work_items SELECT * FROM json_populate_record(NULL::public.ingestion_work_items,%s::json)',(json.dumps(item),),effect=True)
             ctl['grants'][authority]=grant
             self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
             self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            exception=dict(authority=authority,transport='REQUESTS_IDOX',grant_binding={k:v for k,v in grant.items() if k not in {'source_calls','writes'}},stop_checkpoint_sha256=STOP_SHA,**self.bindings)
+            exception=dict(authority=authority,transport='REQUESTS_IDOX',grant_binding={k:v for k,v in grant.items() if k not in {'source_calls','writes'}},stop_checkpoint_sha256=STOP_SHA,hard_stop_generation=self.expected_generation,**self.bindings)
             self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(exception),),effect=True)
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)
@@ -144,7 +177,6 @@ class Owner:
             self.emit('temporary_owner_capability_readback',dict(flags=capability))
             if capability!=(False,False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         self.emit('owner_registration_committed',dict(authority=authority,keys=sorted(bindings),binding_sha256=digest(grant)))
-        self.authorities.append(authority)
         return bindings
 
     def teardown(self,github):
@@ -153,7 +185,9 @@ class Owner:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-            for authority in self.authorities:ctl['grants'][authority]['expires_at']=0
+            for authority in self.authorities:
+                ctl['grants'][authority]['expires_at']=0
+                if authority in ctl.get('bolton_exceptions',{}):ctl['bolton_exceptions'][authority]['expires_at']=0
             self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
             self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             for role,capability in ROLES.items():
@@ -170,6 +204,37 @@ class Owner:
         names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
         if any(n in names for n in SECRETS.values()) or 'DATABASE_URL' not in names:raise Uncertain('TEARDOWN_SECRET_RECONCILE')
         self.urls.clear()
+
+    def invalidate_failure(self):
+        """Owner-only safety action. No replay after uncertain administrative effects."""
+        if not self.authorities:return self.invalidation
+        self.invalidation='UNCERTAIN_RECONCILE'
+        if self.effect_uncertain:
+            self.emit('authority_invalidation_uncertain',dict(reason='PRIOR_ADMIN_EFFECT_UNCERTAIN'))
+            return self.invalidation
+        self.diagnostic_mode=True
+        with self.connection() as c:
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
+            if ctl.get('global_stop')!=STOP:raise Uncertain('STOP_IDENTITY_CHANGED')
+            updated=deepcopy(ctl)
+            for authority in self.authorities:
+                grant=updated.get('grants',{}).get(authority)
+                if not grant or grant.get('execution_binding')!=self.bindings:raise Uncertain('INVALIDATION_BINDING_CHANGED')
+                grant['expires_at']=0
+                if authority in updated.get('bolton_exceptions',{}):updated['bolton_exceptions'][authority]['expires_at']=0
+            updated['hard_stop_generation']=updated.get('hard_stop_generation',0)+1
+            updated['last_hard_stop']='OPERATIONAL_SUCCESSOR_FAILED'
+            self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(updated),),effect=True)
+            self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+            self.q(c,'COMMIT',effect=True)
+        with self.connection() as c:
+            actual=self.q(c,'SELECT public.ingestion_acceptance_control()')[0][0]
+            self.emit('authority_invalidation_readback',actual)
+            if actual.get('unexpired_grants')!=0 or actual.get('hard_stop_generation')!=updated['hard_stop_generation'] or actual.get('global_stop')!=STOP:raise Uncertain('INVALIDATION_READBACK')
+        self.invalidation='ACKNOWLEDGED_READBACK'
+        return self.invalidation
 
     def diagnostics(self):
         """Read-only actual state, within remaining13/240 administrative caps."""

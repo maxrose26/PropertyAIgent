@@ -64,8 +64,9 @@ class DatabaseBudget:
     Includes SQLAlchemy initialization, BEGIN/COMMIT/ROLLBACK. Records operation
     kinds only, never SQL parameters, URLs, credentials or row values.
     """
-    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2):
+    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
+        self.emit=emit or (lambda *_:None);self.connection_diagnostics=[]
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
         if type(returned_bytes) is not int or not 0<returned_bytes<=4*1024**2:raise Denied('DATABASE_BYTE_CEILING')
         self.returned_cap=returned_bytes
@@ -79,7 +80,7 @@ class DatabaseBudget:
         self.returned_bytes=previous.get("returned_data_value_bytes",0)
         if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=self.returned_cap:raise Denied("PRIOR_BYTES_BOUND")
         self.previous_elapsed=elapsed
-        self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.stop_file=Path(stop_file) if stop_file else None
+        self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.connection_seconds=0.0;self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
         if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
     def tick(self,kind,*,cleanup=False):
@@ -113,16 +114,28 @@ class DatabaseBudget:
             budget.check()
             if budget.attempts>=budget.connection_cap:raise Denied('CONNECTION_BOUND')
             budget.attempts+=1
-            c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,
+            from .connection_diagnostics import safe_failure
+            budget.emit('runtime_connection_intent',dict(role=role,attempt=budget.attempts,phase='DRIVER_CONNECT',tls='verify-full' if ssl else 'DISPOSABLE'))
+            began=time.monotonic();phase='DRIVER_CONNECT';c=None
+            try:
+                c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,
                 connect_timeout=3,prepare_threshold=None,cursor_factory=Cursor,autocommit=True,
                 options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**({'hostaddr':hostaddr} if hostaddr else {}),**(ssl or {}))
-            budget.opened.append(c)
+            except BaseException as exc:
+                observation=dict(role=role,attempt=budget.attempts,**safe_failure(exc,phase))
+                budget.connection_diagnostics.append(observation);budget.emit('runtime_connection_failed',observation)
+                raise
+            finally:budget.connection_seconds+=time.monotonic()-began
+            budget.opened.append(c);budget.emit('runtime_connection_open',dict(role=role,attempt=budget.attempts))
             try:
                 with c.cursor() as q:
                     q.execute("SELECT current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout'),current_user,session_user,rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_catalog.pg_roles WHERE rolname=current_user")
                     if q.fetchone()!=('10s','3s','20s',role,role,True,False,False,False,False,False):raise Denied('SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE')
                 c.rollback();return c
-            except BaseException:c.close();raise
+            except BaseException as exc:
+                observation=dict(role=role,attempt=budget.attempts,**safe_failure(exc,'SERVER_IDENTITY'))
+                budget.connection_diagnostics.append(observation);budget.emit('runtime_connection_failed',observation)
+                c.close();raise
         e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,skip_autocommit_rollback=role=='ingestion_worker_login',isolation_level='AUTOCOMMIT' if role=='ingestion_worker_login' else 'READ COMMITTED')
         @event.listens_for(e,'checkout')
         def mode_guard(connection,record,proxy):
@@ -130,13 +143,13 @@ class DatabaseBudget:
         self.engines.append(e);return e
     def close(self,engines):
         errors=[]
-        for e in engines:
+        for e in self.engines:
             try:e.dispose()
             except Exception:errors.append('DISPOSE')
         for c in self.opened:
             try:c.close()
             except Exception:errors.append('CLOSE')
-        return dict(slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
+        return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=len(self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 

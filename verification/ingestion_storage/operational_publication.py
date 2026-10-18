@@ -16,10 +16,11 @@ def canonical(value):
 
 class GitHub:
     def __init__(self,emit,check,*,runner=subprocess.run):
-        self.emit=emit;self.check=check;self.runner=runner;self.requests=0
+        self.emit=emit;self.check=check;self.runner=runner;self.requests=0;self.mutation_uncertain=False
 
     def call(self,method,path,body=None):
         self.check()
+        if method!='GET' and self.mutation_uncertain:raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
         if self.requests>=40:raise ValueError('GITHUB_REQUEST_BOUND')
         self.requests+=1
         self.emit('github_intent',dict(method=method,path=path,ordinal=self.requests))
@@ -34,7 +35,9 @@ class GitHub:
                 if re.findall(rb'^HTTP/\S+\s+(\d{3})(?:\s|$)',r.stdout,re.M)!=[b'204']:raise Uncertain('DELETE_ACK_UNCERTAIN')
                 value=None
             else:value=json.loads(r.stdout) if r.stdout else None
-        except BaseException:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN') from None
+        except BaseException:
+            if method!='GET':self.mutation_uncertain=True
+            raise Uncertain('GITHUB_RESPONSE_UNCERTAIN') from None
         self.emit('github_ack',dict(method=method,path=path,ordinal=self.requests))
         self.check();return value
 
@@ -48,12 +51,15 @@ class GitHub:
     def put_secret(self,name,value):
         if name not in {'INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL'}:raise ValueError('EXACT_SECRET_NAME')
         self.check()
+        if self.mutation_uncertain:raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
         if self.requests>=40:raise ValueError('GITHUB_REQUEST_BOUND')
         self.requests+=1;self.emit('secret_mapping_intent',dict(name=name,ordinal=self.requests))
         try:
             r=self.runner(['gh','secret','set',name,'--repo','github.com/maxrose26/PropertyAIgent','--env','stage4-production-canary'],input=value.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
             if r.returncode or len(r.stdout)+len(r.stderr)>8192:raise Uncertain('SECRET_MAPPING_UNCERTAIN')
-        except BaseException:raise Uncertain('SECRET_MAPPING_UNCERTAIN') from None
+        except BaseException:
+            self.mutation_uncertain=True
+            raise Uncertain('SECRET_MAPPING_UNCERTAIN') from None
         self.emit('secret_mapping_ack',dict(name=name));self.check()
 
     def publish(self,files,*,directory,expected_head):
