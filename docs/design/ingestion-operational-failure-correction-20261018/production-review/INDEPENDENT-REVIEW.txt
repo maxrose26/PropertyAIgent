@@ -1,0 +1,9 @@
+Independent read-only reviewer: /root/operational_independent_review
+Final code-review disposition: PASS
+Exact candidate: 07f4dc05d8fbd16d537d3ba2b1e9767407a4ae8d
+Exact tree: a9d28fcf3994d2105c79b15e8f717f752d591e3c
+27 implementation/policy/test/context files verified against remote tree.
+Reviewed: safe diagnostics; pre-ledger invalidation; uncertainty stops; credential mapping boundary; new state/authority; source-attempt accounting; input/work/reporting deadlines; combined output limits; dormant installed-state reuse; restricted diagnostic-only mode; cumulative accounting; generation policy isolation.
+Earlier substantive findings corrected before PASS: unknown mapping acknowledgement allowed mutations; consumed state path reuse; inaccurate source zero/phase labels; post-write output check; soft-only reporting deadline. Additional dormant-access precheck and cumulative connection-count corrections reviewed.
+Review was conditional on exact-head hosted checks; all9 subsequently passed, including45 focused wrapper tests with PG17/real Linux gh.
+This review and the checks grant no production, integration, credential or source authority.

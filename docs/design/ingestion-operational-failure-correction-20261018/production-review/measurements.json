@@ -1,0 +1,113 @@
+{
+  "operational-wrapper.xml": {
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "45",
+        "time": "30.712",
+        "timestamp": "2026-10-18T09:36:33.628006+00:00",
+        "hostname": "runnervm8k3b6"
+      }
+    ]
+  },
+  "provisioning.xml": {
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "21",
+        "time": "30.931",
+        "timestamp": "2026-10-18T09:36:01.219642+00:00",
+        "hostname": "runnervm8k3b6"
+      }
+    ]
+  },
+  "cleanup.xml": {
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "20",
+        "time": "5.031",
+        "timestamp": "2026-10-18T09:37:05.672815+00:00",
+        "hostname": "runnervm8k3b6"
+      }
+    ]
+  },
+  "kernel-memory.xml": {
+    "suites": [
+      {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "10",
+        "time": "2.569",
+        "timestamp": "2026-10-18T09:37:12.009890+00:00",
+        "hostname": "runnervm8k3b6"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[success-operational]",
+      "properties": {
+        "required_wrapper": "{\"admin\": {\"commands\": 117, \"connections\": 6, \"connections_closed\": 6, \"connections_opened\": 6, \"database_active_seconds\": 0.16249866900017196, \"returned_data_value_bytes\": 92871, \"uncertain_effect\": false}, \"admin_supervised_seconds\": 0.9385706210001103, \"aggregate\": {\"connection_attempts\": 29, \"driver_statements\": 830, \"returned_data_value_bytes\": 1662936}, \"audit_bytes\": 128208, \"effective_denials\": 16, \"github_cli_invocations\": 25, \"runtime_supervised_seconds\": 3.5547260619998724, \"source_observations\": 1, \"status\": \"REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED\", \"stored_query_text_retrieved\": false}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[worker_connect-operational]",
+      "properties": {
+        "operational_failure": "{\"accounting\": {\"active_seconds\": 0.8329196619999948, \"administration\": {\"commands\": 86, \"connections\": 5, \"connections_closed\": 5, \"connections_opened\": 5, \"database_active_seconds\": 0.11935248499992213, \"returned_data_value_bytes\": 508, \"supervised_seconds\": 0.8229356339999754, \"uncertain_effect\": false}, \"github_cli_invocations\": 8, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\", \"runtime\": {\"slot_receipts\": {\"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\": {\"cleanup\": \"CLOSED\", \"database\": {\"capture_checkpoint_sha256\": null, \"cleanup\": \"CLOSED\", \"connection_active_seconds\": 0.005869204000021, \"connection_attempts\": 1, \"connection_diagnostics\": [{\"attempt\": 1, \"exception_kind\": \"OperationalError\", \"message_exported\": false, \"phase\": \"DRIVER_CONNECT\", \"role\": \"ingestion_worker_login\", \"sqlstate\": null, \"underlying_cause\": \"UNDETERMINED\"}], \"connections_closed\": true, \"connections_closed_count\": 0, \"connections_opened\": 0, \"driver_statements\": 0, \"elapsed_seconds\": 0.008, \"errors\": [], \"returned_data_value_bytes\": 0, \"slot_key\": \"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\", \"statement_kinds\": {}}, \"supervised_seconds\": 0.008332908999989286}}, \"supervised_seconds\": 0.009984028000019407}}, \"fault\": \"worker_connect\", \"invalidation\": \"NOT_REQUIRED_NO_AUTHORITY\", \"routes\": [\"ingestion_worker_login\"], \"safe_message_export\": false, \"status\": \"STOP_RECONCILE_NO_RETRY\"}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[post_grant_connect-operational]",
+      "properties": {
+        "operational_failure": "{\"accounting\": {\"active_seconds\": 0.917949134999958, \"administration\": {\"commands\": 108, \"connections\": 8, \"connections_closed\": 8, \"connections_opened\": 8, \"database_active_seconds\": 0.162254480999934, \"returned_data_value_bytes\": 9627, \"supervised_seconds\": 0.8808776539999599, \"uncertain_effect\": false}, \"github_cli_invocations\": 8, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\", \"runtime\": {\"slot_receipts\": {\"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\": {\"cleanup\": \"CLOSED\", \"database\": {\"capture_checkpoint_sha256\": null, \"cleanup\": \"CLOSED\", \"connection_active_seconds\": 0.01783757299995159, \"connection_attempts\": 3, \"connection_diagnostics\": [{\"attempt\": 3, \"exception_kind\": \"OperationalError\", \"message_exported\": false, \"phase\": \"DRIVER_CONNECT\", \"role\": \"ingestion_worker_login\", \"sqlstate\": null, \"underlying_cause\": \"UNDETERMINED\"}], \"connections_closed\": true, \"connections_closed_count\": 2, \"connections_opened\": 2, \"driver_statements\": 16, \"elapsed_seconds\": 0.032, \"errors\": [], \"returned_data_value_bytes\": 392, \"slot_key\": \"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\", \"statement_kinds\": {\"cursor\": 10, \"driver_internal\": 6}}, \"supervised_seconds\": 0.03213159699998869}}, \"supervised_seconds\": 0.03707148099999813}}, \"fault\": \"post_grant_connect\", \"invalidation\": \"ACKNOWLEDGED_READBACK\", \"routes\": [\"ingestion_worker_login\", \"ingestion_effect_login\", \"ingestion_worker_login\"], \"safe_message_export\": false, \"status\": \"STOP_RECONCILE_NO_RETRY\"}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[invalidation_commit_unknown-operational]",
+      "properties": {
+        "operational_failure": "{\"accounting\": {\"active_seconds\": 0.6948702230000094, \"administration\": {\"commands\": 94, \"connections\": 6, \"connections_closed\": 6, \"connections_opened\": 6, \"database_active_seconds\": 0.13603318699989586, \"returned_data_value_bytes\": 5986, \"supervised_seconds\": 0.6588781689999905, \"uncertain_effect\": true}, \"github_cli_invocations\": 5, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\", \"runtime\": {\"slot_receipts\": {\"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\": {\"cleanup\": \"CLOSED\", \"database\": {\"capture_checkpoint_sha256\": null, \"cleanup\": \"CLOSED\", \"connection_active_seconds\": 0.018131549999964136, \"connection_attempts\": 3, \"connection_diagnostics\": [{\"attempt\": 3, \"exception_kind\": \"OperationalError\", \"message_exported\": false, \"phase\": \"DRIVER_CONNECT\", \"role\": \"ingestion_worker_login\", \"sqlstate\": null, \"underlying_cause\": \"UNDETERMINED\"}], \"connections_closed\": true, \"connections_closed_count\": 2, \"connections_opened\": 2, \"driver_statements\": 16, \"elapsed_seconds\": 0.033, \"errors\": [], \"returned_data_value_bytes\": 392, \"slot_key\": \"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\", \"statement_kinds\": {\"cursor\": 10, \"driver_internal\": 6}}, \"supervised_seconds\": 0.032919233999962216}}, \"supervised_seconds\": 0.035992054000018925}}, \"fault\": \"invalidation_commit_unknown\", \"invalidation\": \"UNCERTAIN_RECONCILE\", \"routes\": [\"ingestion_worker_login\", \"ingestion_effect_login\", \"ingestion_worker_login\"], \"safe_message_export\": false, \"status\": \"STOP_RECONCILE_NO_RETRY\"}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[source_raises-operational]",
+      "properties": {
+        "operational_failure": "{\"accounting\": {\"active_seconds\": 0.9378979459999641, \"administration\": {\"commands\": 108, \"connections\": 8, \"connections_closed\": 8, \"connections_opened\": 8, \"database_active_seconds\": 0.16389932399982854, \"returned_data_value_bytes\": 9823, \"supervised_seconds\": 0.8849667689999592, \"uncertain_effect\": false}, \"github_cli_invocations\": 8, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\", \"runtime\": {\"slot_receipts\": {\"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\": {\"cleanup\": \"CLOSED\", \"database\": {\"capture_checkpoint_sha256\": null, \"cleanup\": \"CLOSED\", \"connection_active_seconds\": 0.01775244800001019, \"connection_attempts\": 3, \"connection_diagnostics\": [], \"connections_closed\": true, \"connections_closed_count\": 3, \"connections_opened\": 3, \"driver_statements\": 28, \"elapsed_seconds\": 0.05, \"errors\": [], \"returned_data_value_bytes\": 3561, \"slot_key\": \"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\", \"statement_kinds\": {\"cursor\": 20, \"driver_internal\": 8}}, \"supervised_seconds\": 0.04985695499993881}}, \"supervised_seconds\": 0.052931177000004936}}, \"fault\": \"source_raises\", \"invalidation\": \"ACKNOWLEDGED_READBACK\", \"routes\": [\"ingestion_worker_login\", \"ingestion_effect_login\", \"ingestion_worker_login\"], \"safe_message_export\": false, \"status\": \"STOP_RECONCILE_NO_RETRY\"}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[mapping_second_lost_ack-operational]",
+      "properties": {
+        "operational_failure": "{\"accounting\": {\"active_seconds\": 0.5878619139999728, \"administration\": {\"commands\": 69, \"connections\": 4, \"connections_closed\": 4, \"connections_opened\": 4, \"database_active_seconds\": 0.08921407100001488, \"returned_data_value_bytes\": 549, \"supervised_seconds\": 0.5878619139999728, \"uncertain_effect\": false}, \"github_cli_invocations\": 5, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\", \"runtime\": {\"slot_receipts\": {}, \"supervised_seconds\": 0}}, \"fault\": \"mapping_second_lost_ack\", \"invalidation\": \"NOT_REQUIRED_NO_AUTHORITY\", \"routes\": [], \"safe_message_export\": false, \"status\": \"STOP_RECONCILE_NO_RETRY\"}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[reuse_installed_success-operational]",
+      "properties": {
+        "fixture_installation": "{\"connections\": 1, \"connections_opened\": 1, \"connections_closed\": 1, \"commands\": 46, \"returned_data_value_bytes\": 0, \"database_active_seconds\": 0.03415978599991831, \"uncertain_effect\": false}",
+        "fixture_negative_preflight": "{\"connections\": 1, \"connections_opened\": 1, \"connections_closed\": 1, \"commands\": 12, \"returned_data_value_bytes\": 397, \"database_active_seconds\": 0.012956501999951797, \"uncertain_effect\": false}",
+        "fixture_policy_assertion_commands": "4",
+        "required_wrapper": "{\"admin\": {\"commands\": 95, \"connections\": 6, \"connections_closed\": 6, \"connections_opened\": 6, \"database_active_seconds\": 0.14858373799984292, \"returned_data_value_bytes\": 119820, \"uncertain_effect\": false}, \"admin_supervised_seconds\": 0.9868312209999885, \"aggregate\": {\"connection_attempts\": 29, \"driver_statements\": 830, \"returned_data_value_bytes\": 1662959}, \"audit_bytes\": 118268, \"effective_denials\": 16, \"github_cli_invocations\": 25, \"runtime_supervised_seconds\": 3.4564696240000217, \"source_observations\": 1, \"status\": \"REQUIRED_CAPTURE_SCREENING_ACCEPTED_ACCESS_DISABLED\", \"stored_query_text_retrieved\": false}"
+      }
+    },
+    {
+      "test": "test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown[diagnostic_only-operational]",
+      "properties": {
+        "fixture_installation": "{\"connections\": 1, \"connections_opened\": 1, \"connections_closed\": 1, \"commands\": 46, \"returned_data_value_bytes\": 0, \"database_active_seconds\": 0.03355163799989214, \"uncertain_effect\": false}",
+        "fixture_negative_preflight": "{\"connections\": 1, \"connections_opened\": 1, \"connections_closed\": 1, \"commands\": 12, \"returned_data_value_bytes\": 397, \"database_active_seconds\": 0.012479314000074737, \"uncertain_effect\": false}",
+        "restricted_route_diagnostic": "{\"accounting\": {\"administration\": {\"connections\": 4, \"connections_opened\": 4, \"connections_closed\": 4, \"commands\": 46, \"returned_data_value_bytes\": 26926, \"database_active_seconds\": 0.0847310169997968, \"uncertain_effect\": false, \"supervised_seconds\": 0.7646691469999496}, \"runtime\": {\"slot_receipts\": {\"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\": {\"database\": {\"connection_diagnostics\": [], \"connection_active_seconds\": 0.01191499300000487, \"connections_opened\": 2, \"connections_closed_count\": 2, \"slot_key\": \"e4470056207b962689a7f3a165f79044e8ab88dfde5216526c460d2ece6ca324\", \"returned_data_value_bytes\": 392, \"connection_attempts\": 2, \"driver_statements\": 16, \"statement_kinds\": {\"cursor\": 10, \"driver_internal\": 6}, \"connections_closed\": true, \"cleanup\": \"CLOSED\", \"errors\": [], \"capture_checkpoint_sha256\": null, \"elapsed_seconds\": 0.024}, \"supervised_seconds\": 0.023743471999978283, \"cleanup\": \"CLOSED\"}}, \"supervised_seconds\": 0.02565734200004499}, \"github_cli_invocations\": 7, \"active_seconds\": 0.7903264889999946, \"historical_accounting_gaps\": \"PRESERVED_NOT_RECONSTRUCTED\"}, \"status\": \"RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED\", \"execution_grants\": 0, \"source_calls\": 0, \"ledger_changed\": false}"
+      }
+    }
+  ]
+}
