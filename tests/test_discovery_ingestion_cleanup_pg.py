@@ -5,6 +5,7 @@ import json,os,secrets,subprocess
 from pathlib import Path
 import psycopg,pytest
 from psycopg import sql
+from tests.storage_gh_fixture import real_gh_store
 from verification.ingestion_storage.operational_cleanup import (Cleanup,Journal,Stop,Memory,ROLES,
     CAPTURE_KEY,CAPTURE_AUTHORITY,GRANT_SHA256,REVISION,SECRETS,digest)
 
