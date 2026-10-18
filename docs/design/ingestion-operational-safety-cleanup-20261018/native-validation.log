@@ -1,0 +1,30 @@
+2026-10-18T07:47:21.8654909Z ##[group]Run timeout --kill-after=2s 90s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=90s setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_CLEANUP_NATIVE=1 INGESTION_PROVISIONING_TEST_URL=***127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_cleanup.py tests/test_discovery_ingestion_cleanup_pg.py -q --basetemp="$RUNNER_TEMP/cleanup-rehearsal" --junitxml="$RUNNER_TEMP/cleanup.xml"
+2026-10-18T07:47:21.8657699Z [36;1mtimeout --kill-after=2s 90s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=90s setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_CLEANUP_NATIVE=1 INGESTION_PROVISIONING_TEST_URL=***127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_cleanup.py tests/test_discovery_ingestion_cleanup_pg.py -q --basetemp="$RUNNER_TEMP/cleanup-rehearsal" --junitxml="$RUNNER_TEMP/cleanup.xml"[0m
+2026-10-18T07:47:21.8713720Z shell: /usr/bin/bash -e {0}
+2026-10-18T07:47:21.8713878Z ##[endgroup]
+2026-10-18T07:47:21.8964240Z Running as unit: propertyaigent-operational-cleanup-20261018.scope; invocation ID: a9eb5ce004074ae09879717c06f8c362
+2026-10-18T07:47:23.8268877Z ...........                                                              [100%]
+2026-10-18T07:47:23.8281359Z =============================== warnings summary ===============================
+2026-10-18T07:47:23.8281866Z tests/test_discovery_ingestion_cleanup_pg.py::test_revoke_only_non_superuser_native_cleanup[success-operational]
+2026-10-18T07:47:23.8282474Z tests/test_discovery_ingestion_cleanup_pg.py::test_revoke_only_non_superuser_native_cleanup[changed_grant-operational]
+2026-10-18T07:47:23.8283121Z tests/test_discovery_ingestion_cleanup_pg.py::test_revoke_only_non_superuser_native_cleanup[commit_lost_ack-operational]
+2026-10-18T07:47:23.8283737Z tests/test_discovery_ingestion_cleanup_pg.py::test_revoke_only_non_superuser_native_cleanup[delete_lost_ack-operational]
+2026-10-18T07:47:23.8284364Z tests/test_discovery_ingestion_cleanup_pg.py::test_revoke_only_non_superuser_native_cleanup[associated_session-operational]
+2026-10-18T07:47:23.8285083Z   tests/test_discovery_ingestion_cleanup_pg.py:26: PytestWarning: record_property is incompatible with junit_family 'xunit2' (use 'legacy' or 'xunit1')
+2026-10-18T07:47:23.8285673Z     @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+2026-10-18T07:47:23.8285912Z 
+2026-10-18T07:47:23.8286096Z -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2026-10-18T07:47:23.8286369Z 11 passed, 5 warnings in 1.48s
+2026-10-18T07:47:24.0264236Z ##[group]Run set +e
+2026-10-18T07:47:24.0264406Z [36;1mset +e[0m
+2026-10-18T07:47:24.0265134Z [36;1mtimeout --kill-after=2s 20s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.test_discovery_ingestion_cleanup_native[0m
+2026-10-18T07:47:24.0265851Z [36;1mresult=$?[0m
+2026-10-18T07:47:24.0265977Z [36;1mset -e[0m
+2026-10-18T07:47:24.0266098Z [36;1mtest "$result" != 0[0m
+2026-10-18T07:47:24.0266397Z [36;1mtest "$(sudo systemctl show propertyaigent-operational-cleanup-20261018.scope -p Result --value)" = oom-kill[0m
+2026-10-18T07:47:24.0266993Z [36;1mtest -z "$(sudo systemctl show propertyaigent-operational-cleanup-20261018.scope -p ControlGroup --value)"[0m
+2026-10-18T07:47:24.0267409Z [36;1msudo systemctl reset-failed propertyaigent-operational-cleanup-20261018.scope[0m
+2026-10-18T07:47:24.0333422Z shell: /usr/bin/bash -e {0}
+2026-10-18T07:47:24.0333664Z ##[endgroup]
+2026-10-18T07:47:24.0670281Z Running as unit: propertyaigent-operational-cleanup-20261018.scope; invocation ID: a4384bee26984e6c8bc9e7ef4ef932a9
+2026-10-18T07:47:24.1653464Z /home/runner/work/_temp/9b9fc0d2-9397-4847-9db1-6fde26b6803e.sh: line 2:  4538 Killed                  timeout --kill-after=2s 20s sudo systemd-run --scope --unit=propertyaigent-operational-cleanup-20261018 -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.test_discovery_ingestion_cleanup_native

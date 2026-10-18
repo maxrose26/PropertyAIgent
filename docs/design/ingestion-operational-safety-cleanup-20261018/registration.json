@@ -1,0 +1,71 @@
+{
+  "authority": "AUTHORISE_OPERATIONAL_SAFETY_CLEANUP_ONCE_20261018",
+  "status": "OWNER_APPROVED_CLEANUP_ONCE",
+  "issued_at": "2026-10-18T07:50:00+00:00",
+  "expires_at": "2026-10-18T22:00:00+00:00",
+  "helper_candidate": "2c092cc7758452b85f9a7467b3c9ee76643ae84d",
+  "helper_tree": "847c7f17d8bd3885e198a64d611bb23fff4a39d0",
+  "helper_blob": "2a100d7d9307f75cc58df9429e376d769cb608e1",
+  "helper_sha256": "a8f6e78399fe89585f45f9815ca96e15d8f4e9a7e118103bbe41de66fc8a212c",
+  "revision": "ad8d5211afcc635c5bc50f4963adde4f31b4ef62",
+  "tree": "8482c3d62c79bcbdb6ce91b1b8075751bcaf9893",
+  "evidence_parent": "047f8ef88bbcf115b8783f75019e4f42b07883c8",
+  "original_registration_sha256": "5dd3cc1f5252b80d55d31ec3e98303d5a5fb609f212776d29d65c799819746dc",
+  "original_audit_sha256": "dd7c5814b686c8dd4c23451238d88fa76e095040ac30871e4139936b9d02677f",
+  "original_audit_chain_head": "cb86102ae32d0e91c8b1acd36b95f60cf7e4a35c28fecabe8cd359a4e678f679",
+  "capture_authority": "AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018_CAPTURE",
+  "capture_key": "48e304a92fbe01bac655be36b1c4d6f8fa29ab11857501911b68929bec790699",
+  "grant_sha256": "d456f1849accfbde3d7c7dfeb576cad8211693c141cc542b6fb2e6363cb95f0c",
+  "roles": [
+    "ingestion_effect_login",
+    "ingestion_worker_login"
+  ],
+  "memberships": [
+    [
+      "ingestion_effect_login",
+      "ingestion_effect_broker"
+    ],
+    [
+      "ingestion_worker_login",
+      "ingestion_worker"
+    ]
+  ],
+  "secret_names": [
+    "INGESTION_WORKER_DATABASE_URL",
+    "INGESTION_EFFECT_DATABASE_URL"
+  ],
+  "preserved_secret": "DATABASE_URL",
+  "endpoint": "aws-0-eu-west-2.pooler.supabase.com:5432/postgres",
+  "username": "postgres.zcikcfgpblzuzpanpdqd",
+  "current_user": "postgres",
+  "tls": {
+    "sslmode": "verify-full",
+    "ca_pem_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+  },
+  "limits": {
+    "connections": 2,
+    "commands": 32,
+    "supervised_seconds": 45,
+    "returned_data_value_bytes": 1048576,
+    "actual_memory_bytes": 268435456,
+    "exported_bytes": 524288,
+    "deletes": 2,
+    "names_reads": 2
+  },
+  "hashes": {
+    "verification/ingestion_storage/__init__.py": "bd77e01897bd2c7626f70a81897c257533f584c6b0dba92df9c8c16c47c1cdd3",
+    "verification/discovery/__init__.py": "018744b0a740962f92519fad48546c49d42e056816c0c7659de5af8c12cf9598",
+    "verification/ingestion_storage/credential_mapping.py": "437d0853cf8797a79c52f1249d922d0e255afd0e3db237045fa854fd80b1c4e7",
+    "verification/ingestion_storage/tls_trust.py": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+    "verification/ingestion_storage/memory_enforcement.py": "97150604f63aded266945f5ead282cc010528a9817fb2504377dfced56331220",
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "verification/discovery/route_validation.py": "fab37617d82da1cc0a2f36c33fbeed0b54165f279073dcc798a209b989760c8b",
+    "app/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/db/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app/db/session.py": "fbc0cd65f179b7bc7f3665c3340a30bd74310227c9b65327825b80e488d3a131",
+    "app/db/models.py": "431fc1d420e4724cbd4773cb89107a5d84d112e251db1ab126f82040107077f0"
+  },
+  "credential_method": "EXISTING_MIGRATION_URL_HIDDEN_TTY_NO_NEW_CREDENTIALS",
+  "policy": "NO_RETRY_NO_PIPELINE_NO_SOURCE_NO_APPLICATION_WRITES",
+  "historical_cleanup": "UNCERTAIN_PRESERVED"
+}
