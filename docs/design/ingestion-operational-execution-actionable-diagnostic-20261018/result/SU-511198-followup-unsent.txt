@@ -1,0 +1,11 @@
+Prepared only — existing ticket SU-511198; do not send without explicit messaging authority.
+
+Important scope: this question concerns the earlier restricted handshake, not the latest attempt. The latest attempt stopped before any database connection and provides no evidence of a provider-side rejection.
+
+Project zcikcfgpblzuzpanpdqd. Existing session pooler aws-0-eu-west-2.pooler.supabase.com:5432, database postgres. The migration principal connected with verified TLS. Existing custom restricted logins ingestion_worker_login and ingestion_effect_login use routing usernames <role>.zcikcfgpblzuzpanpdqd.
+An earlier finite test acknowledged custom-role password/membership/activation operations, then the first worker handshake failed before SQL with Psycopg OperationalError and no SQLSTATE. The effect handshake was skipped. The accounts were subsequently disabled, passwords/memberships removed, sessions empty and temporary mappings removed.
+Client uses Psycopg3.3.6/SQLAlchemy2.1.1, verified provider CA, sslmode=verify-full, one selected IPv4 hostaddr while retaining the pooler hostname for verification, connect_timeout3, prepare_threshold=None, initial autocommitTrue. Startup options are statement_timeout10000, lock_timeout3000 and idle_in_transaction_session_timeout20000.
+
+Specific question: Does this project's session pooler support these exact custom-role routing usernames and startup options, and is there an additional project-side routing/authentication prerequisite that could reject such a custom-role handshake while the migration principal connects? If provider request correlation is necessary, specify the minimum non-secret timestamp/identifier needed.
+
+No password, connection string, verifier, token, arbitrary exception text or raw log is supplied or requested. No credential, logging, endpoint, permission or subscription change is requested.
