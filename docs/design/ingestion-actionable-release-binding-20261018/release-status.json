@@ -1,0 +1,23 @@
+{
+  "status": "NOT_RELEASED_BINDING_CORRECTION_REQUIRES_EXACT_REVIEW",
+  "approved_pr129_integration": "6bb68733441d487f556179ee3845c3b28aaff2f3",
+  "correction_candidate": "8fd3c0d91caa09f50a00eb8d6bec5027743288c4",
+  "correction_tree": "0c51773453e9c88aca2ad25b7cf2c194e0acdade",
+  "proposed_authority": "AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018",
+  "proposed_state_directory": "operational-actionable-diagnostic-once-20261018",
+  "maximum_executions": 1,
+  "maximum_expiry_after_release_seconds": 86400,
+  "registration": null,
+  "registration_sha256": null,
+  "expires_at": null,
+  "production_calls": 0,
+  "permission_operations": 0,
+  "source_calls": 0,
+  "existing_diagnostic_authority": "CONSUMED_PRESERVED",
+  "new_diagnostic_allowance": "UNUSED",
+  "controller_hashes": {
+    "verification/ingestion_storage/operational_runner.py": "faee261cd2582b044d0f60746aed7d6f4266b3895f9221a6de21c217eb04b68a",
+    "tests/test_ingestion_actionable_release_binding.py": "81e87b81c096452ab6b36c2afe5c40a9a950bd14637cf77625a91b57a2c2f452",
+    ".github/workflows/stage4-discovery-offline.yml": "1e132adf93c4faf073af1c8536c8183b7d6a610ccc07d343ba899c3e816bfe98"
+  }
+}

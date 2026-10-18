@@ -1,0 +1,5 @@
+{
+  "verification/ingestion_storage/operational_runner.py": "faee261cd2582b044d0f60746aed7d6f4266b3895f9221a6de21c217eb04b68a",
+  "tests/test_ingestion_actionable_release_binding.py": "81e87b81c096452ab6b36c2afe5c40a9a950bd14637cf77625a91b57a2c2f452",
+  ".github/workflows/stage4-discovery-offline.yml": "1e132adf93c4faf073af1c8536c8183b7d6a610ccc07d343ba899c3e816bfe98"
+}

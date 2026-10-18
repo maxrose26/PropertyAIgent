@@ -1,0 +1,40 @@
+{
+  "sha": "6bb68733441d487f556179ee3845c3b28aaff2f3",
+  "node_id": "C_kwDOToZJi9oAKDZiYjY4NzMzNDQxZDQ4N2Y1NTYxNzllZTM4NDVjM2IyOGFhZmYyZjM",
+  "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/6bb68733441d487f556179ee3845c3b28aaff2f3",
+  "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/6bb68733441d487f556179ee3845c3b28aaff2f3",
+  "author": {
+    "name": "maxrose26",
+    "email": "maxrose26@gmail.com",
+    "date": "2026-10-18T15:02:15Z"
+  },
+  "committer": {
+    "name": "GitHub",
+    "email": "noreply@github.com",
+    "date": "2026-10-18T15:02:15Z"
+  },
+  "tree": {
+    "sha": "724adb7104fb9ce4a77f6118b35c75b32ca08525",
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/trees/724adb7104fb9ce4a77f6118b35c75b32ca08525"
+  },
+  "message": "Integrate reviewed actionable restricted-connection diagnostics and closure [skip render]\n\nPreserve exact reviewed tree724adb7104fb9ce4a77f6118b35c75b32ca08525. No deployment, pipeline activation or source execution.",
+  "parents": [
+    {
+      "sha": "b9e6bd639ad1f1a472c35f339b70f8f524c08ac4",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/b9e6bd639ad1f1a472c35f339b70f8f524c08ac4",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/b9e6bd639ad1f1a472c35f339b70f8f524c08ac4"
+    },
+    {
+      "sha": "4f4ef89edc83a549fc16e0c43986b9ca30539ecd",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/4f4ef89edc83a549fc16e0c43986b9ca30539ecd",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/4f4ef89edc83a549fc16e0c43986b9ca30539ecd"
+    }
+  ],
+  "verification": {
+    "verified": true,
+    "reason": "valid",
+    "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq1N93CRC1aQ7uu5UhlAAA+q8QAJRJzp3zP0kSFR8z6wBJ1bqq\ntZGiPR4dQfY1WZMQZYhM3vXUrYM84bhDP/YXkamyl2tq0bXpBjUZtrnMqVfjFAuv\nrR1GVeOUm/20ssR1qK0nqbtQP3HowVK6uItu3uUH/99U2AdxJJpzo2JdBGMWSBdB\nS4hQ3VX9Ugu6ZRXVVz4jG1PCe2toWORg2B8IeJCemlF50axfGbYm71/EGa2bYUln\nKjWwqu+Ii8DEJgevNPe0pNB7ZEvfqrldsNyvoG7pD9w8gZFIflSXqb5pBr3KIwXR\nQ7miRZ7BLRaQCAxeEZ7DUcKimF0ATB14X7+RP6VSvzud5TgoEsYOdiIqYVG6oIht\ns9WcmB7OEx0Cn2/kLf1WbJVQYYfPh7Vq37l5TiIbDTO8Nda3u5UHXeMlQJPxoXVK\nN6D96xQnMg1EWQBY1blLKONSaEqsejMtPh92fgv3luOcF6V9uoxW2T8T556nD2DL\nJirZ4kooGHes9pXM9bL+wOhL+hVnSgjyv9X6zqVQ6uBpHto+miOhRcowVCvaV4/G\n2Voysj62lbTLOfpMoRtdtWnD2O0wsIUTZ8auUxGXNgB/N/JVwBzB5T0f7Uhy6eph\novr5v8NZ53KpyUqfMQK1MPDuDGQ+nk0NT4jFYRVFlnOOQO7VbltzBBCDrm23LCaC\nVsViHWRgOBjgIpJPiiX1\n=G/33\n-----END PGP SIGNATURE-----\n",
+    "payload": "tree 724adb7104fb9ce4a77f6118b35c75b32ca08525\nparent b9e6bd639ad1f1a472c35f339b70f8f524c08ac4\nparent 4f4ef89edc83a549fc16e0c43986b9ca30539ecd\nauthor maxrose26 <maxrose26@gmail.com> 1792335735 +0100\ncommitter GitHub <noreply@github.com> 1792335735 +0100\n\nIntegrate reviewed actionable restricted-connection diagnostics and closure [skip render]\n\nPreserve exact reviewed tree724adb7104fb9ce4a77f6118b35c75b32ca08525. No deployment, pipeline activation or source execution.",
+    "verified_at": "2026-10-18T15:02:15Z"
+  }
+}
