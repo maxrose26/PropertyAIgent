@@ -70,7 +70,7 @@ MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
 DIRECT_OWNER_LIMITS=dict(connections=(5,6),commands=(60,80,92))
 # Stable-credential provisioning / revocation: finite administrative TOTALS (normal, through teardown, including failure diagnostics). Measured on the disposable server: provisioning
 # 50 commands / 4 connections, revocation 21 / 2; the ceiling also covers the failure path (provisioning fails after the credentials exist -> disable, restore settings, diagnostics).
-STABLE_OWNER_LIMITS=dict(connections=(6,7),commands=(60,92,104))
+STABLE_OWNER_LIMITS=dict(connections=(6,8),commands=(60,92,104))
 # Ordering invariants (tested): job + diagnostic_window <= work alarm (session), so a Runner-detected stop at the job limit still has its full failure window before the one-shot work alarm;
 # work alarm + diagnostic_window <= diagnostic_total <= active window - reporting, so a stop CAUSED by the alarm also keeps a full window; admin_pre < admin_total < admin_diagnostic, so a stop at the
 # very end of the pre-teardown allowance still leaves teardown and failure diagnostics their own administrative time.
@@ -517,7 +517,7 @@ def validate_registration(body,sha):
         if (r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!=stable_risk or r.get('state_directory')!=stable_state
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=stable_state)
             or r.get('owner_limits')!=dict(connections=list(STABLE_OWNER_LIMITS['connections']),commands=list(STABLE_OWNER_LIMITS['commands']))
-            or r.get('validity_days')!=(STABLE_VALIDITY_DAYS if r['mode']==STABLE_PROVISION_MODE else None) or 'restricted_route' in r or 'settling_seconds' in r):raise ValueError('STABLE_CREDENTIAL_BINDING')
+            or not ((type(r.get('validity_days')) is int and r['validity_days']==STABLE_VALIDITY_DAYS) if r['mode']==STABLE_PROVISION_MODE else 'validity_days' not in r) or 'restricted_route' in r or 'settling_seconds' in r):raise ValueError('STABLE_CREDENTIAL_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)

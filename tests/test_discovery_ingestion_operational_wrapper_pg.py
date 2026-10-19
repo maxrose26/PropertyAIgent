@@ -303,9 +303,13 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     if fault=='stable_provision_failure':
                         assert prov['status']=='STOP_RECONCILE_NO_RETRY' and prov['access']=='DISABLED_VERIFIED' and prov['cleanup']=='CLOSED',(prov.get('failure'),prov.get('operation_phase'),prov.get('authority_invalidation'),prov['accounting']['administration'].get('teardown_residuals'),prov['accounting']['administration'].get('role_settings'),prov.get('diagnostics'))      # a failure after the credentials exist falls into the ordinary disabling path
                         assert roles_state()==[(EFFECT_,False,True,True),(WORKER_,False,True,True)] and set(ciphertexts)=={'DATABASE_URL'}
+                        lim_=orr_.STABLE_OWNER_LIMITS;adm_=prov['accounting']['administration']
+                        assert adm_['connections']<=lim_['connections'][1] and adm_['commands']<=lim_['commands'][2] and adm_['connections_opened']==adm_['connections_closed']      # the failure path fits the diagnostic allowance
                         print('ROLLUP_STABLE',fault,prov['accounting']['administration']['commands'],prov['accounting']['administration']['connections'])
                         return
                     assert prov['status']=='STABLE_CREDENTIALS_PROVISIONED_LOGIN_ENABLED' and prov['cleanup']=='CLOSED' and prov['access']=='LOGIN_ENABLED_BY_DESIGN' and prov['execution_grants_created']==0 and prov['source_observations_attempted']==0 and prov['application_writes']==0
+                    lim_=orr_.STABLE_OWNER_LIMITS;adm_=prov['accounting']['administration']
+                    assert adm_['connections']<=lim_['connections'][0] and adm_['commands']<=lim_['commands'][0] and adm_['connections_opened']==adm_['connections_closed']      # provisioning fits the NORMAL allowance
                     assert roles_state()==[(EFFECT_,True,False,True),(WORKER_,True,False,True)] and role_configs()=={WORKER_:reviewed_cfg,EFFECT_:reviewed_cfg}      # login enabled, password present, validity set, reviewed settings kept
                     validity=boot.execute("SELECT min(rolvaliduntil)-now() FROM pg_authid WHERE rolname=ANY(%s)",([WORKER_,EFFECT_],)).fetchone()[0]
                     assert timedelta(days=89,hours=23)<validity<=timedelta(days=90,minutes=5)
