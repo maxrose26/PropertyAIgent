@@ -41,7 +41,7 @@ jobs:
           sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope
       - name: A real allocation beyond the controller limit is killed by the kernel (negative case)
         run: |
-          set -uo pipefail
+          set +e; set -u -o pipefail      # the command's exit status is the evidence here; do not abort on it
           cat > "$RUNNER_TEMP/negative.py" <<'PY'
           import os,sys
           sys.path.insert(0,os.getcwd())
@@ -61,7 +61,7 @@ jobs:
           sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope/controller /sys/fs/cgroup/propertyaigent-operational-once.scope/source /sys/fs/cgroup/propertyaigent-operational-once.scope
       - name: The setup refuses to start the command when it cannot prove the scope (fail closed)
         run: |
-          set -uo pipefail
+          set +e; set -u -o pipefail      # the command's exit status is the evidence here; do not abort on it
           sudo mkdir /sys/fs/cgroup/propertyaigent-operational-once.scope
           ran=0
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" /usr/bin/touch "$RUNNER_TEMP/must-not-exist" && ran=1
