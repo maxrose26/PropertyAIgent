@@ -196,3 +196,13 @@ def test_the_cancellation_ceiling_is_aggregate_across_budgets_not_reset_per_slot
 def test_an_unbounded_or_negative_prior_cancel_count_is_refused():
     with pytest.raises(Exception,match="CANCEL_RUN_ALLOWANCE_BOUND"):DatabaseBudget(cancel_used=oc.CANCEL_RUN_ALLOWANCE["attempts"]+1)
     with pytest.raises(Exception,match="CANCEL_RUN_ALLOWANCE_BOUND"):oc.run_cancel_used({"a":{"database":{"cancel_attempts":-1}}})
+
+
+def test_a_resumed_slot_keeps_its_earlier_cancel_count(cluster,roles,local_principal,monkeypatch):
+    monkeypatch.setattr(oc,"STATEMENT_HARD_SECONDS",1)
+    first=DatabaseBudget(cancel_used=0);e=first.engine(local_principal)
+    with e.connect() as c:
+        with pytest.raises(Exception):c.execute(text("SELECT pg_sleep(30)"))
+    receipt=first.close([]);assert receipt["cancel_attempts"]==1
+    second=DatabaseBudget(previous=receipt,slot_key=receipt["slot_key"],cancel_used=oc.run_cancel_used({}))        # same key re-entered: its own earlier count is carried, not dropped
+    assert second.close([])["cancel_attempts"]==1

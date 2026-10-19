@@ -104,7 +104,7 @@ class Runner:
         remaining=allocation['remaining']
         if remaining['driver_statements']<80 or remaining['connection_attempts']<2:raise Denied('INSUFFICIENT_NEXT_SLOT_RESERVATION')
         prior=self.receipts.get(key,{})
-        cancel_used=run_cancel_used(self.receipts)      # every slot already closed in this run, including this key's earlier use
+        cancel_used=run_cancel_used({k:v for k,v in self.receipts.items() if k!=key})      # every slot already closed in this run, including this key's earlier use
         budget=DatabaseBudget(cancel_used=cancel_used,slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],emit=self.emit,stop_file=self.journal.root/'STOP')
         engines=[];started=time.monotonic();success=False
         budget.hard_stop_at=self.started+self.deadlines['job']      # no driver wait may run past the job limit: the failure window and teardown start after it

@@ -15,7 +15,7 @@ from .storage_controller import split_sql
 from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
 
 ADMIN_STATEMENT_HARD_SECONDS=12
-ADMIN_CANCEL_ALLOWANCE=3          # aggregate ceiling on administrative cancel connections for the whole run (one Owner); beyond it a deadline only closes the client
+ADMIN_CANCEL_ALLOWANCE=3          # aggregate ceiling on administrative cancel connections for the whole run (one Owner object and its resumed copies share one event list); beyond it a deadline only closes the client
 TERMINATE_SQL="SELECT pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE pid=%s AND usename=%s AND backend_start=%s::timestamptz"
 SESSIONS_SQL='SELECT pid,usename,state,backend_start FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid'
 # USAGE (privileges actually INHERITED), not MEMBER: a NOINHERIT or WITH INHERIT FALSE membership answers MEMBER=true yet does not confer the privilege (found by the hosted PG17 rehearsal).
@@ -288,6 +288,13 @@ class Owner:
         is therefore resolved (bounded waits, then at most two precisely identified terminations, only with proven existing privileges) or left UNRESOLVED and reported - it can no
         longer suppress the secret deletion, and it can never be reported closed."""
         self.tearing_down=True
+        try:self._teardown(github)
+        except BaseException:
+            if self.role_settings_prior is not None and self.role_settings_state in ('APPLYING','APPLIED_VERIFIED'):
+                self.role_settings_state='RESTORATION_NOT_ATTEMPTED';self.teardown_residuals.append('ROLE_SETTINGS_RESTORATION_NOT_ATTEMPTED')
+            raise
+
+    def _teardown(self,github):
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
             if self.authorities:
@@ -319,6 +326,7 @@ class Owner:
         if not disabled:
             if self.role_settings_prior is not None:self.teardown_residuals.append('ROLE_SETTINGS_RESTORATION_NOT_ATTEMPTED');self.role_settings_state='RESTORATION_NOT_ATTEMPTED'
             raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
+        if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):self.teardown_residuals.append('SESSIONS_'+self.session_disposition)      # recorded before anything can raise
         try:
             for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
             names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
@@ -327,7 +335,7 @@ class Owner:
         finally:
             settings_ok=self.restore_role_settings_guarded()      # independent of the secret outcome; the secrets always come first
         if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):
-            self.teardown_residuals.append('SESSIONS_'+self.session_disposition);raise Uncertain('TEARDOWN_SESSIONS_UNRESOLVED')
+            raise Uncertain('TEARDOWN_SESSIONS_UNRESOLVED')
         if not settings_ok:raise Uncertain('TEARDOWN_ROLE_SETTINGS_UNRESTORED')
 
     def resolve_sessions(self,c,sessions):
