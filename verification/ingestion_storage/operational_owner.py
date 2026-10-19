@@ -34,6 +34,60 @@ SCOPE=dict(kind='DISCOVERY_SCOPE',council='bolton',start='2026-10-16',end='2026-
 ROLES={'ingestion_worker_login':'ingestion_worker','ingestion_effect_login':'ingestion_effect_broker'}
 SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_effect_login':'INGESTION_EFFECT_DATABASE_URL'}
 
+PIPELINE_LOGINS=('ingestion_effect_login','ingestion_storage_login','ingestion_worker_login')
+PIPELINE_ROLES_SQL="SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NOT NULL,r.rolvaliduntil,r.rolconnlimit,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname"
+PIPELINE_IDENTITY_SQL="SELECT current_user,session_user,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET'),pg_catalog.pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_catalog.pg_has_role(current_user,'ingestion_barrier_releaser','SET'),pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE') FROM pg_catalog.pg_roles r WHERE r.rolname=current_user"
+# Sessions: the two restricted logins by name PLUS any client backend whose role is not attributable to this identity (a non-monitoring identity sees NULL there). No query text is ever selected.
+PIPELINE_SESSIONS_SQL="SELECT pid,usename,state,backend_start,backend_type FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s) OR (usename IS NULL AND backend_type='client backend' AND pid<>pg_catalog.pg_backend_pid()) ORDER BY pid"
+PIPELINE_REVIEWED_FLAGS=(False,False,False,False,False)
+
+
+def evaluate_pipeline_readback(obs,expected):
+    """Pure evaluation of the fixed owner readback against the registration expectations. Returns (findings, notes). `findings` are FIXED reason codes (never values); ANY finding prevents
+    grant issuance. `notes` are accurate, non-blocking observations: an idle pooled backend is reported as exactly that and is never classified as a leak.
+
+    The same evaluation serves the final readback after invalidation: execution authority has ended (no unexpired grant) and the standing credentials are still exactly as provisioned."""
+    findings=[];notes=[]
+    ident=obs.get('identity')
+    if not ident or tuple(ident[:6])!=(expected['identity'],expected['identity'],False,True,True,True):findings.append('MIGRATION_IDENTITY')
+    elif tuple(ident[6:10])!=(False,False,False,False):findings.append('TEMPORARY_OWNER_OR_RELEASER_CAPABILITY_PRESENT')
+    ctl=obs.get('control')
+    if not isinstance(ctl,dict):findings.append('CONTROL_STATE_UNAVAILABLE')
+    else:
+        if ctl.get('global_stop')!=STOP:findings.append('GLOBAL_STOP_CHANGED')
+        if ctl.get('manual_stop')!='STORAGE_TEST_STOP':findings.append('MANUAL_STOP_CHANGED')
+        if ctl.get('hard_stop_generation')!=expected['hard_stop_generation']:findings.append('HARD_STOP_GENERATION_CHANGED')
+        if ctl.get('unexpired_grants')!=0:findings.append('UNEXPIRED_GRANT_PRESENT')
+    roles={r[0]:r for r in obs.get('roles') or []}
+    if set(roles)!=set(PIPELINE_LOGINS):findings.append('RESTRICTED_OR_STORAGE_LOGIN_MISSING')
+    else:
+        storage=roles['ingestion_storage_login']
+        if (storage[1],storage[2])!=(False,False):findings.append('ACCEPTED_STORAGE_ACCESS_CHANGED')
+        for name in ('ingestion_effect_login','ingestion_worker_login'):
+            r=roles[name]
+            if r[1] is not True:findings.append('LOGIN_NOT_ENABLED')
+            if r[2] is not True:findings.append('PASSWORD_NOT_PRESENT')
+            if r[3] is None or r[3].isoformat()!=expected['valid_until']:findings.append('VALID_UNTIL_MISMATCH')
+            if r[4]!=1:findings.append('CONNECTION_LIMIT_CHANGED')
+            if tuple(r[5:10])!=PIPELINE_REVIEWED_FLAGS:findings.append('PRIVILEGE_FLAG_CHANGED')
+    if sorted(tuple(m) for m in obs.get('memberships') or [])!=sorted((r,c) for r,c in ROLES.items()):findings.append('MEMBERSHIPS_CHANGED')
+    reviewed={'%s=%s'%(k,v) for k,v in ROLE_SETTINGS}
+    config=obs.get('role_settings') or {}
+    if not all(reviewed<=set(config.get(n,[])) for n in ROLES):findings.append('ROLE_SETTINGS_CHANGED')
+    if not obs.get('inventory_recognised'):findings.append('INSTALLED_FUNCTIONS_NOT_RECOGNISED')
+    sessions=obs.get('sessions')
+    if sessions is None:findings.append('SESSIONS_NOT_OBSERVED')
+    else:
+        if not (ident and ident[10] is True):findings.append('SESSION_VISIBILITY_NOT_PROVEN')
+        states=set()
+        for row in sessions:
+            if len(row)!=5 or row[1] is None or row[1] not in ROLES or row[2] is None:findings.append('UNATTRIBUTABLE_CLIENT_BACKEND');continue
+            states.add(row[2])
+            if row[2]!='idle':findings.append('ROLE_SESSION_NOT_IDLE')
+        if states:notes.append('IDLE_POOLED_BACKENDS_OBSERVED_NOT_CLASSIFIED_AS_A_LEAK' if states=={'idle'} else 'NON_IDLE_ROLE_SESSION_OBSERVED')
+    return sorted(set(findings)),notes
+
+
 class Owner:
     # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
     DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
@@ -42,7 +96,7 @@ class Owner:
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
-        self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
+        self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False;self.grant_expiry=None;self.require_control_sha256=None
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
         self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.permitted_policy_states=None;self.stable_state=False;self.valid_until=None;self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
@@ -301,7 +355,7 @@ class Owner:
 
     def register(self,items,authority,*,capture_key,source_calls,prepared=()):
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}
-        grant=dict(keys=sorted(bindings),contracts=sorted({x['contract'] for x in [*items,*prepared]}),expires_at=self.expiry.timestamp(),source_calls=source_calls,writes=0,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=['required_once'],bindings=bindings,detail_source_keys=[],capture_key=capture_key,capture_only=True,execution_binding=self.bindings,
+        grant=dict(keys=sorted(bindings),contracts=sorted({x['contract'] for x in [*items,*prepared]}),expires_at=(self.grant_expiry or self.expiry).timestamp(),source_calls=source_calls,writes=0,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=['required_once'],bindings=bindings,detail_source_keys=[],capture_key=capture_key,capture_only=True,execution_binding=self.bindings,
                    completion_outcomes={'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'LISTING_METADATA':['BATCH_SCREENED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE']})
         # Owner-only fixed insertion/issuance. No runtime principal receives the
         # owner, issuer, barrier or recovery memberships used here.
@@ -310,6 +364,7 @@ class Owner:
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
             if ctl['global_stop']!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=self.expected_generation or authority in ctl['grants']:raise Uncertain('OWNER_REGISTRATION_STATE_CHANGED')
+            if self.require_control_sha256 is not None and digest(ctl)!=self.require_control_sha256:raise Uncertain('OWNER_REGISTRATION_CONTROL_BINDING')      # first registration: the control row is exactly the accepted baseline
             self.authorities.append(authority);self.invalidation='REQUIRED'
             for item in items:
                 self.q(c,'INSERT INTO public.ingestion_work_items SELECT * FROM json_populate_record(NULL::public.ingestion_work_items,%s::json)',(json.dumps(item),),effect=True)
@@ -456,6 +511,75 @@ class Owner:
                 result[key]=self.q(c,statement,params)
                 self.emit('failure_diagnostic_observed',dict(field=key,value=result[key]))
         return result
+
+    PIPELINE_MAX_STATEMENTS=12      # bound named in the registration; the readback itself uses 9
+
+    def pipeline_readback(self,expected,*,label):
+        """The FIXED read-only owner phase. One connection, one READ ONLY transaction, no GRANT, no write, no query text, no password or verifier value (a boolean presence only). The
+        observation is persisted to the audit journal BEFORE it is evaluated and before anything can proceed. Any finding, or any failed or uncertain read, raises and nothing is issued."""
+        started=time.monotonic();before=self.commands
+        obs={}
+        with self.connection() as c:
+            self.q(c,'BEGIN READ ONLY')
+            obs['identity']=tuple(self.q(c,PIPELINE_IDENTITY_SQL)[0])
+            raw=self.q(c,'SELECT public.ingestion_acceptance_control()')[0][0]
+            obs['control']=raw if isinstance(raw,dict) else json.loads(raw)
+            obs['roles']=[tuple(r) for r in self.q(c,PIPELINE_ROLES_SQL,(list(PIPELINE_LOGINS),))]
+            obs['memberships']=[tuple(m) for m in self.q(c,'SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[]) ORDER BY 1,2',(list(PIPELINE_LOGINS),))]
+            obs['role_settings']={r[0]:sorted(r[1] or []) for r in self.q(c,ROLE_SETTINGS_SQL,(list(ROLES),))}
+            obs['sessions']=[tuple(r) for r in self.q(c,PIPELINE_SESSIONS_SQL,(list(ROLES),))]
+            try:self.verify_installed(c);obs['inventory_recognised']=True
+            except ValueError:obs['inventory_recognised']=False
+            self.q(c,'ROLLBACK')
+        findings,notes=evaluate_pipeline_readback(obs,expected)
+        record=dict(label=label,statements=self.commands-before,elapsed_seconds=round(time.monotonic()-started,3),
+                    identity=list(obs['identity']),control=obs['control'],
+                    roles=[[r[0],r[1],r[2],r[3].isoformat() if r[3] else None,r[4],*r[5:]] for r in obs['roles']],memberships=[list(m) for m in obs['memberships']],
+                    role_settings=obs['role_settings'],sessions=[[r[0],r[1],r[2],r[3].isoformat() if r[3] else None,r[4]] for r in obs['sessions']],
+                    inventory_recognised=obs['inventory_recognised'],findings=findings,notes=notes,query_text_read=False,password_values_read=False)
+        self.emit('pipeline_readback',record)      # persisted (chained, synced) before the result can be acted on
+        if findings:raise Uncertain('PIPELINE_READBACK_'+findings[0])
+        if record['statements']>self.PIPELINE_MAX_STATEMENTS:raise Uncertain('PIPELINE_READBACK_STATEMENT_BOUND')
+        return record
+
+    def read_items(self,keys):
+        """Bounded owner read of named ledger rows (state and checkpoint only). The administrative identity has no table privilege; this uses the accepted preflight technique: the temporary
+        owner capability exists only inside a transaction that is ROLLED BACK, and its absence is read back."""
+        keys=list(keys)
+        if not 1<=len(keys)<=64:raise ValueError('READ_ITEMS_BOUND')
+        with self.connection() as c:
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            rows=self.q(c,'SELECT key,state,checkpoint FROM public.ingestion_work_items WHERE key=ANY(%s) ORDER BY key',(keys,))
+            self.q(c,'ROLLBACK',effect=True)
+            capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
+            if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        return {r[0]:(r[1],r[2]) for r in rows}
+
+    def invalidate_authorities(self):
+        """Normal end of execution authority: sets expires_at=0 on every grant and exception THIS run registered. It never changes a credential, membership, role setting or secret, and never
+        bumps the hard-stop generation (this is not a failure path). Bound to the exact execution binding; anything unexpected is UNCERTAIN."""
+        if not self.authorities:return 'NOT_REQUIRED_NO_AUTHORITY'
+        if self.effect_uncertain:
+            self.emit('authority_invalidation_uncertain',dict(reason='PRIOR_ADMIN_EFFECT_UNCERTAIN'));self.invalidation='UNCERTAIN_RECONCILE';return self.invalidation
+        self.invalidation='UNCERTAIN_RECONCILE'
+        with self.connection() as c:
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
+            if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=self.expected_generation:raise Uncertain('STOP_IDENTITY_CHANGED')
+            updated=deepcopy(ctl)
+            for authority in self.authorities:
+                grant=updated.get('grants',{}).get(authority)
+                if not grant or grant.get('execution_binding')!=self.bindings:raise Uncertain('INVALIDATION_BINDING_CHANGED')
+                grant['expires_at']=0
+                if authority in updated.get('bolton_exceptions',{}):updated['bolton_exceptions'][authority]['expires_at']=0
+            self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(updated),),effect=True)
+            self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+            self.q(c,'COMMIT',effect=True)
+            capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
+            if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        self.invalidation='ACKNOWLEDGED_READBACK';self.emit('authorities_invalidated',dict(authorities=list(self.authorities)));return self.invalidation
 
 def item(identity,*,dependencies=(),checkpoint=None,limits=None,max_attempts=2):
     return dict(identity,key=digest(identity),dependencies=list(dependencies),priority=50,eligible_at=0,state='QUEUED',reason=None,next_action='CLAIM_WHEN_AUTHORISED',limits=limits or DEFAULT_LIMITS,authority=None,attempt_count=0,max_attempts=max_attempts,fence=0,owner=None,lease_until=None,phase='IDLE',checkpoint=checkpoint,outcome=None)

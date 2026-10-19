@@ -15,13 +15,13 @@ def canonical(value):
     return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False).encode()
 
 class GitHub:
-    def __init__(self,emit,check,*,runner=subprocess.run):
-        self.emit=emit;self.check=check;self.runner=runner;self.requests=0;self.mutation_uncertain=False
+    def __init__(self,emit,check,*,runner=subprocess.run,bound=40):
+        self.emit=emit;self.check=check;self.runner=runner;self.requests=0;self.mutation_uncertain=False;self.bound=bound
 
     def call(self,method,path,body=None):
         self.check()
         if method!='GET' and self.mutation_uncertain:raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
-        if self.requests>=40:raise ValueError('GITHUB_REQUEST_BOUND')
+        if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
         self.requests+=1
         self.emit('github_intent',dict(method=method,path=path,ordinal=self.requests))
         command=['gh','api','--method',method,path]
