@@ -58,6 +58,9 @@ def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
     return dict(totals=totals,remaining=remaining)
 
 
+STATEMENT_HARD_SECONDS=12       # client-side ceiling per driver call; the server statement_timeout (10 s) is the primary control when the transport reflects it
+
+
 class DatabaseBudget:
     """Counts attempts before connect and every cursor/internal driver command.
 
@@ -67,7 +70,7 @@ class DatabaseBudget:
     def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
-        self.failed_native_closed=True
+        self.failed_native_closed=True;self.hard_deadline_events=[]
         from .tls_trust import owned_resources
         self.socket_baseline=owned_resources()['socket_fds']
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
@@ -86,6 +89,15 @@ class DatabaseBudget:
         self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.previous_opened=previous.get('connections_opened',0);self.connection_seconds=previous.get('connection_active_seconds',0.0);self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
         if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
+    def guarded(self,connection,call):
+        """Run one blocking driver call under a CLIENT-side hard deadline that does not depend on the server honouring any timeout. On expiry the call is interrupted, the server is asked to
+        cancel, the connection is closed and the call is denied; the event is accounted. A cleanup call (rollback/closure) is bounded the same way."""
+        from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
+        remaining=max(.5,min(STATEMENT_HARD_SECONDS,self.seconds-self.previous_elapsed-(time.monotonic()-self.started)))
+        try:
+            with hard_deadline(remaining,'STATEMENT_HARD_DEADLINE'):return call()
+        except DeadlineExceeded:
+            self.hard_deadline_events.append(dict(abandon(connection),hard_seconds=round(remaining,3)));raise Denied('STATEMENT_HARD_DEADLINE') from None
     def tick(self,kind,*,cleanup=False):
         if not cleanup:self.check()
         # Reserve eight slots for finite rollback/closure; no commit after stop.
@@ -101,7 +113,7 @@ class DatabaseBudget:
         budget=self
         class Cursor(psycopg.Cursor):
             def execute(self,query,params=None,**kwargs):
-                budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=super().execute(query,params,**kwargs)
+                budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=budget.guarded(self.connection,lambda:super(Cursor,self).execute(query,params,**kwargs))
                 if self.pgresult is not None:
                     budget.returned_bytes+=sum(len(self.pgresult.get_value(r,c) or b'') for r in range(self.pgresult.ntuples) for c in range(self.pgresult.nfields))
                     if budget.returned_bytes>budget.returned_cap:raise Denied('DATABASE_RETURNED_VALUE_BOUND')
@@ -112,7 +124,7 @@ class DatabaseBudget:
                 raw=command if isinstance(command,bytes) else str(command).encode()
                 rollback=raw.strip().upper().startswith(b'ROLLBACK')
                 budget.tick('driver_internal',cleanup=rollback)
-                return super()._exec_command(command,*a,**kw)
+                return budget.guarded(self,lambda:super(Connection,self)._exec_command(command,*a,**kw))
         def creator():
             budget.check()
             if budget.attempts>=budget.connection_cap:raise Denied('CONNECTION_BOUND')
@@ -166,7 +178,7 @@ class DatabaseBudget:
         except BaseException:pass
         failed_closed=self.failed_native_closed or socket_proof=='NO_NEW_OWNED_SOCKETS'
         return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=self.previous_opened+len(self.opened),connections_closed_count=self.previous_opened+sum(bool(c.closed) for c in self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
-            failed_native_connections_closed=failed_closed,socket_closure=socket_proof,
+            failed_native_connections_closed=failed_closed,socket_closure=socket_proof,hard_deadline_events=list(self.hard_deadline_events),
             connections_closed=failed_closed and all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and failed_closed and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 
