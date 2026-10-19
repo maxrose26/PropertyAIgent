@@ -69,7 +69,7 @@ PIPELINE_MODE='STABLE_PIPELINE_AUTHORITY'
 PIPELINE_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_AUTHORITY_ONCE_20261020'
 PIPELINE_STATE='operational-stable-pipeline-once-20261020'
 PIPELINE_BINDING=dict(
-    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2400,retention_wait_seconds=300,screening_wait_seconds=900,
+    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2400,retention_wait_seconds=300,screening_wait_seconds=600,
     provisioning=dict(registration_sha256='b7e00b48d659b4fa83cd72d14efe734846c2d9d2e699f6998e509e3c3f280264',events_sha256='a26f9d1f51d8e908431cfdebf2bf20f6362b7bcbcecb35717a13935017155a19',
                       final_result_sha256='51aea5d5ce0a3515b369b0d098a5c3da73a210ff86034f1f9e368d654274d3e6'),
     qualification=dict(run_id=39284253302,artifact_id=12212818855,artifact_zip_sha256='b02da6fcf1658f627f4935db0a998fb3764498b3e15b6d57ad2ab135ba15db58',revision='46b9356d352efcde39df9e1505db582543adecee'),
