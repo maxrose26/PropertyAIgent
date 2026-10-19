@@ -68,6 +68,9 @@ SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
 # Direct-route diagnostic: finite administrative TOTALS (normal, teardown, diagnostic); pinned from the disposable rehearsal below plus a small margin.
 DIRECT_OWNER_LIMITS=dict(connections=(5,6),commands=(60,80,92))
+# Stable-credential provisioning / revocation: finite administrative TOTALS (normal, through teardown, including failure diagnostics). Measured on the disposable server: provisioning
+# 50 commands / 4 connections, revocation 21 / 2; the ceiling also covers the failure path (provisioning fails after the credentials exist -> disable, restore settings, diagnostics).
+STABLE_OWNER_LIMITS=dict(connections=(6,7),commands=(60,92,104))
 # Ordering invariants (tested): job + diagnostic_window <= work alarm (session), so a Runner-detected stop at the job limit still has its full failure window before the one-shot work alarm;
 # work alarm + diagnostic_window <= diagnostic_total <= active window - reporting, so a stop CAUSED by the alarm also keeps a full window; admin_pre < admin_total < admin_diagnostic, so a stop at the
 # very end of the pre-teardown allowance still leaves teardown and failure diagnostics their own administrative time.
@@ -99,7 +102,7 @@ class Runner:
         stable=registration.get('mode') in STABLE_MODES
         self.route_name='DIRECT' if direct else 'POOLER';self.restricted_hostaddr=None
         self.deadlines=dict(MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else DIRECT_OWNER_LIMITS if (direct or stable) else None)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
         if direct or stable:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
@@ -513,7 +516,7 @@ def validate_registration(body,sha):
         _,stable_state,stable_risk=STABLE_MODES[r['mode']]
         if (r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!=stable_risk or r.get('state_directory')!=stable_state
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=stable_state)
-            or r.get('owner_limits')!=dict(connections=list(DIRECT_OWNER_LIMITS['connections']),commands=list(DIRECT_OWNER_LIMITS['commands']))
+            or r.get('owner_limits')!=dict(connections=list(STABLE_OWNER_LIMITS['connections']),commands=list(STABLE_OWNER_LIMITS['commands']))
             or r.get('validity_days')!=(STABLE_VALIDITY_DAYS if r['mode']==STABLE_PROVISION_MODE else None) or 'restricted_route' in r or 'settling_seconds' in r):raise ValueError('STABLE_CREDENTIAL_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
