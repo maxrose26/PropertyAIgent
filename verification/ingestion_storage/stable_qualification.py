@@ -13,7 +13,6 @@ for the worker only - the control row it holds SELECT on). It cannot see other s
 A failed qualification cannot disable anything (that needs the privileged revocation path): it reports the retained access and a blocked-for-use state.
 A manual stop in production is cancelling the workflow run (the STOP file under the output directory exists for local rehearsals; a hosted runner is ephemeral and nobody can create it)."""
 import argparse,json,os,signal,sys,time
-from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 from .connection_diagnostics import safe_failure
@@ -63,14 +62,32 @@ class Cancelled(BaseException):
     """The run was cancelled (SIGTERM/SIGINT). A BaseException so that no generic handler can mistake it for a failure class."""
 
 
-@contextmanager
-def shielded():
-    """Defer cancellation signals while a durable record is written; a pending signal is delivered on exit, AFTER the record is complete (so a record is never half written and an attempt never lost)."""
-    try:previous = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
-    except (AttributeError, ValueError, OSError):previous = None
-    try:yield
-    finally:
-        if previous is not None:signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+class _Cancellation:
+    """Cooperative cancellation. The signal handler ONLY records the request, and raises Cancelled solely while the run is inside an explicitly interruptible region (waiting, preparation, the connection attempt itself). Everywhere else - closing the budget, building and writing records, publishing the final result - a request is deferred and acted on at the next safe point, so no catchable signal can land between recording steps."""
+    interruptible = False
+    requested = False
+
+
+def _on_signal(signum, frame):
+    _Cancellation.requested = True
+    if _Cancellation.interruptible:
+        _Cancellation.interruptible = False      # one-shot: the state can never be left raised by an exception unwinding through the exit
+        raise Cancelled()
+
+
+def install_cancellation():
+    """Install the handlers (main thread); returns the previous ones. An uncatchable kill (SIGKILL, the 345 s timeout kill, runner loss) cannot be handled at all: only the per-attempt events and progress.json written so far survive, and the absence of final-result.json means UNKNOWN."""
+    _Cancellation.interruptible = False;_Cancellation.requested = False
+    return {sig: signal.signal(sig, _on_signal) for sig in (signal.SIGTERM, signal.SIGINT)}
+
+
+class interruptible:
+    def __enter__(self):
+        _Cancellation.interruptible = True
+        if _Cancellation.requested:
+            _Cancellation.interruptible = False;raise Cancelled()
+    def __exit__(self, *exc):
+        _Cancellation.interruptible = False;return False
 
 
 RETAINED_ACCESS = 'BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION'
@@ -133,6 +150,7 @@ class Qualification:
                                   credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=None, receipt=None, receipt_basis='UNKNOWN'))      # counted as STARTED before anything can be interrupted; replaced when the attempt completes
         budget = None
         try:
+          with interruptible():
             budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)
             try:
                 engine = budget.engine(self.urls[role], ssl=self.ssl, hostaddr=self.hostaddr, route='POOLER')
@@ -155,16 +173,14 @@ class Qualification:
             receipt = None
             try:receipt = self.sanitise(budget.close([])) if budget is not None else None
             except Exception:receipt = None      # closing failed: the measurements and the closure are UNKNOWN, never zero and never verified
-            except Cancelled:receipt, cancelled, status, reason = None, True, 'INTERRUPTED', 'CANCELLED'      # interrupted while closing: UNKNOWN as well
         closure_ok = receipt is not None and receipt.get('cleanup') == 'CLOSED' and receipt.get('connections_closed') is True
         record = dict(role=role, ordinal=ordinal, spacing_waited_seconds=round(waited, 3), outcome=status, reason_code=reason, client_closure_verified=bool(closure_ok), elapsed_seconds=round(self.clock() - began, 3),
                       credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=probe, receipt=receipt, receipt_basis='MEASURED' if receipt is not None else 'UNKNOWN')
         self.attempts[slot] = record
-        with shielded():
-            self.emit('qualification_attempt', record)
-            try:self.progress(self.accounting())
-            except Exception:pass      # a failed progress write never changes the sequence; the per-attempt event above is the durable record
-        if cancelled:raise Cancelled()
+        self.emit('qualification_attempt', record)
+        try:self.progress(self.accounting())
+        except Exception:pass      # a failed progress write never changes the sequence; the per-attempt event above is the durable record
+        if cancelled or _Cancellation.requested:raise Cancelled()      # a request received while closing or recording is acted on only now, after the record is complete
         if refused:raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT')
         return record
 
@@ -212,10 +228,12 @@ class Qualification:
         try:
             for role in ROLES:
                 for n in range(1, MAX_PER_ROLE + 1):
+                    if _Cancellation.requested:raise Cancelled()
                     if len(self.attempts) >= MAX_TOTAL:raise Stop('AUTH_REJECTED_EXHAUSTED')
                     waited = 0.0
                     if n > 1:
-                        waited = float(SPACING_SECONDS[n - 2]);self.wait(waited)
+                        waited = float(SPACING_SECONDS[n - 2])
+                        with interruptible():self.wait(waited)
                     self.check(starting_attempt=True)
                     record = self.attempt(role, n, waited)
                     if not record['client_closure_verified']:raise Stop('UNCERTAIN_CLOSURE')      # verified client closure is required before ANYTHING continues, success included
@@ -256,17 +274,16 @@ def main(argv=None):
     if not all(urls.values()):raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
     journal = Journal(args.output)
     journal.emit('consumed', dict(authority=AUTHORITY))
-    def cancel(signum, frame):raise Cancelled()
-    signal.signal(signal.SIGTERM, cancel);signal.signal(signal.SIGINT, cancel)      # a cancelled run keeps the receipts of the attempts already made and reports CANCELLED
+    install_cancellation()      # a cancelled run keeps the receipts of the attempts already made and reports CANCELLED
     try:
+      with interruptible():
         ca, _ = verified_trust();progress = Progress()
         hostaddr = resolve_addresses(progress)
         q = Qualification(urls, emit=journal.emit, ssl={'sslmode': 'verify-full', 'sslrootcert': str(ca)}, hostaddr=hostaddr, stop_file=journal.root / 'STOP', progress_sink=lambda snap: journal.save('progress.json', snap))
     except (Exception, Cancelled) as exc:
         result = preparation_failure_result(type(exc).__name__)
     else:result = q.run()      # run() keeps every attempt already made, whatever happens
-    with shielded():
-        journal.emit('final', result);journal.save('final-result.json', result)
+    journal.emit('final', result);journal.save('final-result.json', result)      # not interruptible: a signal only records a request
     print(json.dumps({k: result.get(k) for k in ('status', 'stop_reason', 'attempts_total', 'use_blocked')}, sort_keys=True))
     raise SystemExit(0 if result['status'] == 'STABLE_CREDENTIALS_QUALIFIED' else 1)
 

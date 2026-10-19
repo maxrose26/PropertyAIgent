@@ -27,6 +27,7 @@ def entry(tmp_path,monkeypatch):
         return caught.value.code,json.loads((out/'final-result.json').read_text()),out
     yield run
     for s,h in saved.items():signal.signal(s,h)
+    sq._Cancellation.requested=False;sq._Cancellation.interruptible=False
 
 
 def refuse(message):
@@ -80,6 +81,16 @@ def test_a_cancellation_during_an_attempt_keeps_that_attempts_receipt_and_stops_
     a=result['roles'][WORKER]['attempts'][0]
     assert a['outcome']=='INTERRUPTED' and a['reason_code']=='CANCELLED' and a['receipt_basis']=='MEASURED' and a['receipt']['connection_attempts']==1 and a['receipt']['driver_statements']==0
     assert result['roles'][EFFECT]['attempts']==[] and result['accounting']['metrics']['connection_attempts']==dict(value=1,basis='MEASURED') and result['use_blocked'] is True
+
+
+def test_a_request_arriving_just_after_the_run_returns_still_publishes_the_final_result(entry,monkeypatch):
+    original=sq.Qualification.run
+    def late(self):
+        r=original(self);os.kill(os.getpid(),signal.SIGTERM);return r      # the request lands between run() and the final publication
+    monkeypatch.setattr(sq.Qualification,'run',late)
+    monkeypatch.setattr(psycopg.Connection,'connect',refuse('password authentication failed for user "x"'))
+    code,result,out=entry()
+    assert code==1 and (out/'final-result.json').exists() and '"final"' in (out/'events.jsonl').read_text().splitlines()[-1]
 
 
 class UnreadableReceiptBudget:

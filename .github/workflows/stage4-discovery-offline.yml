@@ -86,25 +86,52 @@ jobs:
       - name: Restricted connection matrix, server-observed, disposable PostgreSQL only
         run: |
           timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_restricted_matrix.py tests/test_ingestion_restricted_matrix_package.py tests/test_ingestion_hard_deadline.py  tests/test_ingestion_statement_deadline.py tests/test_ingestion_deadline_arithmetic.py tests/test_ingestion_preflight_policy_state.py tests/test_ingestion_direct_route_package.py tests/test_ingestion_stable_credentials_package.py tests/test_ingestion_stable_qualification.py tests/test_ingestion_stable_qualification_receipts.py tests/test_ingestion_stable_qualification_workflow.py tests/test_ingestion_operational_settled_r2_package.py tests/test_ingestion_operational_settling.py tests/test_ingestion_operational_settled_package.py tests/test_ingestion_operational_capture_package.py tests/test_ingestion_owner_teardown_policy.py tests/test_ingestion_surviving_session_privileges.py -v --junitxml="$RUNNER_TEMP/restricted-matrix.xml"
-      - name: Stable qualification module imports, builds its engine and starts a TLS client under the workflow's enforced resource limits, no network
+      - name: Stable qualification module imports, builds its engine, negotiates TLS with a local server and is memory-limited under the workflow's enforced resource limits, no external network
         run: |
           set -euo pipefail
-          (ulimit -c 0; ulimit -n 64; ulimit -f 4096; ulimit -v 3145728; env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" "$RUNNER_TEMP/discovery-venv/bin/python" -I -B - <<'PY'
-          import os,sys
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout "$RUNNER_TEMP/dry.key" -out "$RUNNER_TEMP/dry.crt" -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost >/dev/null 2>&1
+          (ulimit -c 0; ulimit -n 64; ulimit -f 4096; ulimit -v 3145728; env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" DRY_CRT="$RUNNER_TEMP/dry.crt" DRY_KEY="$RUNNER_TEMP/dry.key" "$RUNNER_TEMP/discovery-venv/bin/python" -I -B - <<'PY'
+          import os,resource,socket,ssl,sys,threading
           sys.path.insert(0,os.getcwd())
           import psycopg
           from verification.ingestion_storage import stable_qualification as q, restricted_route as rr
           from verification.ingestion_storage.operational_controller import DatabaseBudget
           from verification.ingestion_storage.tls_trust import verified_trust
+          # 1. the limit is really in force: address space is capped at 3 GiB and a 3.5 GiB allocation fails
+          assert resource.getrlimit(resource.RLIMIT_AS)[0] == 3145728 * 1024, resource.getrlimit(resource.RLIMIT_AS)
+          try:
+              bytearray(3584 * 1024 * 1024)
+          except MemoryError:
+              pass
+          else:
+              raise SystemExit("address-space limit not enforced")
+          # 2. the module imports and builds its engine
           ca,_=verified_trust()
           b=DatabaseBudget(connections=1,statements=24,seconds=60)
           b.engine(rr.url("POOLER","ingestion_worker_login","x"),ssl={"sslmode":"verify-full","sslrootcert":str(ca)},hostaddr="192.0.2.1",route="POOLER")
           b.close([])
           assert not q.admitted({})
-          try:psycopg.connect(host="localhost",hostaddr="127.0.0.1",port=9,dbname="x",user="x",password="x",sslmode="verify-full",sslrootcert=str(ca),connect_timeout=2)
-          except psycopg.OperationalError:pass      # refused: libpq and OpenSSL initialised under the same address-space limit
-          else:raise SystemExit("unexpected connection")
-          print("limits ok")
+          # 3. a real TLS negotiation: a local server with a self-signed certificate answers the PostgreSQL SSL request; verify-full against the trusted CA bundle must reject it at certificate verification
+          ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(os.environ["DRY_CRT"],os.environ["DRY_KEY"])
+          srv=socket.socket();srv.bind(("127.0.0.1",0));srv.listen(1);port=srv.getsockname()[1]
+          seen=[]
+          def serve():
+              conn,_=srv.accept();conn.settimeout(10)
+              try:
+                  conn.recv(8);conn.sendall(b"S")
+                  try:ctx.wrap_socket(conn,server_side=True)
+                  except ssl.SSLError as e:seen.append(type(e).__name__)
+              finally:conn.close()
+          t=threading.Thread(target=serve);t.start()
+          try:
+              psycopg.connect(host="localhost",hostaddr="127.0.0.1",port=port,dbname="x",user="x",password="x",sslmode="verify-full",sslrootcert=str(ca),connect_timeout=10)
+          except psycopg.OperationalError as e:
+              assert "certificate verify failed" in str(e), "unexpected failure (not a TLS verification failure): "+type(e).__name__
+          else:
+              raise SystemExit("unexpected connection")
+          t.join(15)
+          assert seen,"the server never completed a TLS negotiation with the client"
+          print("limits ok; tls negotiated and rejected at certificate verification")
           PY
           )
       - name: Fixed committee caller and field-level B2, network denied

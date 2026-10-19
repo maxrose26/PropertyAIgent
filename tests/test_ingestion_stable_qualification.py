@@ -235,44 +235,81 @@ def test_an_unexpected_error_keeps_the_attempts_already_made_in_the_accounting()
 
 
 def _handler():
-    def cancel(signum,frame):raise sq.Cancelled()
-    saved={s:signal.getsignal(s) for s in (signal.SIGTERM,signal.SIGINT)}
-    for s in saved:signal.signal(s,cancel)
-    return saved
+    return sq.install_cancellation()      # the module's real handler: records a request, raises only in an interruptible region
 
 
 def _restore(saved):
     for s,h in saved.items():signal.signal(s,h)
+    sq._Cancellation.requested=False;sq._Cancellation.interruptible=False
 
 
-def test_a_cancellation_while_the_budget_is_being_closed_leaves_a_started_unknown_attempt_not_a_lost_one():
+class _FailingBudget:
+    closed=0
+    def __init__(self,**kw):self.connection_diagnostics=[]
+    def engine(self,url,**kw):
+        @contextmanager
+        def connect():
+            raise RuntimeError('x')
+            yield
+        return SimpleNamespace(connect=connect)
+    def close(self,_):
+        type(self).closed+=1;return dict(connection_attempts=1,driver_statements=0,returned_data_value_bytes=0,connection_active_seconds=0.0,connections_opened=0,connections_closed_count=0,connections_closed=True,cleanup='CLOSED',cancel_attempts=0,cancel_failures=0,cancel_seconds=0.0,hard_deadline_events=[])
+
+
+def test_a_request_while_the_budget_is_being_closed_is_deferred_until_the_complete_record_exists():
+    saved=_handler();events=[]
+    class Budget(_FailingBudget):
+        def close(self,x):os.kill(os.getpid(),signal.SIGTERM);return _FailingBudget.close(self,x)      # lands in the non-interruptible closing section
+    try:
+        q=sq.Qualification(URLS,emit=lambda e,p:events.append(e),ssl={},hostaddr='192.0.2.1',budget_factory=Budget);r=q.run()
+    finally:_restore(saved)
+    a=r['roles'][WORKER]['attempts'][0]
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and a['receipt_basis']=='MEASURED' and a['client_closure_verified'] is True and events.count('qualification_attempt')==1
+
+
+def test_a_request_while_the_attempt_record_is_being_emitted_never_loses_or_truncates_it():
+    saved=_handler();events=[]
+    def emit(e,p):
+        events.append(e)
+        if e=='qualification_attempt':os.kill(os.getpid(),signal.SIGTERM)
+    try:
+        q=sq.Qualification(URLS,emit=emit,ssl={},hostaddr='192.0.2.1',budget_factory=_FailingBudget);r=q.run()
+    finally:_restore(saved)
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and events.count('qualification_attempt')==1 and r['roles'][WORKER]['attempts'][0]['receipt_basis']=='MEASURED'
+
+
+def test_a_request_inside_the_connection_section_is_the_interrupted_path_and_the_budget_is_still_closed():
     saved=_handler()
-    class Budget:
-        def __init__(self,**kw):self.connection_diagnostics=[]
-        def engine(self,url,**kw):
-            @contextmanager
-            def connect():
-                raise RuntimeError('x')
-                yield
-            return SimpleNamespace(connect=connect)
-        def close(self,_):os.kill(os.getpid(),signal.SIGTERM);return dict(cleanup='CLOSED',connections_closed=True)
+    class Budget(_FailingBudget):
+        closed=0
+        def engine(self,url,**kw):os.kill(os.getpid(),signal.SIGTERM);raise AssertionError('unreached: the request interrupts the region')
     try:
         q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=Budget);r=q.run()
     finally:_restore(saved)
     a=r['roles'][WORKER]['attempts'][0]
-    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and a['outcome']=='INTERRUPTED' and a['receipt'] is None and a['receipt_basis']=='UNKNOWN' and a['client_closure_verified'] is False
-    assert r['accounting']['attempts_started']['value']==1 and all(m['basis']=='LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN' for m in r['accounting']['metrics'].values()) and r['accounting']['client_closure']['status']=='NOT_VERIFIED_FOR_SOME_ATTEMPT'
+    assert a['outcome']=='INTERRUPTED' and a['reason_code']=='CANCELLED' and r['stop_reason']=='CANCELLED' and Budget.closed==1 and a['receipt_basis']=='MEASURED'
 
 
-def test_a_cancellation_before_the_budget_exists_still_counts_the_attempt_as_started_and_unknown():
-    saved=_handler()
-    def factory(**kw):os.kill(os.getpid(),signal.SIGTERM);raise AssertionError('unreached')
+def test_a_request_before_the_budget_exists_is_the_interrupted_path_with_unknown_measurements():
+    saved=_handler();calls=[]
+    def factory(**kw):calls.append(1);os.kill(os.getpid(),signal.SIGTERM);raise AssertionError('unreached')
     try:
         q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=factory);r=q.run()
     finally:_restore(saved)
     a=r['roles'][WORKER]['attempts'][0]
-    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and a['outcome'] in ('INTERRUPTED','STARTED_UNRESOLVED') and a['receipt'] is None and a['client_closure_verified'] is False
-    assert r['accounting']['attempts_started']['value']==1 and r['accounting']['metrics']['connection_attempts']['basis']!='MEASURED' and r['use_blocked'] is True
+    assert calls==[1] and a['outcome']=='INTERRUPTED' and a['reason_code']=='CANCELLED' and a['receipt'] is None and a['receipt_basis']=='UNKNOWN' and a['client_closure_verified'] is False
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and r['accounting']['attempts_started']['value']==1 and r['accounting']['metrics']['connection_attempts']['basis']=='LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN' and r['use_blocked'] is True
+
+
+def test_the_handler_outside_an_interruptible_region_only_records_the_request():
+    saved=_handler()
+    try:
+        os.kill(os.getpid(),signal.SIGTERM)      # must not raise
+        assert sq._Cancellation.requested is True and sq._Cancellation.interruptible is False
+        with pytest.raises(sq.Cancelled):
+            with sq.interruptible():pass      # a pending request is honoured at the next interruptible point
+        assert sq._Cancellation.interruptible is False
+    finally:_restore(saved)
 
 
 def test_a_receipt_missing_a_numeric_field_is_not_a_measured_zero():
@@ -288,11 +325,10 @@ def test_a_cancelled_preparation_is_reported_as_cancelled_not_as_a_credential_re
     assert r['stop_reason']=='CANCELLED' and r['accounting']['attempts_started']['value']==0 and all(m['basis']=='NOT_STARTED' for m in r['accounting']['metrics'].values())
 
 
-def test_a_signal_during_a_shielded_record_is_delivered_only_after_the_record_is_complete():
-    saved=_handler();done=[]
+def test_the_state_is_never_left_interruptible_after_a_request_unwinds_through_the_exit():
+    saved=_handler()
     try:
         with pytest.raises(sq.Cancelled):
-            with sq.shielded():
-                os.kill(os.getpid(),signal.SIGTERM);done.append('record written')      # still running: the signal is pending, not delivered
+            with sq.interruptible():os.kill(os.getpid(),signal.SIGTERM)
+        assert sq._Cancellation.interruptible is False
     finally:_restore(saved)
-    assert done==['record written']
