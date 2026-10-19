@@ -1,0 +1,38 @@
+{
+ "_carried_from": "restricted-connection-matrix base_constants (non-secret constants, unchanged) plus the approved operational limits",
+ "accepted_cleanup_evidence": "8dc4a36bc5565318e138d192bf2f7e96906f048f",
+ "baseline_control_sha256": "0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf",
+ "initial_control": {
+  "accepted_control_sha256": "0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf",
+  "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+  "global_stop": {
+   "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+   "run": "38884069913"
+  },
+  "hard_stop_generation": 1,
+  "manual_stop": "STORAGE_TEST_STOP"
+ },
+ "latest_disabled_access_evidence": "3d5d852748af9129a24d273eb14bdf1fb72192d2",
+ "limits": {
+  "administration": {"commands": 240, "connections": 13},
+  "cancellation": {"administrative": 3, "runtime": 8, "seconds_each": 2},
+  "role_settings": {"idle_in_transaction_session_timeout": "20s", "lock_timeout": "3s", "statement_timeout": "10s"},
+  "runtime": {"connections": 40, "seconds": 300, "statements": 1040},
+  "source": {"observations": 1, "pages": 6, "received_body_bytes": 3000000, "rows": 60, "screening_source_requests": 0, "transport_requests": 10}
+ },
+ "optional_writer": "HELD_NO_APPLICATION_WRITER",
+ "reuse_accepted_operational_installation": true,
+ "risk_acceptance": "ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE",
+ "roles": [
+  "ingestion_worker_login",
+  "ingestion_effect_login"
+ ],
+ "scope": {
+  "council": "bolton",
+  "end": "2026-10-16",
+  "kind": "DISCOVERY_SCOPE",
+  "semantics": "RECEIVED",
+  "start": "2026-10-16"
+ },
+ "status": "OWNER_APPROVED_REQUIRED_ONCE"
+}
