@@ -144,7 +144,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     policy_file=Path('docs/design/ingestion-operational-required-20261018/successor-policy.sql')
                     def function_statement(name):
                         m=re_.search(r'CREATE (?:OR REPLACE )?FUNCTION public\.'+name+r'\(.*?\$(\w*)\$.*?\$\1\$;',Path('docs/design/ingestion-operational-20261016/worker.sql').read_text(),re_.S)
-                        return m[0],'$'+m[1]+'$;'
+                        statement_=re_.sub(r'^CREATE (OR REPLACE )?FUNCTION','CREATE OR REPLACE FUNCTION',m[0])      # worker.sql creates; the rehearsal replaces
+                        return statement_,'$'+m[1]+'$;'
                     # 1. original installed state, preflight by a controller
                     first=fresh();first.preflight();assert first.preflight_report['policy_state']=='ORIGINAL'
                     # 2. the real installation path applies the reviewed successor policy; the lifecycle then completes with a verified teardown
