@@ -69,7 +69,7 @@ PIPELINE_MODE='STABLE_PIPELINE_AUTHORITY'
 PIPELINE_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_AUTHORITY_ONCE_20261020'
 PIPELINE_STATE='operational-stable-pipeline-once-20261020'
 PIPELINE_BINDING=dict(
-    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,poll_seconds=30,capture_wait_seconds=2400,screening_wait_seconds=900,
+    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2400,screening_wait_seconds=900,
     provisioning=dict(registration_sha256='b7e00b48d659b4fa83cd72d14efe734846c2d9d2e699f6998e509e3c3f280264',events_sha256='a26f9d1f51d8e908431cfdebf2bf20f6362b7bcbcecb35717a13935017155a19',
                       final_result_sha256='51aea5d5ce0a3515b369b0d098a5c3da73a210ff86034f1f9e368d654274d3e6'),
     qualification=dict(run_id=39284253302,artifact_id=12212818855,artifact_zip_sha256='b02da6fcf1658f627f4935db0a998fb3764498b3e15b6d57ad2ab135ba15db58',revision='46b9356d352efcde39df9e1505db582543adecee'),
@@ -77,8 +77,11 @@ PIPELINE_BINDING=dict(
 # Finite owner totals (normal, through invalidation, including failure diagnostics); pinned from the disposable rehearsal plus a small margin.
 PIPELINE_OWNER_LIMITS=dict(connections=(8,9),commands=(48,60,72))
 PIPELINE_GITHUB_BOUND=140
-PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4560,work_seconds=4440,diagnostic_seconds=40,report_seconds=20,outer_seconds=4800)
-PIPELINE_DEADLINES=dict(job=4260,diagnostic_total=4400,diagnostic_window=60,admin_diagnostic=300,admin_pre=4200,admin_total=4300,runtime_total=1)
+# Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
+# admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
+PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
+PIPELINE_DEADLINES=dict(job=4200,diagnostic_total=4320,diagnostic_window=60,admin_diagnostic=4300,admin_pre=4100,admin_total=4180,runtime_total=1)
+PIPELINE_BACKSTOP_SECONDS=4600
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -516,6 +519,7 @@ class Runner:
         self.emit('pipeline_capture_retained',dict(capture_sha256=digest(self.capture),rows=len(self.capture.get('records',[])),batches=len(self.plans),archive_sha256=archive['sha256']))
         if self.plans:
             self.operation_phase='PIPELINE_SCREENING_AUTHORITY'
+            self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(minutes=pb['screening_grant_minutes']))
             prepared=[]
             for record in self.capture['records']:
                 prepared.append(item(dict(subject=dict(kind='APPLICATION',council='bolton',reference=record['reference']),task='SCREENING',contract='listing-screen-v1',revision=digest(record)),dependencies=[self.capture_key]))

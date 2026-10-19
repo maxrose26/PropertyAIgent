@@ -61,14 +61,14 @@ printf '%s\n' \
   'STABLE-PIPELINE AUTHORITY. Effects:' \
   '  1. a FIXED READ-ONLY readback (one connection, at most 12 statements): logins, password PRESENCE, exact expiry, memberships, role settings, sessions (no query text), grants, stops. Any mismatch ends the run with nothing issued.' \
   '  2. ONE bounded Bolton RECEIVED 16 October 2026 capture authority + exception (source_calls=1, at most 55 minutes) under the UNCHANGED Salford stop and STORAGE_TEST_STOP.' \
-  '  3. after the restricted GitHub job has durably retained the capture: ONE source-free screening authority (source_calls=0).' \
+  '  3. after the restricted GitHub job has durably retained the capture: ONE source-free screening authority (source_calls=0, at most 30 minutes).' \
   '  4. both authorities are INVALIDATED and the readback repeated. NO password, membership, role setting or secret is changed; the standing logins stay as provisioned until you revoke them.' \
   'Keep this terminal open. Claude will dispatch the restricted job once the capture authority is recorded; you approve the protected environment in GitHub.'
 printf '%s\n' 'The 120-second hidden-input timer starts at the prompt below. Enter the existing migration credential only there (typing is not echoed). Never paste it into chat.'
 set +e
 systemd-run --user --scope \
   --unit=propertyaigent-operational-once \
-  -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=4900s \
+  -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=4600s \
   "$PY" -I -B -c \
   'import os,runpy,sys; sys.path.insert(0,os.getcwd()); runpy.run_module("verification.ingestion_storage.operational_runner",run_name="__main__")' \
   --registration "$REGISTRATION" --registration-sha256 "$REGISTRATION_SHA256"

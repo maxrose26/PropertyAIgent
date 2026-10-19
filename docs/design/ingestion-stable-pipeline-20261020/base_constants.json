@@ -32,7 +32,8 @@
    ],
    "authority": 2,
    "bolton_exception": 2,
-   "grant_minutes": 55
+   "grant_minutes": 55,
+   "screening_grant_minutes": 30
   },
   "hosted": {
    "actual_memory_bytes": {
@@ -77,9 +78,10 @@
   "timing": {
    "capture_wait_seconds": 2400,
    "hidden_input_seconds": 120,
-   "owner_active_seconds": 4560,
-   "owner_outer_seconds": 4800,
+   "owner_active_seconds": 4380,
+   "owner_outer_seconds": 4500,
    "poll_seconds": 30,
+   "process_backstop_seconds": 4600,
    "screening_wait_seconds": 900
   }
  },

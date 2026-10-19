@@ -15,8 +15,8 @@ Specification: `specifications/032-stage4-stable-credential-pipeline.md`. Nothin
 |---|---|
 | Readback (P0, and P3 repeat) | 1 connection, 9 statements used / ≤ 12 allowed, ≤ 20 s database-active, ≤ 30 s supervised-active, no retry |
 | Owner administration overall | ≤ 8 connections / ≤ 48 commands normal, ≤ 9 / 60 through invalidation, ≤ 9 / 72 with failure diagnostics (pinned from the disposable measurement) |
-| Owner session | hidden input 120 s; active ≤ 4,560 s; outer ≤ 4,800 s; process backstop 4,900 s; registration ≤ 110 minutes |
-| Authorities | capture ≤ 55 minutes (`source_calls=1`); screening `source_calls=0`; both invalidated at P3 |
+| Owner session | hidden input 120 s; active ≤ 4,380 s; outer ≤ 4,500 s; process backstop 4,600 s; registration ≤ 110 minutes |
+| Authorities | capture ≤ 55 minutes (`source_calls=1`); screening ≤ 30 minutes (`source_calls=0`); both invalidated at P3 |
 | Source | one observation; ≤ 10 transport requests, ≤ 3,000,000 received-body bytes, ≤ 6 pages, ≤ 60 rows |
 | Restricted runtime (capture + screening) | ≤ 1,040 driver statements, ≤ 40 connections, ≤ 300 s aggregate, per-slot ceilings as accepted |
 | Connection qualification (before any ledger work) | the reviewed qualification: ≤ 3 attempts per login, ≤ 6 total, 20 s then 60 s, ≤ 330 s; read-only |

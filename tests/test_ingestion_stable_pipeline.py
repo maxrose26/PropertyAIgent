@@ -201,3 +201,15 @@ def test_secrets_reach_the_job_only_through_the_environment_never_a_file_or_an_a
     for line in t.splitlines():
         if 'secrets.' in line:assert re.match(r'\s+INGESTION_(WORKER|EFFECT)_DATABASE_URL: \$\{\{ secrets\.',line)
     assert 'echo' not in ' '.join(l for l in t.splitlines() if 'DATABASE_URL' in l or 'GH_TOKEN' in l)
+
+
+def test_pipeline_deadline_ordering_invariants_hold_for_the_actual_constants():
+    d=orr.PIPELINE_DEADLINES;t=orr.PIPELINE_TIMING;b=orr.PIPELINE_BINDING
+    assert d['job']+d['diagnostic_window']<=t['work_seconds']                                         # a stop detected at the job limit still has its full failure window before the one-shot work alarm
+    assert t['work_seconds']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
+    assert d['admin_pre']<d['admin_total']<d['admin_diagnostic']<=d['diagnostic_total']
+    assert t['active_seconds']<t['outer_seconds']<orr.PIPELINE_BACKSTOP_SECONDS
+    assert b['capture_wait_seconds']+b['screening_wait_seconds']+600<=d['admin_pre']                    # both bounded waits plus the fixed phases fit the administrative allowance
+    assert b['grant_minutes']*60<d['job'] and b['screening_grant_minutes']<b['grant_minutes']          # the authority always ends before the controller's own limit
+    assert 'RuntimeMaxSec=%ds'%orr.PIPELINE_BACKSTOP_SECONDS in Path('docs/design/ingestion-stable-pipeline-20261020/owner-run.sh').read_text()
+    assert sp.HOSTED_DEADLINES['job']+240<=2100 and 40*60>2100                                          # the hosted hard kill (2,100 s) lies inside the 40-minute job limit and above the hosted job deadline
