@@ -584,7 +584,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         holder={}
         try:from .operational_source import read
         except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
-        github=GitHub(journal.emit,lambda:holder['runner'].check(),bound=PIPELINE_GITHUB_BOUND if r.get('mode')==PIPELINE_MODE else 40)
+        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode')==PIPELINE_MODE else {}))
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
         try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
