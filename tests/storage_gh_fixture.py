@@ -198,6 +198,7 @@ def real_gh_store(tmp_path,request):
         result=subprocess.run(args,input=kwargs.get('input'),stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,env=env,timeout=10,check=False)
         assert len(result.stdout)+len(result.stderr)<(3*1024**2 if operational else 32768)
+        if result.returncode and kwargs.get('allow_failure'):return result      # a read-only probe interprets the status itself (as the production runner's CompletedProcess allows)
         if result.returncode:
             # Fixture-only diagnostic categories; no raw CLI output or values.
             import hashlib

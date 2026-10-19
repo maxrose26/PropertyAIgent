@@ -38,6 +38,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
     mapped_values={}
     def cli(command,**kwargs):
         if command[1:3]==['secret','set']:mapped_values[command[3]]=kwargs['input'].decode()
+        if command[1:4]==['api','--method','GET']:kwargs['allow_failure']=True      # reads return their exit status and stderr (the production runner does), so a probe can tell a 404 from any other failure
         return metadata.cli(command,**kwargs)
     with psycopg.connect(raw,autocommit=True) as boot:
         boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER CREATEROLE CREATEDB BYPASSRLS NOINHERIT PASSWORD {}').format(sql.Identifier(role),sql.Literal(password)))
