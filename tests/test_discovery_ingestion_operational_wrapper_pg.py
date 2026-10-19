@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained','direct_diagnostic_success','direct_first_connection_rejected','direct_route_fallback_refused','direct_address_missing'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained','direct_diagnostic_success','direct_first_connection_rejected','direct_route_fallback_refused','direct_address_missing','direct_effect_rejected'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     retained=fault.endswith('_retained');fault=fault[:-len('_retained')] if retained else fault      # same scenario, started from the RETAINED upgraded installation of a previous run
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
@@ -279,10 +279,10 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     runner.url_factory=(lambda r_,p_:rr_.url('POOLER',r_,p_)) if fault=='direct_route_fallback_refused' else (lambda r_,p_:rr_.url('DIRECT',r_,p_))
                     runner.ssl={'sslmode':'verify-full','sslrootcert':str(ca)};runner.hostaddr='192.0.2.1'      # the ADMINISTRATIVE (pooler) address: must never be used for the restricted engines
                     runner.restricted_hostaddr=None if fault=='direct_address_missing' else '198.51.100.20'
-                    if fault=='direct_first_connection_rejected':
+                    if fault in {'direct_first_connection_rejected','direct_effect_rejected'}:
                         original_map_d=runner.owner.map_and_activate
                         def map_then_deny_d(*a,**k):
-                            original_map_d(*a,**k);boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN')
+                            original_map_d(*a,**k);boot.execute('ALTER ROLE '+('ingestion_worker_login' if fault=='direct_first_connection_rejected' else 'ingestion_effect_login')+' NOLOGIN')
                         runner.owner.map_and_activate=map_then_deny_d
                     lines=[]
                     result=session(journal,registration['expires_at'],lambda:'hidden fixture input',lambda raw_,started:runner,output=lambda line,**kw:lines.append(line),timing=orr_.MATRIX_TIMING)
@@ -303,6 +303,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         assert result['closure_components']['access']=='DISABLED_VERIFIED' and set(adm['first_connection_intervals'])=={'ingestion_worker_login','ingestion_effect_login'}
                     elif fault=='direct_first_connection_rejected':
                         assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and restricted_contacts==['ingestion_worker_login']      # effect never attempted, nothing retried
+                    elif fault=='direct_effect_rejected':
+                        assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and restricted_contacts==['ingestion_worker_login','ingestion_effect_login']      # the worker connected once, the effect was attempted once and refused; teardown still disabled everything
                     else:
                         assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and restricted_contacts==[]      # refused before ANY restricted contact
                     print('ROLLUP_DIRECT',fault,adm['commands'],adm['connections'],result['status'],result['cleanup'])

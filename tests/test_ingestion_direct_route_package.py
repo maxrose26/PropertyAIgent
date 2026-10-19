@@ -51,7 +51,7 @@ def test_the_limits_in_the_package_match_the_code_that_enforces_them():
     dict(restricted_route='POOLER'),dict(restricted_route=None),dict(execution_authority='CAPTURE'),dict(execution_authority=None),dict(risk_application='ANY_FUTURE_USE'),
     dict(predecessor=None),dict(predecessor={**orr.DIRECT_PREDECESSOR,'run_3':{**orr.DIRECT_PREDECESSOR['run_3'],'events_sha256':'0'*64}}),dict(predecessor=orr.SETTLED_R2_PREDECESSOR),
     dict(state_directory=orr.SETTLED_R2_STATE),dict(state_directory=None),dict(execution=None),dict(execution=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=2,retry=False,state_directory=orr.DIRECT_STATE)),
-    dict(owner_limits=dict(connections=[13,13],commands=[240,240,240])),dict(settling_seconds=30),dict(risk_acceptance='NONE'),dict(roles=['ingestion_worker_login']),dict(scope={'council':'salford'}),
+    dict(owner_limits=dict(connections=[13,13],commands=[240,240,240])),dict(settling_seconds=30),dict(settling_seconds=False),dict(settling_seconds=0.0),dict(risk_acceptance='NONE'),dict(roles=['ingestion_worker_login']),dict(scope={'council':'salford'}),
     dict(reuse_accepted_operational_installation=False),dict(baseline_control_sha256='0'*64),dict(revision='0'*40),dict(tree='0'*40),dict(controller_sha256='0'*64),dict(evidence_directory='docs/design/elsewhere'),
     dict(expires_at=(datetime.now(timezone.utc)+timedelta(hours=3)).isoformat()),dict(expires_at=(datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat()),
 ])

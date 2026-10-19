@@ -459,7 +459,7 @@ def validate_registration(body,sha):
     if r.get('mode')==DIRECT_MODE:
         if (r.get('restricted_route')!='DIRECT' or r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_DIRECT_ROUTE_DIAGNOSTIC_ONLY'
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=DIRECT_STATE) or r.get('state_directory')!=DIRECT_STATE
-            or r.get('owner_limits')!=dict(connections=list(DIRECT_OWNER_LIMITS['connections']),commands=list(DIRECT_OWNER_LIMITS['commands'])) or r.get('settling_seconds') not in (None,0)):raise ValueError('DIRECT_ROUTE_BINDING')
+            or r.get('owner_limits')!=dict(connections=list(DIRECT_OWNER_LIMITS['connections']),commands=list(DIRECT_OWNER_LIMITS['commands'])) or not (r.get('settling_seconds') is None or (type(r.get('settling_seconds')) is int and r['settling_seconds']==0))):raise ValueError('DIRECT_ROUTE_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
