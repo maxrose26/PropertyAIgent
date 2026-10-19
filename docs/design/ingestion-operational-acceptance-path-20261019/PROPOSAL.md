@@ -1,0 +1,52 @@
+# Operational acceptance path — release proposal (for review; nothing here is authorised or run)
+
+Status: PROPOSAL. No live connection, provisioning, matrix replay, ingestion or stop release is authorised by this document. Storage remains accepted. Stage 4 remains OPEN. All historical results and consumed authorities are preserved and are not reinterpreted by later code.
+
+## 1. What the live record establishes (and does not)
+| Source | Fact |
+|---|---|
+| Administrative probe (successor 2) | The administrative identity connects through the approved pooler with the reviewed options. Nothing about restricted logins. |
+| Restricted matrix (consumed) | Entry 1: worker, no options — rejected, classified `AUTHENTICATION_REJECTED`. Entry 2: worker, reviewed options — connected and ran the identity statement; the session did **not** carry the reviewed server timeouts (recorded as `IDENTITY_UNEXPECTED` by the *pre-correction* code, which merged identity and timeout checks; the consumed result is **not** reinterpreted). Entries 3–4 never ran. No cause of entry 1's rejection is established (order, time since installation, options, caching, propagation and provider behaviour all vary together). |
+| Cleanup (consumed) | The idle worker session reported at the matrix's teardown (pid 3175259) was already gone ≈9 h later; both logins `NOLOGIN`/NULL/no membership; both temporary secrets deleted (204 each), `DATABASE_URL` preserved. |
+
+## 2. The deadline question (resolved by inspection and a real blocked query)
+*Does a per-entry/query deadline remain enforced when server timeout settings are absent or ignored?*
+- **Before this proposal: no.** The matrix entry and the operational `DatabaseBudget` relied on the server `statement_timeout` (requested through startup options) plus elapsed-time checks that run only **before** a call. The matrix's live entry 2 shows a session can connect while the requested server timeouts are not reflected. The operational creator already refuses such a session (it requires `('10s','3s','20s')` and fails closed as `SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE`), but nothing bounded a blocked call on a session that did reflect them if the server or pooler stalled.
+- **Proof of the gap and the fix, against a real blocked query** (`pg_sleep(30)` on a server with `statement_timeout = 0`; a lock wait): `hard_deadline` (watchdog thread → signal to the main thread → handler raises out of psycopg's wait) interrupts at the client deadline; `abandon()` sends a bounded cancel then closes. **Closing alone does not end a running backend** (tested: the backend kept running after the client closed), so cancel is sent first and the session readback remains the only proof. It does not use SIGALRM (the session's one-shot work alarm is verified undisturbed); the process-level `HardDeadline` stays the outer backstop. Existing hard supervisors were reviewed: `HardDeadline` exits the whole controller (no teardown), and the source-worker supervisor is a process-level supervisor; neither bounds one driver call while keeping the controller alive to tear down.
+- **Two separate PRs, two separate approvals**: (a) matrix: every entry runs under the client deadline and reports `operational_deadline_acceptance: NOT_ESTABLISHED_BY_THIS_DIAGNOSTIC` (connection success ≠ deadline acceptance); (b) operational runtime: `DatabaseBudget` runs **every blocking driver wait of a runtime connection** (statements, BEGIN, COMMIT, ROLLBACK, pool reset) under the client deadline (12 s, strictly above the 10 s server timeout, which stays primary when reflected). It is applied at the connection's `wait` (the generator-based commands block there, not where they are constructed); a stalled COMMIT is tested through a socket that stops forwarding. Connection **establishment** is not covered by this deadline: it is bounded by `connect_timeout` (3 s) and, as a last resort, by the process-level `HardDeadline`. Contexts do not nest, signals are masked during teardown, and a signal that races a normal exit is ignored. (b) changes the accepted operational runtime path and is isolated for that reason.
+
+## 3. Qualification before any execution grant (reuse, do not rebuild)
+The accepted Runner already orders: lifecycle (preflight, install/reuse, fresh credentials, protected mapping, activation) → **both restricted engines connect and pass the profile check** → *only then* `owner.register` issues the authority. Proposal: keep that order and make the qualification explicit and sufficient — a qualifying result is **both** restricted logins connecting through the same factory the capture run will use, with (i) identity and restricted flags verified, (ii) the reviewed server timeouts **reflected** (existing check), and (iii) the client hard deadline active on every call (PR b). Failure of any element stops before any grant, with teardown. A connected-but-options-not-reflected session is **not** a qualification.
+
+## 4. Backend-session teardown: bounded, reviewed policy
+Evidence: after the matrix's teardown (NOLOGIN, NULL password, membership revoked) one idle backend of the worker login remained, which made the strict zero-session readback raise and left the temporary secrets undeleted; it was gone by the cleanup. Disposable test: a surviving session **loses membership-granted privileges immediately** when the membership is revoked (statement-time evaluation), while the session persists. Proposed policy, in order:
+1. Disable (existing): `NOLOGIN`, NULL password, membership revoked, capability role revoked — privileges of any surviving session end immediately; no new login.
+2. **Bounded wait**: up to 3 session reads, 0.5 s apart (≤ 3 extra commands).
+3. **Exact termination, only if still present**: at most the sessions of those two logins observed in the latest read, each bound by pid + role + backend start in one atomic statement (the matrix-cleanup statement), at most 2 terminations, only when the identity read shows the migration identity can see (`pg_read_all_stats`) and signal (`pg_signal_backend`) — otherwise no attempt.
+4. **Secrets are deleted independently** once the logins are verified disabled (as in the cleanup); a residual session is reported as such.
+5. A residual session after steps 2–3 is **UNCERTAIN, never CLOSED** (so a surviving session can no longer suppress the secret deletion, nor be hidden by it).
+The privilege facts (`pg_read_all_stats`, `pg_signal_backend`) are **unknown for the managed migration identity**: the cleanup run recorded no flags. They must be read (read-only, existing identity statement) before step 3 can be relied on; if absent, step 3 is skipped and reported, and no privilege is granted.
+
+## 5. From a qualifying result to the Bolton capture/screening test, without repeating setup
+Credentials are temporary by design (created, used and torn down within one run), so a separate qualification run **cannot hand its credentials to a later run**. The efficient path is therefore a **single run**: lifecycle → strengthened qualification (section 3) → [if and only if qualified] register one authority → capture-once (existing `capture_once`, retained single source request) → batched screening (existing `batch_allocation`, 1 040 statements / 40 connections / 300 s aggregate ceilings) → teardown with the section-4 policy. If qualification fails, the run stops before any grant and its teardown/diagnostics are the whole product; no separate matrix replay is needed. Reused unchanged: accepted storage state and its stops, the capture-once retention, the batching plans and the accounting receipts (`ControllerLedger`, `DatabaseBudget`).
+
+## 6. Items requiring approval (kept separate)
+| # | Item | Kind | Notes |
+|---|---|---|---|
+| A | Matrix client entry deadline + separate identity/timeout reporting (PR #136) | Code, diagnostic-only | No live use authorised. |
+| B | `DatabaseBudget` client hard deadline on every driver call (new PR) | Code, **accepted operational runtime path** | No permission change; denies any call over 12 s; accounting adds `hard_deadline_events`. |
+| C | Teardown session policy (section 4) | Code + budget | +≤3 reads, +≤2 terminations (one allow-listed statement), only with proven privilege; secrets deleted independently of session state; residual session = UNCERTAIN. |
+| D | Read the migration identity's `pg_read_all_stats`/`pg_signal_backend` membership | Read-only fact | No grant is proposed. |
+| E | Permissions | **None changed** | No privilege grants, no new accounts, no stronger privileges. |
+| F | Budgets | Capture run keeps the existing aggregate ceilings; teardown gains the small allowance in C | Any further change would be proposed separately. |
+| G | Stop disposition | **Requires its own explicit approval** | The capture test issues one time-bound authority/exception through the existing owner step under the unchanged global and manual stops (hard-stop generation 1 after the earlier cleanup); no stop is released by this proposal, and a fresh control readback must be bound into that registration. |
+| H | Residual-risk acceptance (possible provider SCRAM-verifier retention) | Must be explicitly re-bound to that run | Not extended by this document. |
+
+## 7. Existing PRs, individually
+| PR | Content | Evidence preservation | Recommended order / disposition |
+|---|---|---|---|
+| #133 | Admin-probe evidence archive, restricted-gap analysis with erratum, provider draft | Preserves the two admin-probe audits with hashes; the analysis text keeps the original wrong statement visible beside its erratum | Docs only, independent: merge first, whenever approved. |
+| #135 | Single-use matrix-cleanup controller (executed from its head `375601af…`) | The registration/audit bind that exact commit and tree | The executed code is single-use. Keep the head reachable (PR ref or a tag) in any case; merging is optional and gains nothing operationally. Do **not** merge it ahead of an evidence PR that publishes its audit. |
+| #136 | Matrix correction + client entry deadline (this branch) | Does not alter the consumed matrix result or any audit | Merge only after review; independent of #133/#135; deadline helper is shared with B (B is based on #136). |
+| new evidence PR | Matrix and cleanup audits with verified hashes | Durable publication of the complete verified audits | Docs only; independent; recommended before #135. |
+| B | `DatabaseBudget` deadline (based on #136) | – | After #136, with its own approval (item B). |
