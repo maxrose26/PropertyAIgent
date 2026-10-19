@@ -6,7 +6,7 @@ Stage 4 remains OPEN. Storage remains accepted. This is the offline implementati
 | Item | Value |
 |---|---|
 | PR | #151 (draft), branch `stage4/stable-credentials-20261020`, **stacked on PR #150** (`stage4/direct-route-20261020`, which stays preserved; its direct-route code is dormant — no registration selects it) |
-| Tested code state | `85014b4490e0eb3dfc23abdea82573a48a5eb64c`, tree `1f0113821572d7e8b9b68af35792ea9e85f8419a` (later commits on the branch are documentation only; the grouped provisioning → qualification → revocation handoff is `HANDOFF.md` in this folder) |
+| Tested code state | `6fccce96f500ddcda9e31f18eb5ae0e76956e00c`, tree `8a0b4c7fe176491feb03738030816330c6094bee` (later commits on the branch are documentation only; the grouped provisioning → qualification → revocation handoff is `HANDOFF.md` in this folder) |
 | Hosted checks at exactly that head | all pass: offline (three jobs), native, postgres-admission, restricted-provisioning (disposable PG17 rehearsals), web |
 | Review | full independent review (D1–D7, F1–F2), re-reviews of the receipt/cancellation corrections, and a focused review of the final cancellation fixes; exact-head hosted validation as above |
 
