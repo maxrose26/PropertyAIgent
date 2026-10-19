@@ -61,7 +61,7 @@ def test_environment_is_exclusive_to_live_job():
                 continue
             if (path,job_id)==('.github/workflows/stage4-stable-credential-qualification-once.yml','qualify'):
                 import hashlib
-                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='ee8b0fbc0327212cb4f696773305e35baca44b323eb415f48ddde6bc067fc88c'
+                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='625cd29355ebae37ffa2271edd2ceb431c341b9c964d4ac246f23924b7fcb1f1'
                 continue
             if (path,job_id)==('.github/workflows/stage4-ingestion-storage-catalogue-once.yml','catalogue'):
                 import hashlib

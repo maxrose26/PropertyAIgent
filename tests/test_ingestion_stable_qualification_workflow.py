@@ -44,3 +44,12 @@ def test_the_module_refuses_administrative_environment_and_has_no_admin_capabili
             sql=re.sub(r'has_table_privilege\([^)]*\)','',node.value)
             assert not re.search(r'(ALTER|INSERT|UPDATE|DELETE|GRANT|TRUNCATE|CREATE|DROP|pg_authid)',sql),sql[:60]      # reads only
     assert 'DATABASE_URL' in sq.FORBIDDEN_ENV and 'INGESTION_STORAGE_DATABASE_URL' in sq.FORBIDDEN_ENV
+
+
+def test_the_workflow_enforces_its_resource_limits_and_documents_what_it_does_not():
+    t=text()
+    assert 'ulimit -c 0; ulimit -n 64; ulimit -f 4096; ulimit -v 3145728' in t                       # core files, open files, file size (4 MiB), address space (3 GiB)
+    assert t.index('ulimit -v 3145728')<t.index('env -i PATH=/usr/bin:/bin') and 'timeout --kill-after=5s 345s' in t
+    from verification.ingestion_storage.operational_journal import Journal
+    import inspect
+    assert '1024**2' in inspect.getsource(Journal.emit)                                              # the audit journal is bounded at 1 MiB by code; stdout is one JSON line

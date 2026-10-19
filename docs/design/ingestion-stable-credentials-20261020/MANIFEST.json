@@ -46,6 +46,7 @@
   "tests/test_ingestion_owner_teardown_policy.py",
   "tests/test_ingestion_preflight_policy_state.py",
   "tests/test_ingestion_stable_qualification.py",
+  "tests/test_ingestion_stable_qualification_receipts.py",
   "tests/test_ingestion_stable_qualification_workflow.py",
   "tests/test_ingestion_statement_deadline.py",
   "verification/bolton_recon/__init__.py",

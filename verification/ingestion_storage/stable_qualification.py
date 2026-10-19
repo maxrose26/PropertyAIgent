@@ -12,7 +12,7 @@ What a restricted runtime can and cannot verify: it reads only what the two logi
 for the worker only - the control row it holds SELECT on). It cannot see other sessions or the password state; those are OWNER verifications (listed in the result).
 A failed qualification cannot disable anything (that needs the privileged revocation path): it reports the retained access and a blocked-for-use state.
 A manual stop in production is cancelling the workflow run (the STOP file under the output directory exists for local rehearsals; a hosted runner is ephemeral and nobody can create it)."""
-import argparse,json,os,sys,time
+import argparse,json,os,signal,sys,time
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 from .connection_diagnostics import safe_failure
@@ -35,7 +35,7 @@ ATTEMPT_SECONDS = 60                # the budget of ONE attempt: no attempt may 
 MIN_VALID_DAYS = 7
 FORBIDDEN_ENV = ('DATABASE_URL', 'INGESTION_STORAGE_DATABASE_URL', 'GH_TOKEN', 'GITHUB_TOKEN', 'PGPASSWORD', 'PGSERVICE', 'PGSERVICEFILE')
 OWNER_VERIFICATIONS = ('NO_OTHER_SESSIONS_OF_THE_TWO_LOGINS', 'PASSWORD_STATE_AND_EXACT_VALID_UNTIL_ON_THE_SERVER', 'NO_UNEXPIRED_GRANT_FOR_THE_EFFECT_VIEW', 'SERVER_SIDE_CLOSURE_OF_THE_QUALIFICATION_SESSIONS')
-STOP_REASONS = frozenset({'AUTH_REJECTED_EXHAUSTED', 'UNCERTAIN_CLOSURE', 'UNEXPECTED_PROFILE', 'OVERALL_DEADLINE', 'MANUAL_STOP', 'CIRCUIT_BREAKER_INDICATED', 'TLS_FAILURE', 'UNRECOGNISED_FAILURE', 'ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT'})
+STOP_REASONS = frozenset({'CANCELLED', 'AUTH_REJECTED_EXHAUSTED', 'UNCERTAIN_CLOSURE', 'UNEXPECTED_PROFILE', 'OVERALL_DEADLINE', 'MANUAL_STOP', 'CIRCUIT_BREAKER_INDICATED', 'TLS_FAILURE', 'UNRECOGNISED_FAILURE', 'ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT'})
 
 PROBE_SQL = ("SELECT r.rolvaliduntil,r.rolconnlimit,r.rolcanlogin,coalesce((SELECT array_agg(m.roleid::regrole::text ORDER BY m.roleid::regrole::text) FROM pg_auth_members m WHERE m.member=r.oid),ARRAY[]::text[]),"
              "pg_has_role(current_user,CAST(:cap AS name),'USAGE'),"
@@ -58,6 +58,14 @@ class Stop(Exception):
 class ProfileViolation(Exception):pass
 
 
+class Cancelled(BaseException):
+    """The run was cancelled (SIGTERM/SIGINT). A BaseException so that no generic handler can mistake it for a failure class."""
+
+
+RETAINED_ACCESS = 'BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION'
+USE_BLOCKED_SEMANTICS = 'QUALIFICATION_RESULT_ONLY_NOT_A_DURABLE_DATABASE_BARRIER_THE_LOGINS_STAY_ENABLED_UNTIL_THE_OWNER_REVOKES_AND_NO_GRANT_MAY_BE_ISSUED_FROM_THIS_MILESTONE'
+
+
 def admitted(env):
     """Single-use, protected-environment admission (the same shape as the other once-workflows), and no administrative credential in the environment."""
     sha = env.get('QUALIFICATION_REVIEWED_SHA', '')
@@ -67,11 +75,11 @@ def admitted(env):
 
 
 class Qualification:
-    def __init__(self, urls, *, emit, ssl, hostaddr, clock=time.monotonic, sleep=time.sleep, stop_file=None, budget_factory=DatabaseBudget):
+    def __init__(self, urls, *, emit, ssl, hostaddr, clock=time.monotonic, sleep=time.sleep, stop_file=None, budget_factory=DatabaseBudget, progress_sink=None):
         if set(urls) != set(ROLES):raise ValueError('EXACT_TWO_CREDENTIALS')
         self.urls = dict(urls);self.first_urls = dict(urls)       # compared on every attempt: the credential is never changed between attempts
         self.emit = emit;self.ssl = ssl;self.hostaddr = hostaddr;self.clock = clock;self.sleep = sleep;self.stop_file = Path(stop_file) if stop_file else None;self.budget_factory = budget_factory
-        self.started = clock();self.attempts = [];self.ran = False
+        self.started = clock();self.attempts = [];self.ran = False;self.progress = progress_sink or (lambda snapshot: None)
 
     # ------------------------------------------------------------------ waits and limits
     def check(self, starting_attempt=False):
@@ -109,28 +117,68 @@ class Qualification:
         from sqlalchemy.engine import make_url
         if rr.identify(make_url(self.urls[role])) != ('POOLER', role):raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT')
         budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)
-        began = self.clock();probe = None;reason = None
+        began = self.clock();probe = None;reason = None;status = 'FAILED';cancelled = False;refused = False
         try:
-            engine = budget.engine(self.urls[role], ssl=self.ssl, hostaddr=self.hostaddr, route='POOLER')
-        except Denied:
-            budget.close([]);raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT') from None
-        try:
-            with engine.connect() as connection:
-                probe = self.probe(connection, role, True)
-            status = 'CONNECTED'
-        except ProfileViolation:status, reason = 'FAILED', 'UNEXPECTED_PROFILE'
-        except Exception as exc:
-            status = 'FAILED'
-            seen = budget.connection_diagnostics[-1] if budget.connection_diagnostics else None
-            if seen is not None and seen.get('phase') == 'DRIVER_CONNECT':reason = seen.get('reason_code') or 'UNKNOWN'
-            elif isinstance(exc, Denied) and 'SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE' in str(exc):reason = 'UNEXPECTED_PROFILE'
-            else:reason = safe_failure(exc, 'EXECUTION')['reason_code']
-        receipt = budget.close([])
-        closure_ok = receipt.get('cleanup') == 'CLOSED' and receipt.get('connections_closed') is True
-        record = dict(role=role, ordinal=ordinal, spacing_waited_seconds=round(waited, 3), outcome=status, reason_code=reason, client_closure_verified=bool(closure_ok), connection_attempts=receipt.get('connection_attempts'),
-                      driver_statements=receipt.get('driver_statements'), elapsed_seconds=round(self.clock() - began, 3), credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=probe)
+            try:
+                engine = budget.engine(self.urls[role], ssl=self.ssl, hostaddr=self.hostaddr, route='POOLER')
+            except Denied:
+                refused = True;reason = 'ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT'
+            else:
+                try:
+                    with engine.connect() as connection:
+                        probe = self.probe(connection, role, True)
+                    status = 'CONNECTED'
+                except Cancelled:status, reason, cancelled = 'INTERRUPTED', 'CANCELLED', True
+                except ProfileViolation:reason = 'UNEXPECTED_PROFILE'
+                except Exception as exc:
+                    seen = budget.connection_diagnostics[-1] if budget.connection_diagnostics else None
+                    if seen is not None and seen.get('phase') == 'DRIVER_CONNECT':reason = seen.get('reason_code') or 'UNKNOWN'
+                    elif isinstance(exc, Denied) and 'SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE' in str(exc):reason = 'UNEXPECTED_PROFILE'
+                    else:reason = safe_failure(exc, 'EXECUTION')['reason_code']
+        except Cancelled:status, reason, cancelled = 'INTERRUPTED', 'CANCELLED', True
+        finally:
+            receipt = None
+            try:receipt = self.sanitise(budget.close([]))
+            except Exception:receipt = None      # closing failed or was interrupted: the measurements and the closure are UNKNOWN, never zero and never verified
+        closure_ok = receipt is not None and receipt.get('cleanup') == 'CLOSED' and receipt.get('connections_closed') is True
+        record = dict(role=role, ordinal=ordinal, spacing_waited_seconds=round(waited, 3), outcome=status, reason_code=reason, client_closure_verified=bool(closure_ok), elapsed_seconds=round(self.clock() - began, 3),
+                      credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=probe, receipt=receipt, receipt_basis='MEASURED' if receipt is not None else 'UNKNOWN')
         self.attempts.append(record);self.emit('qualification_attempt', record)
+        try:self.progress(self.accounting())
+        except Exception:pass      # a failed progress write never changes the sequence; the per-attempt event above is the durable record
+        if cancelled:raise Cancelled()
+        if refused:raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT')
         return record
+
+    # ------------------------------------------------------------------ the credential-free budget receipt of every attempt, and the cumulative accounting
+    RECEIPT_KEYS = ('connection_attempts', 'driver_statements', 'returned_data_value_bytes', 'connection_active_seconds', 'connections_opened', 'connections_closed_count', 'connections_closed', 'cleanup',
+                    'failed_native_connections_closed', 'socket_closure', 'statement_kinds', 'connection_diagnostics', 'hard_deadline_events', 'cancel_attempts', 'cancel_failures', 'cancel_seconds',
+                    'cancel_allowance', 'cancel_run_allowance', 'cancel_used_before', 'errors', 'elapsed_seconds')
+
+    @classmethod
+    def sanitise(cls, receipt):
+        """Whitelist of the budget receipt's own fields (allow-listed classifications, counters, durations); it never contains a URL, password, message or query text."""
+        return json.loads(json.dumps({k: receipt.get(k) for k in cls.RECEIPT_KEYS if k in receipt}, default=str))
+
+    @staticmethod
+    def accounting_for(attempts):
+        started = len(attempts);measured = [a for a in attempts if a.get('receipt') is not None]
+        basis = 'NOT_STARTED' if started == 0 else 'MEASURED' if len(measured) == started else 'LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN'
+        def total(key, nested=None):
+            return sum((a['receipt'].get(key) or 0) for a in measured) if nested is None else sum(len(a['receipt'].get(key) or []) for a in measured)
+        metrics = {'connection_attempts': total('connection_attempts'), 'driver_commands': total('driver_statements'), 'returned_database_value_bytes': total('returned_data_value_bytes'),
+                   'connection_active_seconds': round(total('connection_active_seconds'), 3), 'connections_opened': total('connections_opened'), 'connections_closed': total('connections_closed_count'),
+                   'cancel_attempts': total('cancel_attempts'), 'cancel_failures': total('cancel_failures'), 'cancel_seconds': round(total('cancel_seconds'), 3), 'hard_deadline_events': total('hard_deadline_events', nested=True)}
+        closed = sum(1 for a in attempts if a.get('client_closure_verified'))
+        return dict(attempts_started=dict(value=started, basis='MEASURED'), attempts_with_receipt=dict(value=len(measured), basis='MEASURED'),
+                    metrics={k: dict(value=v, basis=basis) for k, v in metrics.items()},
+                    client_closure=dict(verified_attempts=closed, attempts_started=started,
+                                        status='NOT_APPLICABLE_NO_ATTEMPT_STARTED' if started == 0 else 'VERIFIED_FOR_EVERY_ATTEMPT' if closed == started else 'NOT_VERIFIED_FOR_SOME_ATTEMPT',
+                                        basis='THE_CLIENT_SIDE_BUDGET_RECEIPT_ONLY'),
+                    server_session_verification='NOT_PERFORMED_BY_THE_RESTRICTED_RUNTIME_OWNER_VERIFICATION_REQUIRED')
+
+    def accounting(self):
+        return self.accounting_for(self.attempts)
 
     # ------------------------------------------------------------------ the finite procedure
     def run(self):
@@ -156,14 +204,25 @@ class Qualification:
                     if reason != 'AUTHENTICATION_REJECTED':raise Stop('UNRECOGNISED_FAILURE')
                     if n == MAX_PER_ROLE:raise Stop('AUTH_REJECTED_EXHAUSTED')
         except Stop as stopped:stop = stopped.reason
+        except Cancelled:stop = 'CANCELLED'
         except Exception:stop = 'UNRECOGNISED_FAILURE'      # attempts already made stay in the accounting
         done = len(qualified) == len(ROLES)
+        return self.result(done, stop, qualified)
+
+    def result(self, done, stop, qualified):
         return dict(status='STABLE_CREDENTIALS_QUALIFIED' if done else 'QUALIFICATION_STOPPED', stop_reason=None if done else stop,
                     roles={r: dict(qualified=qualified.get(r, False), attempts=[a for a in self.attempts if a['role'] == r]) for r in ROLES},
                     attempts_total=len(self.attempts), limits=dict(per_role=MAX_PER_ROLE, total=MAX_TOTAL, spacing_seconds=list(SPACING_SECONDS), overall_seconds=OVERALL_SECONDS),
-                    elapsed_seconds=round(self.clock() - self.started, 3), use_blocked=not done,
-                    retained_access=None if done else 'BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION',
-                    owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, exceptions_registered=0, source_requests=0, application_writes=0, administrative_credential_present=False)
+                    elapsed_seconds=round(self.clock() - self.started, 3), use_blocked=not done, use_blocked_semantics=USE_BLOCKED_SEMANTICS, accounting=self.accounting(),
+                    retained_access=None if done else RETAINED_ACCESS, owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, exceptions_registered=0, source_requests=0,
+                    application_writes=0, administrative_credential_present=False, grant_may_be_issued_from_this_milestone=False)
+
+
+def preparation_failure_result(kind):
+    """Preparation stopped before any database work: the measurements are NOT_STARTED (explicitly), the closure is NOT_APPLICABLE - neither is a measured zero or a verified closure."""
+    return dict(status='QUALIFICATION_STOPPED', stop_reason='ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT', attempts_total=0, use_blocked=True, use_blocked_semantics=USE_BLOCKED_SEMANTICS, detail=kind,
+                accounting=Qualification.accounting_for([]), retained_access=RETAINED_ACCESS, owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, exceptions_registered=0, source_requests=0,
+                application_writes=0, administrative_credential_present=False, grant_may_be_issued_from_this_milestone=False)
 
 
 def main(argv=None):
@@ -173,13 +232,14 @@ def main(argv=None):
     if not all(urls.values()):raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
     journal = Journal(args.output)
     journal.emit('consumed', dict(authority=AUTHORITY))
+    def cancel(signum, frame):raise Cancelled()
+    signal.signal(signal.SIGTERM, cancel);signal.signal(signal.SIGINT, cancel)      # a cancelled run keeps the receipts of the attempts already made and reports CANCELLED
     try:
         ca, _ = verified_trust();progress = Progress()
         hostaddr = resolve_addresses(progress)
-        q = Qualification(urls, emit=journal.emit, ssl={'sslmode': 'verify-full', 'sslrootcert': str(ca)}, hostaddr=hostaddr, stop_file=journal.root / 'STOP')
-    except Exception as exc:
-        result = dict(status='QUALIFICATION_STOPPED', stop_reason='ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT', attempts_total=0, use_blocked=True, detail=type(exc).__name__,
-                      retained_access='BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION', owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, source_requests=0, application_writes=0)
+        q = Qualification(urls, emit=journal.emit, ssl={'sslmode': 'verify-full', 'sslrootcert': str(ca)}, hostaddr=hostaddr, stop_file=journal.root / 'STOP', progress_sink=lambda snap: journal.save('progress.json', snap))
+    except (Exception, Cancelled) as exc:
+        result = preparation_failure_result(type(exc).__name__)
     else:result = q.run()      # run() keeps every attempt already made, whatever happens
     journal.emit('final', result);journal.save('final-result.json', result)
     print(json.dumps({k: result.get(k) for k in ('status', 'stop_reason', 'attempts_total', 'use_blocked')}, sort_keys=True))

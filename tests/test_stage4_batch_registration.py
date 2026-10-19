@@ -49,7 +49,7 @@ def test_workflow_scope():
             continue
         if path.name=='stage4-stable-credential-qualification-once.yml':
             # Exact separately authorised restricted-credential qualification (restricted secrets only; no administrative secret); no blanket exception.
-            assert hashlib.sha256(path.read_bytes()).hexdigest()=='ee8b0fbc0327212cb4f696773305e35baca44b323eb415f48ddde6bc067fc88c'
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='625cd29355ebae37ffa2271edd2ceb431c341b9c964d4ac246f23924b7fcb1f1'
             continue
         if path.name=='stage4-ingestion-storage-catalogue-once.yml':
             # Exact separately authorised catalogue-only access; no blanket exception.

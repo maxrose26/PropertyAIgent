@@ -382,6 +382,10 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     q1=qualify(secret_urls);q2=qualify(dict(secret_urls))
                     for q_ in (q1,q2):
                         assert q_['status']=='STABLE_CREDENTIALS_QUALIFIED' and q_['attempts_total']==2 and q_['use_blocked'] is False and q_['grants_issued']==0 and q_['administrative_credential_present'] is False
+                    for q_ in (q1,q2):      # the cumulative accounting of a real success: measured, credential-free, client closure from the receipts only
+                        acc_=q_['accounting'];assert acc_['metrics']['connection_attempts']==dict(value=2,basis='MEASURED') and acc_['metrics']['driver_commands']['value']>0 and acc_['metrics']['driver_commands']['basis']=='MEASURED' and acc_['metrics']['returned_database_value_bytes']['value']>0
+                        assert acc_['metrics']['cancel_attempts']==dict(value=0,basis='MEASURED') and acc_['client_closure']['status']=='VERIFIED_FOR_EVERY_ATTEMPT' and acc_['server_session_verification'].startswith('NOT_PERFORMED_BY_THE_RESTRICTED_RUNTIME')
+                        assert all(a_['receipt_basis']=='MEASURED' and a_['receipt']['cleanup']=='CLOSED' and a_['receipt']['connection_attempts']==1 for r_ in q_['roles'].values() for a_ in r_['attempts'])
                     wprobe=q1['roles'][WORKER_]['attempts'][0]['probe'];assert wprobe['valid_days_remaining']>=89 and wprobe['memberships']==['ingestion_worker'] and wprobe['control_row']['unexpired_grants']==0 and wprobe['control_row']['global_stop_set'] is True
                     assert q1['roles'][EFFECT_]['attempts'][0]['probe']['control_row'] is None and pooler_users==[WORKER_,EFFECT_,WORKER_,EFFECT_]       # one attempt per role per invocation; same credentials
                     assert sessions_of_roles()==0 and secret_urls[WORKER_]==mapped_values['INGESTION_WORKER_DATABASE_URL']                               # (the server-side session readback here is the disposable test's own, not the runtime's)
