@@ -59,6 +59,7 @@ class HostedOwner:
     def register(self,items,authority,*,capture_key,source_calls,prepared=()):
         if source_calls!=0 or not authority.endswith('_SCREEN'):raise Denied('HOSTED_JOB_CANNOT_REGISTER_AUTHORITY')
         bindings=bindings_for([*items,*prepared])
+        self.runner.publish_retained()      # the ledger checkpoint is durable now: tell the owner (it verifies in the database; this marker is not an authority)
         self.runner.await_marker(bindings)
         return bindings
 
@@ -78,7 +79,7 @@ class HostedRunner(Runner):
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
-        self.pipeline_sleep=time.sleep;self.authority_check=None
+        self.pipeline_sleep=time.sleep;self.authority_check=None;self.retained_published=False
 
     def check(self):
         if sq._Cancellation.requested:raise Denied('CANCELLED')
@@ -86,6 +87,19 @@ class HostedRunner(Runner):
 
     def head(self):
         return self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
+
+    def capture_once(self):
+        self.retained_published=False
+        super().capture_once()
+        self.publish_retained()      # also covers a capture with no screening batches or a blocked capture
+
+    def publish_retained(self):
+        """Idempotent. The raw source is archived on the evidence branch BEFORE the ledger checkpoint is made durable (accepted order). This second, non-authoritative marker says the checkpoint is
+        complete; the owner then verifies it in the database before registering anything."""
+        if self.retained_published or self.capture is None:return
+        marker=dict(capture_sha256=digest(self.capture),kind=self.capture.get('kind'))
+        self.evidence_head=self.github.publish({'retained.json':json.dumps(marker,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/capture-retained',expected_head=self.evidence_head)
+        self.retained_published=True;self.emit('capture_retained_marker_published',dict(head=self.evidence_head))
 
     def await_marker(self,bindings):
         """Poll the evidence branch (no database connection) for the OWNER's screening-authority marker. The marker is not an authority: the authority is in the database and is enforced there when

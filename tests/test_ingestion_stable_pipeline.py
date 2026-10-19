@@ -209,7 +209,19 @@ def test_pipeline_deadline_ordering_invariants_hold_for_the_actual_constants():
     assert t['work_seconds']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
     assert d['admin_pre']<d['admin_total']<d['admin_diagnostic']<=d['diagnostic_total']
     assert t['active_seconds']<t['outer_seconds']<orr.PIPELINE_BACKSTOP_SECONDS
-    assert b['capture_wait_seconds']+b['screening_wait_seconds']+600<=d['admin_pre']                    # both bounded waits plus the fixed phases fit the administrative allowance
+    assert b['capture_wait_seconds']+b['retention_wait_seconds']+b['screening_wait_seconds']+600<=d['admin_pre']                    # both bounded waits plus the fixed phases fit the administrative allowance
     assert b['grant_minutes']*60<d['job'] and b['screening_grant_minutes']<b['grant_minutes']          # the authority always ends before the controller's own limit
     assert 'RuntimeMaxSec=%ds'%orr.PIPELINE_BACKSTOP_SECONDS in Path('docs/design/ingestion-stable-pipeline-20261020/owner-run.sh').read_text()
     assert sp.HOSTED_DEADLINES['job']+240<=2100 and 40*60>2100                                          # the hosted hard kill (2,100 s) lies inside the 40-minute job limit and above the hosted job deadline
+
+
+def test_the_retained_marker_is_published_once_after_the_checkpoint_and_carries_no_authority(tmp_path):
+    published=[]
+    class Pub(FakeGitHub):
+        def publish(self,files,*,directory,expected_head):
+            published.append((directory,sorted(files)));return '3'*40
+    runner=hosted(tmp_path,Pub(['1'*40]));runner.capture=dict(kind='LISTING_RECEIPT_V1',records=[])
+    runner.publish_retained();runner.publish_retained()
+    assert published==[(sp.EVIDENCE_DIRECTORY+'/capture-retained',['retained.json'])] and runner.evidence_head=='3'*40
+    empty=hosted(tmp_path/'none',Pub(['1'*40]));empty.publish_retained()
+    assert len(published)==1      # nothing is published without a capture

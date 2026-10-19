@@ -82,6 +82,7 @@
    "owner_outer_seconds": 4500,
    "poll_seconds": 30,
    "process_backstop_seconds": 4600,
+   "retention_wait_seconds": 300,
    "screening_wait_seconds": 900
   }
  },
