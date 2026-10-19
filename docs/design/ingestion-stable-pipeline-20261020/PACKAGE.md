@@ -21,7 +21,7 @@ Specification: `specifications/032-stage4-stable-credential-pipeline.md`. Nothin
 | Restricted runtime (capture + screening) | ≤ 1,040 driver statements, ≤ 40 connections, ≤ 300 s aggregate, per-slot ceilings as accepted |
 | Connection qualification (before any ledger work) | the reviewed qualification: ≤ 3 attempts per login, ≤ 6 total, 20 s then 60 s, ≤ 330 s; read-only |
 | Hosted job | 40-minute job limit; hard kill 2,100 s; **actual memory** 1.5 GiB aggregate / 256 MiB controller / 1 GiB source, no swap, OOM-group kill (cgroup v2) — an address-space limit is not used and is not described as this |
-| GitHub requests | owner ≤ 160 (worst case 147: see the itemised table below), hosted ≤ 140 (worst case about 100) |
+| GitHub requests | owner ≤ 180 (worst case 166: see the itemised table below), hosted ≤ 140 (worst case about 80) |
 
 ## Failure disposition (execution authority vs standing credentials)
 See specification section 7. Execution authority is always ended by P3 (or by its own ≤ 55-minute expiry if the owner session is lost). Standing credentials are never touched by this package; ending them is the separately registered `STABLE_CREDENTIAL_REVOCATION` (a fresh registration is rendered for the integrated revision when needed).
@@ -45,19 +45,19 @@ Any production registration, dispatch, grant, exception, source call, applicatio
 | failure after the normal path: reserved invalidation 12 + diagnostics 7 (measured 90 commands / 9 connections including the connections the failed run had already used) | 71 modelled, 90 measured | up to 9 |
 Allowances: **56 / 80 / 96 commands** (normal 52 + 4, end-of-run 73 + 7, failure 90 + 6) and **8 / 10 connections** (7 and 9 measured, each with a reserve). The earlier placeholder of 48 / 60 / 72 was exhausted by the normal path (52 > 48).
 
-**Owner GitHub requests** (allowance 160; the worst case below is computed by `tests/test_ingestion_stable_pipeline.py::owner_worst_case_github_requests` from the constants and the publisher's own request structure, and the test asserts at least ten requests of reserve):
+**Owner GitHub requests** (allowance 180; the worst case below is computed by `tests/test_ingestion_stable_pipeline.py::owner_worst_case_github_requests` from the constants and the publisher's own request structure, and the test asserts at least ten requests of reserve; each distinct evidence head is examined at most 3 times so that one transient 404 cannot hide a published file):
 | Item | Requests |
 |---|---|
 | account check | 1 |
-| freshness check before anything is issued (one ref read, three absent-file probes) | 4 |
-| wait for the retained marker or an early result: 2,700 s at the production 30 s interval = 90 polls + 1 boundary poll = 91 ref reads, plus up to 2 probes for each of 3 distinct heads observed | 97 |
+| freshness check before anything is issued (one ref read, the README.md anchor, three absent-file probes) | 5 |
+| wait for the retained marker or an early result: 2,700 s at the production 30 s interval = 90 polls + 1 boundary poll = 91 ref reads, plus up to 2 files x 3 examinations for each of 3 distinct heads observed | 109 |
 | source archive probe and re-read of the retained marker at the observed head | 2 |
-| screening marker publication (publisher: ref, commit, 1 blob, tree, commit, patch, ref, 1 file readback = 6 + 2×1) | 8 |
-| wait for the restricted job's result: 600 s = 20 polls + 1 = 21 ref reads, plus 1 probe for each of 3 heads | 24 |
-| owner evidence publication (2 files = 6 + 2×2) | 10 |
+| screening marker publication (publisher: ref, commit, 1 blob, tree, commit, patch, ref, 1 file readback = 6 + 2x1) | 8 |
+| wait for the restricted job's result: 600 s = 20 polls + 1 = 21 ref reads, plus 1 file x 3 examinations for each of 3 heads | 30 |
+| owner evidence publication (2 files = 6 + 2x2) | 10 |
 | failure-path secret-name read | 1 |
-| **worst case** | **147 of 160 (reserve 13)** |
-The disposable rehearsal polls at 1 s through a test-only override of the binding (the production constant stays 30 s and is asserted by a unit test); at 0.1 s it exhausted the bound, which is how the first lifecycle runs ended after the invalidation had already committed.
+| **worst case** | **166 of 180 (reserve 14)** |
+Commits made to the evidence branch by anyone other than the two controllers during a run are outside the design: they would be examined (up to 3 probes each) and would move the head under the publication guard, which then refuses (`EVIDENCE_HEAD_MOVED_RECONCILE`) rather than overwrite. The disposable rehearsal polls at 1 s through a test-only override of the binding (the production constant stays 30 s and is asserted by a unit test); at 0.1 s it exhausted the bound, which is how the first lifecycle runs ended after the invalidation had already committed.
 
 **Hosted job**: GitHub requests ≤ 140 (polling for the owner marker at 15 s over 480 s = 32, three publications of about 8 = 24, plus reads); 40-minute job limit; hard kill 2,100 s; actual memory 1.5 GiB aggregate / 256 MiB controller / 1 GiB source with no swap (cgroup v2, proved on a hosted runner).
 
@@ -66,3 +66,6 @@ The restricted job publishes the archive and, seconds later, the retained marker
 
 ## Markers belong to this execution (existence is never acceptance)
 Every file the two controllers exchange on the evidence branch names the execution it belongs to - the reviewed revision, the manifest, the capture root key, the evidence head the run was registered against and the authority - and the capture it concerns. The owner accepts the retained marker only if that identity matches, its capture digest and kind equal the checkpoint the DATABASE holds, and its archive digest equals both the checkpoint's recorded archive digest and the bytes of the archived source on the branch. The restricted job accepts the owner's marker only if the identity matches and the screening bindings and capture digest equal those it recomputes locally. The owner accepts the restricted job's result only for this execution and (once a capture exists) this capture. A restricted job that ends without retaining a capture publishes an execution-bound result, which the owner reads at once and ends the ceremony on (instead of holding it open for the retention window). Only a confirmed HTTP 404 means "not published yet"; every other failure, and any file whose content does not match its git blob identity, is Uncertain.
+
+## Evidence-branch reads
+Only a confirmed HTTP 404 (gh's final line `... (HTTP 404)`) means "not published yet"; a message that merely mentions 404, an empty successful answer, and every other failure are Uncertain. A 404 for the evidence files is meaningful only if the same read of the branch finds the `README.md` anchor, which both controllers require before they rely on absence (a wrong ref or directory would otherwise look like "not yet" and hold the ceremony open). The raw source archived on the branch is bounded at 512 KiB by the accepted source worker, below the 1 MB limit of the contents API's inline body that the readbacks depend on.

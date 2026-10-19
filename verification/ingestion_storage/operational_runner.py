@@ -80,9 +80,9 @@ PIPELINE_BINDING=dict(
 # the reserved invalidation (12) and diagnostics (7). The allowances keep a reserve so that ENDING an authority and diagnosing can never be refused for want of capacity. The earlier
 # placeholder (48 / 60 / 72) was exhausted by the normal path (52 > 48), which is how the invalidation was left undone in the first rehearsal.
 PIPELINE_OWNER_LIMITS=dict(connections=(8,10),commands=(56,80,96))
-# GitHub requests (owner): polling at poll_seconds for the three bounded waits (2,400 + 300 + 600 s at 30 s = at most 110 polls) plus about 8 requests per publication (marker, final evidence), the user check and
-# the failure-path name/ref reads. Measured arithmetic is asserted in tests/test_ingestion_stable_pipeline.py; the bound keeps a reserve above it.
-PIPELINE_GITHUB_BOUND=160
+# GitHub requests (owner): the worst case is itemised and asserted in tests/test_ingestion_stable_pipeline.py::owner_worst_case_github_requests (polls of the two bounded waits at 30 s, each distinct head
+# examined up to three times, the freshness and anchor probes, both publications with their readbacks, the account check and the failure-path read); the bound keeps a reserve above it.
+PIPELINE_GITHUB_BOUND=180
 # Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
 # admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
 PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
@@ -495,10 +495,17 @@ class Runner:
         if blob is None:return None
         blob_bytes(blob);return blob
 
+    EVIDENCE_ANCHOR='README.md'      # a file that exists on the evidence branch; a 404 for the evidence files means something only if the same read of the branch finds this one
+    REPROBES=3      # each distinct head is examined at most this many times (on successive polls): a just-published commit can briefly answer 404 from another replica
+
+    def require_evidence_anchor(self,head):
+        if self.github.probe(self.EVIDENCE_CONTENTS+self.EVIDENCE_ANCHOR+'?ref='+head) is None:raise Uncertain('EVIDENCE_BRANCH_ANCHOR_MISSING')
+
     def require_fresh_evidence_directory(self):
         """The two restricted-job markers must not exist yet: a leftover from any earlier run would otherwise be mistaken for this run's publication."""
         head=self.evidence_head_now()
         if head!=self.evidence_head:raise Uncertain('EVIDENCE_HEAD_MOVED')
+        self.require_evidence_anchor(head)
         for relative in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
             if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
 
@@ -527,13 +534,13 @@ class Runner:
     def await_any(self,relatives,seconds):
         """Bounded wait until one of `relatives` EXISTS in the evidence directory at the CURRENT head of the evidence branch (earlier entries take priority when several exist). Presence-based, never
         change-based: the restricted job publishes several commits within seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would
-        miss the one it is waiting for). Each distinct head is probed once; the first probe is of the head as it stands. Timeout is a stop (no retry, no replay). Returns (head, relative, blob)."""
-        deadline=time.monotonic()+seconds;probed=None
+        miss the one it is waiting for). Each distinct head is examined at most REPROBES times (on successive polls, so one transient 404 cannot hide a published file); the first examination is of the head as it stands. Timeout is a stop (no retry, no replay). Returns (head, relative, blob)."""
+        deadline=time.monotonic()+seconds;probes={}
         while True:
             self.check();self.stop_requested()
             head=self.evidence_head_now()
-            if head!=probed:
-                probed=head
+            if probes.get(head,0)<self.REPROBES:
+                probes[head]=probes.get(head,0)+1
                 for relative in relatives:
                     blob=self.evidence_file(head,relative)
                     if blob is not None:return head,relative,blob

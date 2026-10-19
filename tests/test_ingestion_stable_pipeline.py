@@ -122,10 +122,14 @@ class FakeGitHub:
         if '/git/ref/heads/' in path:
             head=self.timeline[min(self.ref_calls,len(self.timeline)-1)][0];self.ref_calls+=1;return {'object':{'sha':head}}
         raise AssertionError(path)
+    transient_404=None      # {(relative, head): n} - the first n probes of that file at that head answer 404 although it is there (a replica that has not caught up)
     def probe(self,path):
         self.requests+=1
         relative,head=path.split('/contents/')[1].split('?ref=')
         files=dict(self.timeline)[head]
+        key=(relative.split(sp.EVIDENCE_DIRECTORY+'/')[-1],head)
+        if self.transient_404 and self.transient_404.get(key,0)>0:
+            self.transient_404[key]-=1;return None
         return blob_response(files[relative]) if relative in files else None
 
 
@@ -257,9 +261,9 @@ def blob_response(raw,**extra):
     return dict(content=base64.b64encode(raw).decode(),sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),**extra)
 
 
-def cumulative(*steps):
-    """steps: [(head, {relative: bytes})] - each commit ADDS files; every later head contains all earlier ones, as a real tree does."""
-    out=[];files={}
+def cumulative(*steps,anchor=True):
+    """steps: [(head, {relative: bytes})] - each commit ADDS files; every later head contains all earlier ones, as a real tree does. The branch's README.md anchor is in every commit."""
+    out=[];files={'README.md':b'anchor'} if anchor else {}
     for head,added in steps:
         files=dict(files,**{sp.EVIDENCE_DIRECTORY+'/'+k:v for k,v in added.items()});out.append((head,dict(files)))
     return out
@@ -276,18 +280,33 @@ def test_the_owner_wait_is_presence_based_and_finds_the_file_when_the_poll_only_
     assert blob_bytes(runner.evidence_file(head,'capture/source.json'))==b'{"raw":1}'      # the archive written before the marker is still there at head B
 
 
-def test_the_owner_wait_probes_each_head_once_and_is_bounded():
+def test_the_owner_wait_examines_each_head_a_bounded_number_of_times_and_is_bounded():
     github=FakeGitHub(None,timeline=cumulative(('1'*40,{})));probes=[]
     original=github.probe;github.probe=lambda path:(probes.append(path),original(path))[1]
     runner=owner_stub(github);sleeps=[]
     def sleeper(seconds):
         sleeps.append(seconds)
-        if len(sleeps)==3:raise Denied('TEST_STOP_AFTER_THREE_POLLS')
+        if len(sleeps)==6:raise Denied('TEST_STOP_AFTER_SIX_POLLS')
     runner.pipeline_sleep=sleeper
-    with pytest.raises(Denied,match='TEST_STOP_AFTER_THREE_POLLS'):runner.await_file('capture-retained/retained.json',3600)
-    assert len(probes)==1 and github.ref_calls==3      # the unchanged head was probed once, not on every poll
+    with pytest.raises(Denied,match='TEST_STOP_AFTER_SIX_POLLS'):runner.await_file('capture-retained/retained.json',3600)
+    assert len(probes)==orr.Runner.REPROBES==3 and github.ref_calls==6      # an unchanged head is examined REPROBES times, then only the cheap ref read continues
     zero=FakeGitHub(None,timeline=cumulative(('1'*40,{})))
     with pytest.raises(Denied,match='HOSTED_PUBLICATION_WAIT_EXPIRED'):owner_stub(zero).await_file('capture-retained/retained.json',0)      # a zero-second wait still examines the head once, then stops
+
+
+def test_a_transient_404_for_a_published_file_at_the_current_head_does_not_hide_it():
+    timeline=cumulative(('1'*40,{}),('b'*40,{'capture-retained/retained.json':b'{"m":1}'}))
+    github=FakeGitHub(None,timeline=timeline);github.ref_calls=1      # the branch stands at head B throughout
+    github.transient_404={('capture-retained/retained.json','b'*40):2}      # the first two probes answer 404 although the file is there
+    head,blob=owner_stub(github).await_file('capture-retained/retained.json',3600)
+    assert head=='b'*40 and blob_bytes(blob)==b'{"m":1}'
+    never=FakeGitHub(None,timeline=timeline);never.ref_calls=1;never.transient_404={('capture-retained/retained.json','b'*40):99}
+    r=owner_stub(never);slept=[]
+    def stop(seconds):
+        slept.append(1)
+        if len(slept)==8:raise Denied('TEST_STOP')
+    r.pipeline_sleep=stop
+    with pytest.raises(Denied,match='TEST_STOP'):r.await_file('capture-retained/retained.json',3600)      # a persistent 404 is bounded: three examinations, then waiting for a NEW head (or the wait bound)
 
 
 def test_the_owner_wait_refuses_a_file_whose_identity_does_not_match_its_content():
@@ -299,12 +318,29 @@ def test_the_owner_wait_refuses_a_file_whose_identity_does_not_match_its_content
 
 
 def test_the_owner_requires_a_fresh_evidence_directory_before_it_issues_anything():
-    clean=FakeGitHub(None,timeline=[('1'*40,{})]);owner_stub(clean).require_fresh_evidence_directory()
+    clean=FakeGitHub(None,timeline=cumulative(('1'*40,{})));owner_stub(clean).require_fresh_evidence_directory()
     for leftover in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
         dirty=FakeGitHub(None,timeline=cumulative(('1'*40,{leftover:b'{}'})))
         with pytest.raises(Uncertain,match='EVIDENCE_DIRECTORY_NOT_FRESH'):owner_stub(dirty).require_fresh_evidence_directory()
-    moved=FakeGitHub(None,timeline=[('9'*40,{})])
+    moved=FakeGitHub(None,timeline=[('9'*40,{'README.md':b'a'})])
     with pytest.raises(Uncertain,match='EVIDENCE_HEAD_MOVED'):owner_stub(moved).require_fresh_evidence_directory()
+    unreadable=FakeGitHub(None,timeline=cumulative(('1'*40,{}),anchor=False))      # the branch cannot be read at all (wrong ref/path): a vacuous 404 must not pass the freshness check
+    with pytest.raises(Uncertain,match='EVIDENCE_BRANCH_ANCHOR_MISSING'):owner_stub(unreadable).require_fresh_evidence_directory()
+
+
+def test_probe_accepts_only_the_final_404_line_and_never_an_empty_answer_as_absence():
+    import subprocess
+    def runner_for(returncode,stdout=b'',stderr=b''):
+        return lambda command,**kw:subprocess.CompletedProcess(command,returncode,stdout,stderr)
+    for stderr in (b'gh: Not Found (HTTP 404)',b'gh: Not Found (HTTP 404)\n'):
+        assert GitHub(lambda *a:None,lambda:None,runner=runner_for(1,stderr=stderr)).probe('p') is None
+    for stderr in (b'error contacting proxy: HTTP 404 from upstream cache',b'gh: Bad Gateway (HTTP 502) while reading HTTP 404 fixture',b'HTTP 404 retry later'):
+        with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=runner_for(1,stderr=stderr)).probe('p')      # a message that merely mentions 404 is not a 404
+    with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=runner_for(0,stdout=b'')).probe('p')      # success with no content is not evidence of absence
+    events=[]
+    GitHub(lambda e,p=None:events.append((e,p)),lambda:None,runner=runner_for(1,stderr=b'gh: Not Found (HTTP 404)')).probe('p')
+    GitHub(lambda e,p=None:events.append((e,p)),lambda:None,runner=runner_for(0,stdout=b'{"content":"","sha":"s"}')).probe('p')
+    assert [p['result'] for e,p in events if e=='github_ack']==['ABSENT_HTTP_404','PRESENT']      # the audit records what was answered
 
 
 def test_probe_treats_http_404_as_absent_and_every_other_failure_as_uncertain():
@@ -318,7 +354,7 @@ def test_probe_treats_http_404_as_absent_and_every_other_failure_as_uncertain():
     for rc,err in ((1,b'gh: Internal Server Error (HTTP 500)'),(1,b'connection reset'),(4,b'')):
         with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=runner_for(rc,stderr=err)).probe('p')
     with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=lambda command,**kw:(_ for _ in ()).throw(subprocess.TimeoutExpired(command,5))).probe('p')
-    bounded=GitHub(lambda *a:None,lambda:None,runner=runner_for(1,stderr=b'HTTP 404'),bound=1);bounded.probe('p')
+    bounded=GitHub(lambda *a:None,lambda:None,runner=runner_for(1,stderr=b'gh: Not Found (HTTP 404)'),bound=1);bounded.probe('p')
     with pytest.raises(ValueError,match='GITHUB_REQUEST_BOUND'):bounded.probe('p')
 
 
@@ -405,13 +441,14 @@ def publish_requests(files):
 def owner_worst_case_github_requests():
     b=orr.PIPELINE_BINDING
     polls=lambda wait:-(-wait//b['poll_seconds'])+1      # one ref read per poll plus the boundary poll
-    retained_heads=3;result_heads=3      # distinct evidence heads probed per wait (initial, archive, retained marker / marker, result, owner publication) - each probed once
+    retained_heads=3;result_heads=3      # distinct evidence heads per wait (initial, archive, retained marker / marker, result, owner publication)
+    examinations=orr.Runner.REPROBES      # each distinct head is examined at most this many times
     account=1
-    fresh=1+3                                                   # one ref read, three absent-file probes, before anything is issued
-    retained_wait=polls(b['capture_wait_seconds'])+retained_heads*2      # ref reads plus up to two probes per observed head (retained marker, early result)
+    fresh=1+1+3                                                 # one ref read, the README anchor, three absent-file probes, before anything is issued
+    retained_wait=polls(b['capture_wait_seconds'])+retained_heads*2*examinations      # ref reads plus up to two files (retained marker, early result) per examination of each observed head
     archive_probe=1+1                                           # source.json at the retained head and the retained marker's own re-read
     marker_publication=publish_requests(1)
-    result_wait=polls(b['screening_wait_seconds'])+result_heads
+    result_wait=polls(b['screening_wait_seconds'])+result_heads*examinations
     owner_publication=publish_requests(2)                       # events.jsonl and final-result.json
     failure_reads=1                                             # secret names on the failure path
     return account+fresh+retained_wait+archive_probe+marker_publication+result_wait+owner_publication+failure_reads
@@ -429,5 +466,11 @@ def test_the_owner_request_calculation_includes_freshness_probes_publications_an
 
 def test_the_hosted_request_calculation_fits_its_bound():
     wait=sp.SCREENING_WAIT_SECONDS;polls=-(-wait//sp.POLL_SECONDS)+1
-    total=1+publish_requests(1)+publish_requests(1)+polls+3+publish_requests(2)+1      # evidence-head check, archive, retained marker, owner-marker wait (+3 probes), result publication (+its head read)
+    total=1+1+publish_requests(1)+publish_requests(1)+polls+3*sp.REPROBES+publish_requests(2)+1      # evidence-head check, anchor, archive, retained marker, owner-marker wait (3 heads x REPROBES examinations), result publication (+its head read)
     assert total+40<=140
+
+
+def test_the_raw_source_is_below_the_contents_api_size_limit_the_readback_depends_on():
+    """The contents API returns the file body inline only up to 1 MB; the archive readback (the accepted publisher's own) and the owner's identity check depend on that. The accepted source worker bounds
+    the audit it produces (and therefore the archived raw source) at 512 KiB."""
+    assert 'len(raw)>512*1024' in Path('verification/ingestion_storage/operational_source.py').read_text() and 512*1024<1024**2

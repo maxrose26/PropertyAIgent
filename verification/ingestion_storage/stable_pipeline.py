@@ -29,6 +29,8 @@ MANIFEST_PATH='docs/design/ingestion-stable-pipeline-20261020/MANIFEST.json'
 # Hosted deadlines. Waiting for the owner counts as the administrative phase of the accepted accounting; runtime keeps the accepted 300 s aggregate.
 HOSTED_DEADLINES=dict(job=1800,diagnostic_total=1860,diagnostic_window=40,admin_diagnostic=240,admin_pre=1700,admin_total=1790,runtime_total=300)
 SCREENING_WAIT_SECONDS=480
+REPROBES=3      # each distinct head is examined at most this many times (successive polls) so one transient 404 cannot hide a published file
+EVIDENCE_ANCHOR='README.md'
 POLL_SECONDS=15
 FORBIDDEN_ENV=('DATABASE_URL','INGESTION_STORAGE_DATABASE_URL','GITHUB_TOKEN','PGPASSWORD','PGSERVICE','PGSERVICEFILE')
 SECRET_NAMES=tuple(sq.SECRET_ENV.values())
@@ -107,13 +109,13 @@ class HostedRunner(Runner):
     def await_marker(self,bindings):
         """Wait (no database connection) for the OWNER's screening-authority marker: presence-based at the current head of the evidence branch, each distinct head probed once. The marker is not an
         authority - the authority is in the database and is enforced there when the screening slot runs. A marker that disagrees with the locally recomputed bindings is UNCERTAIN. Timeout is a stop."""
-        deadline=time.monotonic()+SCREENING_WAIT_SECONDS;probed=None
+        deadline=time.monotonic()+SCREENING_WAIT_SECONDS;probes={}
         self.emit('awaiting_owner_screening_authority',dict(from_head=self.evidence_head,seconds=SCREENING_WAIT_SECONDS))
         while True:
             self.check()
             head=self.head()
-            if head!=probed:
-                probed=head
+            if probes.get(head,0)<REPROBES:
+                probes[head]=probes.get(head,0)+1
                 blob=self.github.probe(REPO+'/contents/'+EVIDENCE_DIRECTORY+'/screening-authority/registered.json?ref='+head)
                 if blob is not None:
                     try:marker=json.loads(blob_bytes(blob))
@@ -206,6 +208,7 @@ def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memor
     runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision);holder['runner']=runner
     runner.source_reader=source_reader_factory(runner)
     if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
+    if github.probe(REPO+'/contents/'+EVIDENCE_ANCHOR+'?ref='+evidence_head) is None:return stop_early(journal,'EVIDENCE_BRANCH_ANCHOR_MISSING'),1      # a 404 below means something only if the branch itself is readable
     result=runner.run()
     try:runner.publish_completed(result)
     except BaseException as exc:

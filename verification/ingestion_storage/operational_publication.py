@@ -50,8 +50,13 @@ class GitHub:
         self.emit('github_ack',dict(method=method,path=path,ordinal=self.requests))
         self.check();return value
 
+    NOT_FOUND=re.compile(rb'\(HTTP 404\)\s*$')
+
+    NOT_FOUND=re.compile(rb'\(HTTP 404\)\s*$')
+
     def probe(self,path):
-        """A read-only GET whose HTTP 404 means 'not there (yet)' and returns None. Every other failure, an oversized answer or an unreadable one is Uncertain, exactly as for call()."""
+        """A read-only GET whose confirmed HTTP 404 (gh's final line `... (HTTP 404)`) means 'not there (yet)' and returns None. Every other failure - another status, a message that merely mentions 404, an
+        empty successful answer, an unreadable or oversized one - is Uncertain, exactly as for call(). The audit records what was answered (PRESENT / ABSENT_HTTP_404)."""
         self.check()
         if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
         self.requests+=1
@@ -60,11 +65,13 @@ class GitHub:
             r=self.runner(['gh','api','--method','GET',path],input=None,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
             if len(r.stdout)+len(r.stderr)>3*1024**2:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')
             if r.returncode:
-                if b'HTTP 404' in r.stderr:value=None
-                else:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')
-            else:value=json.loads(r.stdout) if r.stdout else None
+                if not self.NOT_FOUND.search(r.stderr.rstrip()):raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')
+                value=None
+            else:
+                if not r.stdout:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')      # a successful probe that returns nothing is not evidence of absence
+                value=json.loads(r.stdout)
         except BaseException:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN') from None
-        self.emit('github_ack',dict(method='GET',path=path,ordinal=self.requests))
+        self.emit('github_ack',dict(method='GET',path=path,ordinal=self.requests,result='PRESENT' if value is not None else 'ABSENT_HTTP_404'))
         self.check();return value
 
     def names(self):

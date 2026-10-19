@@ -47,6 +47,11 @@ def real_gh_store(tmp_path,request):
     names={'INGESTION_WORKER_DATABASE_URL','INGESTION_STORAGE_DATABASE_URL'}
     if operational:names|={'INGESTION_EFFECT_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL'}
     git_objects={};git_head=['1'*40]
+    if operational:      # the initial evidence head (its tree is '2'*40, as the commit lookup below answers) contains the branch's README.md anchor, as the real evidence branch does
+        anchor=b'disposable evidence branch anchor\n';anchor_sha=hashlib.sha1(b'blob '+str(len(anchor)).encode()+b'\0'+anchor).hexdigest()
+        git_objects[anchor_sha]=dict(content=base64.b64encode(anchor).decode(),encoding='base64',sha=anchor_sha)
+        git_objects['2'*40]=dict(tree=[dict(path='README.md',mode='100644',type='blob',sha=anchor_sha)])
+        git_objects['1'*40]=dict(tree={'sha':'2'*40},parents=[])
     prefix='/repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets'
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -79,7 +84,7 @@ def real_gh_store(tmp_path,request):
             contents='/repos/maxrose26/PropertyAIgent/contents/'
             if operational and method=='GET' and path.startswith(contents):
                 revision=parse_qs(urlsplit(self.path).query)['ref'][0]
-                tree=git_objects[git_objects[revision]['tree']['sha']]['tree']
+                tree=git_objects[git_objects[revision]['tree']['sha']]['tree'] if revision in git_objects else []
                 entry=next((x for x in tree if x['path']==path[len(contents):]),None)
                 if entry is None:return self.answer(404,{'message':'Not Found'})
                 return self.answer(200,git_objects[entry['sha']])
