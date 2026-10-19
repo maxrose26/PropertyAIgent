@@ -58,7 +58,11 @@ def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
     return dict(totals=totals,remaining=remaining)
 
 
-STATEMENT_HARD_SECONDS=12       # client-side ceiling per driver call; the server statement_timeout (10 s) is the primary control when the transport reflects it
+# Deadline levels (see PROPOSAL / RELEASE_PACKAGE): PER-WAIT = STATEMENT_HARD_SECONDS (12 s, above the 10 s server statement_timeout, which stays primary when reflected);
+# COMPLETE OPERATION = up to WAITS_PER_OPERATION waits (BEGIN + statement on a non-autocommit login) + one bounded cancel + close; AGGREGATE = the slot budget (<=165 s) and the runner job limit.
+STATEMENT_HARD_SECONDS=12
+WAITS_PER_OPERATION=2
+CANCEL_ALLOWANCE=dict(attempts=4,seconds_each=2.0)       # explicit finite allowance for cancel connections per budget; they are not logins and are accounted separately
 
 
 class DatabaseBudget:
@@ -70,7 +74,7 @@ class DatabaseBudget:
     def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
-        self.failed_native_closed=True;self.hard_deadline_events=[]
+        self.failed_native_closed=True;self.hard_deadline_events=[];self.hard_stop_at=None
         from .tls_trust import owned_resources
         self.socket_baseline=owned_resources()['socket_fds']
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
@@ -90,14 +94,30 @@ class DatabaseBudget:
     def check(self):
         if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
     def guarded(self,connection,call):
-        """Run one blocking driver call under a CLIENT-side hard deadline that does not depend on the server honouring any timeout. On expiry the call is interrupted, the server is asked to
-        cancel, the connection is closed and the call is denied; the event is accounted. A cleanup call (rollback/closure) is bounded the same way."""
+        """Run one blocking driver wait under a CLIENT-side hard deadline that does not depend on the server honouring any timeout.
+
+        Each wait is bounded by min(STATEMENT_HARD_SECONDS, remaining slot budget, time left before `hard_stop_at`), so no wait can run past the execution reserve the runner set. On expiry the call is
+        interrupted, a bounded cancel is attempted within the explicit cancellation allowance, the connection is closed, the event is accounted (attempts, seconds, outcome) and the call is denied.
+        A cancel acknowledgement never establishes that the backend ended."""
         from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
-        remaining=max(.5,min(STATEMENT_HARD_SECONDS,self.seconds-self.previous_elapsed-(time.monotonic()-self.started)))
+        now=time.monotonic()
+        remaining=min(STATEMENT_HARD_SECONDS,self.seconds-self.previous_elapsed-(now-self.started))
+        if self.hard_stop_at is not None:remaining=min(remaining,self.hard_stop_at-now)
+        if remaining<=0:raise Denied('EXECUTION_RESERVE_REACHED')
+        remaining=max(.5,remaining)
         try:
             with hard_deadline(remaining,'STATEMENT_HARD_DEADLINE'):return call()
         except DeadlineExceeded:
-            self.hard_deadline_events.append(dict(abandon(connection),hard_seconds=round(remaining,3)));raise Denied('STATEMENT_HARD_DEADLINE') from None
+            attempts=sum(e.get('cancel_attempts',0) for e in self.hard_deadline_events)
+            if attempts>=CANCEL_ALLOWANCE['attempts']:
+                event=dict(cancel_requested=False,cancel_outcome='CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED',cancel_attempts=0,cancel_seconds=0.0,backend_closure='NOT_ESTABLISHED')
+                try:connection.close()
+                except BaseException:pass
+                event['client_closed']=bool(getattr(connection,'closed',False))
+            else:event=abandon(connection)
+            event['hard_seconds']=round(remaining,3);self.hard_deadline_events.append(event)
+            self.connection_seconds+=event.get('cancel_seconds',0.0)+event.get('close_seconds',0.0)
+            raise Denied('STATEMENT_HARD_DEADLINE') from None
     def tick(self,kind,*,cleanup=False):
         if not cleanup:self.check()
         # Reserve eight slots for finite rollback/closure; no commit after stop.
@@ -154,7 +174,16 @@ class DatabaseBudget:
             try:
                 with c.cursor() as q:
                     q.execute("SELECT current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout'),current_user,session_user,rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_catalog.pg_roles WHERE rolname=current_user")
-                    if q.fetchone()!=('10s','3s','20s',role,role,True,False,False,False,False,False):raise Denied('SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE')
+                    row=q.fetchone()
+                    expected=('10s','3s','20s',role,role,True,False,False,False,False,False)
+                    if row!=expected:
+                        # the gate refuses (unchanged), but WHAT was observed is recorded, bounded and allow-listed, with identity and timeouts reported separately
+                        import re
+                        setting=lambda x:x if isinstance(x,str) and re.fullmatch(r'0|[0-9]{1,6}(?:us|ms|s|min|h|d)?',x) else 'NON_ALLOWLISTED_VALUE'
+                        ok=isinstance(row,tuple) and len(row)==11
+                        budget.emit('runtime_qualification_observation',dict(role=role,attempt=budget.attempts,identity_and_flags_match=ok and tuple(row[3:])==expected[3:],
+                            observed_timeouts=[setting(x) for x in row[:3]] if ok else None,timeouts_match_reviewed=ok and tuple(row[:3])==expected[:3]))
+                        raise Denied('SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE')
                 c.rollback();return c
             except BaseException as exc:
                 observation=dict(role=role,attempt=budget.attempts,**safe_failure(exc,'SERVER_IDENTITY'))
@@ -182,7 +211,9 @@ class DatabaseBudget:
         except BaseException:pass
         failed_closed=self.failed_native_closed or socket_proof=='NO_NEW_OWNED_SOCKETS'
         return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=self.previous_opened+len(self.opened),connections_closed_count=self.previous_opened+sum(bool(c.closed) for c in self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
-            failed_native_connections_closed=failed_closed,socket_closure=socket_proof,hard_deadline_events=list(self.hard_deadline_events),
+            failed_native_connections_closed=failed_closed,socket_closure=socket_proof,hard_deadline_events=list(self.hard_deadline_events),cancel_attempts=sum(e.get('cancel_attempts',0) for e in self.hard_deadline_events),
+            cancel_failures=sum(1 for e in self.hard_deadline_events if e.get('cancel_outcome') not in ('CANCEL_SENT',)),cancel_seconds=round(sum(e.get('cancel_seconds',0.0) for e in self.hard_deadline_events),3),
+            cancel_allowance=dict(CANCEL_ALLOWANCE),
             connections_closed=failed_closed and all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and failed_closed and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 

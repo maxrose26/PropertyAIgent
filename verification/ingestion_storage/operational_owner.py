@@ -12,6 +12,13 @@ from psycopg import sql
 from app.ingestion.ledger import digest,DEFAULT_LIMITS
 from .operational_publication import Uncertain,canonical
 from .storage_controller import split_sql
+from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
+
+ADMIN_STATEMENT_HARD_SECONDS=12
+TERMINATE_SQL="SELECT pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE pid=%s AND usename=%s AND backend_start=%s::timestamptz"
+SESSIONS_SQL='SELECT pid,usename,state,backend_start FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid'
+PRIVILEGE_SQL="SELECT pg_catalog.pg_has_role(current_user,'pg_read_all_stats','MEMBER'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','MEMBER')"
+SESSION_POLICY=dict(wait_reads=3,wait_seconds=0.5,max_terminations=2,post_reads=3)
 
 PKG=Path('docs/design/ingestion-operational-required-20261018')
 WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
@@ -30,7 +37,7 @@ class Owner:
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
-        self.failed_native_connections=[]
+        self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
 
     @contextmanager
     def connection(self):
@@ -65,8 +72,12 @@ class Owner:
         if effect:self.emit('admin_effect_intent',dict(command=self.commands))
         started=time.monotonic()
         try:
-            cur=c.execute(statement,params)
-            rows=cur.fetchall() if cur.description else []
+            try:
+                with hard_deadline(ADMIN_STATEMENT_HARD_SECONDS,'ADMIN_STATEMENT_HARD_DEADLINE'):
+                    cur=c.execute(statement,params)
+                    rows=cur.fetchall() if cur.description else []
+            except DeadlineExceeded:
+                self.cancel_events.append(abandon(c));raise Uncertain('ADMIN_STATEMENT_HARD_DEADLINE') from None       # cancel acknowledged or not, the effect and the backend stay unproven
             if cur.pgresult is not None:
                 self.returned_bytes+=sum(len(cur.pgresult.get_value(r,k) or b'') for r in range(cur.pgresult.ntuples) for k in range(cur.pgresult.nfields))
             if self.returned_bytes>1024**2:raise Uncertain('ADMIN_RETURNED_VALUE_BOUND')
@@ -81,7 +92,7 @@ class Owner:
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
 
     def accounting(self):
-        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain)
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),session_terminations=self.terminations)
 
     def preflight(self):
         with self.connection() as c:
@@ -203,6 +214,11 @@ class Owner:
         return bindings
 
     def teardown(self,github):
+        """Disable access first, then resolve surviving sessions under a bounded, privilege-proven policy, then delete the temporary secrets independently once DISABLED status is verified.
+
+        Disabling stops NEW logins and removes membership-granted privileges from any open session immediately (statement-time evaluation); it does not end a session. A surviving session
+        is therefore resolved (bounded waits, then at most two precisely identified terminations, only with proven existing privileges) or left UNRESOLVED and reported - it can no
+        longer suppress the secret deletion, and it can never be reported closed."""
         self.tearing_down=True
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
@@ -221,13 +237,39 @@ class Owner:
             # Observe actual safe fields, never password material or query text.
             roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
             memberships=self.q(c,'SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),))
-            sessions=self.q(c,'SELECT pid,usename,state FROM pg_stat_activity WHERE usename=ANY(%s)',(list(ROLES),))
-            self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=sessions))
-            if roles!=[(r,False,True) for r in sorted(ROLES)] or memberships or sessions:raise Uncertain('TEARDOWN_RECONCILE')
+            sessions=self.q(c,SESSIONS_SQL,(list(ROLES),))
+            self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=[[s[0],s[1],s[2]] for s in sessions]))
+            disabled=roles==[(r,False,True) for r in sorted(ROLES)] and not memberships
+            self.session_disposition='NONE' if not sessions else 'NOT_EVALUATED'
+            if disabled and sessions:self.resolve_sessions(c,sessions)
+        if not disabled:raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
         for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
         names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
         if any(n in names for n in SECRETS.values()) or 'DATABASE_URL' not in names:raise Uncertain('TEARDOWN_SECRET_RECONCILE')
         self.urls.clear()
+        if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):raise Uncertain('TEARDOWN_SESSIONS_UNRESOLVED')
+
+    def resolve_sessions(self,c,sessions):
+        policy=SESSION_POLICY
+        for _ in range(policy['wait_reads']):
+            self.sleep(policy['wait_seconds']);sessions=self.q(c,SESSIONS_SQL,(list(ROLES),))
+            if not sessions:self.session_disposition='CLEARED_BY_WAIT';self.emit('session_disposition',dict(disposition=self.session_disposition));return
+        # still present: identify precisely or leave unresolved. No privilege is ever granted to make this possible.
+        flags=self.q(c,PRIVILEGE_SQL)[0]
+        if tuple(flags)!=(True,True):self.session_disposition='UNRESOLVED_PRIVILEGE_NOT_PROVEN'
+        elif len(sessions)>policy['max_terminations'] or any(len(row)!=4 or None in row or row[1] not in ROLES for row in sessions):self.session_disposition='UNRESOLVED_EXTRA_OR_UNIDENTIFIABLE'
+        else:
+            for pid,usename,state,start in sessions:
+                if self.terminations>=policy['max_terminations']:self.session_disposition='UNRESOLVED_TERMINATION_BOUND';break
+                self.terminations+=1
+                answer=self.q(c,TERMINATE_SQL,(pid,usename,start))
+                self.emit('session_termination',dict(pid=pid,role=usename,state=state,acknowledged=answer==[(True,)]))
+            else:
+                self.session_disposition='TERMINATION_SIGNALLED_NOT_VERIFIED'
+                for _ in range(policy['post_reads']):
+                    self.sleep(policy['wait_seconds']);left=self.q(c,SESSIONS_SQL,(list(ROLES),))
+                    if not left:self.session_disposition='TERMINATED_VERIFIED_ABSENT';break
+        self.emit('session_disposition',dict(disposition=self.session_disposition))
 
     def invalidate_failure(self):
         """Owner-only safety action. No replay after uncertain administrative effects."""

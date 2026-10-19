@@ -106,6 +106,7 @@ class Runner:
         prior=self.receipts.get(key,{})
         budget=DatabaseBudget(slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],emit=self.emit,stop_file=self.journal.root/'STOP')
         engines=[];started=time.monotonic();success=False
+        budget.hard_stop_at=self.started+self.deadlines['job']      # no driver wait may run past the job limit: the failure window and teardown start after it
         try:
             engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.hostaddr) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])

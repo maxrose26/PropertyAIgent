@@ -25,7 +25,8 @@ def test_a_blocked_query_is_interrupted_without_any_server_timeout(cluster):
     assert backends(cluster,pid)                                                       # the server is still running that query
     outcome=abandon(c);deadline=time.monotonic()+5
     while backends(cluster,pid) and time.monotonic()<deadline:time.sleep(.1)
-    assert outcome=={'cancel_requested':True,'client_closed':True} and c.closed and not backends(cluster,pid)      # cancel + close ends the backend
+    assert outcome['cancel_outcome']=='CANCEL_SENT' and outcome['cancel_attempts']==1 and outcome['client_closed'] is True and outcome['backend_closure']=='NOT_ESTABLISHED' and outcome['cancel_seconds']<2.5
+    assert c.closed and not backends(cluster,pid)      # the cancel + close ended the backend (the helper itself never claims that)
 
 
 def test_closing_alone_leaves_a_running_backend_which_is_why_cancel_is_sent_first(cluster):
@@ -103,3 +104,36 @@ def test_the_guard_is_released_even_if_teardown_or_setup_fails(monkeypatch):
         with hard_deadline(5,'X'):pass
     monkeypatch.undo()
     with hard_deadline(5,'AFTER_SETUP_FAILURE'):pass
+
+
+def test_a_failed_cancellation_is_recorded_and_the_connection_is_still_closed(cluster,monkeypatch):
+    c=connect(cluster);pid=c.info.backend_pid
+    monkeypatch.setattr(type(c),'cancel_safe',lambda self,timeout=2.0:(_ for _ in ()).throw(psycopg.OperationalError('cancel failed')))
+    outcome=abandon(c)
+    assert outcome['cancel_outcome']=='CANCEL_FAILED' and outcome['cancel_requested'] is False and outcome['cancel_attempts']==1 and outcome['client_closed'] is True and outcome['backend_closure']=='NOT_ESTABLISHED'
+
+
+def test_a_cancel_that_cannot_reach_the_server_is_bounded_by_its_own_timeout(cluster):
+    from tests.test_ingestion_statement_deadline import StallingProxy
+    proxy=StallingProxy(cluster.port)
+    c=psycopg.connect(host='127.0.0.1',port=proxy.port,dbname='postgres',user='postgres',autocommit=True)
+    try:
+        proxy.stall.set()                                                                    # the cancel connection (and everything else) goes nowhere
+        started=time.monotonic();outcome=abandon(c);elapsed=time.monotonic()-started
+        assert outcome['cancel_outcome'] in ('CANCEL_FAILED_TIMEOUT','CANCEL_FAILED') and 1.5<=elapsed<4.5 and outcome['client_closed'] is True and outcome['cancel_attempts']==1
+        assert outcome['cancel_seconds']<=3.0 and outcome['close_seconds']<1.0
+    finally:
+        proxy.stall.clear();proxy.close()
+
+
+def test_without_a_boundable_cancel_none_is_attempted(cluster,monkeypatch):
+    from psycopg import capabilities
+    monkeypatch.setattr(capabilities,'has_cancel_safe',lambda:False)
+    c=connect(cluster);called=[]
+    monkeypatch.setattr(type(c),'cancel',lambda self:called.append(1))
+    outcome=abandon(c)
+    assert outcome['cancel_outcome']=='CANCEL_SKIPPED_NOT_BOUNDABLE' and outcome['cancel_attempts']==0 and not called and outcome['client_closed'] is True        # the unbounded blocking cancel() is never used
+
+
+def test_abandon_without_a_connection_is_a_recorded_no_op():
+    assert abandon(None)['cancel_outcome']=='CANCEL_SKIPPED_NO_CONNECTION'

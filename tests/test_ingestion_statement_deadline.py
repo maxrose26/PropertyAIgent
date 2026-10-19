@@ -119,3 +119,59 @@ def test_a_stalled_commit_is_bounded_by_the_client_deadline(cluster,roles,monkey
         except Exception:pass
         account=budget.close([]);proxy.close()
     assert account['connections_closed'] is True and account['cleanup']=='CLOSED'
+
+
+# --- cancellation accounting, the execution reserve clamp and the observed qualification ---------------------------------------------------------------------
+
+def test_cancellation_is_accounted_in_the_budget_receipt(cluster,roles,local_principal,monkeypatch):
+    monkeypatch.setattr(oc,'STATEMENT_HARD_SECONDS',1)
+    budget=DatabaseBudget();engine=budget.engine(local_principal)
+    with engine.connect() as c:
+        with pytest.raises(Exception):c.execute(text('SELECT pg_sleep(30)'))
+    account=budget.close([])
+    e=account['hard_deadline_events'][0]
+    assert account['cancel_attempts']==1 and account['cancel_failures']==0 and account['cancel_seconds']<2.5 and account['cancel_allowance']==dict(attempts=4,seconds_each=2.0)
+    assert e['cancel_outcome']=='CANCEL_SENT' and e['backend_closure']=='NOT_ESTABLISHED' and e['client_closed'] is True and account['connections_closed'] is True
+
+
+def test_the_cancellation_allowance_is_finite_and_exhaustion_still_closes(cluster,roles,local_principal,monkeypatch):
+    monkeypatch.setattr(oc,'STATEMENT_HARD_SECONDS',1);monkeypatch.setitem(oc.CANCEL_ALLOWANCE,'attempts',0)
+    budget=DatabaseBudget();engine=budget.engine(local_principal)
+    with engine.connect() as c:
+        pid=c.connection.driver_connection.info.backend_pid
+        with pytest.raises(Exception):c.execute(text('SELECT pg_sleep(30)'))
+    account=budget.close([])
+    assert account['hard_deadline_events'][0]['cancel_outcome']=='CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED' and account['cancel_attempts']==0 and account['hard_deadline_events'][0]['client_closed'] is True
+    assert backend_count(cluster,pid)==1                                                           # without a cancel the server keeps running the statement: reported, never claimed ended
+    with psycopg.connect(host='127.0.0.1',port=cluster.port,dbname='postgres',user='postgres',autocommit=True) as a:a.execute('SELECT pg_cancel_backend(%s)',(pid,))      # test hygiene
+
+
+def test_no_wait_may_run_past_the_execution_reserve(cluster,roles,local_principal):
+    budget=DatabaseBudget();engine=budget.engine(local_principal)
+    budget.hard_stop_at=time.monotonic()+1.0                                                      # the runner's job limit is one second away
+    with engine.connect() as c:
+        started=time.monotonic()
+        with pytest.raises(Exception) as caught:c.execute(text('SELECT pg_sleep(30)'))
+        elapsed=time.monotonic()-started
+        assert 'STATEMENT_HARD_DEADLINE' in repr(caught.value) and elapsed<3.0                       # clamped to the reserve (about 1 s), not the 12 s per-wait ceiling
+    budget.close([])
+    budget2=DatabaseBudget();engine2=budget2.engine(local_principal);budget2.hard_stop_at=time.monotonic()-1
+    with pytest.raises(Exception) as caught:
+        with engine2.connect() as c:c.execute(text('SELECT 1'))
+    assert 'EXECUTION_RESERVE_REACHED' in repr(caught.value)                                        # already past the reserve: refused before any wait
+    budget2.close([])
+
+
+def test_a_failed_gate_records_what_was_observed_separately_for_identity_and_timeouts(cluster,roles,local_principal,monkeypatch):
+    real=psycopg.Connection.connect.__func__
+    def stripped(cls,conninfo='',**kw):
+        kw.pop('options',None);return real(cls,conninfo,**kw)
+    monkeypatch.setattr(psycopg.Connection,'connect',classmethod(stripped))
+    events=[]
+    budget=DatabaseBudget(emit=lambda e,p:events.append((e,p)));engine=budget.engine(local_principal)
+    with pytest.raises(Exception) as caught:
+        with engine.connect() as c:c.execute(text('SELECT 1'))
+    obs=[p for e,p in events if e=='runtime_qualification_observation']
+    assert 'SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE' in repr(caught.value) and len(obs)==1
+    assert obs[0]['identity_and_flags_match'] is True and obs[0]['timeouts_match_reviewed'] is False and obs[0]['observed_timeouts']==['0','0','0'] and obs[0]['role']==WORKER      # identity was right; the timeouts were not reflected
+    budget.close([])
