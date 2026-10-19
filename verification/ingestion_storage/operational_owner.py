@@ -44,7 +44,7 @@ class Owner:
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
-        self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
+        self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
     @contextmanager
     def connection(self):
@@ -104,7 +104,7 @@ class Owner:
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
 
     def accounting(self):
-        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),admin_cancel_allowance=ADMIN_CANCEL_ALLOWANCE,session_terminations=self.terminations,first_connection_intervals={r:t.get('first_contact_intervals') for r,t in self.timeline.items()},session_disposition=self.session_disposition,role_settings=dict(state=self.role_settings_state,prior_captured=self.role_settings_prior is not None),teardown_residuals=list(self.teardown_residuals))
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),admin_cancel_allowance=ADMIN_CANCEL_ALLOWANCE,session_terminations=self.terminations,preflight=dict(self.preflight_report),first_connection_intervals={r:t.get('first_contact_intervals') for r,t in self.timeline.items()},session_disposition=self.session_disposition,role_settings=dict(state=self.role_settings_state,prior_captured=self.role_settings_prior is not None),teardown_residuals=list(self.teardown_residuals))
 
     def preflight(self):
         with self.connection() as c:
@@ -141,16 +141,37 @@ class Owner:
                 return
             if self.q(c,"SELECT to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_effect_login')")[0]!=(None,False):raise ValueError('INSTALLATION_ALREADY_EXISTS_NO_REPLAY')
 
+    FUNCTION_PATTERN=re.compile(r'CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)\(.*?\).*?AS \$(\w*)\$(.*?)\$\2\$;',re.S)
+
+    @classmethod
+    def reviewed_inventories(cls,permit_successor_policy):
+        """The coherent, explicitly identified installed states that may be accepted: the ORIGINAL reviewed inventory (worker.sql) and, only for a mode that itself applies the reviewed
+        successor policy, the SUCCESSOR_POLICY_APPLIED inventory (the original with exactly the functions redefined by successor-policy.sql). Never a per-function mixture."""
+        original={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(WORKER.read_text())}
+        policy={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer((PKG/'successor-policy.sql').read_text())}
+        if len(original)<5 or not policy or not set(policy)<=set(original):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
+        states={'ORIGINAL':original}
+        upgraded={**original,**policy}
+        return states,upgraded,(dict(states,SUCCESSOR_POLICY_APPLIED=upgraded) if permit_successor_policy else states)
+
     def verify_installed(self,c):
-        # Compare the retained reviewed function bodies, owner and search path;
-        # activation separately reuses the exact effective ACL boundary.
-        expected={}
-        for match in re.finditer(r'CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)\(.*?\).*?AS \$(\w*)\$(.*?)\$\2\$;',WORKER.read_text(),re.S):
-            expected[match[1]]=match[3]
-        if len(expected)<5:raise ValueError('REVIEWED_FUNCTION_INVENTORY')
-        rows=self.q(c,"SELECT p.proname,p.prosrc,r.rolname,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname",(list(expected),))
-        self.emit('installed_function_inventory',dict(hashes={n:hashlib.sha256(body.encode()).hexdigest() for n,body,_,_ in rows}))
-        if len(rows)!=len(expected) or any(body!=expected.get(n) or owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for n,body,owner,config in rows):raise ValueError('INSTALLED_FUNCTION_CONTENT_CHANGED')
+        """Accept exactly one coherent reviewed inventory, bound to the execution mode, with the reviewed owner and search path on every function. Reports a fixed reason code and the
+        recognised policy state (never exception text). Preflight fails closed before any change."""
+        states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
+        names=list(upgraded)
+        rows=self.q(c,"SELECT p.proname,p.prosrc,r.rolname,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname",(names,))
+        observed={n:body for n,body,_,_ in rows}
+        recognised=next((s for s,b in {'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded}.items() if observed==b),None)
+        self.emit('installed_function_inventory',dict(hashes={n:hashlib.sha256(body.encode()).hexdigest() for n,body in observed.items()},policy_state=recognised or 'UNRECOGNISED'))
+        if set(observed)!=set(names) or len(rows)!=len(names):reason='INSTALLED_FUNCTION_CONTENT_CHANGED'      # missing, extra or duplicated (overloaded) functions
+        elif any(owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for _,_,owner,config in rows):reason='INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED'
+        elif recognised is None:
+            mixed=all(observed[n] in (states['ORIGINAL'][n],upgraded[n]) for n in names)
+            reason='INSTALLED_POLICY_STATE_MIXED' if mixed else 'INSTALLED_FUNCTION_CONTENT_CHANGED'
+        elif recognised not in permitted:reason='INSTALLED_POLICY_STATE_NOT_PERMITTED_FOR_MODE'
+        else:reason=None
+        self.preflight_report=dict(reason_code=reason or 'POLICY_STATE_RECOGNISED',policy_state=recognised or 'UNRECOGNISED',permitted_states=sorted(permitted))
+        if reason:raise ValueError(reason)
         self.expected_generation=1
 
     def install(self):
