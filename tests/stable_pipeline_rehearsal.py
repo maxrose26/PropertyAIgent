@@ -91,7 +91,7 @@ def probe():      # rehearsal only: what the hosted checkout would report; the f
     if plan[fault]==wrong_executable:actual[controller_sha256]=f*64
     return actual
 result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=None,
-                          evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'])
+                          evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'],checkout_probe=probe)
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
 Path(plan['output']).joinpath('rehearsal-done').write_text(str(code))
 raise SystemExit(code)
