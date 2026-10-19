@@ -85,7 +85,7 @@ jobs:
           timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_admin_connection_probe.py -v --junitxml="$RUNNER_TEMP/admin-probe.xml"
       - name: Restricted connection matrix, server-observed, disposable PostgreSQL only
         run: |
-          timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_restricted_matrix.py tests/test_ingestion_restricted_matrix_package.py -v --junitxml="$RUNNER_TEMP/restricted-matrix.xml"
+          timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_REQUIRE_LOCAL_PG=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_restricted_matrix.py tests/test_ingestion_restricted_matrix_package.py tests/test_ingestion_hard_deadline.py -v --junitxml="$RUNNER_TEMP/restricted-matrix.xml"
       - name: Fixed committee caller and field-level B2, network denied
         run: |
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q

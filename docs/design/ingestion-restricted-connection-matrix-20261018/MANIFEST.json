@@ -13,11 +13,13 @@
   "docs/design/ingestion-restricted-connection-matrix-20261018/owner-run.sh",
   "docs/design/ingestion-restricted-connection-matrix-20261018/render_registration.py",
   "tests/test_discovery_ingestion_operational_wrapper_pg.py",
+  "tests/test_ingestion_hard_deadline.py",
   "tests/test_ingestion_restricted_matrix.py",
   "tests/test_ingestion_restricted_matrix_package.py",
   "verification/discovery/route_validation.py",
   "verification/ingestion_storage/connection_diagnostics.py",
   "verification/ingestion_storage/credential_mapping.py",
+  "verification/ingestion_storage/hard_deadline.py",
   "verification/ingestion_storage/operational_controller.py",
   "verification/ingestion_storage/operational_journal.py",
   "verification/ingestion_storage/operational_memory.py",
@@ -34,5 +36,14 @@
  "entrypoint": "verification.ingestion_storage.operational_runner",
  "mode": "RESTRICTED_CONNECTION_MATRIX_ONLY",
  "state_directory": "operational-restricted-connection-matrix-once-20261018",
- "forbidden_in_this_package": ["registration release", "execution", "credential generation", "mapping", "activation", "connection", "merge", "provider ticket submission"]
+ "forbidden_in_this_package": [
+  "registration release",
+  "execution",
+  "credential generation",
+  "mapping",
+  "activation",
+  "connection",
+  "merge",
+  "provider ticket submission"
+ ]
 }
