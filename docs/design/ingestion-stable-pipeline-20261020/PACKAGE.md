@@ -7,14 +7,14 @@ Specification: `specifications/032-stage4-stable-credential-pipeline.md`. Nothin
    * P0 fixed read-only readback → persisted → compared with the registration; any mismatch or uncertainty ends the run with nothing issued.
    * P1 one capture authority + Bolton exception (`source_calls=1`, ≤ 55 minutes).
    * P2 after the restricted job durably retained the capture: one source-free screening authority (`source_calls=0`) and a non-authoritative marker on the evidence branch.
-   * P3 invalidation of both authorities (`expires_at=0`), repeated fixed readback, evidence publication. Runs on every outcome.
+   * P3 **revocation-only** invalidation: under the control-row lock, only the authorities this execution registered, with their exact execution and exception bindings verified, have only their grant and exception expiry set to zero (stops, generation, unrelated grants and every other field are preserved exactly, verified inside the transaction before COMMIT and again by a readback after it); an uncertain commit is never retried. Then the repeated fixed readback and evidence publication. Runs on every outcome and does not depend on any stop-state.
 2. **Restricted job** (`stage4-stable-pipeline-once.yml`, protected environment, the two restricted secrets only, no administrative credential, kernel-enforced actual memory): bounded connection qualification → capture authority check → one source request and durable retention → wait for the marker (no database connection) → source-free queued screening → sealed result published. No connection retry after qualification.
 
 ## Numerical budgets
 | Boundary | Bound |
 |---|---|
 | Readback (P0, and P3 repeat) | 1 connection, 9 statements used / ≤ 12 allowed, ≤ 20 s database-active, ≤ 30 s supervised-active, no retry |
-| Owner administration overall | ≤ 8 connections / ≤ 48 commands normal, ≤ 9 / 60 through invalidation, ≤ 9 / 72 with failure diagnostics (pinned from the disposable measurement) |
+| Owner administration overall | **measured** (real Owner methods against a scripted connection, repeated on the disposable PG17): normal path 52 commands / 5 connections (readback 9, capture authority 11, ledger read 5, screening authority 22 for the maximum 12 batches, ledger read 5); through the revocation-only invalidation (12) and the final readback (9) 73 / 7; worst failure at the end of the normal path plus the reserved invalidation and diagnostics 71. Allowances: **56 / 80 / 96 commands** (normal / through the end-of-run / failure incl. diagnostics), **8 / 9 connections**. The earlier placeholder of 48 / 60 / 72 was exhausted by the normal path |
 | Owner session | hidden input 120 s; active ≤ 4,380 s; outer ≤ 4,500 s; process backstop 4,600 s; registration ≤ 110 minutes |
 | Authorities | capture ≤ 55 minutes (`source_calls=1`); screening ≤ 30 minutes (`source_calls=0`); both invalidated at P3 |
 | Source | one observation; ≤ 10 transport requests, ≤ 3,000,000 received-body bytes, ≤ 6 pages, ≤ 60 rows |

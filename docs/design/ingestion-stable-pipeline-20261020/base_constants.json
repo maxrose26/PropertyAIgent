@@ -16,14 +16,20 @@
  "limits": {
   "administration": {
    "commands": [
-    48,
-    60,
-    72
+    56,
+    80,
+    96
    ],
    "connections": [
     8,
     9
-   ]
+   ],
+   "measured": {
+    "connections": 7,
+    "normal_commands": 52,
+    "through_end_commands": 73,
+    "worst_failure_commands": 71
+   }
   },
   "grants": {
    "authorities": [

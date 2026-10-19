@@ -74,8 +74,12 @@ PIPELINE_BINDING=dict(
                       final_result_sha256='51aea5d5ce0a3515b369b0d098a5c3da73a210ff86034f1f9e368d654274d3e6'),
     qualification=dict(run_id=39284253302,artifact_id=12212818855,artifact_zip_sha256='b02da6fcf1658f627f4935db0a998fb3764498b3e15b6d57ad2ab135ba15db58',revision='46b9356d352efcde39df9e1505db582543adecee'),
     hosted_workflow='.github/workflows/stage4-stable-pipeline-once.yml')
-# Finite owner totals (normal, through invalidation, including failure diagnostics); pinned from the disposable rehearsal plus a small margin.
-PIPELINE_OWNER_LIMITS=dict(connections=(8,9),commands=(48,60,72))
+# Finite owner totals (normal, through invalidation and the final readback, including failure diagnostics). MEASURED, not estimated: the real Owner methods run against a scripted connection
+# (tests/test_ingestion_pipeline_invalidation.py) count 52 statements / 5 connections on the normal path (readback 9, capture authority 11, ledger read 5, screening authority 22 for the
+# maximum 12 batches, ledger read 5), 73 / 7 through the end-of-run invalidation (12) and final readback (9), and at most 71 when a failure at the very end of the normal path is followed by
+# the reserved invalidation (12) and diagnostics (7). The allowances keep a reserve so that ENDING an authority and diagnosing can never be refused for want of capacity. The earlier
+# placeholder (48 / 60 / 72) was exhausted by the normal path (52 > 48), which is how the invalidation was left undone in the first rehearsal.
+PIPELINE_OWNER_LIMITS=dict(connections=(8,9),commands=(56,80,96))
 PIPELINE_GITHUB_BOUND=140
 # Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
 # admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
@@ -415,8 +419,9 @@ class Runner:
                 invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
             if self.pipeline_mode:
-                invalidation=self.owner.invalidate_authorities()      # normal-path invalidation: no generation bump; credentials, memberships and secrets are untouched
-                if invalidation=='ACKNOWLEDGED_READBACK':access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
+                self.owner.diagnostic_mode=True      # the reserved failure allowance: ending an authority must never be refused for want of administrative capacity
+                invalidation=self.owner.invalidate_authorities()      # revocation-only: independent of every stop-state; credentials, memberships and secrets are untouched
+                if invalidation in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'):access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
                 elif invalidation=='NOT_REQUIRED_NO_AUTHORITY':access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED'
             else:
                 invalidation=self.owner.invalidate_failure()
@@ -552,10 +557,11 @@ class Runner:
             hosted_summary=dict(status='NOT_APPLICABLE_NO_BATCHES');incomplete=[]
             self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS'))
         self.operation_phase='PIPELINE_INVALIDATION'
+        self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
         invalidation=self.owner.invalidate_authorities()
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
         components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
-        if invalidation!='ACKNOWLEDGED_READBACK' or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
+        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
         finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
         result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),

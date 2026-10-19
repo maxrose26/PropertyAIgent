@@ -50,6 +50,7 @@
   "tests/test_ingestion_hard_deadline.py",
   "tests/test_ingestion_operational_settling.py",
   "tests/test_ingestion_owner_teardown_policy.py",
+  "tests/test_ingestion_pipeline_invalidation.py",
   "tests/test_ingestion_preflight_policy_state.py",
   "tests/test_ingestion_stable_pipeline.py",
   "tests/test_ingestion_stable_qualification.py",

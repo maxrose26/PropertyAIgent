@@ -556,30 +556,94 @@ class Owner:
             if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         return {r[0]:(r[1],r[2]) for r in rows}
 
+    AUTHORITY_NAME=re.compile(r'[A-Z0-9_]{1,100}')
+    INVALIDATION_CONFIRMED=('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK','NOT_REQUIRED_NO_AUTHORITY')
+
     def invalidate_authorities(self):
-        """Normal end of execution authority: sets expires_at=0 on every grant and exception THIS run registered. It never changes a credential, membership, role setting or secret, and never
-        bumps the hard-stop generation (this is not a failure path). Bound to the exact execution binding; anything unexpected is UNCERTAIN."""
+        """REVOCATION-ONLY end of execution authority. It is deliberately independent of every stop-state: permission to END an authority never depends on the global stop, the manual stop or
+        the hard-stop generation, all of which a failed execution may legitimately have advanced (the accepted fail-safe stop replaces the manual stop and bumps the generation).
+
+        Under the control-row lock it identifies ONLY the authorities THIS execution registered, verifies their exact execution binding and the corresponding exception binding, and sets ONLY
+        the grant and exception expiry values to zero (jsonb_set on exact paths, create_missing=false). Every other control field - stops, generation, unrelated grants and exceptions - is
+        left byte-for-byte as it is, which the transaction verifies from the UPDATE's own RETURNING row before COMMIT. A committed revocation is then confirmed by a readback; nothing is
+        claimed confirmed before that. An uncertain COMMIT is never retried: it is reported UNCERTAIN_RECONCILE (with a read-only observation if one can be made) for reconciliation.
+
+        Returns one of INVALIDATION_CONFIRMED, or UNCERTAIN_RECONCILE."""
         if not self.authorities:return 'NOT_REQUIRED_NO_AUTHORITY'
-        if self.effect_uncertain:
-            self.emit('authority_invalidation_uncertain',dict(reason='PRIOR_ADMIN_EFFECT_UNCERTAIN'));self.invalidation='UNCERTAIN_RECONCILE';return self.invalidation
+        names=list(dict.fromkeys(self.authorities))
+        if any(not self.AUTHORITY_NAME.fullmatch(a) for a in names):raise Uncertain('INVALIDATION_AUTHORITY_NAME')
         self.invalidation='UNCERTAIN_RECONCILE'
-        with self.connection() as c:
-            self.q(c,'BEGIN',effect=True)
-            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-            if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=self.expected_generation:raise Uncertain('STOP_IDENTITY_CHANGED')
-            updated=deepcopy(ctl)
-            for authority in self.authorities:
-                grant=updated.get('grants',{}).get(authority)
-                if not grant or grant.get('execution_binding')!=self.bindings:raise Uncertain('INVALIDATION_BINDING_CHANGED')
-                grant['expires_at']=0
-                if authority in updated.get('bolton_exceptions',{}):updated['bolton_exceptions'][authority]['expires_at']=0
-            self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(updated),),effect=True)
-            self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
-            self.q(c,'COMMIT',effect=True)
-            capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
-            if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
-        self.invalidation='ACKNOWLEDGED_READBACK';self.emit('authorities_invalidated',dict(authorities=list(self.authorities)));return self.invalidation
+        report=dict(authorities=names,absent=[],already=[],revoked=[],refused=[],prior_effect_uncertain=self.effect_uncertain)
+        committed=False
+        try:
+            with self.connection() as c:
+                self.q(c,'BEGIN',effect=True)
+                self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+                ctl=self.q(c,"SELECT outcome::jsonb FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
+                ctl=ctl if isinstance(ctl,dict) else json.loads(ctl)
+                targets=[]
+                for authority in names:
+                    grant=(ctl.get('grants') or {}).get(authority);exception=(ctl.get('bolton_exceptions') or {}).get(authority)
+                    if grant is None and exception is None:report['absent'].append(authority);continue      # nothing of ours exists under this name
+                    if grant is None or grant.get('execution_binding')!=self.bindings:report['refused'].append(authority);continue      # not demonstrably ours: never touched
+                    if exception is not None:
+                        identity={k:v for k,v in grant.items() if k not in ('source_calls','writes')}
+                        recorded=exception.get('grant_binding') or {}
+                        if grant.get('expires_at')==0:      # once revoked the grant's expiry no longer equals the snapshot taken at registration; every other field must still correspond
+                            identity={k:v for k,v in identity.items() if k!='expires_at'};recorded={k:v for k,v in recorded.items() if k!='expires_at'}
+                        if recorded!=identity:report['refused'].append(authority);continue
+                    if grant.get('expires_at')==0 and (exception is None or exception.get('expires_at')==0):report['already'].append(authority);continue
+                    targets.append((authority,exception is not None))
+                if targets:
+                    expression="outcome::jsonb";params=[]
+                    for authority,has_exception in targets:
+                        expression="jsonb_set(%s,ARRAY['grants',%%s,'expires_at'],'0'::jsonb,false)"%expression;params.append(authority)
+                        if has_exception:
+                            expression="jsonb_set(%s,ARRAY['bolton_exceptions',%%s,'expires_at'],'0'::jsonb,false)"%expression;params.append(authority)
+                    expected=deepcopy(ctl)
+                    for authority,has_exception in targets:
+                        expected['grants'][authority]['expires_at']=0
+                        if has_exception:expected['bolton_exceptions'][authority]['expires_at']=0
+                    posted=self.q(c,"UPDATE public.ingestion_work_items SET outcome=("+expression+")::json WHERE key=repeat('0',64) RETURNING outcome::jsonb",tuple(params),effect=True)[0][0]
+                    posted=posted if isinstance(posted,dict) else json.loads(posted)
+                    if posted!=expected:      # anything other than exactly the expiry paths changed: do not commit
+                        self.q(c,'ROLLBACK',effect=True);raise Uncertain('INVALIDATION_UNEXPECTED_CHANGE')
+                    report['revoked']=[a for a,_ in targets]
+                self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+                if targets:
+                    self.q(c,'COMMIT',effect=True);committed=True
+                else:self.q(c,'ROLLBACK',effect=True)
+                capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
+                if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+                if report['refused']:      # not ours / inconsistent: reported, never altered
+                    self.emit('authority_invalidation_refused',report);return self.invalidation
+                if committed or report['already'] or report['absent']:
+                    confirmed=self._confirm_revoked(c,[a for a in names if a not in report['absent']])
+                    report['readback']='CONFIRMED' if confirmed else 'NOT_CONFIRMED'
+                    if not confirmed:self.emit('authority_invalidation_unconfirmed',report);return self.invalidation
+        except Uncertain as exc:
+            report['stopped']=str(exc)
+            if committed or str(exc)=='ADMIN_EFFECT_UNCERTAIN':      # persistence unknown: ONE read-only observation, never a retry of the effect
+                report['observation']=self._observe_revoked(names)
+            self.emit('authority_invalidation_uncertain',report);return self.invalidation
+        self.invalidation=('ACKNOWLEDGED_READBACK' if report['revoked'] else 'ALREADY_INVALIDATED_READBACK')
+        self.emit('authorities_invalidated',report);return self.invalidation
+
+    def _confirm_revoked(self,c,names):
+        """Readback on the same connection AFTER the commit: the control row as committed, with the same transient owner capability as the accepted preflight, rolled back."""
+        self.q(c,'BEGIN',effect=True)
+        self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+        ctl=self.q(c,"SELECT outcome::jsonb FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0][0]
+        self.q(c,'ROLLBACK',effect=True)
+        capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
+        if tuple(capability)!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        ctl=ctl if isinstance(ctl,dict) else json.loads(ctl)
+        return all((ctl.get('grants') or {}).get(a,{}).get('expires_at',0)==0 and (ctl.get('bolton_exceptions') or {}).get(a,{}).get('expires_at',0)==0 for a in names)
+
+    def _observe_revoked(self,names):
+        try:
+            with self.connection() as c:return 'REVOKED_OBSERVED' if self._confirm_revoked(c,names) else 'NOT_REVOKED_OBSERVED'
+        except BaseException:return 'UNOBSERVABLE'
 
 def item(identity,*,dependencies=(),checkpoint=None,limits=None,max_attempts=2):
     return dict(identity,key=digest(identity),dependencies=list(dependencies),priority=50,eligible_at=0,state='QUEUED',reason=None,next_action='CLAIM_WHEN_AUTHORISED',limits=limits or DEFAULT_LIMITS,authority=None,attempt_count=0,max_attempts=max_attempts,fence=0,owner=None,lease_until=None,phase='IDLE',checkpoint=checkpoint,outcome=None)

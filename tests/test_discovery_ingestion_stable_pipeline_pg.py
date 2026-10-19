@@ -141,6 +141,10 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 for conn in held:
                     try:conn.close()
                     except Exception:pass
+            owner_summary=dict(fault=fault,status=result.get('status'),cleanup=result.get('cleanup'),access=result.get('access'),invalidation=result.get('authority_invalidation'),phase=result.get('operation_phase'),
+                               failure=result.get('failure'),accounting=orunner.owner.accounting(),owner_connections=orunner.owner.connections,owner_commands=orunner.owner.commands,github_requests=orunner.github.requests)
+            print('PIPELINE_OWNER_RESULT',json.dumps(owner_summary,default=str,sort_keys=True))      # before any assertion can hide it
+            record_property('pipeline_owner_result',json.dumps(owner_summary,default=str,sort_keys=True))
             hosted_log=(tmp_path/'hosted.log').read_text() if (tmp_path/'hosted.log').exists() else ''
             hosted_final=json.loads((hosted_dir/'final-result.json').read_bytes()) if (hosted_dir/'final-result.json').exists() else None
             source_calls=int((hosted_dir/'rehearsal-source-calls').read_text()) if (hosted_dir/'rehearsal-source-calls').exists() else 0
@@ -158,9 +162,17 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             standing_after=(roles_state(),memberships(),role_configs())
             if fault!='valid_until_mismatch_blocks':assert standing_after==standing_before      # no password change, no membership change, no role-setting change, no secret change
             assert set(ciphertexts)=={'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'} and not orunner.owner.urls
-            unexpired=lambda c:[a for a,g in c.get('grants',{}).items() if g.get('expires_at',0)>time.time()]
-            if fault!='unexpired_grant_blocks':assert unexpired(ctl_after)==[] and all(e.get('expires_at',0)<=time.time() for e in ctl_after.get('bolton_exceptions',{}).values())
-            assert orunner.owner.connections<=orr.PIPELINE_OWNER_LIMITS['connections'][1] and orunner.owner.commands<=orr.PIPELINE_OWNER_LIMITS['commands'][2] and orunner.owner.opened==orunner.owner.closed
+            ours=[a for a in ctl_after.get('grants',{}) if a.startswith(orr.PIPELINE_AUTHORITY)]      # exactly the authorities THIS execution registered
+            for a in ours:      # every one of them is explicitly ENDED (expiry zero), on success and on every failure - never merely left to time out
+                assert ctl_after['grants'][a]['expires_at']==0 and ctl_after.get('bolton_exceptions',{}).get(a,{}).get('expires_at',0)==0,(a,owner_summary)
+            assert {a:g for a,g in ctl_after.get('grants',{}).items() if a not in ours}==ctl_before.get('grants',{})      # unrelated grants (expired or live) are untouched
+            assert {a:e for a,e in ctl_after.get('bolton_exceptions',{}).items() if a not in ours}==ctl_before.get('bolton_exceptions',{})
+            if fault not in ('source_raises',):assert {k:ctl_after.get(k) for k in ('global_stop','manual_stop','hard_stop_generation','last_hard_stop')}=={k:ctl_before.get(k) for k in ('global_stop','manual_stop','hard_stop_generation','last_hard_stop')}      # the stops and the generation are exactly as they were
+            if fault=='source_raises':      # the NEWER stop raised by the failed source request is preserved, never rolled back by the invalidation
+                assert ctl_after['manual_stop']=='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE' and ctl_after['hard_stop_generation']==2 and ctl_after['global_stop']==ctl_before['global_stop']
+            caps=orr.PIPELINE_OWNER_LIMITS;ended_normally=result['status'].startswith('STABLE_PIPELINE_AUTHORITY_COMPLETED')
+            assert orunner.owner.opened==orunner.owner.closed and orunner.owner.connections<=(caps['connections'][0] if ended_normally else caps['connections'][1]) and orunner.owner.commands<=(caps['commands'][1] if ended_normally else caps['commands'][2]),owner_summary
+            if fault in ('source_raises','owner_wait_expires','screening_stops'):assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'),owner_summary      # a failure still ends the authority and says so only after a readback
             assert result['application_writes']==0 and result['stage4']=='OPEN' and result['pipeline_retry']=='HELD'
             if fault in ('active_session_blocks','unexpired_grant_blocks','valid_until_mismatch_blocks'):
                 # the fixed read-only phase found a mismatch: NOTHING was issued, nothing started, nothing mutated
@@ -174,7 +186,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             events=[json.loads(l) for l in owner_journal.file.read_text().splitlines()];names=[e['event'] for e in events]
             readbacks=[e['payload'] for e in events if e['event']=='pipeline_readback']
             assert names.index('pipeline_readback')<names.index('owner_registration_committed')      # persisted BEFORE any grant mutation
-            assert readbacks[0]['label']=='BEFORE_ANY_GRANT' and readbacks[0]['findings']==[] and readbacks[0]['statements']<=12
+            assert readbacks[0]['label']=='BEFORE_ANY_GRANT' and readbacks[0]['findings']==[] and readbacks[0]['statements']==9
             if fault=='idle_pooled_session':assert readbacks[0]['notes']==['IDLE_POOLED_BACKENDS_OBSERVED_NOT_CLASSIFIED_AS_A_LEAK'] and readbacks[0]['sessions'] and readbacks[0]['sessions'][0][2]=='idle'
             capture_grants=[a for a in ctl_after['grants'] if a.endswith('_CAPTURE')]
             assert capture_grants and ctl_after['grants'][capture_grants[0]]['expires_at']==0      # invalidated (never merely expired by time)
