@@ -44,7 +44,7 @@ class Owner:
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
-        self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
+        self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.permitted_policy_states=None;self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
     @contextmanager
     def connection(self):
@@ -158,6 +158,8 @@ class Owner:
         """Accept exactly one coherent reviewed inventory, bound to the execution mode, with the reviewed owner and search path on every function. Reports a fixed reason code and the
         recognised policy state (never exception text). Preflight fails closed before any change."""
         states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
+        if self.permitted_policy_states is not None:      # a mode may name exactly the retained state it is bound to (it then neither applies the policy nor accepts any other state)
+            permitted={k:v for k,v in {'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded}.items() if k in self.permitted_policy_states}
         names=list(upgraded)
         rows=self.q(c,"SELECT p.proname,p.prosrc,r.rolname,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname",(names,))
         observed={n:body for n,body,_,_ in rows}

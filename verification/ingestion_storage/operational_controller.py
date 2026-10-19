@@ -13,21 +13,26 @@ from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.listing_screening import screen_row
 
 
-def runtime_principal(url, ssl):
-    """Bind pooler routing identity separately from the restricted SQL role."""
+def runtime_principal(url, ssl, route=None):
+    """Bind the routing identity separately from the restricted SQL role. `route`, when given, is the ONE route the run is registered for; any other reviewed route is refused (no fallback)."""
     from sqlalchemy.engine import make_url
+    from . import restricted_route as rr
     u=make_url(url)
     roles={'ingestion_worker_login','ingestion_effect_login','ingestion_application_login'}
     if (u.host,u.port,u.database)==('127.0.0.1',5432,'ingestion_provisioning_test'):
         if u.username not in roles|{'ingestion_recovery_login'}:raise Denied('FIXED_DISPOSABLE_PRINCIPAL')
         return u,u.username
-    identities={role+'.zcikcfgpblzuzpanpdqd':role for role in roles}
-    if u.username not in identities:raise Denied('NO_MIGRATION_OR_STRONGER_RUNTIME_PRINCIPAL')
     from .tls_trust import verified_trust
     ca,_=verified_trust()
-    if (u.host,u.port,u.database)!=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres') or ssl!={'sslmode':'verify-full','sslrootcert':str(ca)}:raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
+    found=rr.identify(u)
+    if found is None:
+        if u.host in {s['host'] for s in rr.ROUTES.values()}:raise Denied('NO_MIGRATION_OR_STRONGER_RUNTIME_PRINCIPAL')
+        raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
+    name,role=found
+    if route is not None and name!=route:raise Denied('RESTRICTED_ROUTE_MISMATCH')
+    if ssl!={'sslmode':'verify-full','sslrootcert':str(ca)}:raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
     if u.drivername not in {'postgresql','postgresql+psycopg'} or u.query:raise Denied('REVIEWED_CONNECTION_CONFIGURATION_REQUIRED')
-    return u,identities[u.username]
+    return u,role
 
 
 def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
@@ -144,9 +149,9 @@ class DatabaseBudget:
         # Reserve eight slots for finite rollback/closure; no commit after stop.
         if self.statements>=self.statement_cap-(0 if cleanup else 8):raise Denied('DRIVER_STATEMENT_BOUND')
         self.statements+=1;self.kinds[kind]=self.kinds.get(kind,0)+1
-    def engine(self,url,*,ssl=None,hostaddr=None):
+    def engine(self,url,*,ssl=None,hostaddr=None,route=None):
         import psycopg
-        u,role=runtime_principal(url,ssl)
+        u,role=runtime_principal(url,ssl) if route is None else runtime_principal(url,ssl,route)
         if any(k.startswith('PG') for k in __import__('os').environ):raise Denied('LIBPQ_ENVIRONMENT_OVERRIDE')
         if u.host!='127.0.0.1':
             import ipaddress

@@ -45,9 +45,18 @@ SETTLED_R2_PREDECESSOR=dict(
     run_2=dict(state_directory=SETTLED_STATE,registration_sha256='fa3a94c8b27b32e0ab07119530caf001632768f7c88a3e0ff87fc385434b4634',
                events_sha256='c4dc12776784ca678f5a1a0558f421ba405d0a243df52f5e78008a9ef66fb6cc',final_result_sha256='8116e06698669fb03a9550860ced87685fa4e483a9f93921989a40f295f528c3'))
 # mode -> (authority, state directory, bound predecessor); every settled mode applies the one fixed settling period.
+DIRECT_MODE='DIRECT_ROUTE_DIAGNOSTIC_ONLY'
+DIRECT_AUTHORITY='AUTHORISE_INGESTION_DIRECT_RESTRICTED_ROUTE_DIAGNOSTIC_ONCE_20261020'
+DIRECT_STATE='operational-direct-route-diagnostic-once-20261020'
+# The direct-route diagnostic binds all three consumed runs by hash; it applies no policy and accepts only the retained successor-policy installation.
+DIRECT_PREDECESSOR=dict(SETTLED_R2_PREDECESSOR,run_3=dict(state_directory=SETTLED_R2_STATE,registration_sha256='4186c88fb6ce36c73b3eac03e6ad54d4c0f6aa6c9ca81d286789777e98261e8c',
+                        events_sha256='945b1b500676ab0a43e6982e0a65fb849e75637e89e915d790182e91c284e159',final_result_sha256='389d4623f0b86be450123b9255ac84c2d1184882c2797e6834b3ab47410bd40f'))
+DIAGNOSTIC_MODES=('CONNECTION_DIAGNOSTIC_ONLY',DIRECT_MODE)
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
+# Direct-route diagnostic: finite administrative TOTALS (normal, teardown, diagnostic); pinned from the disposable rehearsal below plus a small margin.
+DIRECT_OWNER_LIMITS=dict(connections=(5,6),commands=(60,80,92))
 # Ordering invariants (tested): job + diagnostic_window <= work alarm (session), so a Runner-detected stop at the job limit still has its full failure window before the one-shot work alarm;
 # work alarm + diagnostic_window <= diagnostic_total <= active window - reporting, so a stop CAUSED by the alarm also keeps a full window; admin_pre < admin_total < admin_diagnostic, so a stop at the
 # very end of the pre-teardown allowance still leaves teardown and failure diagnostics their own administrative time.
@@ -75,10 +84,13 @@ class Runner:
         settled=registration.get('mode') in SETTLED_MODES
         self.authority=SETTLED_MODES[registration['mode']][0] if settled else AUTHORITY
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
-        self.deadlines=dict(MATRIX_DEADLINES if self.matrix_mode else DEFAULT_DEADLINES)
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else None)
+        direct=registration.get('mode')==DIRECT_MODE
+        self.route_name='DIRECT' if direct else 'POOLER';self.restricted_hostaddr=None
+        self.deadlines=dict(MATRIX_DEADLINES if (self.matrix_mode or direct) else DEFAULT_DEADLINES)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else DIRECT_OWNER_LIMITS if direct else None)
+        if direct:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode') not in ('CONNECTION_DIAGNOSTIC_ONLY',MATRIX_MODE)
+        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE)
         self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
@@ -132,7 +144,7 @@ class Runner:
         budget.timeline=self.owner.timeline;budget.settle_seconds=self.settle_seconds      # non-secret elapsed-interval recording at first contact
         budget.hard_stop_at=self.started+self.deadlines['job']      # no driver wait may run past the job limit: the failure window and teardown start after it
         try:
-            engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.hostaddr) for r in ROLES]
+            engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])
             yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,WindowConfig('bolton','RECEIVED',date(2026,10,16),date(2026,10,16),0),QUALIFICATION)}),budget
             success=True
@@ -162,13 +174,20 @@ class Runner:
                 for engine in budget.engines:
                     with engine.connect():pass
         self.emit('restricted_connections_verified_before_authority',dict(capture_key=self.capture_key))
-        if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':return
+        if self.r.get('mode') in DIAGNOSTIC_MODES:return
         self.operation_phase='AUTHORITY_REGISTRATION'
         self.capture_bindings=self.owner.register([root],self.authority+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.emit('required_setup_committed',dict(capture_key=self.capture_key))
 
     def stop_requested(self):
         if (self.journal.root/'STOP').exists():raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')      # the owner STOP file, honoured at every step of the interval
+
+    def restricted_address(self):
+        """The pinned address for the restricted engines. A direct run uses ONLY the address resolved for the direct host; it never borrows the administrative (pooler) address."""
+        if self.route_name=='DIRECT':
+            if not self.restricted_hostaddr:raise Denied('DIRECT_ROUTE_ADDRESS_REQUIRED')
+            return self.restricted_hostaddr
+        return self.hostaddr
 
     def settle(self):
         """One fixed settling period after BOTH passwords and the activation are committed and BEFORE either restricted account is first contacted.
@@ -391,7 +410,7 @@ class Runner:
                 return dict(status='RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),matrix=self.matrix.finalise(),owned_cleanup=components['process'],
                             source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
             self.setup()
-            if self.r.get('mode')=='CONNECTION_DIAGNOSTIC_ONLY':
+            if self.r.get('mode') in DIAGNOSTIC_MODES:
                 with self.phase_as('teardown'):self.owner.teardown(self.github)
                 components=self.closure('DISABLED_VERIFIED')
                 if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
@@ -407,7 +426,9 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 
     No database connection is made here: `connect` is only a closure handed to the Runner. Seams (`dns_run`, `dns_command`) exist solely so the real stage code can be
     exercised against controlled local fixtures; production passes neither."""
-    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command)
+    direct=r.get('mode')==DIRECT_MODE
+    from . import restricted_route as rr
+    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command,restricted_host=rr.ROUTES['DIRECT']['host'] if direct else None)
     ca,selected,connect=prepared.ca,prepared.hostaddr,prepared.connect
     with progress.stage('RUNNER_COMPONENTS'):
         holder={}
@@ -416,8 +437,9 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         github=GitHub(journal.emit,lambda:holder['runner'].check())
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
-        try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
+        try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
         except (KeyError,TypeError,ValueError,AttributeError):raise PreparationFailure('RUNNER_CONSTRUCTION','RUNNER_CONSTRUCTION_FAILED') from None
+        runner.restricted_hostaddr=prepared.restricted_hostaddr
         holder['runner']=runner
     return runner
 
@@ -425,7 +447,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()}}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
@@ -434,12 +456,16 @@ def validate_registration(body,sha):
         if (r.get('matrix')!=[list(e) for e in ENTRIES] or r.get('matrix_limits')!=MX or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_RESTRICTED_CONNECTION_MATRIX_ONLY'
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=MATRIX_STATE)
             or r.get('owner_limits')!=dict(connections=list(MATRIX_OWNER_LIMITS['connections']),commands=list(MATRIX_OWNER_LIMITS['commands'])) or r.get('state_directory')!=MATRIX_STATE):raise ValueError('MATRIX_BINDING')
+    if r.get('mode')==DIRECT_MODE:
+        if (r.get('restricted_route')!='DIRECT' or r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_DIRECT_ROUTE_DIAGNOSTIC_ONLY'
+            or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=DIRECT_STATE) or r.get('state_directory')!=DIRECT_STATE
+            or r.get('owner_limits')!=dict(connections=list(DIRECT_OWNER_LIMITS['connections']),commands=list(DIRECT_OWNER_LIMITS['commands'])) or r.get('settling_seconds') not in (None,0)):raise ValueError('DIRECT_ROUTE_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
             or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,*SETTLED_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,*SETTLED_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -460,7 +486,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -468,7 +494,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=MATRIX_TIMING) if r['mode']==MATRIX_MODE else {}))
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)

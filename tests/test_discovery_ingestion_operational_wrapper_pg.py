@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained','direct_diagnostic_success','direct_first_connection_rejected','direct_route_fallback_refused','direct_address_missing'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     retained=fault.endswith('_retained');fault=fault[:-len('_retained')] if retained else fault      # same scenario, started from the RETAINED upgraded installation of a previous run
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
@@ -66,6 +66,9 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             if fault.startswith('settled_'):
                 from verification.ingestion_storage.operational_runner import SETTLED_R2_MODE
                 registration['mode']=SETTLED_R2_MODE
+            if fault.startswith('direct_'):
+                from verification.ingestion_storage.operational_runner import DIRECT_MODE
+                registration['mode']=DIRECT_MODE
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
             contacts=[]
             if fault.startswith('settled_'):
@@ -101,7 +104,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             with pytest.raises(psycopg.Error,match=reason):c.execute(activation)
                     finally:boot.execute(undo)
             runner.owner.install=install_with_ambient_negatives
-            if fault in {'reuse_installed_success','diagnostic_only','policy_lifecycle'} or fault.startswith('matrix_') or retained:
+            if fault in {'reuse_installed_success','diagnostic_only','policy_lifecycle'} or fault.startswith('matrix_') or retained or fault.startswith('direct_'):
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
@@ -120,7 +123,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 runner.owner.reuse_installed=True
                 from app.ingestion.ledger import digest
                 runner.owner.baseline_control_sha256=digest(ctl)
-                if retained:
+                if retained or fault.startswith('direct_'):
                     with installer.connection() as c_:installer.script(c_,Path('docs/design/ingestion-operational-required-20261018/successor-policy.sql'))      # the state a previous run leaves behind
                 for mutation,undo,expected in [
                   ('ALTER ROLE ingestion_effect_login BYPASSRLS','ALTER ROLE ingestion_effect_login NOBYPASSRLS','REUSED_RUNTIME_FLAGS_CHANGED'),
@@ -253,6 +256,56 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     record_property('restricted_matrix',json.dumps(dict(fault=fault,status=result['status'],outcomes=outcomes,global_stop=stop,admin_connections=runner.owner.connections,admin_commands=runner.owner.commands,
                                     admin_opened=runner.owner.opened,admin_closed=runner.owner.closed,matrix_accounting=result['matrix']['accounting'],access=result.get("access"),cleanup=result["cleanup"])))
                     print('MATRIX_MEASURE',fault,'admin_connections',runner.owner.connections,'admin_commands',runner.owner.commands,"cleanup",result["cleanup"],"access",result.get("access"))
+                    return
+
+                if fault.startswith('direct_'):
+                    from verification.ingestion_storage.operational_outcome import session
+                    from verification.ingestion_storage.tls_trust import verified_trust
+                    from verification.ingestion_storage import restricted_route as rr_, operational_runner as orr_
+                    ca,_=verified_trust();restricted_contacts=[];pooler_restricted=[]
+                    real_connect=psycopg.Connection.connect.__func__
+                    def route_direct(cls,conninfo='',**kw):
+                        user=str(kw.get('user'))
+                        if kw.get('host')==rr_.ROUTES['DIRECT']['host']:
+                            assert kw['hostaddr']=='198.51.100.20' and kw['port']==5432 and kw['dbname']=='postgres' and kw['sslmode']=='verify-full' and kw['sslrootcert']==str(ca) and kw['prepare_threshold'] is None
+                            assert user in ('ingestion_worker_login','ingestion_effect_login')      # the plain role, never the pooler form
+                            restricted_contacts.append(user)
+                            kw=dict(kw,host='127.0.0.1',dbname=info['dbname'])
+                            for field in ('sslmode','sslrootcert','hostaddr'):kw.pop(field,None)
+                        elif kw.get('host')==rr_.ROUTES['POOLER']['host'] or user.startswith('ingestion_'):
+                            pooler_restricted.append(user)                                       # any restricted contact outside the direct route would be a fallback
+                        return real_connect(cls,conninfo,**kw)
+                    monkeypatch.setattr(psycopg.Connection,'connect',classmethod(route_direct))
+                    runner.url_factory=(lambda r_,p_:rr_.url('POOLER',r_,p_)) if fault=='direct_route_fallback_refused' else (lambda r_,p_:rr_.url('DIRECT',r_,p_))
+                    runner.ssl={'sslmode':'verify-full','sslrootcert':str(ca)};runner.hostaddr='192.0.2.1'      # the ADMINISTRATIVE (pooler) address: must never be used for the restricted engines
+                    runner.restricted_hostaddr=None if fault=='direct_address_missing' else '198.51.100.20'
+                    if fault=='direct_first_connection_rejected':
+                        original_map_d=runner.owner.map_and_activate
+                        def map_then_deny_d(*a,**k):
+                            original_map_d(*a,**k);boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN')
+                        runner.owner.map_and_activate=map_then_deny_d
+                    lines=[]
+                    result=session(journal,registration['expires_at'],lambda:'hidden fixture input',lambda raw_,started:runner,output=lambda line,**kw:lines.append(line),timing=orr_.MATRIX_TIMING)
+                    adm=result['accounting']['administration'];limits=orr_.DIRECT_OWNER_LIMITS
+                    actual=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                    assert actual==ctl and not runner.owner.authorities and not source_calls and not pooler_restricted      # control row untouched, no grant, no source, no restricted contact outside the direct route
+                    assert boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>repeat('0',64)").fetchone()[0]==0 and not boot.execute("SELECT count(*) FROM public.ingestion_work_attempts").fetchone()[0]
+                    assert set(ciphertexts)=={'DATABASE_URL'} and adm['preflight']['policy_state']=='SUCCESSOR_POLICY_APPLIED' and adm['preflight']['permitted_states']==['SUCCESSOR_POLICY_APPLIED']
+                    assert boot.execute("SELECT rolname,rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()==[('ingestion_effect_login',False,True),('ingestion_worker_login',False,True)]
+                    assert not boot.execute("SELECT 1 FROM pg_auth_members WHERE member=ANY(%s::regrole[])",(['ingestion_worker_login','ingestion_effect_login'],)).fetchall() and not boot.execute("SELECT 1 FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()
+                    assert adm['role_settings']['state']=='RESTORED_VERIFIED' and {r_:c_ for r_,c_ in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}=={'ingestion_worker_login':None,'ingestion_effect_login':None}
+                    assert adm['connections']<=limits['connections'][1] and adm['commands']<=limits['commands'][2] and adm['connections_opened']==adm['connections_closed'] and adm['teardown_residuals']==[]
+                    assert result['closure_components']['connections']['status']=='CLOSED' and result['closure_components']['process']['status']=='CLOSED' and result['access']=='DISABLED_VERIFIED' if fault!='direct_diagnostic_success' else True
+                    if fault=='direct_diagnostic_success':
+                        assert result['status']=='RESTRICTED_ROUTE_QUALIFIED_ACCESS_DISABLED' and result['cleanup']=='CLOSED' and restricted_contacts==['ingestion_worker_login','ingestion_effect_login']      # one attempt per role, worker first
+                        slot=list(result['accounting']['runtime']['slot_receipts'].values())[0]['database']
+                        assert slot['connection_attempts']==2 and slot['cleanup']=='CLOSED' and slot['connections_closed'] is True and adm['commands']<=limits['commands'][1]
+                        assert result['closure_components']['access']=='DISABLED_VERIFIED' and set(adm['first_connection_intervals'])=={'ingestion_worker_login','ingestion_effect_login'}
+                    elif fault=='direct_first_connection_rejected':
+                        assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and restricted_contacts==['ingestion_worker_login']      # effect never attempted, nothing retried
+                    else:
+                        assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and restricted_contacts==[]      # refused before ANY restricted contact
+                    print('ROLLUP_DIRECT',fault,adm['commands'],adm['connections'],result['status'],result['cleanup'])
                     return
 
                 if fault=='diagnostic_only':

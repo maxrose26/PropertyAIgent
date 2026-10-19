@@ -21,9 +21,9 @@ DNS_ENVIRONMENT={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'}
 CA_REASONS=frozenset({'REVIEWED_CA_MISSING','REVIEWED_CA_HASH_MISMATCH','REVIEWED_CA_NOT_SIGNING_CA','REVIEWED_CA_VALIDITY_REVIEW_REQUIRED','REVIEWED_CA_DER_MISMATCH'})
 
 
-def dns_command():
+def dns_command(host=None):
     """Credential-free exec so a stuck libc lookup cannot survive its hard timeout. Evaluated per call so the interpreter path is the live one."""
-    return [sys.executable,'-c',"import socket,json;print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo('%s',%d,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"%(DNS_HOST,DNS_PORT)]
+    return [sys.executable,'-c',"import socket,json;print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo('%s',%d,family=socket.AF_INET,type=socket.SOCK_STREAM)})))"%(host or DNS_HOST,DNS_PORT)]
 
 
 class Progress:
@@ -32,6 +32,7 @@ class Progress:
         self.current=None;self.completed=[];self.started=time.monotonic()
         self.dns=dict(subprocess_started=False,subprocess_spawned=False,subprocess_completed=False,exit_code=None,stdout_bytes=None,address_count=None)
         self.database_connection_calls=0
+        self.dns_restricted=dict(subprocess_started=False,subprocess_spawned=False,subprocess_completed=False,exit_code=None,stdout_bytes=None,address_count=None)
 
     @contextmanager
     def stage(self,name):
@@ -59,25 +60,26 @@ class Progress:
                     state='PREPARATION_ONLY_NO_DATABASE_GITHUB_OR_SOURCE_WORK' if not self.database_connection_calls else 'CONNECT_CLOSURE_INVOKED_AFTER_PREPARATION')
 
 
-def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIMEOUT_SECONDS):
+def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIMEOUT_SECONDS,record=None):
     """Bounded IPv4 resolution in a credential-free subprocess. The exit status is checked BEFORE the output is parsed."""
+    record=progress.dns if record is None else record
     command=command or dns_command()
-    progress.dns['subprocess_started']=True
+    record['subprocess_started']=True
     try:
         done=run(command,env=DNS_ENVIRONMENT,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=timeout)
     except subprocess.TimeoutExpired:
-        progress.dns['subprocess_spawned']=True   # a timeout can only follow a successful spawn; subprocess.run kills and reaps the child
+        record['subprocess_spawned']=True   # a timeout can only follow a successful spawn; subprocess.run kills and reaps the child
         raise PreparationFailure('DNS_RESOLUTION','DNS_TIMEOUT') from None
     except OSError:raise PreparationFailure('DNS_RESOLUTION','DNS_SUBPROCESS_SPAWN_FAILED') from None
-    progress.dns.update(subprocess_spawned=True,subprocess_completed=True,exit_code=done.returncode if isinstance(done.returncode,int) and -255<=done.returncode<=255 else None,
+    record.update(subprocess_spawned=True,subprocess_completed=True,exit_code=done.returncode if isinstance(done.returncode,int) and -255<=done.returncode<=255 else None,
                         stdout_bytes=len(done.stdout) if isinstance(done.stdout,(bytes,bytearray)) else None)
-    if done.returncode!=0:raise PreparationFailure('DNS_RESOLUTION','DNS_NONZERO_EXIT',exit_code=progress.dns['exit_code'])
+    if done.returncode!=0:raise PreparationFailure('DNS_RESOLUTION','DNS_NONZERO_EXIT',exit_code=record['exit_code'])
     if not isinstance(done.stdout,(bytes,bytearray)) or len(done.stdout)>DNS_STDOUT_BOUND_BYTES:raise PreparationFailure('DNS_RESOLUTION','DNS_OUTPUT_BOUND')
     if not done.stdout.strip():raise PreparationFailure('DNS_RESOLUTION','DNS_EMPTY_OUTPUT')
     try:addresses=json.loads(done.stdout)
     except ValueError:raise PreparationFailure('DNS_RESOLUTION','DNS_MALFORMED_OUTPUT') from None
     if not isinstance(addresses,list) or not all(isinstance(x,str) for x in addresses):raise PreparationFailure('DNS_RESOLUTION','DNS_MALFORMED_OUTPUT')
-    progress.dns['address_count']=len(addresses)
+    record['address_count']=len(addresses)
     if not addresses:raise PreparationFailure('DNS_RESOLUTION','DNS_NO_ADDRESS')
     if len(addresses)>32:raise PreparationFailure('DNS_RESOLUTION','DNS_TOO_MANY_ADDRESSES')
     parsed=[]
@@ -88,7 +90,7 @@ def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIM
     return sorted(str(a) for a in parsed)[0]
 
 
-def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None):
+def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None,restricted_host=None,restricted_dns_command=None):
     """The credential-dependent, connection-free preparation shared by every operational path: expiry, exact route, password presence, reviewed CA, bounded DNS, driver import.
 
     Returns the parsed route, the CA path, the selected address and a `connect` closure. No connection is made here; `connect` only counts and opens when a caller invokes it.
@@ -109,10 +111,13 @@ def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None)
             raise
     with progress.stage('DNS_RESOLUTION'):
         selected=resolve_addresses(progress,command=dns_command,run=dns_run)
+        restricted_selected=None
+        if restricted_host:      # the direct route: its own bounded, credential-free IPv4 resolution, pinned for the restricted engines only
+            restricted_selected=resolve_addresses(progress,command=restricted_dns_command or globals()['dns_command'](restricted_host),run=dns_run,record=progress.dns_restricted)
     with progress.stage('DRIVER_IMPORT'):
         try:import psycopg
         except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
     def connect():
         progress.database_connection_calls+=1
         return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options=STARTUP_OPTIONS)
-    return SimpleNamespace(route=u,ca=ca,hostaddr=selected,connect=connect)
+    return SimpleNamespace(route=u,ca=ca,hostaddr=selected,restricted_hostaddr=restricted_selected,connect=connect)
