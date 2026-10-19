@@ -341,12 +341,12 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert all(carried['database'][k]>=prior_capture['database'][k] for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds'))
             assert carried['supervised_seconds']>=prior_capture['supervised_seconds']
             assert runner.screen()=='SCREENING_COMPLETE' and len(source_calls)==1
-            survivors=[]
+            survivors=[];survivor_pids=[]
             if fault in {'session_survives_privileged','session_survives_unprivileged'}:
                 original_teardown=runner.owner.teardown
                 def with_survivor(gh):
                     ru=make_url(runner.owner.urls['ingestion_worker_login'])
-                    survivors.append(psycopg.connect(host=ru.host,port=ru.port,dbname=ru.database,user=ru.username,password=ru.password,autocommit=True,connect_timeout=3))      # a session that outlives the disable
+                    survivors.append(psycopg.connect(host=ru.host,port=ru.port,dbname=ru.database,user=ru.username,password=ru.password,autocommit=True,connect_timeout=3));survivor_pids.append(survivors[0].info.backend_pid)      # a session that outlives the disable
                     try:return original_teardown(gh)
                     finally:
                         if fault=='session_survives_privileged':survivors[0].close()          # the test process is the client: release its socket so process closure measures the controller, not the fixture
@@ -394,7 +394,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert aggregate['driver_statements']<=1040 and aggregate['connection_attempts']<=40 and aggregate['returned_data_value_bytes']<=4*1024**2
             assert runner.owner.connections<=13 and runner.owner.commands<=240
             if fault=='session_survives_privileged':
-                pid=survivors[0].info.backend_pid
+                pid=survivor_pids[0]
                 assert runner.owner.session_disposition=='TERMINATED_VERIFIED_ABSENT' and runner.owner.terminations==1 and boot.execute('SELECT count(*) FROM pg_stat_activity WHERE pid=%s',(pid,)).fetchone()[0]==0
                 print('ROLLUP_SURVIVOR_PRIVILEGED',runner.owner.session_disposition,runner.owner.commands,runner.owner.connections)
             record_property('required_wrapper',json.dumps(dict(aggregate=aggregate,admin=result['admin'],runtime_supervised_seconds=runner.runtime_seconds,admin_supervised_seconds=runner.admin_seconds,source_observations=len(source_calls),audit_bytes=journal.file.stat().st_size,github_cli_invocations=github.requests,status=result['status'],effective_denials=effective_denials,stored_query_text_retrieved=False),sort_keys=True))
