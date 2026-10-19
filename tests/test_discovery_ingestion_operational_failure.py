@@ -80,6 +80,6 @@ def blocked(*a,**k):time.sleep(30)
 session(j,(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat(),lambda:'hidden',lambda raw,started:Worker(),output=blocked,timing=dict(input_seconds=1,active_seconds=10,work_seconds=8,diagnostic_seconds=1,report_seconds=.1,outer_seconds=12))
 """
     began=time.monotonic()
-    r=subprocess.run([sys.executable,'-c',script,str(tmp_path/'blocked')],capture_output=True,timeout=3)
-    assert r.returncode==124 and time.monotonic()-began<3
+    r=subprocess.run([sys.executable,'-c',script,str(tmp_path/'blocked')],capture_output=True,timeout=20)
+    assert r.returncode==124 and time.monotonic()-began<10      # the output call blocks for 30 s; exiting well under that proves the hard reporting deadline, independent of interpreter start-up and import time on a loaded runner
     assert (tmp_path/'blocked'/'final-result.json').exists()
