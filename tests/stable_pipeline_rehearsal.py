@@ -50,7 +50,22 @@ def _recording(self,*a,**k):
     try:return _original(self,*a,**k)
     except BaseException as exc:
         diag=getattr(exc,'diag',None)
-        Path(plan['output']).joinpath('rehearsal-exception').write_text(json.dumps(dict(kind=type(exc).__name__,text=str(exc)[:800],primary=getattr(diag,'message_primary',None),context=getattr(diag,'context',None))))
+        analysis=None
+        try:      # rehearsal-only: evaluate each component of the Bolton disposition against the control row AS THE WORKER SEES IT, at the moment of failure
+            import time as _time
+            from sqlalchemy.engine import make_url as _mk
+            u=_mk(urls['ingestion_worker_login'])
+            with psycopg.connect(host='127.0.0.1',port=5432,dbname=plan['dbname'],user='ingestion_worker_login',password=u.password,autocommit=True,connect_timeout=3) as c:
+                ctl=c.execute("SELECT outcome::jsonb FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+            authority=orr.PIPELINE_AUTHORITY+'_CAPTURE';grant=ctl.get('grants',{}).get(authority);exc=ctl.get('bolton_exceptions',{}).get(authority)
+            analysis=dict(global_stop_ok=ctl.get('global_stop')=={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'},generation=ctl.get('hard_stop_generation'),exception_generation=(exc or {}).get('hard_stop_generation'),
+                          manual_stop=ctl.get('manual_stop'),exception_present=exc is not None,transport=(exc or {}).get('transport'),exception_expires_in=((exc or {}).get('expires_at') or 0)-_time.time(),
+                          grant_present=grant is not None,grant_expires_in=((grant or {}).get('expires_at') or 0)-_time.time(),grant_source_calls=(grant or {}).get('source_calls'),
+                          binding_equal=bool(exc and grant and exc.get('grant_binding')=={k:v for k,v in grant.items() if k not in ('source_calls','writes')}),
+                          grant_keys_diff=sorted(set((exc or {}).get('grant_binding',{}))^set({k:v for k,v in (grant or {}).items() if k not in ('source_calls','writes')})) if exc and grant else None)
+        except BaseException as inner:
+            analysis=dict(analysis_failed=type(inner).__name__)
+        Path(plan['output']).joinpath('rehearsal-exception').write_text(json.dumps(dict(kind=type(exc).__name__,text=str(exc)[:800],primary=getattr(diag,'message_primary',None),context=getattr(diag,'context',None),analysis=analysis)))
         raise
 _coordinator.Coordinator.idox_source=_recording
 from app.ingestion import sql_ledger as _sql_ledger
