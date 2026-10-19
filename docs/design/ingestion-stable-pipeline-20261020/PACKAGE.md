@@ -28,3 +28,23 @@ See specification section 7. Execution authority is always ended by P3 (or by it
 
 ## Not authorised
 Any production registration, dispatch, grant, exception, source call, application write, unit-fact work, stop release, password rotation, scheduling, deployment, purchase or Stage advancement.
+
+## Arithmetic behind the proposed limits (rehearsal allocations and proposed production limits; none of this is released production authority)
+**Owner administrative commands** (measured with the real `Owner` methods against a scripted connection and repeated on the disposable PG17; the rehearsal reproduced 52 / 73 / 90 exactly where the model predicted 52 / 73 / 71+17):
+| Phase | Commands | Connections |
+|---|---|---|
+| fixed read-only readback (before any grant) | 9 | 1 |
+| capture authority registration | 11 | 1 |
+| ledger read (capture checkpoint) | 5 | 1 |
+| screening authority registration (maximum 12 batches = 60 rows / 5) | 22 | 1 |
+| ledger read (batch states) | 5 | 1 |
+| **normal path** | **52** | **5** |
+| revocation-only invalidation with post-commit readback | 12 | 1 |
+| final fixed readback | 9 | 1 |
+| **through the end of the run** | **73** | **7** |
+| failure after the normal path: reserved invalidation 12 + diagnostics 7 (measured 90 commands / 9 connections including the connections the failed run had already used) | 71 modelled, 90 measured | up to 9 |
+Allowances: **56 / 80 / 96 commands** (normal 52 + 4, end-of-run 73 + 7, failure 90 + 6) and **8 / 10 connections** (7 and 9 measured, each with a reserve). The earlier placeholder of 48 / 60 / 72 was exhausted by the normal path (52 > 48).
+
+**Owner GitHub requests** (allowance 160): polling is bounded by three waits at the production interval of 30 s: capture retention 2,400 s (80 polls), retained-marker 300 s (10 polls), screening completion 600 s (20 polls) = 110 polls, plus 3 for boundary polls = 113; two publications (the screening marker and the owner evidence) of about 8 requests each = 16; the account check and failure-path reads = 4. Total 133, a reserve of 27 under 160. The disposable rehearsal polls at 1 s through a test-only override of the binding (the production constant stays 30 s and is asserted by a unit test); at 0.1 s it exhausted the bound, which is how the first lifecycle runs ended after the invalidation had already committed.
+
+**Hosted job**: GitHub requests ≤ 140 (polling for the owner marker at 15 s over 480 s = 32, three publications of about 8 = 24, plus reads); 40-minute job limit; hard kill 2,100 s; actual memory 1.5 GiB aggregate / 256 MiB controller / 1 GiB source with no swap (cgroup v2, proved on a hosted runner).

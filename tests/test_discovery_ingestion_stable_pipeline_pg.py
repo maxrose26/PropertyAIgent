@@ -206,7 +206,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 assert any(state!='COMPLETE' for _,state in items())      # the retained capture is preserved; screening is incomplete and is reported as such, not as success
                 return
             # ---------------------------------------------------------------- success
-            assert result['status']=='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' and result['cleanup']=='CLOSED' and result['screening']=='COMPLETE' and result['credentials'].startswith('UNCHANGED')
+            assert result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and result['status']=='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' and result['cleanup']=='CLOSED' and result['screening']=='COMPLETE' and result['credentials'].startswith('UNCHANGED')
             assert hosted_final['status'] in ('STABLE_PIPELINE_CAPTURE_SCREENING_COMPLETED_RESTRICTED_RUNTIME_ONLY','PARTIAL_PROPOSAL_COVERAGE') and hosted_final['cleanup']=='CLOSED'
             assert hosted_final['qualification']['status']=='STABLE_CREDENTIALS_QUALIFIED' and hosted_final['qualification']['accounting']['client_closure']['status']=='VERIFIED_FOR_EVERY_ATTEMPT'
             assert hosted_final['rows']==60 and hosted_final['batches']==12 and hosted_final['credential_changes']==0 and hosted_final['grants_issued']==0 and hosted_final['application_writes']==0

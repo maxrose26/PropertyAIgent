@@ -262,3 +262,19 @@ def test_the_owner_github_request_bound_covers_the_production_polling_with_a_res
     publications=2*8                                                                                                  # the screening marker and the owner evidence, about eight requests each
     other=1+3                                                                                                         # the account check and the failure-path reads
     assert polls+publications+other+20<=orr.PIPELINE_GITHUB_BOUND      # reserve of at least 20 requests
+
+
+def test_production_polling_is_the_documented_constants_and_the_rehearsal_override_is_test_only():
+    assert orr.PIPELINE_BINDING['poll_seconds']==30 and sp.POLL_SECONDS==15      # production values; the rehearsal overrides them with monkeypatch on its own copy
+    source=Path('tests/test_discovery_ingestion_stable_pipeline_pg.py').read_text()
+    assert "monkeypatch.setitem(orr.PIPELINE_BINDING,'poll_seconds'" in source      # the override lives only in the disposable rehearsal
+    for path in ('verification/ingestion_storage/operational_runner.py','verification/ingestion_storage/stable_pipeline.py'):
+        assert 'monkeypatch' not in Path(path).read_text()
+
+
+def test_the_invalidation_field_of_a_result_is_the_owners_actual_readback_disposition():
+    source=Path('verification/ingestion_storage/operational_runner.py').read_text()
+    a=source.index('    def pipeline(self):');b=source.index('    def execute(self):')
+    body=source[a:b]
+    assert "invalidation=self.owner.invalidate_authorities()" in body and "authority_invalidation=invalidation" in body      # no literal status is written into the result
+    assert "'ACKNOWLEDGED_READBACK'" not in body.replace("invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK')","")      # only the two readback-confirmed values are accepted, by name, in one comparison
