@@ -347,7 +347,9 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 def with_survivor(gh):
                     ru=make_url(runner.owner.urls['ingestion_worker_login'])
                     survivors.append(psycopg.connect(host=ru.host,port=ru.port,dbname=ru.database,user=ru.username,password=ru.password,autocommit=True,connect_timeout=3))      # a session that outlives the disable
-                    return original_teardown(gh)
+                    try:return original_teardown(gh)
+                    finally:
+                        if fault=='session_survives_privileged':survivors[0].close()          # the test process is the client: release its socket so process closure measures the controller, not the fixture
                 runner.owner.teardown=with_survivor
             if fault=='session_survives_unprivileged':
                 with pytest.raises(Uncertain):runner.finish()
