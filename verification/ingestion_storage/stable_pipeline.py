@@ -172,6 +172,30 @@ class HostedRunner(Runner):
         return self.evidence_head
 
 
+def stop_early(journal,reason,detail=None):
+    result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason=reason,detail=detail,database_connections_attempted=0,application_writes=0,credential_changes=0)
+    journal.emit('stopped',result);journal.save('final-result.json',result)
+    print(json.dumps({'status':result['status'],'stop_reason':reason}));return result
+
+
+def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256):
+    """The hosted pipeline over INJECTED effects (the GitHub CLI runner, the source reader, the memory scope). Production passes the reviewed implementations from main(); the disposable rehearsal
+    passes loopback fixtures. Returns (result, exit_code). Nothing else differs between the two."""
+    holder={}
+    github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=gh_runner,bound=140)
+    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256);holder['runner']=runner
+    runner.source_reader=source_reader_factory(runner)
+    if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
+    result=runner.run()
+    try:runner.publish_completed(result)
+    except BaseException as exc:
+        result=dict(result,publication='UNCERTAIN_'+type(exc).__name__)
+        try:journal.save('final-result.json',result)
+        except BaseException:pass
+    print(json.dumps({k:result.get(k) for k in ('status','cleanup','rows','batches','publication')},sort_keys=True))
+    return result,0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1
+
+
 def main(argv=None):
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args(argv)
@@ -184,35 +208,20 @@ def main(argv=None):
     from .operational_memory import OperationalMemory
     try:memory=OperationalMemory()      # kernel-enforced ACTUAL memory (cgroup v2), established BEFORE any database connection; unavailable = stop here
     except Exception as exc:
-        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='ACTUAL_MEMORY_ENFORCEMENT_UNAVAILABLE',detail=type(exc).__name__,database_connections_attempted=0,application_writes=0,credential_changes=0)
-        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
+        stop_early(journal,'ACTUAL_MEMORY_ENFORCEMENT_UNAVAILABLE',type(exc).__name__);raise SystemExit(1)
     journal.emit('actual_memory_enforcement_established',dict(kind='CGROUP_V2',aggregate_bytes=1536*1024**2,controller_bytes=256*1024**2,source_bytes=1024**3,swap=0))
     github_env=dict(PATH='/usr/bin:/bin',HOME=str(args.output.parent),GH_TOKEN=token,GH_HOST='github.com')
-    holder={}
-    github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),bound=140)
-    manifest_sha=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest()
     progress=Progress()
     try:
-        ca,_=verified_trust()
-        hostaddr=resolve_addresses(progress)
+        ca,_=verified_trust();hostaddr=resolve_addresses(progress)
     except BaseException as exc:
-        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='PREPARATION_FAILED',detail=type(exc).__name__,database_connections_attempted=0,application_writes=0,credential_changes=0)
-        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
+        stop_early(journal,'PREPARATION_FAILED',type(exc).__name__);raise SystemExit(1)
     from .operational_source import read
-    ssl={'sslmode':'verify-full','sslrootcert':str(ca)}
-    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=manifest_sha);holder['runner']=runner
-    runner.source_reader=lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
-    if runner.head()!=os.environ['PIPELINE_EVIDENCE_HEAD']:
-        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='EVIDENCE_HEAD_MOVED',database_connections_attempted=0,application_writes=0,credential_changes=0)
-        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
-    result=runner.run()
-    try:runner.publish_completed(result)
-    except BaseException as exc:
-        result=dict(result,publication='UNCERTAIN_'+type(exc).__name__)
-        try:journal.save('final-result.json',result)
-        except BaseException:pass
-    print(json.dumps({k:result.get(k) for k in ('status','cleanup','rows','batches','publication')},sort_keys=True))
-    raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
+    def source_reader_factory(runner):
+        return lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
+    result,code=run_hosted(urls=urls,journal=journal,gh_runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),source_reader_factory=source_reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},
+                           hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest())
+    raise SystemExit(code)
 
 
 if __name__=='__main__':main()

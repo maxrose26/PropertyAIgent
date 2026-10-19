@@ -395,7 +395,7 @@ class Runner:
         connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and (getattr(self,"matrix",None) is None or self.matrix.closed_ok()) and
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
-        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
+        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
         overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
@@ -413,7 +413,8 @@ class Runner:
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
             if self.pipeline_mode:
                 invalidation=self.owner.invalidate_authorities()      # normal-path invalidation: no generation bump; credentials, memberships and secrets are untouched
-                if invalidation in ('ACKNOWLEDGED_READBACK','NOT_REQUIRED_NO_AUTHORITY'):access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
+                if invalidation=='ACKNOWLEDGED_READBACK':access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
+                elif invalidation=='NOT_REQUIRED_NO_AUTHORITY':access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED'
             else:
                 invalidation=self.owner.invalidate_failure()
                 if (invalidation=='ACKNOWLEDGED_READBACK' or (not self.owner.authorities and self.owner.urls and not self.owner.effect_uncertain)):
@@ -526,18 +527,25 @@ class Runner:
             marker=dict(authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
             self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
             self.operation_phase='PIPELINE_AWAIT_SCREENING'
-            head,_=self.await_publication(self.evidence_head,'completed/final-result.json',pb['screening_wait_seconds'])
+            head,blob=self.await_publication(self.evidence_head,'completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
+            raw=__import__('base64').b64decode(blob.get('content',''))
+            try:hosted=json.loads(raw)
+            except ValueError:hosted={}
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))
             done=self.owner.read_items([p['key'] for p in self.plans])
             incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')
-            self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete))
-        else:self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS'))
+            self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
+        else:
+            hosted_summary=dict(status='NOT_APPLICABLE_NO_BATCHES');incomplete=[]
+            self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS'))
         self.operation_phase='PIPELINE_INVALIDATION'
         invalidation=self.owner.invalidate_authorities()
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
         components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
         if invalidation!='ACKNOWLEDGED_READBACK' or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
-        result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED',cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
+        finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+        result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',
                     source_observations_attempted=1,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)

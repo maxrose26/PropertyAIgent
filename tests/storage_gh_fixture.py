@@ -169,15 +169,17 @@ def real_gh_store(tmp_path,request):
     proxy.daemon_threads=True
     proxy_thread=threading.Thread(target=proxy.serve_forever,kwargs={'poll_interval':.02},daemon=True)
     proxy_thread.start()
-    def cli(command,**kwargs):
-        assert command[0]=='gh'
-        env={**os.environ,'GH_HOST':host,'GH_ENTERPRISE_TOKEN':'disposable_fixture_only',
+    def fixture_env():
+        return {**os.environ,'GH_HOST':host,'GH_ENTERPRISE_TOKEN':'disposable_fixture_only',
              'GH_TOKEN':'disposable_fixture_only','GH_CONFIG_DIR':str(config),
              'SSL_CERT_FILE':str(pem),'SSL_CERT_DIR':str(config),
              'GH_PROMPT_DISABLED':'1','GH_DEBUG':'',
              'HTTPS_PROXY':'http://127.0.0.1:%s'%proxy.server_port,
              'https_proxy':'http://127.0.0.1:%s'%proxy.server_port,
              'NO_PROXY':'','no_proxy':''}
+    def cli(command,**kwargs):
+        assert command[0]=='gh'
+        env=fixture_env()
         args=[gh,*command[1:]]
         # Both API and explicit repository routes must use the fixed fixture.
         if '--repo' in args:
@@ -202,7 +204,7 @@ def real_gh_store(tmp_path,request):
             raise Stop('GH_FIXTURE_'+category)
         return result
     def metadata(command,seconds=10):return cli(command).stdout
-    metadata.cli=cli
+    metadata.cli=cli;metadata.fixture_env=fixture_env;metadata.gh=gh
     def secret(operation,name,value):
         from verification.ingestion_storage import credential_mapping as mapping
         if operation=='set':mapping.put_secret(name,value,runner=cli)
