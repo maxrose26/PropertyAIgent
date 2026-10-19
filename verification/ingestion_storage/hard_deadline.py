@@ -26,28 +26,32 @@ def hard_deadline(seconds,code):
     if threading.current_thread() is not threading.main_thread():raise RuntimeError('HARD_DEADLINE_MAIN_THREAD_ONLY')
     if not 0<seconds<=3600:raise ValueError('HARD_DEADLINE_BOUND')
     if not _active.acquire(blocking=False):raise RuntimeError('HARD_DEADLINE_NESTED')
-    main=threading.get_ident();done=threading.Event();live=[True]
-    def handler(signum,frame):
-        if live[0]:raise DeadlineExceeded(code)      # a signal that raced the normal exit is ignored, never raised after the call has completed
-    previous=signal.signal(SIGNAL,handler)
-    def watch():
-        if not done.wait(seconds) and live[0]:
-            try:signal.pthread_kill(main,SIGNAL)
-            except Exception:pass
-    thread=threading.Thread(target=watch,name='hard-deadline',daemon=True);thread.start()
-    try:
-        yield
-    finally:
-        # Block the signal while tearing down so cleanup cannot be interrupted; ignoring the disposition discards any signal still pending; only then restore the previous handler.
-        mask=signal.pthread_sigmask(signal.SIG_BLOCK,{SIGNAL})
+    try:                                          # the lock is released on EVERY exit path, including a failure while installing the handler or starting the watchdog
+        main=threading.get_ident();done=threading.Event();live=[True];state=dict(previous=signal.SIG_DFL,installed=False,thread=None)
+        def handler(signum,frame):
+            if live[0]:raise DeadlineExceeded(code)      # a signal that raced the normal exit is ignored, never raised after the call has completed
+        def watch():
+            if not done.wait(seconds) and live[0]:
+                try:signal.pthread_kill(main,SIGNAL)
+                except Exception:pass
         try:
-            live[0]=False;done.set()
-            signal.signal(SIGNAL,signal.SIG_IGN)
-            thread.join(timeout=1)
-            signal.signal(SIGNAL,previous if previous is not None else signal.SIG_DFL)
+            state['previous']=signal.signal(SIGNAL,handler);state['installed']=True
+            state['thread']=threading.Thread(target=watch,name='hard-deadline',daemon=True);state['thread'].start()
+            yield
         finally:
-            signal.pthread_sigmask(signal.SIG_SETMASK,mask)
-            _active.release()
+            try:live[0]=False                     # a signal can still land on this very line; it is swallowed so teardown always completes
+            except DeadlineExceeded:live[0]=False
+            mask=signal.pthread_sigmask(signal.SIG_BLOCK,{SIGNAL})
+            try:
+                done.set()
+                if state['installed']:
+                    signal.signal(SIGNAL,signal.SIG_IGN)          # discards any pending signal
+                    if state['thread'] is not None:state['thread'].join(timeout=1)
+                    signal.signal(SIGNAL,state['previous'] if state['previous'] is not None else signal.SIG_DFL)
+            finally:
+                signal.pthread_sigmask(signal.SIG_SETMASK,mask)
+    finally:
+        _active.release()
 
 
 def abandon(connection):
