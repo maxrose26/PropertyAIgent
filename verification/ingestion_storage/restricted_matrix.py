@@ -14,6 +14,7 @@ import re,time
 from app.ingestion.ledger import Denied
 from .connection_diagnostics import safe_failure
 from .operational_cleanup import Stop
+from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
 from .operational_preparation import STARTUP_OPTIONS
 from .tls_trust import owned_resources
 
@@ -39,13 +40,15 @@ LIMITS=dict(entries=4,connection_attempts=4,attempts_per_entry=1,identity_statem
             administrative_connections=5,administrative_commands=64,administrative_commands_before_teardown=44,administrative_commands_through_teardown=58)
 INTERPRETATION=dict(scope='CONFIGURATION_SPECIFIC_OBSERVATIONS_AT_ONE_POINT_IN_TIME',
                     not_established=('CAUSE_OF_ANY_FAILURE','CREDENTIAL_CACHING','PROPAGATION_DELAY','PROVIDER_DEFECT','STARTUP_OPTIONS_AS_CAUSE_OR_NON_CAUSE_WHEN_ORDER_AND_TIME_VARY_TOGETHER'),
-                    execution_authority='NONE',qualification_for_execution='NOT_GRANTED_BY_THIS_DIAGNOSTIC')
+                    execution_authority='NONE',qualification_for_execution='NOT_GRANTED_BY_THIS_DIAGNOSTIC',
+                    operational_deadline_acceptance='NOT_ESTABLISHED_BY_THIS_DIAGNOSTIC',
+                    deadline_note='A connected entry shows a configuration works; it does not show that a statement deadline is enforced. Each entry carries a client-side hard deadline independent of server timeout settings.')
 
 
 class MatrixStop(Exception):
     """A global stop with a fixed code; str() is the fixed code only."""
     CODES=frozenset({'UNCLASSIFIED_FAILURE','SECURITY_CLASS_FAILURE','UNEXPECTED_IDENTITY','CLOSURE_UNCERTAIN','CONNECTION_BUDGET_EXHAUSTED','STATEMENT_BUDGET_EXHAUSTED','RETURNED_BYTES_EXHAUSTED',
-                     'MATRIX_TIME_EXHAUSTED','MATRIX_ORDER_VIOLATION','RESPONSE_SHAPE','NON_CONTINUABLE_FAILURE','CAPACITY_AFTER_OWN_CONNECTION','DEADLINE_OR_BUDGET_DENIAL'})
+                     'MATRIX_TIME_EXHAUSTED','MATRIX_ORDER_VIOLATION','RESPONSE_SHAPE','NON_CONTINUABLE_FAILURE','CAPACITY_AFTER_OWN_CONNECTION','DEADLINE_OR_BUDGET_DENIAL','ENTRY_DEADLINE_EXCEEDED'})
     def __init__(self,code):
         if code not in self.CODES:raise ValueError('MATRIX_CODE')
         self.code=code;super().__init__(code)
@@ -124,32 +127,40 @@ class Matrix:
         began=self.clock();record.update(intervals_at_attempt=self.intervals(role,began),outcome='ATTEMPTING')
         self.attempts+=1
         connection=None;failure=None;verified=False;statement_count=0
+        record['deadline_control']=dict(client_hard_deadline_seconds=LIMITS['seconds_per_entry'],exceeded=False)
         try:
-            runner.emit('matrix_entry_intent',dict(ordinal=record['ordinal'],role=role,startup_options=variant,**record['intervals_at_attempt']))
-            connection=self.connect(**kwargs)
-            record['connection_established']=True
-            statement_count=1;self.statements+=1
-            if self.statements>LIMITS['driver_statements']:self.stop('STATEMENT_BUDGET_EXHAUSTED')
-            cursor=connection.execute(STATEMENT);rows=cursor.fetchall();result=cursor.pgresult
-            if result is not None:self.returned_bytes+=sum(len(result.get_value(r,k) or b'') for r in range(result.ntuples) for k in range(result.nfields))
-            if self.returned_bytes>LIMITS['returned_data_value_bytes']:self.stop('RETURNED_BYTES_EXHAUSTED')
-            if len(rows)!=1 or len(rows[0])!=11:self.stop('RESPONSE_SHAPE')
-            row=rows[0]
-            # Two SEPARATE checks. The identity check decides whether this is the expected restricted login; the timeout check only records whether the requested startup options are
-            # reflected in the session. A session that is the right login but does not carry the requested options is a configuration observation, not an identity failure.
-            ident=dict(current_user_matches_login=row[0]==role,session_user_matches_login=row[1]==role,restricted_flags_match=tuple(row[2:8])==EXPECTED_FLAGS)
-            identity_ok=all(ident.values());record['identity_check']=dict(ident,verified=identity_ok)
-            observed=tuple(bounded_setting(x) for x in row[8:11])
-            reviewed_match=observed==EXPECTED_TIMEOUTS['REVIEWED']
-            record['timeout_check']=dict(requested_startup_options=variant,observed_statement_lock_idle_timeouts=list(observed),matches_reviewed_values=reviewed_match,
-                                         reflected_as_requested=(reviewed_match if variant=='REVIEWED' else None))
-            record['observed_server_timeouts_match_reviewed']=reviewed_match
-            if not identity_ok:record['outcome']='IDENTITY_UNEXPECTED'
-            else:verified=True
+            with hard_deadline(LIMITS['seconds_per_entry'],'ENTRY_DEADLINE_EXCEEDED'):
+                runner.emit('matrix_entry_intent',dict(ordinal=record['ordinal'],role=role,startup_options=variant,**record['intervals_at_attempt']))
+                connection=self.connect(**kwargs)
+                record['connection_established']=True
+                statement_count=1;self.statements+=1
+                if self.statements>LIMITS['driver_statements']:self.stop('STATEMENT_BUDGET_EXHAUSTED')
+                cursor=connection.execute(STATEMENT);rows=cursor.fetchall();result=cursor.pgresult
+                if result is not None:self.returned_bytes+=sum(len(result.get_value(r,k) or b'') for r in range(result.ntuples) for k in range(result.nfields))
+                if self.returned_bytes>LIMITS['returned_data_value_bytes']:self.stop('RETURNED_BYTES_EXHAUSTED')
+                if len(rows)!=1 or len(rows[0])!=11:self.stop('RESPONSE_SHAPE')
+                row=rows[0]
+                # Two SEPARATE checks. The identity check decides whether this is the expected restricted login; the timeout check only records whether the requested startup options are
+                # reflected in the session. A session that is the right login but does not carry the requested options is a configuration observation, not an identity failure.
+                ident=dict(current_user_matches_login=row[0]==role,session_user_matches_login=row[1]==role,restricted_flags_match=tuple(row[2:8])==EXPECTED_FLAGS)
+                identity_ok=all(ident.values());record['identity_check']=dict(ident,verified=identity_ok)
+                observed=tuple(bounded_setting(x) for x in row[8:11])
+                reviewed_match=observed==EXPECTED_TIMEOUTS['REVIEWED']
+                record['timeout_check']=dict(requested_startup_options=variant,observed_statement_lock_idle_timeouts=list(observed),matches_reviewed_values=reviewed_match,
+                                             reflected_as_requested=(reviewed_match if variant=='REVIEWED' else None))
+                record['observed_server_timeouts_match_reviewed']=reviewed_match
+                record['deadline_control']['server_timeouts_reflected']=reviewed_match if variant=='REVIEWED' else None
+                if not identity_ok:record['outcome']='IDENTITY_UNEXPECTED'
+                else:verified=True
         except MatrixStop:
             raise
         except (KeyboardInterrupt,SystemExit):
             raise
+        except DeadlineExceeded:
+            # a statement (or connect) outlived the CLIENT-side deadline, whatever the server timeouts are: cancel, close, record and stop everything
+            record['deadline_control'].update(exceeded=True,abandon=abandon(connection) if connection is not None else dict(cancel_requested=False,client_closed=None))
+            self.stopped='ENTRY_DEADLINE_EXCEEDED';record['outcome']='STOPPED_DURING_ENTRY'
+            raise MatrixStop('ENTRY_DEADLINE_EXCEEDED') from None
         except (Stop,Denied):
             self.stopped='DEADLINE_OR_BUDGET_DENIAL';record['outcome']='STOPPED_DURING_ENTRY'
             raise MatrixStop('DEADLINE_OR_BUDGET_DENIAL') from None
