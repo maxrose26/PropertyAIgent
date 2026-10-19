@@ -87,7 +87,7 @@ class DatabaseBudget:
         self.cancel_used=cancel_used;self.prior_cancel_attempts=(previous or {}).get('cancel_attempts',0);self.prior_cancel_seconds=(previous or {}).get('cancel_seconds',0.0);self.prior_cancel_failures=(previous or {}).get('cancel_failures',0)
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
-        self.failed_native_closed=True;self.hard_deadline_events=[];self.hard_stop_at=None
+        self.failed_native_closed=True;self.hard_deadline_events=[];self.hard_stop_at=None;self.timeline=None;self.settle_seconds=None
         from .tls_trust import owned_resources
         self.socket_baseline=owned_resources()['socket_fds']
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
@@ -104,6 +104,14 @@ class DatabaseBudget:
         if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=self.returned_cap:raise Denied("PRIOR_BYTES_BOUND")
         self.previous_elapsed=elapsed
         self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.previous_opened=previous.get('connections_opened',0);self.connection_seconds=previous.get('connection_active_seconds',0.0);self.stop_file=Path(stop_file) if stop_file else None
+    def first_contact(self,role):
+        """Non-secret elapsed intervals (password commit, mapping, activation -> now) recorded ONCE per role at its first connection attempt."""
+        tl=self.timeline.get(role) if isinstance(self.timeline,dict) else None
+        if tl is None or 'first_contact_intervals' in tl:return {}
+        now=time.monotonic()
+        iv={k:round(now-tl[s],3) for k,s in (('since_password_commit_seconds','password_committed'),('since_mapping_seconds','mapped'),('since_activation_seconds','activated')) if s in tl}
+        tl['first_contact_intervals']=dict(iv,settle_seconds_planned=self.settle_seconds or 0,attempt=self.attempts)
+        return dict(first_contact=True,**iv)
     def check(self):
         if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
     def guarded(self,connection,call):
@@ -167,7 +175,7 @@ class DatabaseBudget:
             if budget.attempts>=budget.connection_cap:raise Denied('CONNECTION_BOUND')
             budget.attempts+=1
             from .connection_diagnostics import safe_failure
-            budget.emit('runtime_connection_intent',dict(role=role,attempt=budget.attempts,phase='DRIVER_CONNECT',tls='verify-full' if ssl else 'DISPOSABLE'))
+            budget.emit('runtime_connection_intent',dict(role=role,attempt=budget.attempts,phase='DRIVER_CONNECT',tls='verify-full' if ssl else 'DISPOSABLE',**budget.first_contact(role)))
             began=time.monotonic();phase='DRIVER_CONNECT';c=None
             try:
                 c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,

@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
@@ -49,7 +49,9 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             if fault=='role_settings_success':boot.execute("ALTER ROLE ingestion_worker_login SET work_mem='5MB'");boot.execute("ALTER ROLE ingestion_worker_login SET statement_timeout='7s'")      # prior configuration to be preserved and restored
             journal=Journal(tmp_path/'actual-wrapper');holder={}
             injected=[]
+            mapped_values={}
             def cli(command,**kwargs):
+                if command[1:3]==['secret','set']:mapped_values[command[3]]=kwargs['input'].decode()      # what the protected mapping receives
                 response=metadata.cli(command,**kwargs)
                 if not injected and ((fault=='mapping_lost_ack' and command[1:3]==['secret','set']) or (fault=='teardown_lost_ack' and '--method' in command and command[command.index('--method')+1]=='DELETE')):
                     injected.append(True);raise subprocess.TimeoutExpired(['gh','DISPOSABLE_ACK_LOSS'],1)
@@ -60,7 +62,23 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             if os.environ.get('INGESTION_OPERATIONAL_NATIVE')=='1':
                 from verification.ingestion_storage.operational_memory import OperationalMemory
                 native=OperationalMemory()
+            if fault.startswith('settled_'):
+                from verification.ingestion_storage.operational_runner import SETTLED_MODE
+                registration['mode']=SETTLED_MODE
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
+            contacts=[]
+            if fault.startswith('settled_'):
+                from verification.ingestion_storage.operational_runner import SETTLE_SECONDS
+                assert runner.settle_seconds==SETTLE_SECONDS==30 and runner.authority.endswith('SETTLED_ONCE_20261019')      # the production interval; a short one is substituted below only to keep CI short
+                runner.settle_seconds=0.6
+                original_settle=runner.settle;settled_at=[]
+                def recording_settle():
+                    original_settle();settled_at.append(time.monotonic())
+                runner.settle=recording_settle
+                contact_connect=psycopg.Connection.connect.__func__
+                def recording_connect(cls,conninfo='',**kw):
+                    contacts.append((time.monotonic(),str(kw.get('user'))));return contact_connect(cls,conninfo,**kw)
+                monkeypatch.setattr(psycopg.Connection,'connect',classmethod(recording_connect))
             if fault.startswith('role_settings_') or fault=='first_session_query_fails':
                 real_connect=psycopg.Connection.connect.__func__
                 def options_ignored(cls,conninfo='',**kw):
@@ -204,7 +222,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     record_property('restricted_route_diagnostic',json.dumps(dict(accounting=result['accounting'],status=result['status'],execution_grants=0,source_calls=0,ledger_changed=False)))
                     return
 
-            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration'}:
+            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','settled_first_connection_rejected'}:
                 from verification.ingestion_storage.operational_outcome import session
                 from verification.ingestion_storage.tls_trust import verified_trust
                 # Production-shaped kwargs reach the real psycopg Connection
@@ -226,7 +244,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 monkeypatch.setattr(psycopg.Connection,'connect',classmethod(route))
                 runner.url_factory=lambda r,p:URL.create('postgresql',username=r+'.zcikcfgpblzuzpanpdqd',password=p,host='aws-0-eu-west-2.pooler.supabase.com',port=5432,database='postgres').render_as_string(hide_password=False)
                 runner.ssl={'sslmode':'verify-full','sslrootcert':str(ca)};runner.hostaddr='192.0.2.1'
-                if fault=='worker_connect':
+                if fault in {'worker_connect','settled_first_connection_rejected'}:
                     original_map=runner.owner.map_and_activate
                     def map_then_deny(*args,**kwargs):
                         original_map(*args,**kwargs);boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN')
@@ -305,9 +323,19 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     assert github.mutation_uncertain and not ctl['grants'] and not ctl.get('bolton_exceptions')
                     assert not source_calls and not any(m=='DELETE' for m,p in requests)
                     assert not result['accounting']['runtime']['slot_receipts']
-                elif fault=='worker_connect':
+                elif fault in {'worker_connect','settled_first_connection_rejected'}:
                     assert not ctl['grants'] and not ctl.get('bolton_exceptions') and not source_calls
-                    assert observed_routes==['ingestion_worker_login']
+                    assert observed_routes==['ingestion_worker_login']      # exactly ONE restricted contact: the worker; the effect login is never attempted, nothing is polled or retried
+                    if fault=='settled_first_connection_rejected':
+                        lines_=[json.loads(l) for l in journal.file.read_text().splitlines()];names_=[e['event'] for e in lines_]
+                        assert names_.index('settling_started')<names_.index('settling_completed')<names_.index('runtime_connection_intent')
+                        assert [e for e in names_ if e=='runtime_connection_intent'].__len__()==1 and result['operation_phase']=='RESTRICTED_CONNECTION_QUALIFICATION' and result['access']=='DISABLED_VERIFIED'
+                        intent_=[e['payload'] for e in lines_ if e['event']=='runtime_connection_intent'][0]
+                        assert intent_['role']=='ingestion_worker_login' and intent_['attempt']==1 and intent_['first_contact'] is True and intent_['since_activation_seconds']>=0.6 and intent_['since_password_commit_seconds']>=intent_['since_activation_seconds']
+                        iv_=result['accounting']['administration']['first_connection_intervals']
+                        assert iv_['ingestion_worker_login']['attempt']==1 and iv_['ingestion_effect_login'] is None
+                        assert not [u for t,u in contacts if u.startswith('ingestion_') and t<settled_at[0]]
+                        assert [u for t,u in contacts if u.startswith('ingestion_')]==['ingestion_worker_login']
                     assert set(ciphertexts)=={'DATABASE_URL'}
                 elif fault=='invalidation_commit_unknown':
                     assert result['authority_invalidation']=='UNCERTAIN_RECONCILE' and not any(m=='DELETE' for m,p in requests)
@@ -385,6 +413,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert all(carried['database'][k]>=prior_capture['database'][k] for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds'))
             assert carried['supervised_seconds']>=prior_capture['supervised_seconds']
             assert runner.screen()=='SCREENING_COMPLETE' and len(source_calls)==1
+            if fault=='settled_success':
+                for r_,n_ in (('ingestion_worker_login','INGESTION_WORKER_DATABASE_URL'),('ingestion_effect_login','INGESTION_EFFECT_DATABASE_URL')):assert mapped_values[n_]==runner.owner.urls[r_]
             survivors=[];survivor_pids=[]
             if fault in {'session_survives_privileged','session_survives_unprivileged'}:
                 original_teardown=runner.owner.teardown
@@ -453,6 +483,18 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             expected_cfg={'ingestion_effect_login':[],'ingestion_worker_login':['statement_timeout=7s','work_mem=5MB'] if fault=='role_settings_success' else []}
             assert {r:sorted(c or []) for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}==expected_cfg and runner.owner.role_settings_state=='RESTORED_VERIFIED' and runner.owner.teardown_residuals==[]
             print('ROLLUP_ADMIN_COMPLETE',fault,runner.owner.commands,runner.owner.connections)
+            if fault=='settled_success':
+                lines_=[json.loads(l) for l in journal.file.read_text().splitlines()];names_=[e['event'] for e in lines_]
+                assert names_.index('secret_mapping_ack')<names_.index('settling_started')<names_.index('settling_completed')<names_.index('runtime_connection_intent')
+                restricted_=[(t,u) for t,u in contacts if u.startswith('ingestion_')];assert restricted_ and min(t for t,u in restricted_)>=settled_at[0]      # nothing contacted either role before the interval ended
+                firsts_=[e['payload'] for e in lines_ if e['event']=='runtime_connection_intent' and e['payload'].get('first_contact')]
+                assert [f['role'] for f in firsts_]==['ingestion_worker_login','ingestion_effect_login'] and all(f['since_activation_seconds']>=0.6 and f['since_password_commit_seconds']>=f['since_activation_seconds'] for f in firsts_)
+                assert result['admin']['first_connection_intervals']['ingestion_worker_login']['attempt']==1
+                from sqlalchemy.engine import make_url as mk
+                for r_,n_ in (('ingestion_worker_login','INGESTION_WORKER_DATABASE_URL'),('ingestion_effect_login','INGESTION_EFFECT_DATABASE_URL')):
+                    assert mapped_values[n_]==runner.owner.urls.get(r_,mapped_values[n_])      # the mapped secret and the qualification URL are the same value (urls are cleared at teardown)
+                    password_=mk(mapped_values[n_]).password
+                    assert password_ not in journal.file.read_text() and password_ not in json.dumps(result)      # never exposed in the audit or the result
             if fault=='session_survives_privileged':
                 pid=survivor_pids[0]
                 assert runner.owner.session_disposition=='TERMINATED_VERIFIED_ABSENT' and runner.owner.terminations==1 and boot.execute('SELECT count(*) FROM pg_stat_activity WHERE pid=%s',(pid,)).fetchone()[0]==0
