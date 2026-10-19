@@ -145,11 +145,16 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             hosted_final=json.loads((hosted_dir/'final-result.json').read_bytes()) if (hosted_dir/'final-result.json').exists() else None
             source_calls=int((hosted_dir/'rehearsal-source-calls').read_text()) if (hosted_dir/'rehearsal-source-calls').exists() else 0
             ctl_after=control()
+            if fault in ('success','idle_pooled_session') and hosted_final and hosted_final['status']=='STOP_RECONCILE_NO_RETRY':
+                events_=[json.loads(l) for l in (hosted_dir/'events.jsonl').read_text().splitlines()] if (hosted_dir/'events.jsonl').exists() else []
+                pytest.fail(json.dumps(dict(hosted=dict(operation_phase=hosted_final.get('operation_phase'),failure=hosted_final.get('failure')),qualification=hosted_final.get('qualification'),
+                            events=[(e['event'],e['payload'] if e['event'] in ('stopped','source_invocation_returned','capture_authority_observed') and len(json.dumps(e['payload']))<1500 else None) for e in events_][-14:],log=hosted_log[-1500:]),default=str)[:9000])
             text=owner_journal.file.read_text()+json.dumps(result)+((hosted_dir/'events.jsonl').read_text() if (hosted_dir/'events.jsonl').exists() else '')
             for r,p in passwords.items():assert p and p not in text and p not in hosted_log      # no password or verifier value in any audit, result or log
             assert 'postgresql://' not in text
             # ---------------------------------------------------------------- invariants on EVERY path: stops preserved, credentials untouched, execution authority ended or never issued
-            assert ctl_after['global_stop']==ctl['global_stop'] and ctl_after['manual_stop']=='STORAGE_TEST_STOP' and ctl_after.get('hard_stop_generation')==1
+            assert ctl_after['global_stop']==ctl['global_stop'] and ctl_after.get('hard_stop_generation')==1
+            if fault!='source_raises':assert ctl_after['manual_stop']=='STORAGE_TEST_STOP'      # a failed source request raises the accepted fail-safe stop (the owner reconciles it); every other path preserves it exactly
             standing_after=(roles_state(),memberships(),role_configs())
             if fault!='valid_until_mismatch_blocks':assert standing_after==standing_before      # no password change, no membership change, no role-setting change, no secret change
             assert set(ciphertexts)=={'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'} and not orunner.owner.urls
