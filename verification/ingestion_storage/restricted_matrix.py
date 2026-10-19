@@ -10,7 +10,7 @@ configuration-specific observation, never a cause.
 Each entry: exactly one connection attempt and, only if it connects, exactly one fixed identity statement; the connection is closed and positively verified closed before the
 next entry begins (the logins carry CONNECTION LIMIT 1, so an unclosed connection would invalidate every later entry).
 """
-import time
+import re,time
 from app.ingestion.ledger import Denied
 from .connection_diagnostics import safe_failure
 from .operational_cleanup import Stop
@@ -24,9 +24,15 @@ STATEMENT=("SELECT current_user,session_user,rolcanlogin,rolsuper,rolcreaterole,
            "FROM pg_catalog.pg_roles WHERE rolname=current_user")
 EXPECTED_FLAGS=(True,False,False,False,False,False)
 EXPECTED_TIMEOUTS={'NONE':None,'REVIEWED':('10s','3s','20s')}
+SETTING_PATTERN=re.compile(r'0|[0-9]{1,6}(?:us|ms|s|min|h|d)?')      # bounded, allow-listed rendering of a server timeout setting; anything else is recorded only as a marker
+
+
+def bounded_setting(value):
+    return value if isinstance(value,str) and SETTING_PATTERN.fullmatch(value) else 'NON_ALLOWLISTED_VALUE'
 # A classified failure of one of these kinds does not stop the matrix. Anything else (unclassified, TLS integrity, identity, budgets, closure) is a global stop.
 CONTINUABLE=frozenset({'AUTHENTICATION_REJECTED','AUTHORIZATION_REJECTED','PERMISSION_DENIED','ROUTING_IDENTITY_REJECTED','CONNECTION_CAPACITY','CONNECTION_TIMEOUT','CONNECTION_REFUSED',
                        'CONNECTION_FAILURE','SERVER_NOT_READY'})
+CONNECTED_OUTCOMES=('CONNECTED_IDENTITY_VERIFIED','CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED')
 SECURITY_CLASS=frozenset({'TLS_HOSTNAME_MISMATCH','TLS_CA_UNAVAILABLE','TLS_CHAIN_REJECTED'})
 LIMITS=dict(entries=4,connection_attempts=4,attempts_per_entry=1,identity_statements_per_entry=1,driver_statements=4,rollbacks=0,commits=0,returned_data_value_bytes=1024,
             connect_timeout_seconds=3,seconds_per_entry=13,matrix_seconds=60,
@@ -62,7 +68,8 @@ class Matrix:
     def accounting(self):
         m=lambda v:dict(value=v,basis='MEASURED')
         return dict(connection_attempts=m(self.attempts),identity_statements=m(self.statements),returned_data_value_bytes=m(self.returned_bytes),rollbacks=m(0),commits=m(0),
-                    entries_connected=m(sum(e['outcome']=='CONNECTED_IDENTITY_VERIFIED' for e in self.entries)),
+                    entries_connected=m(sum(e['outcome'] in CONNECTED_OUTCOMES for e in self.entries)),
+                    entries_options_not_reflected=m(sum(e['outcome']=='CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED' for e in self.entries)),
                     entries_failed_classified=m(sum(e['outcome']=='FAILED_CLASSIFIED' for e in self.entries)),
                     entries_not_attempted=m(sum(e['outcome'] in ('NOT_REACHED','SKIPPED_GLOBAL_STOP') for e in self.entries)))
 
@@ -128,15 +135,17 @@ class Matrix:
             if self.returned_bytes>LIMITS['returned_data_value_bytes']:self.stop('RETURNED_BYTES_EXHAUSTED')
             if len(rows)!=1 or len(rows[0])!=11:self.stop('RESPONSE_SHAPE')
             row=rows[0]
-            identity_ok=row[0]==role and row[1]==role and tuple(row[2:8])==EXPECTED_FLAGS
-            timeouts=tuple(row[8:11])
-            record['observed_server_timeouts_match_reviewed']=timeouts==EXPECTED_TIMEOUTS['REVIEWED']
-            if not identity_ok:
-                record['outcome']='IDENTITY_UNEXPECTED'
-            elif EXPECTED_TIMEOUTS[variant] is not None and timeouts!=EXPECTED_TIMEOUTS[variant]:
-                record['outcome']='IDENTITY_UNEXPECTED'              # options were sent but the session does not carry them: not the configuration requested
-            else:
-                verified=True
+            # Two SEPARATE checks. The identity check decides whether this is the expected restricted login; the timeout check only records whether the requested startup options are
+            # reflected in the session. A session that is the right login but does not carry the requested options is a configuration observation, not an identity failure.
+            ident=dict(current_user_matches_login=row[0]==role,session_user_matches_login=row[1]==role,restricted_flags_match=tuple(row[2:8])==EXPECTED_FLAGS)
+            identity_ok=all(ident.values());record['identity_check']=dict(ident,verified=identity_ok)
+            observed=tuple(bounded_setting(x) for x in row[8:11])
+            reviewed_match=observed==EXPECTED_TIMEOUTS['REVIEWED']
+            record['timeout_check']=dict(requested_startup_options=variant,observed_statement_lock_idle_timeouts=list(observed),matches_reviewed_values=reviewed_match,
+                                         reflected_as_requested=(reviewed_match if variant=='REVIEWED' else None))
+            record['observed_server_timeouts_match_reviewed']=reviewed_match
+            if not identity_ok:record['outcome']='IDENTITY_UNEXPECTED'
+            else:verified=True
         except MatrixStop:
             raise
         except (KeyboardInterrupt,SystemExit):
@@ -176,5 +185,6 @@ class Matrix:
             return
         if not verified:
             runner.emit('matrix_entry_outcome',dict(ordinal=record['ordinal'],outcome=record['outcome']));self.stop('UNEXPECTED_IDENTITY')
-        record['outcome']='CONNECTED_IDENTITY_VERIFIED';self.connected_roles.add(role)
+        reflected=record['timeout_check']['reflected_as_requested']
+        record['outcome']='CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED' if reflected is False else 'CONNECTED_IDENTITY_VERIFIED';self.connected_roles.add(role)
         runner.emit('matrix_entry_outcome',dict(ordinal=record['ordinal'],outcome=record['outcome'],elapsed_seconds=record['elapsed_seconds']))

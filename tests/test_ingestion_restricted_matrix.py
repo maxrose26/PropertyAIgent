@@ -173,16 +173,32 @@ def test_global_stops_skip_the_remaining_entries_and_say_so(cluster,roles,failin
     assert 'private text' not in json.dumps(report) and 'arbitrary unknown text' not in json.dumps(report)
 
 
-def test_unexpected_identity_and_unreviewed_session_settings_stop_everything(cluster,roles,monkeypatch):
+def test_unexpected_identity_stops_everything(cluster,roles,monkeypatch):
     runner,matrix=make(cluster)
     monkeypatch.setattr(rm,'EXPECTED_FLAGS',(True,True,False,False,False,False))
     with pytest.raises(MatrixStop) as stopped:matrix.run()
-    assert stopped.value.code=='UNEXPECTED_IDENTITY' and matrix.entries[0]['outcome']=='IDENTITY_UNEXPECTED' and matrix.entries[0]['connection_closure']['status']=='CLOSED'
-    monkeypatch.setattr(rm,'EXPECTED_FLAGS',(True,False,False,False,False,False))
+    e=matrix.entries[0]
+    assert stopped.value.code=='UNEXPECTED_IDENTITY' and e['outcome']=='IDENTITY_UNEXPECTED' and e['connection_closure']['status']=='CLOSED'
+    assert e['identity_check']==dict(current_user_matches_login=True,session_user_matches_login=True,restricted_flags_match=False,verified=False)       # which part of identity failed is recorded
+    assert e['timeout_check']['requested_startup_options']=='NONE'
+
+
+def test_options_not_reflected_is_a_separate_observation_not_an_identity_failure(cluster,roles,monkeypatch):
     runner,matrix=make(cluster)
-    monkeypatch.setitem(rm.EXPECTED_TIMEOUTS,'REVIEWED',('1s','1s','1s'))            # options were sent but the session does not carry the reviewed values
-    with pytest.raises(MatrixStop) as stopped:matrix.run()
-    assert stopped.value.code=='UNEXPECTED_IDENTITY' and matrix.entries[1]['outcome']=='IDENTITY_UNEXPECTED' and matrix.entries[0]['outcome']=='CONNECTED_IDENTITY_VERIFIED'
+    monkeypatch.setitem(rm.EXPECTED_TIMEOUTS,'REVIEWED',('1s','1s','1s'))            # the session does not carry the requested values
+    report=matrix.run()
+    assert [e['outcome'] for e in report['entries']]==['CONNECTED_IDENTITY_VERIFIED','CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED','CONNECTED_IDENTITY_VERIFIED','CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED']
+    assert report['global_stop'] is None and report['accounting']['entries_connected']['value']==4 and report['accounting']['entries_options_not_reflected']['value']==2
+    e=report['entries'][1]
+    assert e['identity_check']['verified'] is True and e['timeout_check']['reflected_as_requested'] is False and e['timeout_check']['matches_reviewed_values'] is False
+    assert report['entries'][0]['timeout_check']['reflected_as_requested'] is None                       # no options were requested for the NONE entry
+    assert e['timeout_check']['observed_statement_lock_idle_timeouts']==['10s','3s','20s']             # bounded allow-listed observation retained
+
+
+def test_observed_settings_are_bounded_and_allow_listed():
+    assert [rm.bounded_setting(x) for x in ('0','10s','2min','1500ms','10 s','x'*40,'DROP','',None,'1;2')]==['0','10s','2min','1500ms']+['NON_ALLOWLISTED_VALUE']*6
+    runner=None
+    assert rm.bounded_setting('999999d')=='999999d' and rm.bounded_setting('9999999')=='NON_ALLOWLISTED_VALUE'
 
 
 def test_budgets_are_global_stops(cluster,roles,monkeypatch):

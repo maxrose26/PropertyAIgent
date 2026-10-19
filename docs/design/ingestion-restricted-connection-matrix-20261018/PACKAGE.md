@@ -81,3 +81,10 @@ The follow-up remains **unsent** until an authorised existing-thread channel is 
 2. `render_registration.py` (offline) from a clean checkout of the approved commit; expiry ≤ 2 h.
 3. Owner runs `owner-run.sh <commit> <tree> <registration-sha256>` in a visible WSL terminal; hidden credential entry only.
 4. Return: audit hashes, per-entry outcomes and intervals, administrative and restricted accounting, closure components, scope readback.
+
+## Correction after the single live run (offline; no further live diagnostic authorised)
+The one live run recorded entry 2 as `IDENTITY_UNEXPECTED` because the matrix merged two different checks into one outcome and one global stop, and it retained only a boolean for the timeout comparison. Corrected here:
+- **Identity check** (`identity_check`): current user, session user and restricted flags are recorded as separate booleans plus `verified`. Only a failed identity check is `IDENTITY_UNEXPECTED` and a global stop.
+- **Timeout check** (`timeout_check`): the requested startup options, the observed statement/lock/idle-in-transaction timeouts as bounded allow-listed renderings (`0`, `10s`, `2min`, …; anything else only as `NON_ALLOWLISTED_VALUE`), whether they match the reviewed values, and whether the options were reflected as requested.
+- A session that is the right login but does not carry the requested options is `CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED`: a configuration observation, not an identity failure and not a stop. The accounting reports `entries_options_not_reflected` separately.
+- This changes the code only; the registration, authority and limits of the consumed matrix are untouched, and any further matrix run would need a new decision and registration.
