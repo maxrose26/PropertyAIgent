@@ -10,7 +10,8 @@ sequence: a new sequence is a new reviewed workflow decision.
 
 What a restricted runtime can and cannot verify: it reads only what the two logins may read about themselves (their own role row, memberships, privileges via the privilege-inquiry functions, and -
 for the worker only - the control row it holds SELECT on). It cannot see other sessions or the password state; those are OWNER verifications (listed in the result).
-A failed qualification cannot disable anything (that needs the privileged revocation path): it reports the retained access and a blocked-for-use state."""
+A failed qualification cannot disable anything (that needs the privileged revocation path): it reports the retained access and a blocked-for-use state.
+A manual stop in production is cancelling the workflow run (the STOP file under the output directory exists for local rehearsals; a hosted runner is ephemeral and nobody can create it)."""
 import argparse,json,os,sys,time
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
@@ -30,6 +31,7 @@ SPACING_SECONDS = (20, 60)          # waited before attempt 2 and before attempt
 MAX_PER_ROLE = 3
 MAX_TOTAL = 6
 OVERALL_SECONDS = 330               # 2 x (20 + 60) of spacing + 6 bounded attempts, with margin; hard stop
+ATTEMPT_SECONDS = 60                # the budget of ONE attempt: no attempt may START unless it can finish inside the overall window
 MIN_VALID_DAYS = 7
 FORBIDDEN_ENV = ('DATABASE_URL', 'INGESTION_STORAGE_DATABASE_URL', 'GH_TOKEN', 'GITHUB_TOKEN', 'PGPASSWORD', 'PGSERVICE', 'PGSERVICEFILE')
 OWNER_VERIFICATIONS = ('NO_OTHER_SESSIONS_OF_THE_TWO_LOGINS', 'PASSWORD_STATE_AND_EXACT_VALID_UNTIL_ON_THE_SERVER', 'NO_UNEXPIRED_GRANT_FOR_THE_EFFECT_VIEW', 'SERVER_SIDE_CLOSURE_OF_THE_QUALIFICATION_SESSIONS')
@@ -37,7 +39,7 @@ STOP_REASONS = frozenset({'AUTH_REJECTED_EXHAUSTED', 'UNCERTAIN_CLOSURE', 'UNEXP
 
 PROBE_SQL = ("SELECT r.rolvaliduntil,r.rolconnlimit,r.rolcanlogin,coalesce((SELECT array_agg(m.roleid::regrole::text ORDER BY m.roleid::regrole::text) FROM pg_auth_members m WHERE m.member=r.oid),ARRAY[]::text[]),"
              "pg_has_role(current_user,CAST(:cap AS name),'USAGE'),"
-             "(SELECT bool_or(pg_has_role(current_user,CAST(f AS name),'MEMBER')) FROM unnest(CAST(:forbidden AS text[])) f),"
+             "(SELECT bool_or(pg_has_role(current_user,CAST(f AS name),'MEMBER')) FROM unnest(CAST(:forbidden AS text[])) f WHERE EXISTS(SELECT 1 FROM pg_catalog.pg_roles x WHERE x.rolname=f)),"
              "has_table_privilege(current_user,'public.ingestion_work_items','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_table_privilege(current_user,'public.ingestion_work_attempts','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),"
              "has_table_privilege(current_user,'public.ingestion_work_items','SELECT'),statement_timestamp() "
              "FROM pg_catalog.pg_roles r WHERE r.rolname=current_user")
@@ -72,8 +74,8 @@ class Qualification:
         self.started = clock();self.attempts = [];self.ran = False
 
     # ------------------------------------------------------------------ waits and limits
-    def check(self):
-        if self.clock() - self.started >= OVERALL_SECONDS:raise Stop('OVERALL_DEADLINE')
+    def check(self, starting_attempt=False):
+        if self.clock() - self.started >= OVERALL_SECONDS - (ATTEMPT_SECONDS + 10 if starting_attempt else 0):raise Stop('OVERALL_DEADLINE')
         if self.stop_file is not None and self.stop_file.exists():raise Stop('MANUAL_STOP')
 
     def wait(self, seconds):
@@ -142,7 +144,7 @@ class Qualification:
                     waited = 0.0
                     if n > 1:
                         waited = float(SPACING_SECONDS[n - 2]);self.wait(waited)
-                    self.check()
+                    self.check(starting_attempt=True)
                     record = self.attempt(role, n, waited)
                     if not record['client_closure_verified']:raise Stop('UNCERTAIN_CLOSURE')      # verified client closure is required before ANYTHING continues, success included
                     if record['outcome'] == 'CONNECTED':
@@ -154,6 +156,7 @@ class Qualification:
                     if reason != 'AUTHENTICATION_REJECTED':raise Stop('UNRECOGNISED_FAILURE')
                     if n == MAX_PER_ROLE:raise Stop('AUTH_REJECTED_EXHAUSTED')
         except Stop as stopped:stop = stopped.reason
+        except Exception:stop = 'UNRECOGNISED_FAILURE'      # attempts already made stay in the accounting
         done = len(qualified) == len(ROLES)
         return dict(status='STABLE_CREDENTIALS_QUALIFIED' if done else 'QUALIFICATION_STOPPED', stop_reason=None if done else stop,
                     roles={r: dict(qualified=qualified.get(r, False), attempts=[a for a in self.attempts if a['role'] == r]) for r in ROLES},
@@ -174,10 +177,10 @@ def main(argv=None):
         ca, _ = verified_trust();progress = Progress()
         hostaddr = resolve_addresses(progress)
         q = Qualification(urls, emit=journal.emit, ssl={'sslmode': 'verify-full', 'sslrootcert': str(ca)}, hostaddr=hostaddr, stop_file=journal.root / 'STOP')
-        result = q.run()
     except Exception as exc:
         result = dict(status='QUALIFICATION_STOPPED', stop_reason='ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT', attempts_total=0, use_blocked=True, detail=type(exc).__name__,
                       retained_access='BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION', owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, source_requests=0, application_writes=0)
+    else:result = q.run()      # run() keeps every attempt already made, whatever happens
     journal.emit('final', result);journal.save('final-result.json', result)
     print(json.dumps({k: result.get(k) for k in ('status', 'stop_reason', 'attempts_total', 'use_blocked')}, sort_keys=True))
     raise SystemExit(0 if result['status'] == 'STABLE_CREDENTIALS_QUALIFIED' else 1)

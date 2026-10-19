@@ -211,5 +211,24 @@ def test_a_circuit_breaker_message_is_a_distinct_fixed_class_and_a_conflicting_m
     import psycopg
     from verification.ingestion_storage.connection_diagnostics import classify_native
     assert classify_native(psycopg.OperationalError('Circuit breaker open: too many authentication errors'),None)==('CIRCUIT_BREAKER_INDICATED','LOCAL_ALLOWLIST')
-    assert classify_native(psycopg.OperationalError('password authentication failed for user "x" (circuit breaker open)'),None)[0]=='UNKNOWN'      # ambiguity never continues the sequence
+    assert classify_native(psycopg.OperationalError('password authentication failed for user "x" (circuit breaker open)'),None)[0]=='CIRCUIT_BREAKER_INDICATED'      # the protection indication wins: never continue
+    assert classify_native(psycopg.OperationalError('Circuit breaker open: too many authentication errors'),'28P01')==('CIRCUIT_BREAKER_INDICATED','LOCAL_ALLOWLIST')      # even with an authentication SQLSTATE
+    assert classify_native(psycopg.OperationalError('Circuit breaker open'),'08006')[0]=='CIRCUIT_BREAKER_INDICATED'
     assert classify_native(psycopg.OperationalError('password authentication failed for user "x"'),None)==('AUTHENTICATION_REJECTED','LOCAL_ALLOWLIST')
+
+
+def test_no_attempt_starts_unless_it_can_finish_inside_the_overall_window():
+    q=scripted([AUTH,AUTH,AUTH,AUTH])
+    q.clock_obj.now=q.started+sq.OVERALL_SECONDS-(sq.ATTEMPT_SECONDS+10)+1
+    r=q.run()
+    assert r['stop_reason']=='OVERALL_DEADLINE' and r['attempts_total']==0 and sq.ATTEMPT_SECONDS+10<sq.OVERALL_SECONDS and sq.OVERALL_SECONDS+15<=345      # the workflow kills the process at 345 s
+
+
+def test_an_unexpected_error_keeps_the_attempts_already_made_in_the_accounting():
+    q=scripted([OK,AUTH])
+    original=q.attempt
+    def attempt(role,ordinal,waited):
+        if len(q.attempts)==2:raise RuntimeError('private text must never escape')
+        return original(role,ordinal,waited)
+    q.attempt=attempt;r=q.run()
+    assert r['attempts_total']==2 and r['stop_reason']=='UNRECOGNISED_FAILURE' and 'private text' not in json.dumps(r) and r['roles'][WORKER]['qualified'] is True

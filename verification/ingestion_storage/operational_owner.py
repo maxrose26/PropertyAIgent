@@ -129,19 +129,23 @@ class Owner:
             if password_access is not True:raise ValueError('EXISTING_PASSWORD_BOOLEAN_READ_UNAVAILABLE')
             roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(['ingestion_worker_login','ingestion_storage_login'],))
             self.emit('existing_login_state',dict(roles=roles))
-            if roles!=([('ingestion_storage_login',False,True),('ingestion_worker_login',True,False)] if self.stable_state else [('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]):raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
-            if self.stable_state:
-                members=self.q(c,"SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole]) ORDER BY 1,2")
-                if [tuple(m) for m in members]!=[('ingestion_worker_login','ingestion_worker')]:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
+            if self.stable_state:      # revocation: the storage login must be as accepted; the worker login may be in ANY enabled/disabled state (a partial earlier disable must not block the revocation)
+                if [r for r in roles if r[0]=='ingestion_storage_login']!=[('ingestion_storage_login',False,True)] or len(roles)!=2:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
+                members=self.q(c,"SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member='ingestion_storage_login'::regrole")
+                if members:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
+            elif roles!=[('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
             elif self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
             if not self.stable_state and self.q(c,"SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login'],))[0][0]:raise ValueError('PREEXISTING_RUNTIME_SESSIONS')      # a revocation must be able to meet and resolve sessions
             if self.reuse_installed:
                 exact=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication,r.rolconnlimit FROM pg_roles r JOIN pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
                 self.emit('reused_runtime_flags_observed',dict(rows=exact))
-                if exact!=[(r,self.stable_state,not self.stable_state,False,False,False,False,False,1) for r in sorted(ROLES)]:raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
-                if self.stable_state:
-                    if [tuple(m) for m in self.q(c,'SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[]) ORDER BY 1,2',(list(ROLES),))]!=[(r,cap) for r,cap in sorted(ROLES.items())]:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
-                elif self.q(c,'SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))[0][0]!=0:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
+                if self.stable_state:      # only the privilege-bearing flags and the connection limit are fixed; login/password/membership state may be partially disabled
+                    if len(exact)!=2 or any(row[3:8]!=(False,False,False,False,False) or row[8]!=1 for row in exact):raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
+                    allowed={(r,cap) for r,cap in ROLES.items()}
+                    if not {tuple(m) for m in self.q(c,'SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))}<=allowed:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
+                else:
+                    if exact!=[(r,False,True,False,False,False,False,False,1) for r in sorted(ROLES)]:raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
+                    if self.q(c,'SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))[0][0]!=0:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
                 self.verify_installed(c)
                 return
             if self.q(c,"SELECT to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_effect_login')")[0]!=(None,False):raise ValueError('INSTALLATION_ALREADY_EXISTS_NO_REPLAY')
@@ -370,7 +374,9 @@ class Owner:
             raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
         if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):self.teardown_residuals.append('SESSIONS_'+self.session_disposition)      # recorded before anything can raise
         try:
-            for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
+            present=github.names() if self.stable_state else None      # a revocation deletes only the secrets that still exist (idempotent after a partial earlier removal)
+            for name in SECRETS.values():
+                if present is None or name in present:github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
             names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
             if any(n in names for n in SECRETS.values()) or 'DATABASE_URL' not in names:raise Uncertain('TEARDOWN_SECRET_RECONCILE')
             self.urls.clear()

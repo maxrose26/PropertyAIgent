@@ -29,6 +29,8 @@ PATTERNS = (
 def classify_native(original, state):
     import psycopg
     if not isinstance(original, psycopg.Error):return 'UNKNOWN','NONE'
+    if original.args and isinstance(original.args[0],str) and len(original.args[0])<=16384 and re.search(r'circuit breaker',original.args[0],re.I):
+        return 'CIRCUIT_BREAKER_INDICATED','LOCAL_ALLOWLIST'      # a pooler protection indication stops any continuation, even when it arrives with an authentication SQLSTATE
     if state in STATES:return STATES[state],'SQLSTATE'
     # Work only on bounded native messages. Do not truncate a huge message and
     # then classify a misleading prefix. Unknown/ambiguous remains UNKNOWN.
