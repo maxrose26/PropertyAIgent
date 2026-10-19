@@ -153,7 +153,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             for r,p in passwords.items():assert p and p not in text and p not in hosted_log      # no password or verifier value in any audit, result or log
             assert 'postgresql://' not in text
             # ---------------------------------------------------------------- invariants on EVERY path: stops preserved, credentials untouched, execution authority ended or never issued
-            assert ctl_after['global_stop']==ctl['global_stop'] and ctl_after.get('hard_stop_generation')==1
+            assert ctl_after['global_stop']==ctl['global_stop'] and (ctl_after.get('hard_stop_generation')==1 or (fault=='source_raises' and ctl_after.get('hard_stop_generation')==2))      # a failed source request raises the accepted fail-safe stop, which advances the generation
             if fault!='source_raises':assert ctl_after['manual_stop']=='STORAGE_TEST_STOP'      # a failed source request raises the accepted fail-safe stop (the owner reconciles it); every other path preserves it exactly
             standing_after=(roles_state(),memberships(),role_configs())
             if fault!='valid_until_mismatch_blocks':assert standing_after==standing_before      # no password change, no membership change, no role-setting change, no secret change
@@ -181,7 +181,8 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             if fault=='owner_wait_expires':
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and result['access']=='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED' and not spawned and source_calls==0
                 return
-            assert spawned and (hosted_dir/'rehearsal-done').exists(),hosted_log
+            if not (spawned and (hosted_dir/'rehearsal-done').exists()):
+                pytest.fail(json.dumps(dict(owner=dict(status=result.get('status'),failure=result.get('failure'),phase=result.get('operation_phase'),invalidation=result.get('authority_invalidation')),owner_events=[e['event'] for e in events][-25:],hosted_log=hosted_log[-1500:],hosted_files=sorted(p.name for p in hosted_dir.iterdir()) if hosted_dir.exists() else None),default=str)[:6000])
             if fault=='source_raises':
                 assert source_calls==1 and hosted_final['status']=='STOP_RECONCILE_NO_RETRY'      # one source request; NO replay
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and not [a for a in ctl_after['grants'] if a.endswith('_SCREEN')]
