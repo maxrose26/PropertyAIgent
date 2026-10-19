@@ -149,3 +149,13 @@ def test_policy_constants_and_the_extra_command_cost_fit_the_matrix_ceilings():
     teardown_base=9          # measured: BEGIN, 2x(ALTER,REVOKE), COMMIT, roles, memberships, sessions
     assert 37+teardown_base+extra<=orr.MATRIX_OWNER_LIMITS['commands'][1]      # preflight+install+mapping (37) + worst-case teardown fits the through-teardown ceiling (58)
     assert 37+teardown_base+extra+6<=orr.MATRIX_OWNER_LIMITS['commands'][2]    # ... and failure diagnostics (6) still fit the total (64)
+
+
+def test_a_membership_without_inherited_privilege_does_not_count_as_proven(cluster):
+    creator=setup(cluster,admin_name='admin_np')
+    with superuser(cluster) as c:c.execute('GRANT pg_signal_backend, pg_read_all_stats TO admin_np WITH INHERIT FALSE')      # MEMBER is true, the privilege is not inherited
+    held=hold(cluster,WORKER);pid=held.info.backend_pid;owner,events=make_owner(cluster,creator);gh=GitHubFake()
+    with superuser(cluster) as c:assert c.execute("SELECT pg_has_role('admin_np','pg_signal_backend','MEMBER'),pg_has_role('admin_np','pg_signal_backend','USAGE')").fetchone()==(True,False)
+    with pytest.raises(Uncertain,match='TEARDOWN_SESSIONS_UNRESOLVED'):owner.teardown(gh)
+    assert owner.session_disposition=='UNRESOLVED_PRIVILEGE_NOT_PROVEN' and owner.terminations==0 and alive(cluster,pid)
+    held.close()

@@ -34,7 +34,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
         # Match the existing, accepted production read-only reconciliation
         # capability: only boolean password-removal checks are ever selected.
         boot.execute(sql.SQL('GRANT SELECT(rolname,rolpassword) ON pg_catalog.pg_authid TO {}').format(sql.Identifier(role)))
-        if fault=='session_survives_privileged':boot.execute(sql.SQL('GRANT pg_signal_backend, pg_read_all_stats TO {}').format(sql.Identifier(role)))      # emulates a migration identity that already holds them
+        if fault=='session_survives_privileged':boot.execute(sql.SQL('GRANT pg_signal_backend, pg_read_all_stats TO {} WITH INHERIT TRUE').format(sql.Identifier(role)))      # emulates a migration identity that already holds them
         boot.execute('CREATE SCHEMA extensions')
         boot.execute("CREATE EXTENSION pg_stat_statements WITH SCHEMA extensions VERSION '1.11'")
         boot.execute(sql.SQL('GRANT USAGE ON SCHEMA extensions TO {}').format(sql.Identifier(role)))
@@ -136,7 +136,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         def map_then_exhaust(*a,**k):
                             original_map(*a,**k);runner.owner.commands=runner.owner.limits['commands'][0];raise ValueError('ADMIN_COMMAND_BOUND')
                         runner.owner.map_and_activate=map_then_exhaust
-                    measured_admin={'matrix_success':(4,46),'matrix_classified_continue':(4,46),'matrix_unclassified_stop':(5,52),'matrix_tls_stop':(5,52),'matrix_identity_stop':(5,52),'matrix_budget_stop':(5,52),'matrix_admin_bound_reserve':(5,59),'matrix_close_uncertain':(5,52)}[fault]
+                    measured_admin={'matrix_success':(4,46),'matrix_classified_continue':(4,46),'matrix_unclassified_stop':(5,52),'matrix_tls_stop':(5,52),'matrix_identity_stop':(5,52),'matrix_budget_stop':(5,52),'matrix_admin_bound_reserve':(5,59),'matrix_close_uncertain':(5,56)}[fault]
                     expected={'matrix_success':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['CONNECTED_IDENTITY_VERIFIED']*4,None,4),
                               'matrix_classified_continue':('RESTRICTED_MATRIX_COMPLETED_ACCESS_DISABLED',['FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED','FAILED_CLASSIFIED','CONNECTED_IDENTITY_VERIFIED'],None,4),
                               'matrix_unclassified_stop':('STOP_RECONCILE_NO_RETRY',['CONNECTED_IDENTITY_VERIFIED','FAILED_UNCLASSIFIED','SKIPPED_GLOBAL_STOP','SKIPPED_GLOBAL_STOP'],'UNCLASSIFIED_FAILURE',2),

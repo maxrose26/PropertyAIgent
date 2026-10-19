@@ -17,7 +17,8 @@ from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
 ADMIN_STATEMENT_HARD_SECONDS=12
 TERMINATE_SQL="SELECT pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE pid=%s AND usename=%s AND backend_start=%s::timestamptz"
 SESSIONS_SQL='SELECT pid,usename,state,backend_start FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid'
-PRIVILEGE_SQL="SELECT pg_catalog.pg_has_role(current_user,'pg_read_all_stats','MEMBER'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','MEMBER')"
+# USAGE (privileges actually INHERITED), not MEMBER: a NOINHERIT or WITH INHERIT FALSE membership answers MEMBER=true yet does not confer the privilege (found by the hosted PG17 rehearsal).
+PRIVILEGE_SQL="SELECT pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE')"
 SESSION_POLICY=dict(wait_reads=3,wait_seconds=0.5,max_terminations=2,post_reads=3)
 
 PKG=Path('docs/design/ingestion-operational-required-20261018')
