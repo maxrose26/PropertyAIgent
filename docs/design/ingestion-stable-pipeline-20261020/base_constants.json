@@ -1,0 +1,101 @@
+{
+ "_carried_from": "stable-credential base_constants (non-secret constants, unchanged) with the pipeline limits",
+ "accepted_cleanup_evidence": "8dc4a36bc5565318e138d192bf2f7e96906f048f",
+ "baseline_control_sha256": "0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf",
+ "initial_control": {
+  "accepted_control_sha256": "0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf",
+  "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+  "global_stop": {
+   "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+   "run": "38884069913"
+  },
+  "hard_stop_generation": 1,
+  "manual_stop": "STORAGE_TEST_STOP"
+ },
+ "latest_disabled_access_evidence": "3d5d852748af9129a24d273eb14bdf1fb72192d2",
+ "limits": {
+  "administration": {
+   "commands": [
+    48,
+    60,
+    72
+   ],
+   "connections": [
+    8,
+    9
+   ]
+  },
+  "grants": {
+   "authorities": [
+    "..._CAPTURE (source_calls=1)",
+    "..._SCREEN (source_calls=0)"
+   ],
+   "authority": 2,
+   "bolton_exception": 2,
+   "grant_minutes": 55
+  },
+  "hosted": {
+   "actual_memory_bytes": {
+    "aggregate": 1610612736,
+    "controller": 268435456,
+    "source": 1073741824,
+    "swap": 0
+   },
+   "address_space_limit": "NOT_USED",
+   "hard_kill_seconds": 2100,
+   "job_minutes": 40
+  },
+  "readback": {
+   "connections": 1,
+   "database_active_seconds": 20,
+   "retries": 0,
+   "statements": 12,
+   "supervised_active_seconds": 30
+  },
+  "restricted_runtime": {
+   "aggregate_seconds": 300,
+   "connections": 40,
+   "driver_statements": 1040,
+   "qualification": {
+    "attempts_per_role": 3,
+    "attempts_total": 6,
+    "overall_seconds": 330,
+    "spacing_seconds": [
+     20,
+     60
+    ]
+   }
+  },
+  "source": {
+   "observations": 1,
+   "pages": 6,
+   "received_body_bytes": 3000000,
+   "rows": 60,
+   "screening_source_requests": 0,
+   "transport_requests": 10
+  },
+  "timing": {
+   "capture_wait_seconds": 2400,
+   "hidden_input_seconds": 120,
+   "owner_active_seconds": 4560,
+   "owner_outer_seconds": 4800,
+   "poll_seconds": 30,
+   "screening_wait_seconds": 900
+  }
+ },
+ "optional_writer": "HELD_NO_APPLICATION_WRITER",
+ "reuse_accepted_operational_installation": true,
+ "risk_acceptance": "ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE",
+ "roles": [
+  "ingestion_worker_login",
+  "ingestion_effect_login"
+ ],
+ "scope": {
+  "council": "bolton",
+  "end": "2026-10-16",
+  "kind": "DISCOVERY_SCOPE",
+  "semantics": "RECEIVED",
+  "start": "2026-10-16"
+ },
+ "status": "OWNER_APPROVED_REQUIRED_ONCE"
+}

@@ -63,6 +63,10 @@ def test_environment_is_exclusive_to_live_job():
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='625cd29355ebae37ffa2271edd2ceb431c341b9c964d4ac246f23924b7fcb1f1'
                 continue
+            if (path,job_id)==('.github/workflows/stage4-stable-pipeline-once.yml','pipeline'):
+                import hashlib
+                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='6f92ae190c778d54bf1d81c8bd69861c2b03d295e5d885583797ca98a802d75a'
+                continue
             if (path,job_id)==('.github/workflows/stage4-ingestion-storage-catalogue-once.yml','catalogue'):
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'
