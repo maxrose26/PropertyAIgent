@@ -1,0 +1,69 @@
+# Proves, on a real GitHub-hosted runner and with real allocations, that the hosted restricted jobs can run inside a kernel-enforced ACTUAL-memory (cgroup v2) scope - the same OperationalMemory
+# class the owner-local controller uses - and that exceeding a limit is killed by the kernel. An address-space limit (ulimit -v) is NOT this and is never described as this.
+# No production credential, secret, environment or database is involved.
+name: Stage4 hosted actual-memory enforcement proof
+on:
+  pull_request:
+    paths:
+      - 'verification/ingestion_storage/hosted_memory_scope.sh'
+      - 'verification/ingestion_storage/operational_memory.py'
+      - 'verification/ingestion_storage/memory_enforcement.py'
+      - '.github/workflows/stage4-hosted-memory-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: The scope is established, exclusive and within its limits (positive case)
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/positive.py" <<'PY'
+          import os,sys
+          sys.path.insert(0,os.getcwd())
+          from verification.ingestion_storage.operational_memory import OperationalMemory
+          m=OperationalMemory()
+          x=bytearray(64*1024**2)
+          for i in range(0,len(x),4096):x[i]=1
+          snap=m.snapshot()
+          assert snap['controller']['peak_bytes']>=64*1024**2, snap
+          assert snap['controller']['events']['oom_kill']==0, snap
+          closed=m.close()
+          assert closed['owned_groups_removed'] is True and closed['owned_survivors']==0, closed
+          print('positive ok; controller peak bytes', snap['controller']['peak_bytes'])
+          PY
+          env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" /usr/bin/python3 -I -B "$RUNNER_TEMP/positive.py"
+          sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope
+      - name: A real allocation beyond the controller limit is killed by the kernel (negative case)
+        run: |
+          set -uo pipefail
+          cat > "$RUNNER_TEMP/negative.py" <<'PY'
+          import os,sys
+          sys.path.insert(0,os.getcwd())
+          from verification.ingestion_storage.operational_memory import OperationalMemory
+          m=OperationalMemory()
+          x=bytearray(600*1024**2)          # the controller group is limited to 256 MiB
+          for i in range(0,len(x),4096):x[i]=1
+          print('NOT KILLED')
+          PY
+          env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" /usr/bin/python3 -I -B "$RUNNER_TEMP/negative.py"
+          status=$?
+          echo "exit status: $status"
+          events="$(sudo cat /sys/fs/cgroup/propertyaigent-operational-once.scope/controller/memory.events)"
+          echo "$events"
+          [[ $status -eq 137 || $status -eq 9 ]]
+          grep -q '^oom_kill [1-9]' <<<"$events"
+          sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope/controller /sys/fs/cgroup/propertyaigent-operational-once.scope/source /sys/fs/cgroup/propertyaigent-operational-once.scope
+      - name: The setup refuses to start the command when it cannot prove the scope (fail closed)
+        run: |
+          set -uo pipefail
+          sudo mkdir /sys/fs/cgroup/propertyaigent-operational-once.scope
+          ran=0
+          env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" /usr/bin/touch "$RUNNER_TEMP/must-not-exist" && ran=1
+          sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope
+          [[ $ran -eq 0 && ! -e "$RUNNER_TEMP/must-not-exist" ]]
