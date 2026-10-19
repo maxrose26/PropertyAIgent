@@ -44,7 +44,7 @@ class Owner:
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
-        self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.permitted_policy_states=None;self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
+        self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.permitted_policy_states=None;self.stable_state=False;self.valid_until=None;self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
     @contextmanager
     def connection(self):
@@ -129,14 +129,19 @@ class Owner:
             if password_access is not True:raise ValueError('EXISTING_PASSWORD_BOOLEAN_READ_UNAVAILABLE')
             roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(['ingestion_worker_login','ingestion_storage_login'],))
             self.emit('existing_login_state',dict(roles=roles))
-            if roles!=[('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
-            if self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
-            if self.q(c,"SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login'],))[0][0]:raise ValueError('PREEXISTING_RUNTIME_SESSIONS')
+            if roles!=([('ingestion_storage_login',False,True),('ingestion_worker_login',True,False)] if self.stable_state else [('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]):raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
+            if self.stable_state:
+                members=self.q(c,"SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole]) ORDER BY 1,2")
+                if [tuple(m) for m in members]!=[('ingestion_worker_login','ingestion_worker')]:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
+            elif self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
+            if not self.stable_state and self.q(c,"SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",(['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login'],))[0][0]:raise ValueError('PREEXISTING_RUNTIME_SESSIONS')      # a revocation must be able to meet and resolve sessions
             if self.reuse_installed:
                 exact=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication,r.rolconnlimit FROM pg_roles r JOIN pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
                 self.emit('reused_runtime_flags_observed',dict(rows=exact))
-                if exact!=[(r,False,True,False,False,False,False,False,1) for r in sorted(ROLES)]:raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
-                if self.q(c,'SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))[0][0]!=0:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
+                if exact!=[(r,self.stable_state,not self.stable_state,False,False,False,False,False,1) for r in sorted(ROLES)]:raise ValueError('REUSED_RUNTIME_FLAGS_CHANGED')
+                if self.stable_state:
+                    if [tuple(m) for m in self.q(c,'SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[]) ORDER BY 1,2',(list(ROLES),))]!=[(r,cap) for r,cap in sorted(ROLES.items())]:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
+                elif self.q(c,'SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(ROLES),))[0][0]!=0:raise ValueError('REUSED_RUNTIME_MEMBERSHIPS_CHANGED')
                 self.verify_installed(c)
                 return
             if self.q(c,"SELECT to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_effect_login')")[0]!=(None,False):raise ValueError('INSTALLATION_ALREADY_EXISTS_NO_REPLAY')
@@ -213,7 +218,7 @@ class Owner:
                 password=secrets.token_urlsafe(48)
                 verifier=c.pgconn.encrypt_password(password.encode(),role.encode(),algorithm=b'scram-sha-256').decode()
                 self.q(c,'BEGIN',effect=True)
-                self.q(c,sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(verifier),sql.Literal(self.expiry.isoformat())),effect=True)
+                self.q(c,sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(verifier),sql.Literal((self.valid_until or self.expiry).isoformat())),effect=True)
                 self.q(c,'COMMIT',effect=True);self.timeline.setdefault(role,{})['password_committed']=time.monotonic()
                 url=url_factory(role,password);github.put_secret(name,url);self.urls[role]=url;self.timeline[role]['mapped']=time.monotonic()
                 del password,verifier,url
@@ -275,6 +280,20 @@ class Owner:
             self.role_settings_state='RESTORATION_UNCERTAIN';self.teardown_residuals.append('ROLE_SETTINGS_UNRESTORED')
             self.emit('role_settings_restoration',dict(state=self.role_settings_state,prior=self.role_settings_prior));return False
         self.emit('role_settings_restoration',dict(state=self.role_settings_state));return True
+
+    def stable_readback(self):
+        """Owner-privileged readback of the STANDING state after provisioning: flags, password presence (boolean only), validity, memberships and role settings. Sessions are NOT read here:
+        that needs monitoring privileges the migration identity has not been shown to hold, so absence of other sessions is an owner verification."""
+        with self.connection() as c:
+            roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NOT NULL,r.rolvaliduntil,r.rolconnlimit,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
+            members=[tuple(m) for m in self.q(c,'SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[]) ORDER BY 1,2',(list(ROLES),))]
+            config={r[0]:sorted(r[1] or []) for r in self.q(c,ROLE_SETTINGS_SQL,(list(ROLES),))}
+        reviewed={'%s=%s'%(k,v) for k,v in ROLE_SETTINGS}
+        ok=(len(roles)==2 and all(r[1] is True and r[2] is True and r[3] is not None and r[4]==1 and not any(r[5:]) for r in roles)
+            and members==[(r,cap) for r,cap in sorted(ROLES.items())] and all(reviewed<=set(config.get(n,[])) for n in ROLES))
+        self.emit('stable_state_readback',dict(roles=[[r[0],r[1],r[2],r[3].isoformat() if r[3] else None,r[4]] for r in roles],memberships=members,role_settings_applied=ok))
+        if not ok:raise Uncertain('STABLE_STATE_NOT_VERIFIED')
+        return dict(valid_until=min(r[3] for r in roles).isoformat(),memberships=members)
 
     def register(self,items,authority,*,capture_key,source_calls,prepared=()):
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}

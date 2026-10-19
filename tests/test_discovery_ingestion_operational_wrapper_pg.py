@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained','direct_diagnostic_success','direct_first_connection_rejected','direct_route_fallback_refused','direct_address_missing','direct_effect_rejected'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained','direct_diagnostic_success','direct_first_connection_rejected','direct_route_fallback_refused','direct_address_missing','direct_effect_rejected','stable_lifecycle','stable_provision_failure','stable_revoke_survivor'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     retained=fault.endswith('_retained');fault=fault[:-len('_retained')] if retained else fault      # same scenario, started from the RETAINED upgraded installation of a previous run
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
@@ -69,6 +69,9 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             if fault.startswith('direct_'):
                 from verification.ingestion_storage.operational_runner import DIRECT_MODE
                 registration['mode']=DIRECT_MODE
+            if fault.startswith('stable_'):
+                from verification.ingestion_storage.operational_runner import STABLE_PROVISION_MODE
+                registration['mode']=STABLE_PROVISION_MODE
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
             contacts=[]
             if fault.startswith('settled_'):
@@ -104,7 +107,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             with pytest.raises(psycopg.Error,match=reason):c.execute(activation)
                     finally:boot.execute(undo)
             runner.owner.install=install_with_ambient_negatives
-            if fault in {'reuse_installed_success','diagnostic_only','policy_lifecycle'} or fault.startswith('matrix_') or retained or fault.startswith('direct_'):
+            if fault in {'reuse_installed_success','diagnostic_only','policy_lifecycle'} or fault.startswith('matrix_') or retained or fault.startswith('direct_') or fault.startswith('stable_'):
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
@@ -123,7 +126,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 runner.owner.reuse_installed=True
                 from app.ingestion.ledger import digest
                 runner.owner.baseline_control_sha256=digest(ctl)
-                if retained or fault.startswith('direct_'):
+                if retained or fault.startswith('direct_') or fault.startswith('stable_'):
                     with installer.connection() as c_:installer.script(c_,Path('docs/design/ingestion-operational-required-20261018/successor-policy.sql'))      # the state a previous run leaves behind
                 for mutation,undo,expected in [
                   ('ALTER ROLE ingestion_effect_login BYPASSRLS','ALTER ROLE ingestion_effect_login NOBYPASSRLS','REUSED_RUNTIME_FLAGS_CHANGED'),
@@ -256,6 +259,165 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     record_property('restricted_matrix',json.dumps(dict(fault=fault,status=result['status'],outcomes=outcomes,global_stop=stop,admin_connections=runner.owner.connections,admin_commands=runner.owner.commands,
                                     admin_opened=runner.owner.opened,admin_closed=runner.owner.closed,matrix_accounting=result['matrix']['accounting'],access=result.get("access"),cleanup=result["cleanup"])))
                     print('MATRIX_MEASURE',fault,'admin_connections',runner.owner.connections,'admin_commands',runner.owner.commands,"cleanup",result["cleanup"],"access",result.get("access"))
+                    return
+
+                if fault.startswith('stable_'):
+                    from verification.ingestion_storage.operational_outcome import session
+                    from verification.ingestion_storage.tls_trust import verified_trust
+                    from verification.ingestion_storage import restricted_route as rr_, operational_runner as orr_, stable_qualification as sq_
+                    from verification.ingestion_storage.operational_publication import GitHub as GitHub_
+                    from verification.ingestion_storage.operational_journal import Journal as Journal_
+                    from app.ingestion.ledger import digest as digest_
+                    from sqlalchemy.engine import make_url as mk_
+                    from verification.ingestion_storage.operational_controller import DatabaseBudget as DatabaseBudget_
+                    ca,_=verified_trust();WORKER_='ingestion_worker_login';EFFECT_='ingestion_effect_login'
+                    pooler_users=[]
+                    real_connect=psycopg.Connection.connect.__func__
+                    def route_pooler(cls,conninfo='',**kw):
+                        if kw.get('host')==rr_.ROUTES['POOLER']['host']:           # the restricted RUNTIME's route; translated to the disposable server
+                            assert kw['user'].endswith('.'+rr_.REF) and kw['sslmode']=='verify-full' and kw['hostaddr']=='192.0.2.1'
+                            pooler_users.append(kw['user'].split('.')[0])
+                            kw=dict(kw,host='127.0.0.1',dbname=info['dbname'],user=kw['user'].split('.')[0])
+                            for field in ('sslmode','sslrootcert','hostaddr'):kw.pop(field,None)
+                        return real_connect(cls,conninfo,**kw)
+                    monkeypatch.setattr(psycopg.Connection,'connect',classmethod(route_pooler))
+                    runner.url_factory=lambda r_,p_:rr_.url('POOLER',r_,p_)         # the restricted secrets carry the reviewed pooler form
+                    runner.ssl={'sslmode':'verify-full','sslrootcert':str(ca)};runner.hostaddr='192.0.2.1'
+                    def roles_state():
+                        return boot.execute("SELECT rolname,rolcanlogin,rolpassword IS NULL,rolvaliduntil IS NOT NULL FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",([WORKER_,EFFECT_],)).fetchall()
+                    def sessions_of_roles():
+                        return boot.execute("SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",([WORKER_,EFFECT_],)).fetchone()[0]
+                    def role_configs():
+                        return {r_:sorted(c_ or []) for r_,c_ in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',([WORKER_,EFFECT_],)).fetchall()}
+                    reviewed_cfg=sorted(['statement_timeout=10s','lock_timeout=3s','idle_in_transaction_session_timeout=20s'])
+                    if fault=='stable_provision_failure':
+                        original_readback=runner.owner.stable_readback
+                        def failing_readback():
+                            original_readback();raise Uncertain('DISPOSABLE_READBACK_FAILURE')      # fails AFTER the credentials exist
+                        runner.owner.stable_readback=failing_readback
+                    lines=[]
+                    prov=session(journal,registration['expires_at'],lambda:'hidden fixture input',lambda raw_,started:runner,output=lambda line,**kw:lines.append(line),timing=orr_.MATRIX_TIMING)
+                    actual=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                    assert actual==ctl and not source_calls and not runner.owner.authorities      # provisioning never touches the control row and issues no grant
+                    assert boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>repeat('0',64)").fetchone()[0]==0 and not boot.execute("SELECT count(*) FROM public.ingestion_work_attempts").fetchone()[0]
+                    if fault=='stable_provision_failure':
+                        assert prov['status']=='STOP_RECONCILE_NO_RETRY' and prov['access']=='DISABLED_VERIFIED' and prov['cleanup']=='CLOSED'      # a failure after the credentials exist falls into the ordinary disabling path
+                        assert roles_state()==[(EFFECT_,False,True,True),(WORKER_,False,True,True)] and set(ciphertexts)=={'DATABASE_URL'}
+                        print('ROLLUP_STABLE',fault,prov['accounting']['administration']['commands'],prov['accounting']['administration']['connections'])
+                        return
+                    assert prov['status']=='STABLE_CREDENTIALS_PROVISIONED_LOGIN_ENABLED' and prov['cleanup']=='CLOSED' and prov['access']=='LOGIN_ENABLED_BY_DESIGN' and prov['execution_grants_created']==0 and prov['source_observations_attempted']==0 and prov['application_writes']==0
+                    assert roles_state()==[(EFFECT_,True,False,True),(WORKER_,True,False,True)] and role_configs()=={WORKER_:reviewed_cfg,EFFECT_:reviewed_cfg}      # login enabled, password present, validity set, reviewed settings kept
+                    validity=boot.execute("SELECT min(rolvaliduntil)-now() FROM pg_authid WHERE rolname=ANY(%s)",([WORKER_,EFFECT_],)).fetchone()[0]
+                    assert timedelta(days=89,hours=23)<validity<=timedelta(days=90,minutes=5)
+                    assert [tuple(m_) for m_ in boot.execute("SELECT member::regrole::text,roleid::regrole::text FROM pg_auth_members WHERE member=ANY(%s::regrole[]) ORDER BY 1",([WORKER_,EFFECT_],)).fetchall()]==[(EFFECT_,'ingestion_effect_broker'),(WORKER_,'ingestion_worker')]
+                    assert {'INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL','DATABASE_URL'}==set(ciphertexts) and not runner.owner.urls and prov['owner_verifications_required']
+                    secret_urls={WORKER_:mapped_values['INGESTION_WORKER_DATABASE_URL'],EFFECT_:mapped_values['INGESTION_EFFECT_DATABASE_URL']}
+                    assert mk_(secret_urls[WORKER_]).username==WORKER_+'.'+rr_.REF and mk_(secret_urls[WORKER_]).password not in journal.file.read_text() and mk_(secret_urls[EFFECT_]).password not in json.dumps(prov)
+                    def direct_conn(role_):
+                        u_=mk_(secret_urls[role_]);return psycopg.connect(host='127.0.0.1',port=5432,dbname=info['dbname'],user=role_,password=u_.password,autocommit=True,connect_timeout=3)
+                    ledger='public.ingestion_work_items'
+                    def attempt_sql(conn_,statement,*params):
+                        try:conn_.execute(statement,params or None);return 'OK'
+                        except psycopg.Error as exc_:return exc_.sqlstate or 'ERR'
+                    def step(conn_,op,key,authority='AUTH'):
+                        return attempt_sql(conn_,"SELECT public.ingestion_worker_step(%s,%s,0,'probe-owner',%s,'{}'::jsonb,'{}'::jsonb)",op,key,authority)
+                    def access_matrix(granted_key=None):
+                        out={};w_=direct_conn(WORKER_);e_=direct_conn(EFFECT_)
+                        try:
+                            out['worker_read_ledger']=attempt_sql(w_,'SELECT count(*) FROM '+ledger)
+                            for verb,sql_ in (('insert',"INSERT INTO "+ledger+" (key) VALUES ('probe')"),('update',"UPDATE "+ledger+" SET state='X' WHERE false"),('delete',"DELETE FROM "+ledger+" WHERE false"),('truncate',"TRUNCATE "+ledger)):
+                                out['worker_'+verb]=attempt_sql(w_,sql_);out['effect_'+verb]=attempt_sql(e_,sql_)
+                            out['effect_read_ledger']=attempt_sql(e_,'SELECT count(*) FROM '+ledger)
+                            key=granted_key or 'f'*64
+                            for op in ('claim','checkpoint','complete','begin_source','begin_write','block'):out['worker_'+op]=step(w_,op,key)
+                            for op in ('fence_effect','resolve_effect','enqueue_child','batch_row','batch_reseal'):out['worker_broker_'+op]=step(w_,op,key);out['effect_'+op]=step(e_,op,key)
+                            for op in ('claim','checkpoint','complete','begin_source','begin_write','block'):out['effect_worker_'+op]=step(e_,op,key)
+                            w_.execute('BEGIN')
+                            out['worker_can_raise_stop']=attempt_sql(w_,"SELECT public.ingestion_raise_stop('probe-stop')");w_.execute('ROLLBACK')      # fail-safe disruption; rolled back here
+                            out['effect_can_raise_stop']=attempt_sql(e_,"SELECT public.ingestion_raise_stop('probe-stop')")
+                            out['worker_grant_functions']=attempt_sql(w_,"SELECT public.ingestion_register_bolton_exception('{}'::jsonb)")
+                            out['worker_acceptance_control']=attempt_sql(w_,"SELECT public.ingestion_acceptance_control()")
+                        finally:w_.close();e_.close()
+                        return out
+                    def assert_matrix(m_,granted):
+                        assert m_['worker_read_ledger']=='OK' and m_['effect_read_ledger']=='42501'                       # the worker can READ the ledger (incl. the control row); the effect login cannot
+                        for verb in ('insert','update','delete','truncate'):assert m_['worker_'+verb]=='42501' and m_['effect_'+verb]=='42501'      # neither can mutate a table directly, with or without a grant
+                        assert all(m_['worker_'+op]!='OK' for op in ('claim','checkpoint','complete','begin_source','begin_write','block'))
+                        assert all(m_['worker_broker_'+op]=='42501' for op in ('fence_effect','resolve_effect','enqueue_child','batch_row','batch_reseal'))      # the worker cannot use broker operations
+                        assert all(m_['effect_'+op]!='OK' for op in ('fence_effect','resolve_effect','enqueue_child','batch_row','batch_reseal'))
+                        assert all(m_['effect_worker_'+op]=='42501' for op in ('claim','checkpoint','complete','begin_source','begin_write','block'))      # the effect login cannot use worker operations
+                        assert m_['worker_can_raise_stop']=='OK' and m_['effect_can_raise_stop']=='42501'                  # a compromised worker could PAUSE operations (fail-safe); the effect login cannot
+                        assert m_['worker_grant_functions']!='OK' and m_['worker_acceptance_control']=='42501'             # neither login can create grants/exceptions or read the owner-only control view
+                    # 1. access WITHOUT a grant
+                    no_grant=access_matrix();assert_matrix(no_grant,False)
+                    # 2. qualification, invocation 1 (restricted credentials ONLY; no admin object exists in the module) - then a SEPARATE invocation reusing the same credentials
+                    def qualify(urls_,budget_factory=None,spacing=(0.0,0.0)):
+                        monkeypatch.setattr(sq_,'SPACING_SECONDS',spacing)
+                        q_=sq_.Qualification(urls_,emit=lambda e_,p_:None,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',**({'budget_factory':budget_factory} if budget_factory else {}))
+                        return q_.run()
+                    q1=qualify(secret_urls);q2=qualify(dict(secret_urls))
+                    for q_ in (q1,q2):
+                        assert q_['status']=='STABLE_CREDENTIALS_QUALIFIED' and q_['attempts_total']==2 and q_['use_blocked'] is False and q_['grants_issued']==0 and q_['administrative_credential_present'] is False
+                    wprobe=q1['roles'][WORKER_]['attempts'][0]['probe'];assert wprobe['valid_days_remaining']>=89 and wprobe['memberships']==['ingestion_worker'] and wprobe['control_row']['unexpired_grants']==0 and wprobe['control_row']['global_stop_set'] is True
+                    assert q1['roles'][EFFECT_]['attempts'][0]['probe']['control_row'] is None and pooler_users==[WORKER_,EFFECT_,WORKER_,EFFECT_]       # one attempt per role per invocation; same credentials
+                    assert sessions_of_roles()==0 and secret_urls[WORKER_]==mapped_values['INGESTION_WORKER_DATABASE_URL']                               # (the server-side session readback here is the disposable test's own, not the runtime's)
+                    # 3. access DURING an active grant (registered through the owner path), then after its expiry
+                    from verification.ingestion_storage.operational_owner import Owner as Owner_
+                    from verification.ingestion_storage.operational_runner import item as item_,SCOPE as SCOPE_,CONTRACT as CONTRACT_
+                    from app.ingestion.ledger import DEFAULT_LIMITS as DL_
+                    granter=Owner_(connector,lambda *_:None,lambda:None,identity=role,expiry=datetime.now(timezone.utc)+timedelta(minutes=30),bindings=runner.bindings)
+                    granter.reuse_installed=True;granter.baseline_control_sha256=digest_(ctl);granter.apply_policy=False;granter.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
+                    granter.stable_state=True;granter.preflight()
+                    root_=item_(dict(subject=SCOPE_,task='DISCOVERY',contract=CONTRACT_,revision='c'*64),max_attempts=1,limits=dict(DL_,requests=10,bytes=3000000,rows=60,pages=6))
+                    granter.register([root_],'AUTHORISE_STABLE_ACCESS_PROBE',capture_key=root_['key'],source_calls=1)
+                    unexpired=sum(1 for g in boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]['grants'].values() if g['expires_at']>time.time())
+                    assert unexpired==1
+                    active=access_matrix(root_['key']);assert_matrix(active,True)              # even with a grant: nothing outside the exact binding, no direct mutation, no grant creation
+                    controlled=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                    for g in controlled['grants'].values():g['expires_at']=0
+                    for g in controlled.get('bolton_exceptions',{}).values():g['expires_at']=0
+                    boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(controlled),))
+                    assert_matrix(access_matrix(),False)
+                    # 4. failed qualification: the effect credential no longer matches -> three rejections, stop, retained access reported, nothing disabled by the runtime
+                    boot.execute("ALTER ROLE ingestion_effect_login PASSWORD 'a-different-password'")
+                    q3=qualify(secret_urls)
+                    assert q3['status']=='QUALIFICATION_STOPPED' and q3['stop_reason']=='AUTH_REJECTED_EXHAUSTED' and q3['attempts_total']==4 and q3['roles'][WORKER_]['qualified'] is True and q3['use_blocked'] is True
+                    assert [a['reason_code'] for a in q3['roles'][EFFECT_]['attempts']]==['AUTHENTICATION_REJECTED']*3 and all(a['client_closure_verified'] for a in q3['roles'][EFFECT_]['attempts'])
+                    assert q3['retained_access'].startswith('BOTH_LOGINS_REMAIN_ENABLED') and roles_state()[0][1] is True and roles_state()[1][1] is True       # the runtime cannot disable: reported, not hidden
+                    # 5. uncertain closure stops after a single rejection
+                    class UncertainBudget(DatabaseBudget_):
+                        def close(self,engines):
+                            r_=super().close(engines);r_['cleanup']='UNCERTAIN';r_['connections_closed']=False;return r_
+                    q4=qualify(secret_urls,budget_factory=UncertainBudget)
+                    assert q4['stop_reason']=='UNCERTAIN_CLOSURE' and q4['attempts_total']==1 and q4['status']=='QUALIFICATION_STOPPED'
+                    # 6. a survivor session (documented: expiry and disabling stop NEW logins only)
+                    survivor=None
+                    if fault=='stable_revoke_survivor':
+                        survivor=direct_conn(WORKER_)
+                    # 7. the privileged revocation path, as a separate invocation
+                    journal2=Journal_(tmp_path/'revoke-run')
+                    github2=GitHub_(journal2.emit,lambda:holder['runner'].check(),runner=cli)
+                    reg2=dict(registration,mode=orr_.STABLE_REVOKE_MODE)
+                    runner2=Runner(reg2,journal2,connector,source_reader=source,github=github2,url_factory=uri,identity=role,memory=None);holder['runner']=runner2
+                    runner2.owner.reuse_installed=True;runner2.owner.baseline_control_sha256=digest_(boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0])
+                    assert runner2.owner.stable_state is True and runner2.owner.apply_policy is False
+                    revoke=session(journal2,registration['expires_at'],lambda:'hidden fixture input',lambda raw_,started:runner2,output=lambda line,**kw:lines.append(line),timing=orr_.MATRIX_TIMING)
+                    if survivor is not None:
+                        alive=sessions_of_roles()
+                        try:
+                            assert alive==1 and revoke['status']=='STOP_RECONCILE_NO_RETRY' and revoke['accounting']['administration']['session_disposition'].startswith('UNRESOLVED')       # unprivileged owner: the session is REPORTED, never called closed
+                        finally:survivor.close()
+                        assert roles_state()==[(EFFECT_,False,True,True),(WORKER_,False,True,True)] and set(ciphertexts)=={'DATABASE_URL'}
+                        print('ROLLUP_STABLE',fault,revoke['accounting']['administration']['commands'],revoke['accounting']['administration']['connections'])
+                        return
+                    assert revoke['status']=='STABLE_CREDENTIALS_REVOKED_ACCESS_DISABLED' and revoke['access']=='DISABLED_VERIFIED' and revoke['cleanup']=='CLOSED' and revoke['execution_grants_created']==0
+                    assert roles_state()==[(EFFECT_,False,True,True),(WORKER_,False,True,True)] and set(ciphertexts)=={'DATABASE_URL'} and sessions_of_roles()==0
+                    assert not boot.execute("SELECT 1 FROM pg_auth_members WHERE member=ANY(%s::regrole[])",([WORKER_,EFFECT_],)).fetchall() and role_configs()=={WORKER_:reviewed_cfg,EFFECT_:reviewed_cfg}      # settings left in place by design
+                    final_ctl=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+                    assert final_ctl['global_stop']==ctl['global_stop'] and final_ctl['manual_stop']==ctl['manual_stop'] and final_ctl.get('hard_stop_generation')==ctl.get('hard_stop_generation')      # stops intact
+                    q5=qualify(secret_urls)
+                    assert q5['status']=='QUALIFICATION_STOPPED' and q5['attempts_total']==1 and q5['stop_reason']=='UNRECOGNISED_FAILURE'          # revoked credentials cannot be used
+                    print('ROLLUP_STABLE',fault,prov['accounting']['administration']['commands'],prov['accounting']['administration']['connections'],revoke['accounting']['administration']['commands'],revoke['accounting']['administration']['connections'])
                     return
 
                 if fault.startswith('direct_'):
