@@ -106,7 +106,7 @@ def restricted_url(role,password):
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
-    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
+    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory

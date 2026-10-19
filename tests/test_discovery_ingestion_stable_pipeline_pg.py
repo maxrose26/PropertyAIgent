@@ -124,7 +124,10 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             original_register=orunner.owner.register
             def register(items_,authority,**kw):
                 out=original_register(items_,authority,**kw)
-                if authority.endswith('_CAPTURE') and fault!='owner_wait_expires':start_hosted()      # the restricted job is dispatched only after the owner registered the capture authority
+                if authority.endswith('_CAPTURE') and fault!='owner_wait_expires':
+                for conn in held:      # the pooler recycles an idle backend; with a connection limit of 1 a held backend would otherwise be the role's only slot
+                    conn.close()
+                held.clear();start_hosted()      # the restricted job is dispatched only after the owner registered the capture authority
                 return out
             orunner.owner.register=register
             # the rehearsal compares process-level resource baselines; the hosted job is a different process
@@ -178,7 +181,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 assert source_calls==1 and hosted_final['status']=='STOP_RECONCILE_NO_RETRY'      # one source request; NO replay
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and not [a for a in ctl_after['grants'] if a.endswith('_SCREEN')]
                 return
-            assert source_calls==1,(hosted_final and {k:hosted_final.get(k) for k in ('status','operation_phase','failure','qualification')},hosted_log[-3000:])
+            assert source_calls==1,json.dumps(dict(hosted=hosted_final and {k:hosted_final.get(k) for k in ('status','operation_phase','failure')},qualification=hosted_final and hosted_final.get('qualification'),log=hosted_log[-1500:]),default=str)[:6000]
             screen_grants=[a for a in ctl_after['grants'] if a.endswith('_SCREEN')];assert screen_grants and ctl_after['grants'][screen_grants[0]]['expires_at']==0
             if fault=='screening_stops':
                 assert hosted_final['status']=='STOP_RECONCILE_NO_RETRY' and result['status']=='STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED' and result['screening']=='INCOMPLETE' and result['cleanup']=='CLOSED'
