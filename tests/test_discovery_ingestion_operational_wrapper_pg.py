@@ -301,7 +301,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     assert actual==ctl and not source_calls and not runner.owner.authorities      # provisioning never touches the control row and issues no grant
                     assert boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>repeat('0',64)").fetchone()[0]==0 and not boot.execute("SELECT count(*) FROM public.ingestion_work_attempts").fetchone()[0]
                     if fault=='stable_provision_failure':
-                        assert prov['status']=='STOP_RECONCILE_NO_RETRY' and prov['access']=='DISABLED_VERIFIED' and prov['cleanup']=='CLOSED'      # a failure after the credentials exist falls into the ordinary disabling path
+                        assert prov['status']=='STOP_RECONCILE_NO_RETRY' and prov['access']=='DISABLED_VERIFIED' and prov['cleanup']=='CLOSED',(prov.get('failure'),prov.get('operation_phase'),prov.get('authority_invalidation'),prov['accounting']['administration'].get('teardown_residuals'),prov['accounting']['administration'].get('role_settings'),prov.get('diagnostics'))      # a failure after the credentials exist falls into the ordinary disabling path
                         assert roles_state()==[(EFFECT_,False,True,True),(WORKER_,False,True,True)] and set(ciphertexts)=={'DATABASE_URL'}
                         print('ROLLUP_STABLE',fault,prov['accounting']['administration']['commands'],prov['accounting']['administration']['connections'])
                         return
@@ -416,7 +416,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     final_ctl=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
                     assert final_ctl['global_stop']==ctl['global_stop'] and final_ctl['manual_stop']==ctl['manual_stop'] and final_ctl.get('hard_stop_generation')==ctl.get('hard_stop_generation')      # stops intact
                     q5=qualify(secret_urls)
-                    assert q5['status']=='QUALIFICATION_STOPPED' and q5['attempts_total']==1 and q5['stop_reason']=='UNRECOGNISED_FAILURE'          # revoked credentials cannot be used
+                    assert q5['status']=='QUALIFICATION_STOPPED' and q5['attempts_total']==3 and q5['stop_reason']=='AUTH_REJECTED_EXHAUSTED' and q5['roles'][WORKER_]['qualified'] is False and q5['roles'][EFFECT_]['attempts']==[]          # revoked credentials are rejected (NULL password): the finite sequence ends within its limits
                     print('ROLLUP_STABLE',fault,prov['accounting']['administration']['commands'],prov['accounting']['administration']['connections'],revoke['accounting']['administration']['commands'],revoke['accounting']['administration']['connections'])
                     return
 
