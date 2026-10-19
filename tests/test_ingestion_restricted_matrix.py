@@ -173,16 +173,32 @@ def test_global_stops_skip_the_remaining_entries_and_say_so(cluster,roles,failin
     assert 'private text' not in json.dumps(report) and 'arbitrary unknown text' not in json.dumps(report)
 
 
-def test_unexpected_identity_and_unreviewed_session_settings_stop_everything(cluster,roles,monkeypatch):
+def test_unexpected_identity_stops_everything(cluster,roles,monkeypatch):
     runner,matrix=make(cluster)
     monkeypatch.setattr(rm,'EXPECTED_FLAGS',(True,True,False,False,False,False))
     with pytest.raises(MatrixStop) as stopped:matrix.run()
-    assert stopped.value.code=='UNEXPECTED_IDENTITY' and matrix.entries[0]['outcome']=='IDENTITY_UNEXPECTED' and matrix.entries[0]['connection_closure']['status']=='CLOSED'
-    monkeypatch.setattr(rm,'EXPECTED_FLAGS',(True,False,False,False,False,False))
+    e=matrix.entries[0]
+    assert stopped.value.code=='UNEXPECTED_IDENTITY' and e['outcome']=='IDENTITY_UNEXPECTED' and e['connection_closure']['status']=='CLOSED'
+    assert e['identity_check']==dict(current_user_matches_login=True,session_user_matches_login=True,restricted_flags_match=False,verified=False)       # which part of identity failed is recorded
+    assert e['timeout_check']['requested_startup_options']=='NONE'
+
+
+def test_options_not_reflected_is_a_separate_observation_not_an_identity_failure(cluster,roles,monkeypatch):
     runner,matrix=make(cluster)
-    monkeypatch.setitem(rm.EXPECTED_TIMEOUTS,'REVIEWED',('1s','1s','1s'))            # options were sent but the session does not carry the reviewed values
-    with pytest.raises(MatrixStop) as stopped:matrix.run()
-    assert stopped.value.code=='UNEXPECTED_IDENTITY' and matrix.entries[1]['outcome']=='IDENTITY_UNEXPECTED' and matrix.entries[0]['outcome']=='CONNECTED_IDENTITY_VERIFIED'
+    monkeypatch.setitem(rm.EXPECTED_TIMEOUTS,'REVIEWED',('1s','1s','1s'))            # the session does not carry the requested values
+    report=matrix.run()
+    assert [e['outcome'] for e in report['entries']]==['CONNECTED_IDENTITY_VERIFIED','CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED','CONNECTED_IDENTITY_VERIFIED','CONNECTED_IDENTITY_VERIFIED_OPTIONS_NOT_REFLECTED']
+    assert report['global_stop'] is None and report['accounting']['entries_connected']['value']==4 and report['accounting']['entries_options_not_reflected']['value']==2
+    e=report['entries'][1]
+    assert e['identity_check']['verified'] is True and e['timeout_check']['reflected_as_requested'] is False and e['timeout_check']['matches_reviewed_values'] is False
+    assert report['entries'][0]['timeout_check']['reflected_as_requested'] is None                       # no options were requested for the NONE entry
+    assert e['timeout_check']['observed_statement_lock_idle_timeouts']==['10s','3s','20s']             # bounded allow-listed observation retained
+
+
+def test_observed_settings_are_bounded_and_allow_listed():
+    assert [rm.bounded_setting(x) for x in ('0','10s','2min','1500ms','10 s','x'*40,'DROP','',None,'1;2')]==['0','10s','2min','1500ms']+['NON_ALLOWLISTED_VALUE']*6
+    runner=None
+    assert rm.bounded_setting('999999d')=='999999d' and rm.bounded_setting('9999999')=='NON_ALLOWLISTED_VALUE'
 
 
 def test_budgets_are_global_stops(cluster,roles,monkeypatch):
@@ -277,3 +293,36 @@ def test_an_audit_failure_while_recording_intent_is_a_stop_with_closure_recorded
     runner.emit=failing
     with pytest.raises(RuntimeError):matrix.run()          # an audit failure propagates to the Runner failure path (teardown); the entry still recorded its closure
     assert matrix.entries[0]['connection_closure']['status']=='CLOSED'
+
+
+# --- the entry deadline holds when server timeout settings are absent or ignored -------------------------------------------------------------------------------
+
+@pytest.mark.parametrize('variant_index',[0,1])
+def test_a_blocked_entry_statement_is_interrupted_by_the_client_deadline_not_the_server(cluster,roles,monkeypatch,variant_index):
+    monkeypatch.setitem(rm.LIMITS,'seconds_per_entry',1)
+    monkeypatch.setattr(rm,'STATEMENT',"SELECT pg_sleep(30),current_user,session_user,true,false,false,false,false,false,'0','0','0'")      # blocks on the server; no server timeout is reached first
+    # entry 0 = NONE (no statement_timeout at all); entry 1 = REVIEWED but with the option ignored by the transport (stripped), so the server has no timeout either
+    real=psycopg.connect
+    def connect(**k):
+        k.pop('options',None);return real(**k)
+    runner,matrix=make(cluster,connect=connect)
+    skipped=[(i,ENTRIES[i]) for i in range(variant_index)]
+    for i in range(variant_index):matrix.entries[i]['outcome']='CONNECTED_IDENTITY_VERIFIED'                          # position the matrix at the entry under test
+    matrix.attempts=variant_index;matrix.started=time.monotonic()
+    started=time.monotonic()
+    with pytest.raises(MatrixStop) as stopped:matrix.entry(variant_index,*ENTRIES[variant_index])
+    elapsed=time.monotonic()-started
+    e=matrix.entries[variant_index]
+    assert stopped.value.code=='ENTRY_DEADLINE_EXCEEDED' and e['outcome']=='STOPPED_DURING_ENTRY' and 0.9<=elapsed<4.0       # interrupted near the 1 s client deadline, not after the 30 s statement
+    assert e['deadline_control']['exceeded'] is True and e['deadline_control']['client_hard_deadline_seconds']==1 and e['deadline_control']['abandon']['cancel_requested'] is True
+    assert e['connection_closure']['status']=='CLOSED'
+    deadline=time.monotonic()+5
+    while sessions(cluster) and time.monotonic()<deadline:time.sleep(.1)
+    assert sessions(cluster)==0                                                                                         # cancel + close ended the backend on the real server
+
+
+def test_the_report_keeps_connection_success_separate_from_deadline_acceptance(cluster,roles):
+    runner,matrix=make(cluster);report=matrix.run()
+    assert report['interpretation']['operational_deadline_acceptance']=='NOT_ESTABLISHED_BY_THIS_DIAGNOSTIC'
+    assert all(e['deadline_control']['client_hard_deadline_seconds']==rm.LIMITS['seconds_per_entry'] and e['deadline_control']['exceeded'] is False for e in report['entries'])
+    assert [e['deadline_control']['server_timeouts_reflected'] for e in report['entries']]==[None,True,None,True]        # whether the SERVER enforced the requested timeouts is recorded apart from success
