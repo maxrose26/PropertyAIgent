@@ -485,7 +485,12 @@ class Runner:
             head=self.github.call('GET','repos/maxrose26/PropertyAIgent/git/ref/heads/'+BRANCH)['object']['sha']
             if head!=previous_head:
                 blob=self.github.call('GET','repos/maxrose26/PropertyAIgent/contents/'+self.r['evidence_directory']+'/'+relative+'?ref='+head)
-                if not isinstance(blob,dict) or blob.get('type')!='file':raise Uncertain('HOSTED_PUBLICATION_FILE_MISSING')
+                # The same contract the publisher's own readback relies on: the file's content and its git blob identity, read AT the committed revision. (No dependence on response fields beyond these two.)
+                try:
+                    raw=__import__('base64').b64decode(blob['content']);identity=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+                    verified=blob['sha']==identity
+                except Exception:verified=False
+                if not verified:raise Uncertain('HOSTED_PUBLICATION_FILE_MISSING')
                 return head,blob
             if time.monotonic()>=deadline:raise Denied('HOSTED_PUBLICATION_WAIT_EXPIRED')
             getattr(self,'pipeline_sleep',time.sleep)(PIPELINE_BINDING['poll_seconds'])

@@ -225,3 +225,32 @@ def test_the_retained_marker_is_published_once_after_the_checkpoint_and_carries_
     assert published==[(sp.EVIDENCE_DIRECTORY+'/capture-retained',['retained.json'])] and runner.evidence_head=='3'*40
     empty=hosted(tmp_path/'none',Pub(['1'*40]));empty.publish_retained()
     assert len(published)==1      # nothing is published without a capture
+
+
+def owner_stub(github,heads):
+    runner=object.__new__(orr.Runner)
+    runner.github=github;runner.r=dict(evidence_directory=sp.EVIDENCE_DIRECTORY);runner.check=lambda:None;runner.stop_requested=lambda:None;runner.pipeline_sleep=lambda s:None
+    return runner
+
+
+def blob_response(raw,**extra):
+    import hashlib
+    return dict(content=base64.b64encode(raw).decode(),sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),**extra)
+
+
+def test_the_owner_wait_accepts_the_publishers_own_readback_contract_with_or_without_extra_fields():
+    raw=b'{"x":1}'
+    for extra in ({},{'type':'file','encoding':'base64','name':'source.json'}):      # the disposable fixture omits `type`; the real API includes it
+        github=FakeGitHub(['1'*40,'2'*40],{sp.EVIDENCE_DIRECTORY+'/capture/source.json':b''})
+        github.call=lambda method,path,body=None,e=extra,r=raw,heads=iter(['1'*40,'2'*40,'2'*40]):({'object':{'sha':next(heads)}} if '/git/ref/' in path else blob_response(r,**e))
+        head,blob=owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
+        assert head=='2'*40 and base64.b64decode(blob['content'])==raw
+
+
+def test_the_owner_wait_refuses_a_file_whose_identity_does_not_match_its_content():
+    raw=b'{"x":1}';bad=dict(blob_response(raw),sha='0'*40)
+    heads=iter(['1'*40,'2'*40])
+    github=FakeGitHub(['1'*40]);github.call=lambda method,path,body=None:({'object':{'sha':next(heads)}} if '/git/ref/' in path else bad)
+    with pytest.raises(Uncertain,match='HOSTED_PUBLICATION_FILE_MISSING'):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
+    github.call=lambda method,path,body=None:({'object':{'sha':'2'*40}} if '/git/ref/' in path else {'type':'file'})      # a response without content is never accepted merely because it says `file`
+    with pytest.raises(Uncertain):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
