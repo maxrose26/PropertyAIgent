@@ -148,7 +148,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             if fault in ('success','idle_pooled_session') and hosted_final and hosted_final['status']=='STOP_RECONCILE_NO_RETRY':
                 events_=[json.loads(l) for l in (hosted_dir/'events.jsonl').read_text().splitlines()] if (hosted_dir/'events.jsonl').exists() else []
                 pytest.fail(json.dumps(dict(hosted=dict(operation_phase=hosted_final.get('operation_phase'),failure=hosted_final.get('failure')),qualification=hosted_final.get('qualification'),
-                            events=[(e['event'],e['payload'] if e['event'] in ('stopped','source_invocation_returned','capture_authority_observed') and len(json.dumps(e['payload']))<1500 else None) for e in events_][-14:],log=hosted_log[-1500:]),default=str)[:9000])
+                            events=[(e['event'],e['payload'] if e['event'] in ('stopped','source_invocation_returned','capture_authority_observed') and len(json.dumps(e['payload']))<1500 else None) for e in events_][-14:],log=hosted_log[-1500:],rehearsal_exception=(hosted_dir/'rehearsal-exception').read_text() if (hosted_dir/'rehearsal-exception').exists() else None),default=str)[:9000])
             text=owner_journal.file.read_text()+json.dumps(result)+((hosted_dir/'events.jsonl').read_text() if (hosted_dir/'events.jsonl').exists() else '')
             for r,p in passwords.items():assert p and p not in text and p not in hosted_log      # no password or verifier value in any audit, result or log
             assert 'postgresql://' not in text

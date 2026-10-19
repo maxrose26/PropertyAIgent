@@ -43,6 +43,16 @@ def gh_runner(command,**kw):
     return subprocess.run([plan['gh'],*command[1:]],env=plan['gh_env'],**kw)
 
 journal=Journal(plan['output'])
+# rehearsal-only diagnostic: the production failure classification deliberately exports no message; the DISPOSABLE server's own error text is recorded beside the audit
+from app.ingestion import coordinator as _coordinator
+_original=_coordinator.Coordinator.idox_source
+def _recording(self,*a,**k):
+    try:return _original(self,*a,**k)
+    except BaseException as exc:
+        diag=getattr(exc,'diag',None)
+        Path(plan['output']).joinpath('rehearsal-exception').write_text(json.dumps(dict(kind=type(exc).__name__,text=str(exc)[:800],primary=getattr(diag,'message_primary',None),context=getattr(diag,'context',None))))
+        raise
+_coordinator.Coordinator.idox_source=_recording
 result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=None,
                           evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'])
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
