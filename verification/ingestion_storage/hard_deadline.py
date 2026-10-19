@@ -47,23 +47,46 @@ def hard_deadline(seconds,code):
                 if state['installed']:
                     signal.signal(SIGNAL,signal.SIG_IGN)          # discards any pending signal
                     if state['thread'] is not None:state['thread'].join(timeout=1)
-                    signal.signal(SIGNAL,state['previous'] if state['previous'] is not None else signal.SIG_DFL)
+                    late=state['thread'] is not None and state['thread'].is_alive()      # a watchdog that outlived the join must never meet the default (fatal) disposition
+                    signal.signal(SIGNAL,signal.SIG_IGN if late else (state['previous'] if state['previous'] is not None else signal.SIG_DFL))
             finally:
                 signal.pthread_sigmask(signal.SIG_SETMASK,mask)
     finally:
         _active.release()
 
 
-def abandon(connection):
-    """After a deadline: ask the server to CANCEL the running statement over a separate, time-bounded cancel connection, then close the client side.
+CANCEL_TIMEOUT_SECONDS=2.0
+CLOSE_ALLOWANCE_SECONDS=1.0
+OUTCOMES=('CANCEL_SENT','CANCEL_FAILED_TIMEOUT','CANCEL_FAILED','CANCEL_SKIPPED_NOT_BOUNDABLE','CANCEL_SKIPPED_NO_CONNECTION')
 
-    Closing alone is NOT enough: a backend running a long statement does not notice the client has gone until the statement ends (client_connection_check_interval is off by default),
-    and a pooler may or may not forward a cancel. So this reports what was done, never that the backend has ended; the session readback in teardown remains the only proof."""
-    sent=False
+
+def abandon(connection,*,clock=None):
+    """After a deadline: ask the server to CANCEL the running statement, then close the client side. Every step is bounded and ACCOUNTED.
+
+    What `cancel_safe` really does (psycopg 3.3, libpq >= 17): it opens a SEPARATE cancel connection to the server's address (TLS as configured) that sends a cancel request. It is not a
+    login: it does not authenticate as the role and does not count against the role's CONNECTION LIMIT, but it is a real network connection that can itself stall, which is why it carries
+    its own timeout. With libpq < 17 `cancel_safe` would fall back to a blocking `cancel()` with no timeout; that path is never taken here (outcome CANCEL_SKIPPED_NOT_BOUNDABLE).
+    A cancel request being SENT or acknowledged is not evidence that the statement stopped, and the backend's closure is never claimed here: `backend_closure` is always NOT_ESTABLISHED
+    and only a later session readback can establish it. Closing alone does not end a running backend (tested)."""
+    import time
+    clock=clock or time.monotonic
+    outcome='CANCEL_SKIPPED_NO_CONNECTION';cancel_seconds=0.0
+    if connection is not None:
+        began=clock()
+        try:
+            from psycopg import capabilities,errors
+            if not capabilities.has_cancel_safe():outcome='CANCEL_SKIPPED_NOT_BOUNDABLE'
+            else:
+                try:
+                    connection.cancel_safe(timeout=CANCEL_TIMEOUT_SECONDS);outcome='CANCEL_SENT'
+                except errors.CancellationTimeout:outcome='CANCEL_FAILED_TIMEOUT'
+        except BaseException:
+            outcome='CANCEL_FAILED'
+        cancel_seconds=clock()-began
+    began=clock()
     try:
-        connection.cancel_safe(timeout=2.0);sent=True
-    except BaseException:
-        pass
-    try:connection.close()
+        if connection is not None:connection.close()
     except BaseException:pass
-    return dict(cancel_requested=sent,client_closed=bool(getattr(connection,'closed',False)))
+    close_seconds=clock()-began
+    return dict(cancel_requested=outcome=='CANCEL_SENT',cancel_outcome=outcome,cancel_attempts=0 if outcome.startswith('CANCEL_SKIPPED') else 1,cancel_seconds=round(cancel_seconds,3),
+                client_closed=bool(getattr(connection,'closed',False)) if connection is not None else None,close_seconds=round(close_seconds,3),backend_closure='NOT_ESTABLISHED')

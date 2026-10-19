@@ -13,7 +13,7 @@ from app.ingestion.coordinator import Coordinator
 from app.ingestion.idox_adapter import IdoxListingContract
 from app.ingestion.batching import capture_once,batch_plans,process_batch
 from verification.discovery.idox_window import WindowConfig
-from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation
+from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation,run_cancel_used
 from .operational_publication import GitHub,Uncertain,canonical,BRANCH
 from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
@@ -104,8 +104,10 @@ class Runner:
         remaining=allocation['remaining']
         if remaining['driver_statements']<80 or remaining['connection_attempts']<2:raise Denied('INSUFFICIENT_NEXT_SLOT_RESERVATION')
         prior=self.receipts.get(key,{})
-        budget=DatabaseBudget(slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],emit=self.emit,stop_file=self.journal.root/'STOP')
+        cancel_used=run_cancel_used({k:v for k,v in self.receipts.items() if k!=key})      # every slot already closed in this run, including this key's earlier use
+        budget=DatabaseBudget(cancel_used=cancel_used,slot_key=key,previous=prior.get('database'),connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),seconds=min(165,remaining['supervised_seconds']),returned_bytes=remaining['returned_data_value_bytes'],emit=self.emit,stop_file=self.journal.root/'STOP')
         engines=[];started=time.monotonic();success=False
+        budget.hard_stop_at=self.started+self.deadlines['job']      # no driver wait may run past the job limit: the failure window and teardown start after it
         try:
             engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.hostaddr) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])
@@ -121,6 +123,7 @@ class Runner:
     def setup(self):
         account=self.github.call('GET','user')
         if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
+        self.owner.apply_role_settings=True        # capture path only: the matrix path never changes role configuration
         self.operation_phase='ADMIN_PREFLIGHT';self.owner.preflight()
         self.operation_phase='ADMIN_INSTALL_OR_REUSE';self.owner.install()
         self.operation_phase='CREDENTIAL_MAPPING_ACTIVATION';self.owner.map_and_activate(self.github,url_factory=self.url_factory)
