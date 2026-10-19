@@ -9,7 +9,7 @@ from verification.ingestion_storage import operational_owner as oo
 from verification.ingestion_storage import operational_runner as orr
 from verification.ingestion_storage import stable_pipeline as sp
 from verification.ingestion_storage.operational_journal import Journal
-from verification.ingestion_storage.operational_publication import Uncertain,REPO,BRANCH
+from verification.ingestion_storage.operational_publication import Uncertain,REPO,BRANCH,GitHub,blob_bytes
 
 VALID='2027-01-17T16:14:12+00:00'
 EXPECTED=dict(identity='postgres',hard_stop_generation=1,valid_until=VALID)
@@ -113,14 +113,20 @@ def test_hosted_admission_is_single_use_pinned_and_credential_separated():
 
 # --------------------------------------------------------------------------- owner/hosted agreement
 class FakeGitHub:
-    def __init__(self,heads,files=None):
-        self.heads=list(heads);self.files=files or {};self.requests=0;self.ref_calls=0
+    """A scripted evidence branch. `timeline` is a list of (head, {path: bytes}) where each entry's files are CUMULATIVE (as a real commit's tree is). Each ref read advances along the timeline."""
+    def __init__(self,heads,files=None,*,timeline=None):
+        self.requests=0;self.ref_calls=0;self.mutation_uncertain=False
+        self.timeline=timeline if timeline is not None else [(h,dict(files or {})) for h in heads]
     def call(self,method,path,body=None):
         self.requests+=1
         if '/git/ref/heads/' in path:
-            head=self.heads[min(self.ref_calls,len(self.heads)-1)];self.ref_calls+=1;return {'object':{'sha':head}}
-        if '/contents/' in path:return {'type':'file','content':base64.b64encode(self.files[path.split('/contents/')[1].split('?')[0]]).decode()}
+            head=self.timeline[min(self.ref_calls,len(self.timeline)-1)][0];self.ref_calls+=1;return {'object':{'sha':head}}
         raise AssertionError(path)
+    def probe(self,path):
+        self.requests+=1
+        relative,head=path.split('/contents/')[1].split('?ref=')
+        files=dict(self.timeline)[head]
+        return blob_response(files[relative]) if relative in files else None
 
 
 def hosted(tmp_path,github):
@@ -143,27 +149,37 @@ def test_the_hosted_job_cannot_register_any_authority(tmp_path):
     assert runner.owner.authorities==[]
 
 
-MARKER_PATH=sp.EVIDENCE_DIRECTORY+'/screening-authority/registered.json'
+MARKER_RELATIVE='screening-authority/registered.json'
 CAPTURE=dict(kind='LISTING_RECEIPT_V1',records=[])
 BINDINGS={'k':{'subject':{},'task':'t','contract':'c','revision':'r'}}
 
 
-def marker_runner(tmp_path,marker):
-    runner=hosted(tmp_path,FakeGitHub(['1'*40,'2'*40],{MARKER_PATH:json.dumps(marker).encode()}))
+def marker_runner(tmp_path,marker,*,heads=('1'*40,'2'*40)):
+    timeline=[(heads[0],{})]+[(h,{sp.EVIDENCE_DIRECTORY+'/'+MARKER_RELATIVE:json.dumps(marker).encode()}) for h in heads[1:]]
+    runner=hosted(tmp_path,FakeGitHub(None,timeline=timeline))
     runner.capture=CAPTURE;runner.pipeline_sleep=lambda s:None
     return runner
 
 
+def good_marker(runner=None):
+    return dict(authority=orr.PIPELINE_AUTHORITY+'_SCREEN',bindings_sha256=digest(BINDINGS),capture_sha256=digest(CAPTURE))
+
+
 def test_the_owner_marker_must_match_the_locally_recomputed_bindings(tmp_path):
-    good_marker=dict(authority=orr.PIPELINE_AUTHORITY+'_SCREEN',bindings_sha256=digest(BINDINGS),capture_sha256=digest(CAPTURE))
-    runner=marker_runner(tmp_path/'good',good_marker);runner.await_marker(BINDINGS)
+    runner=marker_runner(tmp_path/'good',good_marker());runner.await_marker(BINDINGS)
     assert runner.evidence_head=='2'*40
-    for n,bad in enumerate((dict(good_marker,bindings_sha256='0'*64),dict(good_marker,capture_sha256='0'*64),dict(good_marker,authority='OTHER'))):
+    for n,bad in enumerate((dict(good_marker(),bindings_sha256='0'*64),dict(good_marker(),capture_sha256='0'*64),dict(good_marker(),authority='OTHER'))):
         with pytest.raises(Uncertain):marker_runner(tmp_path/('bad%d'%n),bad).await_marker(BINDINGS)
 
 
+def test_the_hosted_wait_finds_the_marker_even_when_later_heads_were_published_meanwhile(tmp_path):
+    # the marker was published at head 2; by the time of the first poll the branch is already at head 3 (cumulative: it still contains the marker)
+    runner=marker_runner(tmp_path,good_marker(),heads=('1'*40,'3'*40));runner.await_marker(BINDINGS)
+    assert runner.evidence_head=='3'*40
+
+
 def test_the_wait_for_the_owner_is_bounded_and_a_timeout_is_a_stop(tmp_path,monkeypatch):
-    runner=hosted(tmp_path,FakeGitHub(['1'*40]));runner.capture=dict(kind='LISTING_RECEIPT_V1',records=[]);runner.pipeline_sleep=lambda s:None
+    runner=hosted(tmp_path,FakeGitHub(['1'*40]));runner.capture=CAPTURE;runner.pipeline_sleep=lambda s:None
     monkeypatch.setattr(sp,'SCREENING_WAIT_SECONDS',0)
     with pytest.raises(Denied,match='OWNER_SCREENING_AUTHORITY_WAIT_EXPIRED'):runner.await_marker({})
 
@@ -209,7 +225,7 @@ def test_pipeline_deadline_ordering_invariants_hold_for_the_actual_constants():
     assert t['work_seconds']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
     assert d['admin_pre']<d['admin_total']<d['admin_diagnostic']<=d['diagnostic_total']
     assert t['active_seconds']<t['outer_seconds']<orr.PIPELINE_BACKSTOP_SECONDS
-    assert b['capture_wait_seconds']+b['retention_wait_seconds']+b['screening_wait_seconds']+600<=d['admin_pre']                    # both bounded waits plus the fixed phases fit the administrative allowance
+    assert b['capture_wait_seconds']+b['screening_wait_seconds']+600<=d['admin_pre']                    # both bounded waits plus the fixed phases fit the administrative allowance
     assert b['grant_minutes']*60<d['job'] and b['screening_grant_minutes']<b['grant_minutes']          # the authority always ends before the controller's own limit
     assert 'RuntimeMaxSec=%ds'%orr.PIPELINE_BACKSTOP_SECONDS in Path('docs/design/ingestion-stable-pipeline-20261020/owner-run.sh').read_text()
     assert sp.HOSTED_DEADLINES['job']+240<=2100 and 40*60>2100                                          # the hosted hard kill (2,100 s) lies inside the 40-minute job limit and above the hosted job deadline
@@ -227,9 +243,9 @@ def test_the_retained_marker_is_published_once_after_the_checkpoint_and_carries_
     assert len(published)==1      # nothing is published without a capture
 
 
-def owner_stub(github,heads):
+def owner_stub(github,*,evidence_head='1'*40):
     runner=object.__new__(orr.Runner)
-    runner.github=github;runner.r=dict(evidence_directory=sp.EVIDENCE_DIRECTORY);runner.check=lambda:None;runner.stop_requested=lambda:None;runner.pipeline_sleep=lambda s:None
+    runner.github=github;runner.r=dict(evidence_directory=sp.EVIDENCE_DIRECTORY);runner.check=lambda:None;runner.stop_requested=lambda:None;runner.pipeline_sleep=lambda s:None;runner.evidence_head=evidence_head
     return runner
 
 
@@ -238,29 +254,76 @@ def blob_response(raw,**extra):
     return dict(content=base64.b64encode(raw).decode(),sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),**extra)
 
 
-def test_the_owner_wait_accepts_the_publishers_own_readback_contract_with_or_without_extra_fields():
-    raw=b'{"x":1}'
-    for extra in ({},{'type':'file','encoding':'base64','name':'source.json'}):      # the disposable fixture omits `type`; the real API includes it
-        github=FakeGitHub(['1'*40,'2'*40],{sp.EVIDENCE_DIRECTORY+'/capture/source.json':b''})
-        github.call=lambda method,path,body=None,e=extra,r=raw,heads=iter(['1'*40,'2'*40,'2'*40]):({'object':{'sha':next(heads)}} if '/git/ref/' in path else blob_response(r,**e))
-        head,blob=owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
-        assert head=='2'*40 and base64.b64decode(blob['content'])==raw
+def cumulative(*steps):
+    """steps: [(head, {relative: bytes})] - each commit ADDS files; every later head contains all earlier ones, as a real tree does."""
+    out=[];files={}
+    for head,added in steps:
+        files=dict(files,**{sp.EVIDENCE_DIRECTORY+'/'+k:v for k,v in added.items()});out.append((head,dict(files)))
+    return out
+
+
+def test_the_owner_wait_is_presence_based_and_finds_the_file_when_the_poll_only_sees_a_later_head():
+    """Reproduced defect: the restricted job publishes the archive (head A) and, seconds later, the retained marker (head B). A coarse poll may see only B. A change-based wait would take B as
+    its baseline and wait for a further head that never comes (the next publication is the owner's own). Presence at the current head finds it."""
+    timeline=cumulative(('1'*40,{}),('a'*40,{'capture/source.json':b'{"raw":1}'}),('b'*40,{'capture-retained/retained.json':b'{"m":1}'}))
+    github=FakeGitHub(None,timeline=timeline);github.ref_calls=2      # the first poll already finds the branch at head B: head A was never observed
+    runner=owner_stub(github)
+    head,blob=runner.await_file('capture-retained/retained.json',5)
+    assert head=='b'*40 and blob_bytes(blob)==b'{"m":1}'
+    assert blob_bytes(runner.evidence_file(head,'capture/source.json'))==b'{"raw":1}'      # the archive written before the marker is still there at head B
+
+
+def test_the_owner_wait_probes_each_head_once_and_is_bounded():
+    github=FakeGitHub(None,timeline=cumulative(('1'*40,{})));probes=[]
+    original=github.probe;github.probe=lambda path:(probes.append(path),original(path))[1]
+    runner=owner_stub(github);sleeps=[]
+    def sleeper(seconds):
+        sleeps.append(seconds)
+        if len(sleeps)==3:raise Denied('TEST_STOP_AFTER_THREE_POLLS')
+    runner.pipeline_sleep=sleeper
+    with pytest.raises(Denied,match='TEST_STOP_AFTER_THREE_POLLS'):runner.await_file('capture-retained/retained.json',3600)
+    assert len(probes)==1 and github.ref_calls==3      # the unchanged head was probed once, not on every poll
+    zero=FakeGitHub(None,timeline=cumulative(('1'*40,{})))
+    with pytest.raises(Denied,match='HOSTED_PUBLICATION_WAIT_EXPIRED'):owner_stub(zero).await_file('capture-retained/retained.json',0)      # a zero-second wait still examines the head once, then stops
 
 
 def test_the_owner_wait_refuses_a_file_whose_identity_does_not_match_its_content():
-    raw=b'{"x":1}';bad=dict(blob_response(raw),sha='0'*40)
-    heads=iter(['1'*40,'2'*40])
-    github=FakeGitHub(['1'*40]);github.call=lambda method,path,body=None:({'object':{'sha':next(heads)}} if '/git/ref/' in path else bad)
-    with pytest.raises(Uncertain,match='HOSTED_PUBLICATION_FILE_MISSING'):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
-    github.call=lambda method,path,body=None:({'object':{'sha':'2'*40}} if '/git/ref/' in path else {'type':'file'})      # a response without content is never accepted merely because it says `file`
-    with pytest.raises(Uncertain):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
+    bad=dict(blob_response(b'{"x":1}'),sha='0'*40)
+    github=FakeGitHub(None,timeline=[('1'*40,{})]);github.probe=lambda path:bad
+    with pytest.raises(Uncertain,match='PUBLICATION_BLOB_IDENTITY'):owner_stub(github).await_file('capture-retained/retained.json',5)
+    github.probe=lambda path:{'type':'file'}      # a response without content is never accepted merely because it says `file`
+    with pytest.raises(Uncertain):owner_stub(github).await_file('capture-retained/retained.json',5)
+
+
+def test_the_owner_requires_a_fresh_evidence_directory_before_it_issues_anything():
+    clean=FakeGitHub(None,timeline=[('1'*40,{})]);owner_stub(clean).require_fresh_evidence_directory()
+    for leftover in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
+        dirty=FakeGitHub(None,timeline=cumulative(('1'*40,{leftover:b'{}'})))
+        with pytest.raises(Uncertain,match='EVIDENCE_DIRECTORY_NOT_FRESH'):owner_stub(dirty).require_fresh_evidence_directory()
+    moved=FakeGitHub(None,timeline=[('9'*40,{})])
+    with pytest.raises(Uncertain,match='EVIDENCE_HEAD_MOVED'):owner_stub(moved).require_fresh_evidence_directory()
+
+
+def test_probe_treats_http_404_as_absent_and_every_other_failure_as_uncertain():
+    import subprocess
+    def runner_for(returncode,stdout=b'',stderr=b''):
+        return lambda command,**kw:subprocess.CompletedProcess(command,returncode,stdout,stderr)
+    events=[]
+    gh=GitHub(lambda e,p=None:events.append(e),lambda:None,runner=runner_for(1,stderr=b'gh: Not Found (HTTP 404)'))
+    assert gh.probe('repos/x/contents/y?ref=z') is None
+    assert GitHub(lambda *a:None,lambda:None,runner=runner_for(0,stdout=b'{"content":"","sha":"s"}')).probe('p')=={'content':'','sha':'s'}
+    for rc,err in ((1,b'gh: Internal Server Error (HTTP 500)'),(1,b'connection reset'),(4,b'')):
+        with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=runner_for(rc,stderr=err)).probe('p')
+    with pytest.raises(Uncertain):GitHub(lambda *a:None,lambda:None,runner=lambda command,**kw:(_ for _ in ()).throw(subprocess.TimeoutExpired(command,5))).probe('p')
+    bounded=GitHub(lambda *a:None,lambda:None,runner=runner_for(1,stderr=b'HTTP 404'),bound=1);bounded.probe('p')
+    with pytest.raises(ValueError,match='GITHUB_REQUEST_BOUND'):bounded.probe('p')
 
 
 def test_the_owner_github_request_bound_covers_the_production_polling_with_a_reserve():
     b=orr.PIPELINE_BINDING
-    polls=(b['capture_wait_seconds']+b['retention_wait_seconds']+b['screening_wait_seconds'])/b['poll_seconds']+3      # one extra poll per wait at the boundary
+    polls=(b['capture_wait_seconds']+b['screening_wait_seconds'])/b['poll_seconds']+2      # one extra poll per wait at the boundary
     publications=2*8                                                                                                  # the screening marker and the owner evidence, about eight requests each
-    other=1+3                                                                                                         # the account check and the failure-path reads
+    other=1+3+3+4                                                                                                     # account check, failure-path reads, the freshness probes, and one probe per observed head change
     assert polls+publications+other+20<=orr.PIPELINE_GITHUB_BOUND      # reserve of at least 20 requests
 
 

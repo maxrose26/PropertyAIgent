@@ -14,7 +14,7 @@ from app.ingestion.idox_adapter import IdoxListingContract
 from app.ingestion.batching import capture_once,batch_plans,process_batch
 from verification.discovery.idox_window import WindowConfig
 from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation,run_cancel_used
-from .operational_publication import GitHub,Uncertain,canonical,BRANCH
+from .operational_publication import GitHub,Uncertain,canonical,BRANCH,blob_bytes
 from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
@@ -69,7 +69,7 @@ PIPELINE_MODE='STABLE_PIPELINE_AUTHORITY'
 PIPELINE_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_AUTHORITY_ONCE_20261020'
 PIPELINE_STATE='operational-stable-pipeline-once-20261020'
 PIPELINE_BINDING=dict(
-    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2400,retention_wait_seconds=300,screening_wait_seconds=600,
+    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2700,screening_wait_seconds=600,
     provisioning=dict(registration_sha256='b7e00b48d659b4fa83cd72d14efe734846c2d9d2e699f6998e509e3c3f280264',events_sha256='a26f9d1f51d8e908431cfdebf2bf20f6362b7bcbcecb35717a13935017155a19',
                       final_result_sha256='51aea5d5ce0a3515b369b0d098a5c3da73a210ff86034f1f9e368d654274d3e6'),
     qualification=dict(run_id=39284253302,artifact_id=12212818855,artifact_zip_sha256='b02da6fcf1658f627f4935db0a998fb3764498b3e15b6d57ad2ab135ba15db58',revision='46b9356d352efcde39df9e1505db582543adecee'),
@@ -483,22 +483,36 @@ class Runner:
         return dict(status='STABLE_CREDENTIALS_REVOKED_ACCESS_DISABLED',cleanup='CLOSED',access='DISABLED_VERIFIED',closure_components=components,accounting=self.accounting(),owned_cleanup=components['process'],
                     role_settings='LEFT_IN_PLACE_REVIEWED_VALUES',source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
 
-    def await_publication(self,previous_head,relative,seconds):
-        """Bounded polling of the evidence branch (one GET per poll). Returns the new head once it moved; the expected file is read AT that commit, so a head that moved without the file is
-        UNCERTAIN, never assumed. Timeout is a stop (no retry, no replay)."""
-        deadline=time.monotonic()+seconds
+    EVIDENCE_CONTENTS='repos/maxrose26/PropertyAIgent/contents/'
+    EVIDENCE_REF='repos/maxrose26/PropertyAIgent/git/ref/heads/'
+
+    def evidence_head_now(self):
+        return self.github.call('GET',self.EVIDENCE_REF+BRANCH)['object']['sha']
+
+    def evidence_file(self,head,relative):
+        """The file in the evidence directory AT the given commit, verified by its git blob identity; None if it is not there (HTTP 404)."""
+        blob=self.github.probe(self.EVIDENCE_CONTENTS+self.r['evidence_directory']+'/'+relative+'?ref='+head)
+        if blob is None:return None
+        blob_bytes(blob);return blob
+
+    def require_fresh_evidence_directory(self):
+        """The two restricted-job markers must not exist yet: a leftover from any earlier run would otherwise be mistaken for this run's publication."""
+        head=self.evidence_head_now()
+        if head!=self.evidence_head:raise Uncertain('EVIDENCE_HEAD_MOVED')
+        for relative in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
+            if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
+
+    def await_file(self,relative,seconds):
+        """Bounded wait until `relative` EXISTS in the evidence directory at the CURRENT head of the evidence branch. Presence-based, never change-based: the restricted job publishes several commits within
+        seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would miss the one it is waiting for). Each distinct head is probed
+        once; the first probe is of the head as it stands. Timeout is a stop (no retry, no replay)."""
+        deadline=time.monotonic()+seconds;probed=None
         while True:
             self.check();self.stop_requested()
-            head=self.github.call('GET','repos/maxrose26/PropertyAIgent/git/ref/heads/'+BRANCH)['object']['sha']
-            if head!=previous_head:
-                blob=self.github.call('GET','repos/maxrose26/PropertyAIgent/contents/'+self.r['evidence_directory']+'/'+relative+'?ref='+head)
-                # The same contract the publisher's own readback relies on: the file's content and its git blob identity, read AT the committed revision. (No dependence on response fields beyond these two.)
-                try:
-                    raw=__import__('base64').b64decode(blob['content']);identity=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
-                    verified=blob['sha']==identity
-                except Exception:verified=False
-                if not verified:raise Uncertain('HOSTED_PUBLICATION_FILE_MISSING')
-                return head,blob
+            head=self.evidence_head_now()
+            if head!=probed:
+                probed=head;blob=self.evidence_file(head,relative)
+                if blob is not None:return head,blob
             if time.monotonic()>=deadline:raise Denied('HOSTED_PUBLICATION_WAIT_EXPIRED')
             getattr(self,'pipeline_sleep',time.sleep)(PIPELINE_BINDING['poll_seconds'])
 
@@ -514,22 +528,23 @@ class Runner:
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key']
         self.operation_phase='PIPELINE_CAPTURE_AUTHORITY'
+        self.require_fresh_evidence_directory()
         self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(minutes=pb['grant_minutes']))
         self.owner.require_control_sha256=self.owner.baseline_control_sha256
         self.capture_bindings=self.owner.register([root],self.authority+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.owner.require_control_sha256=None
         self.emit('pipeline_capture_authority_registered',dict(capture_key=self.capture_key,grant_expires_at=self.owner.grant_expiry.isoformat(),restricted_job='WAITING_FOR_DISPATCH_OR_RUNNING'))
         self.operation_phase='PIPELINE_AWAIT_DURABLE_RETENTION'
-        head,blob=self.await_publication(self.evidence_head,'capture/source.json',pb['capture_wait_seconds'])
+        # The restricted job archives the raw source BEFORE the ledger checkpoint is durable (accepted order) and then publishes the retained marker: that marker (which implies the archive) is what is awaited.
+        head,_=self.await_file('capture-retained/retained.json',pb['capture_wait_seconds'])
         self.evidence_head=head
-        # The raw source is archived BEFORE the ledger checkpoint is durable (accepted order): wait for the restricted job's second marker, then verify the checkpoint in the database ONCE.
-        head,_=self.await_publication(self.evidence_head,'capture-retained/retained.json',pb['retention_wait_seconds'])
-        self.evidence_head=head
+        blob=self.evidence_file(head,'capture/source.json')
+        if blob is None:raise Uncertain('HOSTED_ARCHIVE_MISSING')
         rows=self.owner.read_items([self.capture_key])
         state,checkpoint=rows.get(self.capture_key,(None,None))
         archive=(checkpoint or {}).get('durable_archive') if isinstance(checkpoint,dict) else None
         if state!='COMPLETE' or not isinstance(checkpoint,dict) or checkpoint.get('kind')!='LISTING_RECEIPT_V1' or not archive:raise Uncertain('CAPTURE_NOT_DURABLY_RETAINED')
-        if archive.get('sha256')!=hashlib.sha256(__import__('base64').b64decode(blob.get('content',''))).hexdigest() or archive.get('path')!=self.r['evidence_directory']+'/capture/source.json':raise Uncertain('CAPTURE_ARCHIVE_BINDING')
+        if archive.get('sha256')!=hashlib.sha256(blob_bytes(blob)).hexdigest() or archive.get('path')!=self.r['evidence_directory']+'/capture/source.json':raise Uncertain('CAPTURE_ARCHIVE_BINDING')
         self.capture=checkpoint;self.plans=batch_plans(self.capture_key,self.capture)
         self.emit('pipeline_capture_retained',dict(capture_sha256=digest(self.capture),rows=len(self.capture.get('records',[])),batches=len(self.plans),archive_sha256=archive['sha256']))
         if self.plans:
@@ -546,9 +561,9 @@ class Runner:
             marker=dict(authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
             self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
             self.operation_phase='PIPELINE_AWAIT_SCREENING'
-            head,blob=self.await_publication(self.evidence_head,'completed/final-result.json',pb['screening_wait_seconds'])
+            head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
-            raw=__import__('base64').b64decode(blob.get('content',''))
+            raw=blob_bytes(blob)
             try:hosted=json.loads(raw)
             except ValueError:hosted={}
             hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))

@@ -19,7 +19,7 @@ from .operational_controller import DatabaseBudget
 from .operational_journal import Journal
 from .operational_owner import item,SCOPE,ROLES
 from .operational_preparation import Progress,resolve_addresses
-from .operational_publication import GitHub,Uncertain,BRANCH,REPO
+from .operational_publication import GitHub,Uncertain,BRANCH,REPO,blob_bytes
 from .operational_runner import Runner,CONTRACT,PIPELINE_AUTHORITY
 from .tls_trust import verified_trust,owned_resources
 
@@ -102,19 +102,21 @@ class HostedRunner(Runner):
         self.retained_published=True;self.emit('capture_retained_marker_published',dict(head=self.evidence_head))
 
     def await_marker(self,bindings):
-        """Poll the evidence branch (no database connection) for the OWNER's screening-authority marker. The marker is not an authority: the authority is in the database and is enforced there when
-        the screening slot runs. A marker that disagrees with the locally recomputed bindings is UNCERTAIN. Timeout is a stop."""
-        deadline=time.monotonic()+SCREENING_WAIT_SECONDS;previous=self.evidence_head
-        self.emit('awaiting_owner_screening_authority',dict(from_head=previous,seconds=SCREENING_WAIT_SECONDS))
+        """Wait (no database connection) for the OWNER's screening-authority marker: presence-based at the current head of the evidence branch, each distinct head probed once. The marker is not an
+        authority - the authority is in the database and is enforced there when the screening slot runs. A marker that disagrees with the locally recomputed bindings is UNCERTAIN. Timeout is a stop."""
+        deadline=time.monotonic()+SCREENING_WAIT_SECONDS;probed=None
+        self.emit('awaiting_owner_screening_authority',dict(from_head=self.evidence_head,seconds=SCREENING_WAIT_SECONDS))
         while True:
             self.check()
             head=self.head()
-            if head!=previous:
-                blob=self.github.call('GET',REPO+'/contents/'+EVIDENCE_DIRECTORY+'/screening-authority/registered.json?ref='+head)
-                try:marker=json.loads(base64.b64decode(blob['content']))
-                except Exception:raise Uncertain('OWNER_MARKER_UNREADABLE') from None
-                if marker.get('bindings_sha256')!=digest(bindings) or marker.get('capture_sha256')!=digest(self.capture) or marker.get('authority')!=self.authority+'_SCREEN':raise Uncertain('OWNER_MARKER_BINDING_MISMATCH')
-                self.evidence_head=head;self.emit('owner_screening_authority_marker_verified',dict(head=head));return
+            if head!=probed:
+                probed=head
+                blob=self.github.probe(REPO+'/contents/'+EVIDENCE_DIRECTORY+'/screening-authority/registered.json?ref='+head)
+                if blob is not None:
+                    try:marker=json.loads(blob_bytes(blob))
+                    except ValueError:raise Uncertain('OWNER_MARKER_UNREADABLE') from None
+                    if marker.get('bindings_sha256')!=digest(bindings) or marker.get('capture_sha256')!=digest(self.capture) or marker.get('authority')!=self.authority+'_SCREEN':raise Uncertain('OWNER_MARKER_BINDING_MISMATCH')
+                    self.evidence_head=head;self.emit('owner_screening_authority_marker_verified',dict(head=head));return
             if time.monotonic()>=deadline:raise Denied('OWNER_SCREENING_AUTHORITY_WAIT_EXPIRED')
             self.pipeline_sleep(POLL_SECONDS)
 

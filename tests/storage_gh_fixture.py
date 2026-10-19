@@ -80,7 +80,8 @@ def real_gh_store(tmp_path,request):
             if operational and method=='GET' and path.startswith(contents):
                 revision=parse_qs(urlsplit(self.path).query)['ref'][0]
                 tree=git_objects[git_objects[revision]['tree']['sha']]['tree']
-                entry=next(x for x in tree if x['path']==path[len(contents):])
+                entry=next((x for x in tree if x['path']==path[len(contents):]),None)
+                if entry is None:return self.answer(404,{'message':'Not Found'})
                 return self.answer(200,git_objects[entry['sha']])
             git_prefix='/repos/maxrose26/PropertyAIgent/git/'
             if operational and path.startswith(git_prefix):
@@ -99,6 +100,8 @@ def real_gh_store(tmp_path,request):
                     if target.startswith('refs/heads/'):
                         if value.get('force') is not False or git_objects[value['sha']]['parents']!=[git_head[0]]:return self.answer(409)
                         git_head[0]=value['sha'];return self.answer(200,{'object':{'sha':git_head[0]}})
+                    if target=='trees':      # as on the real API a tree built on a base_tree contains the base tree's entries plus (or replacing) the new ones
+                        base=git_objects.get(value.get('base_tree'));merged={x['path']:x for x in (base['tree'] if base else [])};merged.update({x['path']:x for x in value['tree']});value=dict(value,tree=list(merged.values()))
                     git_objects[sha]=dict(value,sha=sha)
                     if target=='commits':git_objects[sha]['tree']={'sha':value['tree']}
                     return self.answer(201,{'sha':sha})

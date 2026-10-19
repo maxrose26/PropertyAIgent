@@ -82,13 +82,12 @@
    "transport_requests": 10
   },
   "timing": {
-   "capture_wait_seconds": 2400,
+   "capture_wait_seconds": 2700,
    "hidden_input_seconds": 120,
    "owner_active_seconds": 4380,
    "owner_outer_seconds": 4500,
    "poll_seconds": 30,
    "process_backstop_seconds": 4600,
-   "retention_wait_seconds": 300,
    "screening_wait_seconds": 600
   }
  },

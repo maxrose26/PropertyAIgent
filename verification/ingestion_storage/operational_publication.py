@@ -11,6 +11,15 @@ BRANCH='stage4/narrow-continuation-evidence-20261016'
 class Uncertain(RuntimeError):
     pass
 
+
+def blob_bytes(blob):
+    """The decoded bytes of a contents/blob response, accepted ONLY if the response's git blob identity matches them (the contract the publisher's own readback relies on; no other field is trusted)."""
+    try:
+        raw=base64.b64decode(blob['content']);identity=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        if blob['sha']==identity:return raw
+    except Exception:pass
+    raise Uncertain('PUBLICATION_BLOB_IDENTITY')
+
 def canonical(value):
     return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False).encode()
 
@@ -39,6 +48,23 @@ class GitHub:
             if method!='GET':self.mutation_uncertain=True
             raise Uncertain('GITHUB_RESPONSE_UNCERTAIN') from None
         self.emit('github_ack',dict(method=method,path=path,ordinal=self.requests))
+        self.check();return value
+
+    def probe(self,path):
+        """A read-only GET whose HTTP 404 means 'not there (yet)' and returns None. Every other failure, an oversized answer or an unreadable one is Uncertain, exactly as for call()."""
+        self.check()
+        if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
+        self.requests+=1
+        self.emit('github_intent',dict(method='GET',path=path,ordinal=self.requests))
+        try:
+            r=self.runner(['gh','api','--method','GET',path],input=None,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
+            if len(r.stdout)+len(r.stderr)>3*1024**2:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')
+            if r.returncode:
+                if b'HTTP 404' in r.stderr:value=None
+                else:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN')
+            else:value=json.loads(r.stdout) if r.stdout else None
+        except BaseException:raise Uncertain('GITHUB_RESPONSE_UNCERTAIN') from None
+        self.emit('github_ack',dict(method='GET',path=path,ordinal=self.requests))
         self.check();return value
 
     def names(self):
