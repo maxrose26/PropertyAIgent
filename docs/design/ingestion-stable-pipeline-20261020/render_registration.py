@@ -36,7 +36,7 @@ def render(root=None,minutes=60,evidence_head=None):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--minutes',type=int,default=60);parser.add_argument('--evidence-head',required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--minutes',type=int,default=100)      # the ceremony (hidden input, dispatch, approval, two bounded waits, invalidation) needs more than an hour;parser.add_argument('--evidence-head',required=True);args=parser.parse_args()
     if not 1<=args.minutes<=110:raise SystemExit('EXPIRY_MINUTES_1_TO_110')
     body=json.dumps(render(minutes=args.minutes,evidence_head=args.evidence_head),sort_keys=True,indent=1)+'\n'
     sys.stdout.write(body);sys.stderr.write(hashlib.sha256(body.encode()).hexdigest()+'\n')

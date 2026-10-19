@@ -100,14 +100,14 @@ def test_the_readback_statements_are_fixed_read_only_and_never_select_secrets_or
 # --------------------------------------------------------------------------- hosted admission
 def env(**over):
     base=dict(PIPELINE_REVIEWED_SHA='a'*40,PIPELINE_EVIDENCE_HEAD='b'*40,GITHUB_SHA='a'*40,GITHUB_WORKFLOW_SHA='a'*40,GITHUB_REF='refs/heads/master',GITHUB_RUN_NUMBER='1',GITHUB_RUN_ATTEMPT='1',
-              GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',PIPELINE_AUTHORITY=sp.HOSTED_AUTHORITY,GH_TOKEN='t')
+              GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',PIPELINE_AUTHORITY=sp.HOSTED_AUTHORITY)
     base.update(over);return base
 
 
 def test_hosted_admission_is_single_use_pinned_and_credential_separated():
     assert sp.admitted(env())
     for bad in (dict(GITHUB_RUN_NUMBER='2'),dict(GITHUB_RUN_ATTEMPT='2'),dict(GITHUB_REF='refs/heads/x'),dict(GITHUB_SHA='c'*40),dict(PIPELINE_AUTHORITY='NOT_AUTHORISED'),dict(PIPELINE_EVIDENCE_HEAD='zz'),
-                dict(GH_TOKEN=''),dict(DATABASE_URL='postgresql://x'),dict(PGPASSWORD='x'),dict(INGESTION_STORAGE_DATABASE_URL='x'),dict(RUNNER_ENVIRONMENT='self-hosted')):
+                dict(GH_TOKEN='t'),dict(INGESTION_WORKER_DATABASE_URL='postgresql://x'),dict(INGESTION_EFFECT_DATABASE_URL='postgresql://x'),dict(DATABASE_URL='postgresql://x'),dict(PGPASSWORD='x'),dict(INGESTION_STORAGE_DATABASE_URL='x'),dict(RUNNER_ENVIRONMENT='self-hosted')):      # the secrets arrive on stdin: none may be in the environment
         assert not sp.admitted(env(**bad)),bad
 
 
@@ -218,12 +218,47 @@ def test_actual_memory_is_kernel_enforced_and_an_address_space_limit_is_not_clai
     assert '\r' not in script
 
 
-def test_secrets_reach_the_job_only_through_the_environment_never_a_file_or_an_argument():
+def test_secrets_reach_the_process_on_stdin_only_never_the_environment_a_file_or_an_argument():
     t=WF.read_text()
-    assert 'GH_TOKEN="$GH_TOKEN"' in t
-    for line in t.splitlines():
-        if 'secrets.' in line:assert re.match(r'\s+INGESTION_(WORKER|EFFECT)_DATABASE_URL: \$\{\{ secrets\.',line)
-    assert 'echo' not in ' '.join(l for l in t.splitlines() if 'DATABASE_URL' in l or 'GH_TOKEN' in l)
+    run=[l for l in t.splitlines() if 'printf' in l and 'stable_pipeline' in l]
+    assert len(run)==1
+    line=run[0]
+    assert re.match(r"\s+printf '%s\\n%s\\n%s\\n' \"\$GH_TOKEN\" \"\$INGESTION_WORKER_DATABASE_URL\" \"\$INGESTION_EFFECT_DATABASE_URL\" \| env -i ",line)      # a builtin printf into a pipe, then a cleared environment
+    after_env=line.split('| env -i ',1)[1].split(' timeout ',1)[0]
+    for name in ('GH_TOKEN','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL','DATABASE_URL','GITHUB_TOKEN'):assert name not in after_env      # none is placed in the child's environment
+    for l in t.splitlines():
+        if 'secrets.' in l:assert re.match(r'\s+INGESTION_(WORKER|EFFECT)_DATABASE_URL: \$\{\{ secrets\.',l)
+    assert 'echo' not in ' '.join(x for x in t.splitlines() if 'DATABASE_URL' in x or 'GH_TOKEN' in x)
+
+
+def test_read_secrets_takes_exactly_three_lines_from_the_pipe_and_nothing_else():
+    import io
+    token,urls=sp.read_secrets(io.BytesIO(b'ghs_token\npostgresql://w\npostgresql://e\n'))
+    assert token=='ghs_token' and urls=={'ingestion_worker_login':'postgresql://w','ingestion_effect_login':'postgresql://e'}
+    for bad in (b'',b'a\nb\n',b'a\nb\nc',b'a\nb\nc\nd\n',b'a\n\nc\n',b' a\nb\nc\n',b'a\nb c\nc\n',b'x'*20000,b'\xff\xfe\nb\nc\n'):
+        with pytest.raises((SystemExit,UnicodeDecodeError)):sp.read_secrets(io.BytesIO(bad))
+
+
+def test_the_scope_helper_delegates_only_what_cgroup_delegation_requires_and_forbids_regaining_privilege():
+    script=Path('verification/ingestion_storage/hosted_memory_scope.sh').read_text()
+    assert 'chown -R' not in script      # the resource-control files stay root-owned
+    assert 'for target in "$SCOPE" "$SCOPE/cgroup.procs" "$SCOPE/cgroup.subtree_control" "$SCOPE/cgroup.threads"' in script
+    assert '--no-new-privs' in script and script.index('--no-new-privs')>script.index('--clear-groups')
+    assert script.index('memory.max')<script.index('chown')      # limits are written and verified BEFORE any ownership changes
+
+
+def test_the_owner_caps_the_rows_and_also_awaits_the_result_when_there_is_nothing_to_screen():
+    source=Path('verification/ingestion_storage/operational_runner.py').read_text()
+    body=source[source.index('    def pipeline(self):'):source.index('    def execute(self):')]
+    assert "raise Uncertain('CAPTURE_ROW_BOUND')" in body and body.index("CAPTURE_ROW_BOUND")<body.index("batch_plans(self.capture_key,self.capture)")
+    zero=body[body.index("        else:      # an explicit zero"):body.index("        self.operation_phase='PIPELINE_INVALIDATION'")]
+    assert "await_file('completed/final-result.json'" in zero and 'verify_hosted_result(blob)' in zero
+
+
+def test_the_default_registration_lifetime_covers_the_ceremony():
+    text=Path('docs/design/ingestion-stable-pipeline-20261020/render_registration.py').read_text()
+    assert "default=100" in text and "default=60" not in text
+    assert 100*60>orr.PIPELINE_TIMING['input_seconds']+orr.PIPELINE_BINDING['capture_wait_seconds']+orr.PIPELINE_BINDING['screening_wait_seconds']
 
 
 def test_pipeline_deadline_ordering_invariants_hold_for_the_actual_constants():

@@ -53,7 +53,7 @@ def test_workflow_scope():
             continue
         if path.name=='stage4-stable-pipeline-once.yml':
             # Exact separately authorised restricted-credential pipeline job (restricted secrets only; no administrative secret; write token confined to the evidence branch by code); no blanket exception.
-            assert hashlib.sha256(path.read_bytes()).hexdigest()=='6f92ae190c778d54bf1d81c8bd69861c2b03d295e5d885583797ca98a802d75a'
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='8e7ed37afc870ed993bcd6aae8e4b1f59982309ae188926d1d9d25343d577b20'
             continue
         if path.name=='stage4-ingestion-storage-catalogue-once.yml':
             # Exact separately authorised catalogue-only access; no blanket exception.

@@ -228,3 +228,16 @@ def test_the_old_placeholder_limit_would_have_been_exhausted_by_the_normal_path(
     c=lifecycle_counts(batches=12)
     normal=READBACK_STATEMENTS+c['register_capture'][0]+c['read_capture'][0]+c['register_screening'][0]+c['read_batches'][0]
     assert normal>48      # the reproduced command-limit exhaustion: the placeholder normal allowance of 48 cannot cover the lifecycle
+
+
+def test_after_an_uncertain_commit_a_later_call_only_observes_and_never_writes_again():
+    before=control();db=ScriptedAdmin(before,fail_commit=True);o,events=owner_for(db)
+    assert o.invalidate_authorities()=='UNCERTAIN_RECONCILE' and db.updates==1 and o.commit_uncertain is True
+    statements_after_first=len(db.statements)
+    assert o.invalidate_authorities()=='UNCERTAIN_RECONCILE'      # the commit did not persist (the scripted server lost it): still unreconciled
+    assert db.updates==1 and db.commits==0      # no second UPDATE, no second COMMIT
+    assert last(events,'authority_invalidation_uncertain')['stopped']=='PRIOR_COMMIT_UNCERTAIN_OBSERVE_ONLY' and last(events,'authority_invalidation_uncertain')['observation']=='NOT_REVOKED_OBSERVED'
+    assert len(db.statements)-statements_after_first==5      # one read-only observation: begin, capability grant, read, rollback, capability check
+    persisted=ScriptedAdmin(control(),fail_commit=False);o2,_=owner_for(persisted);o2.commit_uncertain=True
+    for a in (CAPTURE,SCREEN):persisted.committed['grants'][a]['expires_at']=0;persisted.committed['bolton_exceptions'][a]['expires_at']=0      # the earlier commit DID persist
+    assert o2.invalidate_authorities()=='ALREADY_INVALIDATED_READBACK' and persisted.updates==0

@@ -96,7 +96,7 @@ class Owner:
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
-        self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False;self.grant_expiry=None;self.require_control_sha256=None
+        self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False;self.grant_expiry=None;self.require_control_sha256=None;self.commit_uncertain=False
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
         self.preflight_report=dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]);self.permitted_policy_states=None;self.stable_state=False;self.valid_until=None;self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
@@ -573,6 +573,11 @@ class Owner:
         names=list(dict.fromkeys(self.authorities))
         if any(not self.AUTHORITY_NAME.fullmatch(a) for a in names):raise Uncertain('INVALIDATION_AUTHORITY_NAME')
         self.invalidation='UNCERTAIN_RECONCILE'
+        if self.commit_uncertain:      # an earlier attempt's persistence is unknown: never a second write, only one read-only observation, reported for reconciliation
+            observation=self._observe_revoked(names)
+            self.emit('authority_invalidation_uncertain',dict(authorities=names,stopped='PRIOR_COMMIT_UNCERTAIN_OBSERVE_ONLY',observation=observation))
+            if observation=='REVOKED_OBSERVED':self.invalidation='ALREADY_INVALIDATED_READBACK'      # confirmed by a readback; the run itself stays uncertain through effect_uncertain
+            return self.invalidation
         report=dict(authorities=names,absent=[],already=[],revoked=[],refused=[],prior_effect_uncertain=self.effect_uncertain)
         committed=False
         try:
@@ -623,6 +628,7 @@ class Owner:
                     if not confirmed:self.emit('authority_invalidation_unconfirmed',report);return self.invalidation
         except Uncertain as exc:
             report['stopped']=str(exc)
+            if str(exc)=='ADMIN_EFFECT_UNCERTAIN':self.commit_uncertain=True
             if committed or str(exc)=='ADMIN_EFFECT_UNCERTAIN':      # persistence unknown: ONE read-only observation, never a retry of the effect
                 report['observation']=self._observe_revoked(names)
             self.emit('authority_invalidation_uncertain',report);return self.invalidation

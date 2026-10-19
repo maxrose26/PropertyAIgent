@@ -1,13 +1,12 @@
 {
- "package": "ingestion-stable-credentials-20261020",
+ "package": "ingestion-stable-pipeline-20261020",
  "status": "PREPARED_REGISTRATION_NOT_RELEASED",
  "execution_authority": "NONE",
  "entrypoint": "verification.ingestion_storage.operational_runner",
  "modes": [
-  "STABLE_CREDENTIAL_PROVISIONING",
-  "STABLE_CREDENTIAL_REVOCATION"
+  "STABLE_PIPELINE_AUTHORITY"
  ],
- "predecessors": "three consumed runs (audit PRs #142, #145, #148); preserved and bound by hash",
+ "predecessors": "three consumed runs (audit PRs #142, #145, #148), the stable provisioning audit and registration, and the accepted qualification artifact; preserved and bound by hash",
  "bound_paths": [
   ".github/workflows/stage4-discovery-offline.yml",
   ".github/workflows/stage4-hosted-memory-proof.yml",
@@ -47,9 +46,11 @@
   "tests/test_discovery_ingestion_stable_pipeline_pg.py",
   "tests/test_ingestion_deadline_arithmetic.py",
   "tests/test_ingestion_direct_route.py",
+  "tests/test_ingestion_evidence_probe_fixture.py",
   "tests/test_ingestion_hard_deadline.py",
   "tests/test_ingestion_operational_settling.py",
   "tests/test_ingestion_owner_teardown_policy.py",
+  "tests/test_ingestion_pipeline_failure_path.py",
   "tests/test_ingestion_pipeline_invalidation.py",
   "tests/test_ingestion_preflight_policy_state.py",
   "tests/test_ingestion_stable_pipeline.py",

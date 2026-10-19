@@ -417,7 +417,7 @@ class Runner:
         # A known failure may invoke the fixed safety disposition. An uncertain
         # admin mutation is never automatically replayed or compensated.
         try:
-            if self.github.mutation_uncertain:
+            if self.github.mutation_uncertain and not self.pipeline_mode:      # in pipeline mode the revocation is database-only and is attempted regardless (an uncertain GitHub publication must never leave an authority live)
                 invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
             if self.pipeline_mode:
@@ -584,7 +584,9 @@ class Runner:
         if state!='COMPLETE' or not isinstance(checkpoint,dict) or checkpoint.get('kind')!='LISTING_RECEIPT_V1' or not archive:raise Uncertain('CAPTURE_NOT_DURABLY_RETAINED')
         if archive.get('sha256')!=hashlib.sha256(blob_bytes(blob)).hexdigest() or archive.get('path')!=self.r['evidence_directory']+'/capture/source.json':raise Uncertain('CAPTURE_ARCHIVE_BINDING')
         self.verify_retained_marker(retained,checkpoint,blob_bytes(blob))      # existence is not acceptance: the marker names this execution and exactly this capture
-        self.capture=checkpoint;self.plans=batch_plans(self.capture_key,self.capture)
+        self.capture=checkpoint
+        if len(self.capture.get('records',[]))>60:raise Uncertain('CAPTURE_ROW_BOUND')      # the accepted capture ceiling, enforced by the owner itself before anything further is registered
+        self.plans=batch_plans(self.capture_key,self.capture)
         self.emit('pipeline_capture_retained',dict(capture_sha256=digest(self.capture),rows=len(self.capture.get('records',[])),batches=len(self.plans),archive_sha256=archive['sha256']))
         if self.plans:
             self.operation_phase='PIPELINE_SCREENING_AUTHORITY'
@@ -607,9 +609,13 @@ class Runner:
             done=self.owner.read_items([p['key'] for p in self.plans])
             incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')
             self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
-        else:
-            hosted_summary=dict(status='NOT_APPLICABLE_NO_BATCHES');incomplete=[]
-            self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS'))
+        else:      # an explicit zero: there is nothing to screen, but the restricted job may still be finishing - its (execution- and capture-bound) result is awaited before the readbacks
+            self.operation_phase='PIPELINE_AWAIT_SCREENING'
+            head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
+            self.evidence_head=head
+            raw,hosted=self.verify_hosted_result(blob)
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
+            self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS',hosted=hosted_summary))
         self.operation_phase='PIPELINE_INVALIDATION'
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
         invalidation=self.owner.invalidate_authorities()

@@ -23,8 +23,12 @@ echo 1610612736 > "$SCOPE/memory.max"
 echo 0 > "$SCOPE/memory.swap.max"
 echo 1 > "$SCOPE/memory.oom.group"
 [[ "$(cat "$SCOPE/memory.max")" = 1610612736 && "$(cat "$SCOPE/memory.swap.max")" = 0 && "$(cat "$SCOPE/memory.oom.group")" = 1 ]] || unavailable 'the limits were not applied'
-chown -R "$UID_NUM:$GID_NUM" "$SCOPE"
+# Delegate ONLY what the cgroup-v2 delegation contract requires (the directory, cgroup.procs, cgroup.subtree_control, cgroup.threads). The resource-control files (memory.max, memory.swap.max,
+# memory.oom.group) stay owned by root, so the unprivileged process cannot raise or remove the ceiling.
+for target in "$SCOPE" "$SCOPE/cgroup.procs" "$SCOPE/cgroup.subtree_control" "$SCOPE/cgroup.threads"; do
+  [[ -e "$target" ]] && chown "$UID_NUM:$GID_NUM" "$target"
+done
 echo $$ > "$SCOPE/cgroup.procs"     # this shell becomes the SOLE member; exec keeps the pid, so the command starts alone in the scope
 mapfile -t members < "$SCOPE/cgroup.procs"      # builtin: a forked reader would itself join the scope
 [[ ${#members[@]} -eq 1 && "${members[0]}" = "$$" ]] || unavailable 'the scope is not exclusive'
-exec setpriv --reuid="$UID_NUM" --regid="$GID_NUM" --clear-groups -- "$@"
+exec setpriv --reuid="$UID_NUM" --regid="$GID_NUM" --clear-groups --no-new-privs -- "$@"      # no_new_privs: a setuid helper such as sudo cannot be used to regain privilege and leave the scope

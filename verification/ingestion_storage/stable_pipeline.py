@@ -32,17 +32,17 @@ SCREENING_WAIT_SECONDS=480
 REPROBES=3      # each distinct head is examined at most this many times (successive polls) so one transient 404 cannot hide a published file
 EVIDENCE_ANCHOR='README.md'
 POLL_SECONDS=15
-FORBIDDEN_ENV=('DATABASE_URL','INGESTION_STORAGE_DATABASE_URL','GITHUB_TOKEN','PGPASSWORD','PGSERVICE','PGSERVICEFILE')
+FORBIDDEN_ENV=('DATABASE_URL','INGESTION_STORAGE_DATABASE_URL','GITHUB_TOKEN','PGPASSWORD','PGSERVICE','PGSERVICEFILE','GH_TOKEN','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL')      # the secrets are read from stdin; none of these may be in the environment
 SECRET_NAMES=tuple(sq.SECRET_ENV.values())
 
 
 def admitted(env):
-    """Single-use protected-environment admission. A GH_TOKEN is REQUIRED here (the evidence publisher) but no administrative credential may be present."""
+    """Single-use protected-environment admission. The restricted URLs and the evidence publisher's job token arrive on STDIN (see read_secrets), so none of them - nor any administrative credential - may be present in the environment, where a same-user child (the credential-free source worker parses untrusted pages) could read them from /proc."""
     sha=env.get('PIPELINE_REVIEWED_SHA','');head=env.get('PIPELINE_EVIDENCE_HEAD','')
     hexed=lambda v:len(v)==40 and all(ch in '0123456789abcdef' for ch in v)
     return (hexed(sha) and hexed(head) and env.get('GITHUB_SHA')==sha and env.get('GITHUB_WORKFLOW_SHA')==sha and env.get('GITHUB_REF')=='refs/heads/master'
             and env.get('GITHUB_RUN_NUMBER')=='1' and env.get('GITHUB_RUN_ATTEMPT')=='1' and env.get('GITHUB_ACTIONS')=='true' and env.get('RUNNER_ENVIRONMENT')=='github-hosted'
-            and env.get('PIPELINE_AUTHORITY')==HOSTED_AUTHORITY and bool(env.get('GH_TOKEN')) and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
+            and env.get('PIPELINE_AUTHORITY')==HOSTED_AUTHORITY and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
 
 
 def bindings_for(items):
@@ -219,13 +219,20 @@ def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memor
     return result,0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1
 
 
+def read_secrets(stream):
+    """The job token and the two restricted URLs, one per line, from the inherited stdin pipe (bounded). Nothing else is read and nothing is echoed."""
+    raw=stream.read(16384)
+    if not isinstance(raw,(bytes,bytearray)) or len(raw)>=16384:raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
+    lines=raw.decode('utf-8','strict').split('\n')
+    if len(lines)!=4 or lines[3]!='' or any(not x or x!=x.strip() or ' ' in x for x in lines[:3]):raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
+    return lines[0],{'ingestion_worker_login':lines[1],'ingestion_effect_login':lines[2]}
+
+
 def main(argv=None):
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args(argv)
     if not admitted(os.environ):raise SystemExit('PIPELINE_NOT_ADMITTED')
-    urls={role:os.environ.get(name,'') for role,name in sq.SECRET_ENV.items()}
-    if not all(urls.values()):raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
-    token=os.environ.pop('GH_TOKEN')
+    token,urls=read_secrets(sys.stdin.buffer)      # stdin only: the secrets are never in this process's environment
     journal=Journal(args.output);journal.emit('consumed',dict(authority=HOSTED_AUTHORITY,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD']))
     sq.install_cancellation()
     from .operational_memory import OperationalMemory
