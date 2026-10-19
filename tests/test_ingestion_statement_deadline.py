@@ -64,3 +64,58 @@ def test_ignored_server_timeouts_fail_the_qualification_before_any_statement(clu
 
 def test_the_client_ceiling_is_strictly_above_the_server_timeout():
     assert oc.STATEMENT_HARD_SECONDS>10             # the 10 s server statement_timeout stays the primary control whenever the transport reflects it
+
+
+
+# --- a stalled COMMIT/ROLLBACK is bounded too (these waits are not cursor statements) --------------------------------------------------------------------------
+
+import socket,threading
+
+
+class StallingProxy:
+    """TCP forwarder to the disposable server that can be told to stop forwarding in both directions (a stalled socket / ignoring pooler)."""
+    def __init__(self,port):
+        self.target=port;self.stall=threading.Event();self.server=socket.socket();self.server.bind(('127.0.0.1',0));self.server.listen(8);self.port=self.server.getsockname()[1];self.alive=True
+        threading.Thread(target=self.accept,daemon=True).start()
+    def accept(self):
+        while self.alive:
+            try:client,_=self.server.accept()
+            except OSError:return
+            upstream=socket.create_connection(('127.0.0.1',self.target))
+            for a,b in ((client,upstream),(upstream,client)):threading.Thread(target=self.pump,args=(a,b),daemon=True).start()
+    def pump(self,src,dst):
+        try:
+            while self.alive:
+                data=src.recv(65536)
+                if not data:break
+                while self.stall.is_set() and self.alive:time.sleep(.05)       # hold the bytes: nothing reaches the other side
+                dst.sendall(data)
+        except OSError:pass
+        finally:
+            for x in (src,dst):
+                try:x.close()
+                except OSError:pass
+    def close(self):
+        self.alive=False
+        try:self.server.close()
+        except OSError:pass
+
+
+def test_a_stalled_commit_is_bounded_by_the_client_deadline(cluster,roles,monkeypatch):
+    monkeypatch.setattr(oc,'runtime_principal',lambda url,ssl:(make_url(url),make_url(url).username))
+    monkeypatch.setattr(oc,'STATEMENT_HARD_SECONDS',1)
+    proxy=StallingProxy(cluster.port);url=f'postgresql+psycopg://ingestion_effect_login:synthetic@127.0.0.1:{proxy.port}/postgres'
+    budget=DatabaseBudget();engine=budget.engine(url)                          # the effect login runs in a normal (non-autocommit) transaction
+    try:
+        c=engine.connect();c.execute(text('SELECT 1'))
+        proxy.stall.set()
+        started=time.monotonic()
+        with pytest.raises(Exception) as caught:c.commit()
+        elapsed=time.monotonic()-started
+        assert 'STATEMENT_HARD_DEADLINE' in repr(caught.value) and 0.9<=elapsed<4.0 and len(budget.hard_deadline_events)>=1
+        proxy.stall.clear()
+    finally:
+        try:c.close()
+        except Exception:pass
+        account=budget.close([]);proxy.close()
+    assert account['connections_closed'] is True and account['cleanup']=='CLOSED'

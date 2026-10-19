@@ -113,7 +113,7 @@ class DatabaseBudget:
         budget=self
         class Cursor(psycopg.Cursor):
             def execute(self,query,params=None,**kwargs):
-                budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=budget.guarded(self.connection,lambda:super(Cursor,self).execute(query,params,**kwargs))
+                budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=super().execute(query,params,**kwargs)
                 if self.pgresult is not None:
                     budget.returned_bytes+=sum(len(self.pgresult.get_value(r,c) or b'') for r in range(self.pgresult.ntuples) for c in range(self.pgresult.nfields))
                     if budget.returned_bytes>budget.returned_cap:raise Denied('DATABASE_RETURNED_VALUE_BOUND')
@@ -124,7 +124,11 @@ class DatabaseBudget:
                 raw=command if isinstance(command,bytes) else str(command).encode()
                 rollback=raw.strip().upper().startswith(b'ROLLBACK')
                 budget.tick('driver_internal',cleanup=rollback)
-                return budget.guarded(self,lambda:super(Connection,self)._exec_command(command,*a,**kw))
+                return super()._exec_command(command,*a,**kw)
+            def wait(self,gen,interval=0.1,timeout=None):
+                # EVERY blocking driver wait of this connection (statements, BEGIN, COMMIT, ROLLBACK, pool reset) runs under the client hard deadline. _exec_command is a generator,
+                # so wrapping its construction would bound nothing; the wait is where the call actually blocks. Connection establishment is bounded by connect_timeout instead.
+                return budget.guarded(self,lambda:super(Connection,self).wait(gen,interval,timeout))
         def creator():
             budget.check()
             if budget.attempts>=budget.connection_cap:raise Denied('CONNECTION_BOUND')
