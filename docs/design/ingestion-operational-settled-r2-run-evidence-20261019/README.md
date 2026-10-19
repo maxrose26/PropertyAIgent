@@ -26,10 +26,10 @@ Run: master `9e0764205e9b553c24c509a7f1ce34897e8c9807` (tree `a208034e59bb56f29f
 | Run | Role options | First worker connection after fresh password | Outcome |
 |---|---|---|---|
 | 18 Oct matrix, entry 1 | none | interval recorded in that audit (not re-derived here) | rejected |
-| 18 Oct matrix, entry 2 (later in the same run) | startup options | later than entry 1 | connected (identity statement ran; merged check recorded non-reflection) |
+| 18 Oct matrix, entry 2 (later in the same run) | startup options | later than entry 1 | connected and ran the identity statement; the merged check recorded `IDENTITY_UNEXPECTED` (it did not independently establish non-reflection of the timeouts, nor that identity and flags passed) |
 | 19 Oct run 1 | startup options + role-level timeouts | no delay; interval not recorded (recording was added afterwards) | rejected |
 | 19 Oct R2 | startup options + role-level timeouts | **30.1 s after activation** | **rejected** |
-A 30-second delay and role-level timeouts did not change the outcome for the worker's first connection. The data does not identify the cause (credential propagation beyond 30 s, per-user pooler state, or something else) and does not contradict a provider-side cause.
+*Correction (2026-10-19): an earlier version of this row described the matrix connection as showing timeout non-reflection; the merged check did not establish that.* A 30-second delay and role-level timeouts did not change the outcome for the worker's first connection. The data does not identify the cause (credential propagation beyond 30 s, per-user pooler state, or something else) and does not contradict a provider-side cause.
 
 ## Recommended alternative
 Stop live experimentation and **escalate to the provider** (Supabase, existing ticket SU-511198, whose follow-up was never sent because no channel was available) with this sanitised evidence: the pooler tenant and routing form, the exact sequence (role created NOLOGIN, fresh SCRAM verifier set, LOGIN activated, first connection through the session-mode pooler rejected with no SQLSTATE), the three rejections including the 30-second one, and the one earlier success. The question for the provider is whether new-role credentials need a longer or different activation path on the pooler (for example an authentication-cache or tenant-sync interval), and what the supported way is to provision a pooler-reachable login. No further delay-based attempt is prepared.
