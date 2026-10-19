@@ -64,13 +64,13 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 from verification.ingestion_storage.operational_memory import OperationalMemory
                 native=OperationalMemory()
             if fault.startswith('settled_'):
-                from verification.ingestion_storage.operational_runner import SETTLED_MODE
-                registration['mode']=SETTLED_MODE
+                from verification.ingestion_storage.operational_runner import SETTLED_R2_MODE
+                registration['mode']=SETTLED_R2_MODE
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
             contacts=[]
             if fault.startswith('settled_'):
                 from verification.ingestion_storage.operational_runner import SETTLE_SECONDS
-                assert runner.settle_seconds==SETTLE_SECONDS==30 and runner.authority.endswith('SETTLED_ONCE_20261019')      # the production interval; a short one is substituted below only to keep CI short
+                assert runner.settle_seconds==SETTLE_SECONDS==30 and runner.authority.endswith('SETTLED_R2_ONCE_20261019')      # the production interval; a short one is substituted below only to keep CI short
                 runner.settle_seconds=0.6
                 original_settle=runner.settle;settled_at=[]
                 def recording_settle():

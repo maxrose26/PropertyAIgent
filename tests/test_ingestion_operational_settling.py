@@ -121,3 +121,13 @@ def test_the_owner_stop_file_ends_the_interval_at_the_next_step(tmp_path,monkeyp
     runner.settle_sleep=sleep
     with pytest.raises(Denied):runner.settle()
     assert len(clock.sleeps)==2 and 'settling_completed' not in [e['event'] for e in events(journal)]
+
+
+def test_the_second_settled_generation_is_distinct_and_binds_both_consumed_runs(tmp_path):
+    sources=''.join(p.read_text() for p in Path('verification/ingestion_storage').glob('*.py'))
+    assert sum(1 for a in re.findall(r"AUTHORISE_[A-Z0-9_]+",sources) if a==orr.SETTLED_R2_AUTHORITY)==1
+    assert len({orr.AUTHORITY,orr.SETTLED_AUTHORITY,orr.SETTLED_R2_AUTHORITY})==3 and len({orr.SETTLED_STATE,orr.SETTLED_R2_STATE,orr.SETTLED_PREDECESSOR['state_directory']})==3
+    assert orr.SETTLED_R2_PREDECESSOR['run_1']==orr.SETTLED_PREDECESSOR and orr.SETTLED_R2_PREDECESSOR['run_2']['state_directory']==orr.SETTLED_STATE
+    assert orr.SETTLED_MODES[orr.SETTLED_R2_MODE]==(orr.SETTLED_R2_AUTHORITY,orr.SETTLED_R2_STATE,orr.SETTLED_R2_PREDECESSOR)
+    r2,_=make(tmp_path,mode=orr.SETTLED_R2_MODE)
+    assert r2.settle_seconds==30 and r2.authority==orr.SETTLED_R2_AUTHORITY
