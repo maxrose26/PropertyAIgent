@@ -79,8 +79,10 @@ PIPELINE_BINDING=dict(
 # maximum 12 batches, ledger read 5), 73 / 7 through the end-of-run invalidation (12) and final readback (9), and at most 71 when a failure at the very end of the normal path is followed by
 # the reserved invalidation (12) and diagnostics (7). The allowances keep a reserve so that ENDING an authority and diagnosing can never be refused for want of capacity. The earlier
 # placeholder (48 / 60 / 72) was exhausted by the normal path (52 > 48), which is how the invalidation was left undone in the first rehearsal.
-PIPELINE_OWNER_LIMITS=dict(connections=(8,9),commands=(56,80,96))
-PIPELINE_GITHUB_BOUND=140
+PIPELINE_OWNER_LIMITS=dict(connections=(8,10),commands=(56,80,96))
+# GitHub requests (owner): polling at poll_seconds for the three bounded waits (2,400 + 300 + 600 s at 30 s = at most 110 polls) plus about 8 requests per publication (marker, final evidence), the user check and
+# the failure-path name/ref reads. Measured arithmetic is asserted in tests/test_ingestion_stable_pipeline.py; the bound keeps a reserve above it.
+PIPELINE_GITHUB_BOUND=160
 # Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
 # admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
 PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
@@ -563,7 +565,7 @@ class Runner:
         components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
         if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
         finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
-        result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
+        result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',
                     source_observations_attempted=1,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)

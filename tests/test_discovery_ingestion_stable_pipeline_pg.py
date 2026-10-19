@@ -88,7 +88,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 return boot.execute("SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)",([WORKER,EFFECT],)).fetchone()[0]
             standing_before=(roles_state(),memberships(),role_configs());valid_until=min(r[3] for r in standing_before[0]).astimezone(timezone.utc).isoformat()
             ctl_before=control();assert ctl_before==ctl and digest(ctl_before)==baseline
-            monkeypatch.setitem(orr.PIPELINE_BINDING,'valid_until',valid_until);monkeypatch.setitem(orr.PIPELINE_BINDING,'poll_seconds',0.1)
+            monkeypatch.setitem(orr.PIPELINE_BINDING,'valid_until',valid_until);monkeypatch.setitem(orr.PIPELINE_BINDING,'poll_seconds',1.0)      # polling is bounded by the request allowance; a 0.1 s interval would exhaust it long before the hosted job finishes
             monkeypatch.setitem(orr.PIPELINE_BINDING,'capture_wait_seconds',3 if fault=='owner_wait_expires' else 120);monkeypatch.setitem(orr.PIPELINE_BINDING,'screening_wait_seconds',120)
 
             # ---------------------------------------------------------------- fault set-up that must be visible to the FIXED READ-ONLY owner phase
@@ -111,7 +111,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             github_o=GitHub(owner_journal.emit,lambda:holder2['runner'].check(),runner=cli,bound=orr.PIPELINE_GITHUB_BOUND)
             orunner=Runner(dict(registration,mode=orr.PIPELINE_MODE),owner_journal,connector,source_reader=lambda row:(_ for _ in ()).throw(AssertionError('owner never reads a source')),github=github_o,url_factory=uri,identity=role,memory=None);holder2['runner']=orunner
             orunner.owner.reuse_installed=True;orunner.owner.baseline_control_sha256=baseline
-            orunner.pipeline_sleep=lambda s:time.sleep(min(s,0.1))
+            orunner.pipeline_sleep=lambda s:time.sleep(min(s,1.0))
             ca,_=verified_trust()
             hosted_dir=tmp_path/'hosted-out';spawned=[]
             plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],output=str(hosted_dir))

@@ -220,7 +220,7 @@ def test_the_measured_lifecycle_fits_the_normal_teardown_and_failure_allowances_
     print('MEASURED_OWNER_LIFECYCLE',json.dumps(dict(per_phase=c,readback=READBACK_STATEMENTS,normal=normal,through_end=through_end,worst_failure=worst_failure,connections=connections)))
     assert normal<=caps['commands'][0] and through_end<=caps['commands'][1] and worst_failure<=caps['commands'][2]      # every path fits its own allowance
     assert caps['commands'][0]-normal>=2 and caps['commands'][1]-through_end>=4 and caps['commands'][2]-worst_failure>=8      # with a reserve for invalidation and diagnostics, not an exact fit
-    assert connections<=caps['connections'][0] and connections+2<=caps['connections'][1]
+    assert connections<=caps['connections'][0] and connections+3<=caps['connections'][1]      # the rehearsal measured 9 on a failure after the normal path (7 + the reserved invalidation + the diagnostics): the allowance keeps a reserve above it
     assert caps['commands'][0]<caps['commands'][1]<caps['commands'][2]
 
 

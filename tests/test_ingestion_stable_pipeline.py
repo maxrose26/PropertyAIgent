@@ -254,3 +254,11 @@ def test_the_owner_wait_refuses_a_file_whose_identity_does_not_match_its_content
     with pytest.raises(Uncertain,match='HOSTED_PUBLICATION_FILE_MISSING'):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
     github.call=lambda method,path,body=None:({'object':{'sha':'2'*40}} if '/git/ref/' in path else {'type':'file'})      # a response without content is never accepted merely because it says `file`
     with pytest.raises(Uncertain):owner_stub(github,None).await_publication('1'*40,'capture/source.json',5)
+
+
+def test_the_owner_github_request_bound_covers_the_production_polling_with_a_reserve():
+    b=orr.PIPELINE_BINDING
+    polls=(b['capture_wait_seconds']+b['retention_wait_seconds']+b['screening_wait_seconds'])/b['poll_seconds']+3      # one extra poll per wait at the boundary
+    publications=2*8                                                                                                  # the screening marker and the owner evidence, about eight requests each
+    other=1+3                                                                                                         # the account check and the failure-path reads
+    assert polls+publications+other+20<=orr.PIPELINE_GITHUB_BOUND      # reserve of at least 20 requests
