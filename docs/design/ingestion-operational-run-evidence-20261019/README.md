@@ -21,4 +21,4 @@ The first runtime connection (worker, verify-full, pinned pooler address, startu
 
 ## What is and is not established
 - Established: the lifecycle, role-level configuration, restoration, teardown and closure all behave as designed under a real failure.
-- Not established: the cause of the rejection. This is the second live rejection of the worker's first connection (the 18 October matrix entry 1 without options, now with options and role settings). Time since password commit was seconds in both cases; entry 2 of the matrix connected later. The data is consistent with provider-side propagation delay of new credentials but does not prove it.
+- Not established: the cause of the rejection. This is the second live rejection of the worker's first connection (the 18 October matrix entry 1 without options, now with options and role settings). In both cases it was the first connection after a fresh password; in the matrix a later entry connected. That pattern is consistent with provider-side propagation delay of new credentials but does not prove it (elapsed times are not compared here).
