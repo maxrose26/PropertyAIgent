@@ -502,19 +502,46 @@ class Runner:
         for relative in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
             if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
 
-    def await_file(self,relative,seconds):
-        """Bounded wait until `relative` EXISTS in the evidence directory at the CURRENT head of the evidence branch. Presence-based, never change-based: the restricted job publishes several commits within
-        seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would miss the one it is waiting for). Each distinct head is probed
-        once; the first probe is of the head as it stands. Timeout is a stop (no retry, no replay)."""
+    def pipeline_execution(self):
+        """The identity of THIS execution that every marker and result must carry: the reviewed revision, the manifest, the capture root it concerns, the evidence head it was registered against, and its authority.
+        A file that merely exists is never accepted; its content must name this execution."""
+        return dict(revision=self.r['revision'],manifest_sha256=self.r['manifest_sha256'],capture_key=self.capture_key,initial_evidence_head=self.r['evidence_head'],authority=self.authority)
+
+    def verify_retained_marker(self,blob,checkpoint,source_raw):
+        """The restricted job's retained marker must name this execution and exactly this capture: the checkpoint the DATABASE holds (digest and kind) and the archive bytes on the evidence branch."""
+        try:marker=json.loads(blob_bytes(blob))
+        except ValueError:raise Uncertain('HOSTED_MARKER_UNREADABLE') from None
+        archive=checkpoint['durable_archive']
+        if (not isinstance(marker,dict) or marker.get('execution')!=self.pipeline_execution() or marker.get('capture_sha256')!=digest(checkpoint) or marker.get('kind')!=checkpoint.get('kind')
+            or marker.get('archive_sha256')!=hashlib.sha256(source_raw).hexdigest() or marker.get('archive_sha256')!=archive.get('sha256')):raise Uncertain('HOSTED_MARKER_BINDING')
+        return marker
+
+    def verify_hosted_result(self,blob,*,require_capture=True):
+        """The restricted job's result must name this execution and, once a capture exists, exactly this capture (after the screening authority was registered the capture digest is required)."""
+        raw=blob_bytes(blob)
+        try:result=json.loads(raw)
+        except ValueError:raise Uncertain('HOSTED_RESULT_UNREADABLE') from None
+        if not isinstance(result,dict) or result.get('execution')!=self.pipeline_execution() or (require_capture and result.get('capture_sha256')!=digest(self.capture)):raise Uncertain('HOSTED_RESULT_BINDING')
+        return raw,result
+
+    def await_any(self,relatives,seconds):
+        """Bounded wait until one of `relatives` EXISTS in the evidence directory at the CURRENT head of the evidence branch (earlier entries take priority when several exist). Presence-based, never
+        change-based: the restricted job publishes several commits within seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would
+        miss the one it is waiting for). Each distinct head is probed once; the first probe is of the head as it stands. Timeout is a stop (no retry, no replay). Returns (head, relative, blob)."""
         deadline=time.monotonic()+seconds;probed=None
         while True:
             self.check();self.stop_requested()
             head=self.evidence_head_now()
             if head!=probed:
-                probed=head;blob=self.evidence_file(head,relative)
-                if blob is not None:return head,blob
+                probed=head
+                for relative in relatives:
+                    blob=self.evidence_file(head,relative)
+                    if blob is not None:return head,relative,blob
             if time.monotonic()>=deadline:raise Denied('HOSTED_PUBLICATION_WAIT_EXPIRED')
             getattr(self,'pipeline_sleep',time.sleep)(PIPELINE_BINDING['poll_seconds'])
+
+    def await_file(self,relative,seconds):
+        head,_,blob=self.await_any((relative,),seconds);return head,blob
 
     def pipeline(self):
         """Owner side of the stable-credential pipeline (see specifications/032-stage4-stable-credential-pipeline.md). Never touches a credential, membership, role setting or secret."""
@@ -536,8 +563,12 @@ class Runner:
         self.emit('pipeline_capture_authority_registered',dict(capture_key=self.capture_key,grant_expires_at=self.owner.grant_expiry.isoformat(),restricted_job='WAITING_FOR_DISPATCH_OR_RUNNING'))
         self.operation_phase='PIPELINE_AWAIT_DURABLE_RETENTION'
         # The restricted job archives the raw source BEFORE the ledger checkpoint is durable (accepted order) and then publishes the retained marker: that marker (which implies the archive) is what is awaited.
-        head,_=self.await_file('capture-retained/retained.json',pb['capture_wait_seconds'])
+        head,relative,retained=self.await_any(('capture-retained/retained.json','completed/final-result.json'),pb['capture_wait_seconds'])
         self.evidence_head=head
+        if relative!='capture-retained/retained.json':      # the restricted job ended WITHOUT retaining a capture: its (execution-bound) result is read, and the ceremony ends now rather than at the end of the retention window
+            _,ended=self.verify_hosted_result(retained,require_capture=False)
+            self.emit('pipeline_hosted_ended_before_retention',dict(status=ended.get('status'),phase=ended.get('operation_phase'),failure=ended.get('failure')))
+            raise Denied('HOSTED_ENDED_BEFORE_RETENTION')
         blob=self.evidence_file(head,'capture/source.json')
         if blob is None:raise Uncertain('HOSTED_ARCHIVE_MISSING')
         rows=self.owner.read_items([self.capture_key])
@@ -545,6 +576,7 @@ class Runner:
         archive=(checkpoint or {}).get('durable_archive') if isinstance(checkpoint,dict) else None
         if state!='COMPLETE' or not isinstance(checkpoint,dict) or checkpoint.get('kind')!='LISTING_RECEIPT_V1' or not archive:raise Uncertain('CAPTURE_NOT_DURABLY_RETAINED')
         if archive.get('sha256')!=hashlib.sha256(blob_bytes(blob)).hexdigest() or archive.get('path')!=self.r['evidence_directory']+'/capture/source.json':raise Uncertain('CAPTURE_ARCHIVE_BINDING')
+        self.verify_retained_marker(retained,checkpoint,blob_bytes(blob))      # existence is not acceptance: the marker names this execution and exactly this capture
         self.capture=checkpoint;self.plans=batch_plans(self.capture_key,self.capture)
         self.emit('pipeline_capture_retained',dict(capture_sha256=digest(self.capture),rows=len(self.capture.get('records',[])),batches=len(self.plans),archive_sha256=archive['sha256']))
         if self.plans:
@@ -558,14 +590,12 @@ class Runner:
             self.batch_bindings=self.owner.register(batches,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[root_binding,*prepared])
             self.emit('pipeline_screening_authority_registered',dict(batches=len(self.plans),children_prepared=len(prepared)))
             # The restricted job waits on the evidence branch (no database connection) for this marker. It is NOT an authority - the authority is the database grant registered above.
-            marker=dict(authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
+            marker=dict(execution=self.pipeline_execution(),authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
             self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
             self.operation_phase='PIPELINE_AWAIT_SCREENING'
             head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
-            raw=blob_bytes(blob)
-            try:hosted=json.loads(raw)
-            except ValueError:hosted={}
+            raw,hosted=self.verify_hosted_result(blob)
             hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))
             done=self.owner.read_items([p['key'] for p in self.plans])
             incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')

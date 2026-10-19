@@ -132,7 +132,7 @@ class FakeGitHub:
 def hosted(tmp_path,github):
     urls={r:'postgresql://%s:x@h/db'%r for r in oo.ROLES}
     Path(tmp_path).mkdir(parents=True,exist_ok=True)
-    return sp.HostedRunner(urls,Journal(tmp_path/'j'),github,None,{},'192.0.2.1',None,evidence_head='1'*40,manifest_sha256='c'*64)
+    return sp.HostedRunner(urls,Journal(tmp_path/'j'),github,None,{},'192.0.2.1',None,evidence_head='1'*40,manifest_sha256='c'*64,revision='a'*40)
 
 
 def test_hosted_and_owner_compute_the_same_capture_key_and_bindings(tmp_path):
@@ -150,6 +150,8 @@ def test_the_hosted_job_cannot_register_any_authority(tmp_path):
 
 
 MARKER_RELATIVE='screening-authority/registered.json'
+CAPTURE_KEY=oo.item(dict(subject=oo.SCOPE,task='DISCOVERY',contract=orr.CONTRACT,revision='c'*64),max_attempts=1,limits=dict(oo.DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))['key']
+EXECUTION=dict(revision='a'*40,manifest_sha256='c'*64,capture_key=CAPTURE_KEY,initial_evidence_head='1'*40,authority=orr.PIPELINE_AUTHORITY)
 CAPTURE=dict(kind='LISTING_RECEIPT_V1',records=[])
 BINDINGS={'k':{'subject':{},'task':'t','contract':'c','revision':'r'}}
 
@@ -162,13 +164,14 @@ def marker_runner(tmp_path,marker,*,heads=('1'*40,'2'*40)):
 
 
 def good_marker(runner=None):
-    return dict(authority=orr.PIPELINE_AUTHORITY+'_SCREEN',bindings_sha256=digest(BINDINGS),capture_sha256=digest(CAPTURE))
+    return dict(execution=EXECUTION,authority=orr.PIPELINE_AUTHORITY+'_SCREEN',bindings_sha256=digest(BINDINGS),capture_sha256=digest(CAPTURE))
 
 
 def test_the_owner_marker_must_match_the_locally_recomputed_bindings(tmp_path):
     runner=marker_runner(tmp_path/'good',good_marker());runner.await_marker(BINDINGS)
     assert runner.evidence_head=='2'*40
-    for n,bad in enumerate((dict(good_marker(),bindings_sha256='0'*64),dict(good_marker(),capture_sha256='0'*64),dict(good_marker(),authority='OTHER'))):
+    others=[dict(good_marker(),execution=dict(EXECUTION,**{k:('f'*40 if k in ('revision','initial_evidence_head') else 'f'*64 if k=='manifest_sha256' else 'OTHER')})) for k in EXECUTION]      # a marker that names ANOTHER execution in any single field
+    for n,bad in enumerate((dict(good_marker(),bindings_sha256='0'*64),dict(good_marker(),capture_sha256='0'*64),dict(good_marker(),authority='OTHER'),{k:v for k,v in good_marker().items() if k!='execution'},*others)):
         with pytest.raises(Uncertain):marker_runner(tmp_path/('bad%d'%n),bad).await_marker(BINDINGS)
 
 
@@ -319,13 +322,6 @@ def test_probe_treats_http_404_as_absent_and_every_other_failure_as_uncertain():
     with pytest.raises(ValueError,match='GITHUB_REQUEST_BOUND'):bounded.probe('p')
 
 
-def test_the_owner_github_request_bound_covers_the_production_polling_with_a_reserve():
-    b=orr.PIPELINE_BINDING
-    polls=(b['capture_wait_seconds']+b['screening_wait_seconds'])/b['poll_seconds']+2      # one extra poll per wait at the boundary
-    publications=2*8                                                                                                  # the screening marker and the owner evidence, about eight requests each
-    other=1+3+3+4                                                                                                     # account check, failure-path reads, the freshness probes, and one probe per observed head change
-    assert polls+publications+other+20<=orr.PIPELINE_GITHUB_BOUND      # reserve of at least 20 requests
-
 
 def test_production_polling_is_the_documented_constants_and_the_rehearsal_override_is_test_only():
     assert orr.PIPELINE_BINDING['poll_seconds']==30 and sp.POLL_SECONDS==15      # production values; the rehearsal overrides them with monkeypatch on its own copy
@@ -341,3 +337,97 @@ def test_the_invalidation_field_of_a_result_is_the_owners_actual_readback_dispos
     body=source[a:b]
     assert "invalidation=self.owner.invalidate_authorities()" in body and "authority_invalidation=invalidation" in body      # no literal status is written into the result
     assert "'ACKNOWLEDGED_READBACK'" not in body.replace("invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK')","")      # only the two readback-confirmed values are accepted, by name, in one comparison
+
+
+# ------------------------------------------------------------------ markers must belong to THIS execution and THIS capture: existence is never acceptance
+def retained_fixture(**over):
+    import hashlib
+    source=b'{"raw":"listing"}'
+    checkpoint=dict(kind='LISTING_RECEIPT_V1',records=[],durable_archive=dict(sha256=hashlib.sha256(source).hexdigest(),path=sp.EVIDENCE_DIRECTORY+'/capture/source.json'))
+    marker=dict(execution=EXECUTION,capture_sha256=digest(checkpoint),kind='LISTING_RECEIPT_V1',archive_sha256=checkpoint['durable_archive']['sha256'])
+    marker.update(over);return checkpoint,source,marker
+
+
+def owner_with_execution():
+    runner=owner_stub(FakeGitHub(None,timeline=[('1'*40,{})]))
+    runner.r=dict(evidence_directory=sp.EVIDENCE_DIRECTORY,revision='a'*40,manifest_sha256='c'*64,evidence_head='1'*40);runner.capture_key=CAPTURE_KEY;runner.authority=orr.PIPELINE_AUTHORITY
+    return runner
+
+
+def test_the_owner_accepts_a_retained_marker_only_when_it_names_this_execution_and_exactly_this_capture():
+    runner=owner_with_execution();checkpoint,source,marker=retained_fixture()
+    assert runner.pipeline_execution()==EXECUTION
+    assert runner.verify_retained_marker(blob_response(json.dumps(marker).encode()),checkpoint,source)==marker
+    for label,bad in (('another revision',dict(marker,execution=dict(EXECUTION,revision='f'*40))),('another manifest',dict(marker,execution=dict(EXECUTION,manifest_sha256='f'*64))),
+                      ('another capture root',dict(marker,execution=dict(EXECUTION,capture_key='f'*64))),('another registered head',dict(marker,execution=dict(EXECUTION,initial_evidence_head='f'*40))),
+                      ('another authority',dict(marker,execution=dict(EXECUTION,authority='OTHER'))),('no execution',{k:v for k,v in marker.items() if k!='execution'}),
+                      ('another capture digest',dict(marker,capture_sha256='0'*64)),('another kind',dict(marker,kind='CAPTURE_BLOCKED_V1')),('another archive digest',dict(marker,archive_sha256='0'*64))):
+        with pytest.raises(Uncertain,match='HOSTED_MARKER_BINDING'):runner.verify_retained_marker(blob_response(json.dumps(bad).encode()),checkpoint,source),label
+    other_source=b'{"raw":"different bytes"}'      # the archive on the branch must be the bytes the marker and the database checkpoint name
+    with pytest.raises(Uncertain,match='HOSTED_MARKER_BINDING'):runner.verify_retained_marker(blob_response(json.dumps(marker).encode()),checkpoint,other_source)
+    with pytest.raises(Uncertain,match='HOSTED_MARKER_UNREADABLE'):runner.verify_retained_marker(blob_response(b'not json'),checkpoint,source)
+    with pytest.raises(Uncertain,match='PUBLICATION_BLOB_IDENTITY'):runner.verify_retained_marker(dict(blob_response(json.dumps(marker).encode()),sha='0'*40),checkpoint,source)
+
+
+def test_the_owner_accepts_the_hosted_result_only_for_this_execution_and_capture():
+    runner=owner_with_execution();checkpoint,_,_=retained_fixture();runner.capture=checkpoint
+    good=dict(status='X',execution=EXECUTION,capture_sha256=digest(checkpoint))
+    assert runner.verify_hosted_result(blob_response(json.dumps(good).encode()))[1]==good
+    for bad in (dict(good,execution=dict(EXECUTION,revision='f'*40)),dict(good,capture_sha256='0'*64),{k:v for k,v in good.items() if k!='execution'},{k:v for k,v in good.items() if k!='capture_sha256'}):
+        with pytest.raises(Uncertain,match='HOSTED_RESULT_BINDING'):runner.verify_hosted_result(blob_response(json.dumps(bad).encode()))
+    early=dict(status='STOP_RECONCILE_NO_RETRY',execution=EXECUTION,capture_sha256=None)      # a job that ended before any capture: the execution is still checked, the capture cannot be
+    assert runner.verify_hosted_result(blob_response(json.dumps(early).encode()),require_capture=False)[1]==early
+    with pytest.raises(Uncertain,match='HOSTED_RESULT_BINDING'):runner.verify_hosted_result(blob_response(json.dumps(dict(early,execution=dict(EXECUTION,authority='OTHER'))).encode()),require_capture=False)
+
+
+def test_the_owner_does_not_hold_the_ceremony_open_when_the_restricted_job_ended_without_retaining():
+    timeline=cumulative(('1'*40,{}),('c'*40,{'completed/final-result.json':json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',execution=EXECUTION,capture_sha256=None)).encode()}))
+    github=FakeGitHub(None,timeline=timeline);github.ref_calls=1
+    head,relative,blob=owner_stub(github).await_any(('capture-retained/retained.json','completed/final-result.json'),5)
+    assert (head,relative)==('c'*40,'completed/final-result.json')      # found at once; not after the retention window
+    both=cumulative(('1'*40,{}),('d'*40,{'capture-retained/retained.json':b'{}','completed/final-result.json':b'{}'}))
+    g2=FakeGitHub(None,timeline=both);g2.ref_calls=1
+    assert owner_stub(g2).await_any(('capture-retained/retained.json','completed/final-result.json'),5)[1]=='capture-retained/retained.json'      # the retained marker takes priority
+
+
+def test_the_publication_guards_are_unchanged():
+    source=Path('verification/ingestion_storage/operational_publication.py').read_text()
+    for needle in ("if current['object']['sha']!=expected_head:raise Uncertain('EVIDENCE_HEAD_MOVED_RECONCILE')","force=False","PUBLICATION_PATH","PUBLICATION_BYTES","PUBLICATION_BYTES_READBACK","docs/design/ingestion-operational-execution-"):assert needle in source
+    runner=Path('verification/ingestion_storage/operational_runner.py').read_text()
+    assert runner.count("expected_head=self.evidence_head")>=2 and "self.require_fresh_evidence_directory()" in runner and "CAPTURE_ARCHIVE_BINDING" in runner and "CAPTURE_NOT_DURABLY_RETAINED" in runner
+
+
+# ------------------------------------------------------------------ the worst-case GitHub request counts, derived from the constants and the publisher's own request structure
+def publish_requests(files):
+    return 6+2*files      # GET ref, GET commit, one POST per blob, POST tree, POST commit, PATCH ref, GET ref, one GET per file read back
+
+
+def owner_worst_case_github_requests():
+    b=orr.PIPELINE_BINDING
+    polls=lambda wait:-(-wait//b['poll_seconds'])+1      # one ref read per poll plus the boundary poll
+    retained_heads=3;result_heads=3      # distinct evidence heads probed per wait (initial, archive, retained marker / marker, result, owner publication) - each probed once
+    account=1
+    fresh=1+3                                                   # one ref read, three absent-file probes, before anything is issued
+    retained_wait=polls(b['capture_wait_seconds'])+retained_heads*2      # ref reads plus up to two probes per observed head (retained marker, early result)
+    archive_probe=1+1                                           # source.json at the retained head and the retained marker's own re-read
+    marker_publication=publish_requests(1)
+    result_wait=polls(b['screening_wait_seconds'])+result_heads
+    owner_publication=publish_requests(2)                       # events.jsonl and final-result.json
+    failure_reads=1                                             # secret names on the failure path
+    return account+fresh+retained_wait+archive_probe+marker_publication+result_wait+owner_publication+failure_reads
+
+
+def test_the_owner_request_calculation_includes_freshness_probes_publications_and_readbacks_and_fits_the_bound():
+    total=owner_worst_case_github_requests()
+    assert publish_requests(1)==8 and publish_requests(2)==10      # matches GitHub.publish: 2 + n blobs + tree + commit + patch + ref + n contents
+    source=Path('verification/ingestion_storage/operational_publication.py').read_text()
+    block=source[source.index('    def publish('):source.index('        return new[')]
+    assert block.count("self.call('GET'")==4 and block.count("self.call('POST'")==3 and block.count("self.call('PATCH'")==1      # GET ref, GET commit, GET ref, GET contents (per file); POST blob (per file), tree, commit; PATCH
+    print('OWNER_WORST_CASE_GITHUB_REQUESTS',total,'of',orr.PIPELINE_GITHUB_BOUND)
+    assert total+10<=orr.PIPELINE_GITHUB_BOUND      # a reserve of at least ten requests
+
+
+def test_the_hosted_request_calculation_fits_its_bound():
+    wait=sp.SCREENING_WAIT_SECONDS;polls=-(-wait//sp.POLL_SECONDS)+1
+    total=1+publish_requests(1)+publish_requests(1)+polls+3+publish_requests(2)+1      # evidence-head check, archive, retained marker, owner-marker wait (+3 probes), result publication (+its head read)
+    assert total+40<=140

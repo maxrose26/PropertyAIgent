@@ -114,7 +114,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             orunner.pipeline_sleep=lambda s:time.sleep(min(s,1.0))
             ca,_=verified_trust()
             hosted_dir=tmp_path/'hosted-out';spawned=[]
-            plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],output=str(hosted_dir))
+            plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],revision=registration['revision'],output=str(hosted_dir))
             plan_path=tmp_path/'plan.json';plan_path.write_text(json.dumps(plan))
             def start_hosted():
                 env=dict(os.environ,INGESTION_ACCEPTANCE_DISPOSABLE='PG17_ONLY',REHEARSAL_URLS=json.dumps(urls),PYTHONPATH=str(Path.cwd()),PYTHONDONTWRITEBYTECODE='1')

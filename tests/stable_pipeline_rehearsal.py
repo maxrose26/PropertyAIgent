@@ -78,7 +78,7 @@ if _original_step is not None:
             _steps.append((op,type(exc).__name__));Path(plan['output']).joinpath('rehearsal-steps').write_text(json.dumps(_steps));raise
     _sql_ledger.SQLLedger._step=_recording_step
 result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=None,
-                          evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'])
+                          evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'])
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
 Path(plan['output']).joinpath('rehearsal-done').write_text(str(code))
 raise SystemExit(code)

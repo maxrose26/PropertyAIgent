@@ -66,7 +66,7 @@ class HostedOwner:
 
 class HostedRunner(Runner):
     """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
-    def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256):
+    def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision):
         self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
         self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.ssl=ssl;self.memory=memory;self.hostaddr=hostaddr
         self.operation_phase='INITIALISATION';self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0
@@ -79,6 +79,8 @@ class HostedRunner(Runner):
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
+        self.initial_evidence_head=evidence_head
+        self.execution=dict(revision=revision,manifest_sha256=manifest_sha256,capture_key=self.capture_key,initial_evidence_head=evidence_head,authority=PIPELINE_AUTHORITY)      # identical to the owner's pipeline_execution()
         self.pipeline_sleep=time.sleep;self.authority_check=None;self.retained_published=False
 
     def check(self):
@@ -97,7 +99,8 @@ class HostedRunner(Runner):
         """Idempotent. The raw source is archived on the evidence branch BEFORE the ledger checkpoint is made durable (accepted order). This second, non-authoritative marker says the checkpoint is
         complete; the owner then verifies it in the database before registering anything."""
         if self.retained_published or self.capture is None:return
-        marker=dict(capture_sha256=digest(self.capture),kind=self.capture.get('kind'))
+        archive=self.capture.get('durable_archive') or {}
+        marker=dict(execution=self.execution,capture_sha256=digest(self.capture),kind=self.capture.get('kind'),archive_sha256=archive.get('sha256'))
         self.evidence_head=self.github.publish({'retained.json':json.dumps(marker,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/capture-retained',expected_head=self.evidence_head)
         self.retained_published=True;self.emit('capture_retained_marker_published',dict(head=self.evidence_head))
 
@@ -115,7 +118,8 @@ class HostedRunner(Runner):
                 if blob is not None:
                     try:marker=json.loads(blob_bytes(blob))
                     except ValueError:raise Uncertain('OWNER_MARKER_UNREADABLE') from None
-                    if marker.get('bindings_sha256')!=digest(bindings) or marker.get('capture_sha256')!=digest(self.capture) or marker.get('authority')!=self.authority+'_SCREEN':raise Uncertain('OWNER_MARKER_BINDING_MISMATCH')
+                    if (not isinstance(marker,dict) or marker.get('execution')!=self.execution or marker.get('bindings_sha256')!=digest(bindings) or marker.get('capture_sha256')!=digest(self.capture)
+                        or marker.get('authority')!=self.authority+'_SCREEN'):raise Uncertain('OWNER_MARKER_BINDING_MISMATCH')
                     self.evidence_head=head;self.emit('owner_screening_authority_marker_verified',dict(head=head));return
             if time.monotonic()>=deadline:raise Denied('OWNER_SCREENING_AUTHORITY_WAIT_EXPIRED')
             self.pipeline_sleep(POLL_SECONDS)
@@ -143,7 +147,7 @@ class HostedRunner(Runner):
         if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1':
             if not screens:outcome='DISCOVERY_EXPLICIT_ZERO_SCREENING_NOT_EXERCISED'
             elif usable<len(screens):outcome='PARTIAL_PROPOSAL_COVERAGE'
-        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,qualification=qualification,
+        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',execution=self.execution,cleanup=components['overall'],closure_components=components,qualification=qualification,
                     rows=len((self.capture or {}).get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture) if self.capture else None,slot_receipts=self.receipts,
                     accounting=self.accounting(),authority_check_receipt=self.authority_check,usable_proposals=usable,screening_dispositions=dict(Counter(x['disposition'] for x in screens)),citation_leads=sum(len(x['citations']['occurrences']) for x in screens),
                     source_resources=(self.capture or {}).get('resources'),source_observations_attempted=self.source_attempts,application_writes=0,credential_changes=0,grants_issued=0,
@@ -173,7 +177,7 @@ class HostedRunner(Runner):
         self.diagnosing=True;self.diagnostic_started=time.monotonic()
         try:components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
         except BaseException:components=dict(overall='UNCERTAIN')
-        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),operation_phase=self.operation_phase,qualification=qualification,
+        result=dict(status='STOP_RECONCILE_NO_RETRY',execution=self.execution,capture_sha256=digest(self.capture) if self.capture else None,cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),operation_phase=self.operation_phase,qualification=qualification,
                     accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
                     application_writes=0,credential_changes=0,grants_issued=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:self.emit('stopped',result)
@@ -194,12 +198,12 @@ def stop_early(journal,reason,detail=None):
     print(json.dumps({'status':result['status'],'stop_reason':reason}));return result
 
 
-def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256):
+def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256,revision):
     """The hosted pipeline over INJECTED effects (the GitHub CLI runner, the source reader, the memory scope). Production passes the reviewed implementations from main(); the disposable rehearsal
     passes loopback fixtures. Returns (result, exit_code). Nothing else differs between the two."""
     holder={}
     github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=gh_runner,bound=140)
-    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256);holder['runner']=runner
+    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision);holder['runner']=runner
     runner.source_reader=source_reader_factory(runner)
     if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
     result=runner.run()
@@ -236,7 +240,7 @@ def main(argv=None):
     def source_reader_factory(runner):
         return lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
     result,code=run_hosted(urls=urls,journal=journal,gh_runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),source_reader_factory=source_reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},
-                           hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest())
+                           hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest(),revision=os.environ['PIPELINE_REVIEWED_SHA'])
     raise SystemExit(code)
 
 
