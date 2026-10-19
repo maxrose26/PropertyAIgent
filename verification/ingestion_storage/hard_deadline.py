@@ -47,7 +47,8 @@ def hard_deadline(seconds,code):
                 if state['installed']:
                     signal.signal(SIGNAL,signal.SIG_IGN)          # discards any pending signal
                     if state['thread'] is not None:state['thread'].join(timeout=1)
-                    signal.signal(SIGNAL,state['previous'] if state['previous'] is not None else signal.SIG_DFL)
+                    late=state['thread'] is not None and state['thread'].is_alive()      # a watchdog that outlived the join must never meet the default (fatal) disposition
+                    signal.signal(SIGNAL,signal.SIG_IGN if late else (state['previous'] if state['previous'] is not None else signal.SIG_DFL))
             finally:
                 signal.pthread_sigmask(signal.SIG_SETMASK,mask)
     finally:

@@ -242,7 +242,11 @@ class Owner:
             self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=[[s[0],s[1],s[2]] for s in sessions]))
             disabled=roles==[(r,False,True) for r in sorted(ROLES)] and not memberships
             self.session_disposition='NONE' if not sessions else 'NOT_EVALUATED'
-            if disabled and sessions:self.resolve_sessions(c,sessions)
+            if disabled and sessions:
+                try:self.resolve_sessions(c,sessions)
+                except BaseException:                                    # a failed session read or termination must never suppress the independent secret deletion
+                    if self.session_disposition in ("NONE","NOT_EVALUATED","CLEARED_BY_WAIT"):self.session_disposition="UNRESOLVED_ERROR"
+                    self.emit("session_disposition",dict(disposition=self.session_disposition))
         if not disabled:raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
         for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
         names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))

@@ -159,3 +159,17 @@ def test_a_membership_without_inherited_privilege_does_not_count_as_proven(clust
     with pytest.raises(Uncertain,match='TEARDOWN_SESSIONS_UNRESOLVED'):owner.teardown(gh)
     assert owner.session_disposition=='UNRESOLVED_PRIVILEGE_NOT_PROVEN' and owner.terminations==0 and alive(cluster,pid)
     held.close()
+
+
+def test_a_failed_session_read_does_not_suppress_secret_deletion(cluster):
+    creator=setup(cluster);held=hold(cluster,WORKER);owner,events=make_owner(cluster,creator);gh=GitHubFake()
+    real=owner.q;calls=[]
+    def broken(c,statement,params=None,*,effect=False):
+        if statement==oo.SESSIONS_SQL:
+            calls.append(1)
+            if len(calls)>1:raise Uncertain("ADMIN_STATEMENT_HARD_DEADLINE")
+        return real(c,statement,params,effect=effect)
+    owner.q=broken
+    with pytest.raises(Uncertain,match="TEARDOWN_SESSIONS_UNRESOLVED"):owner.teardown(gh)
+    assert owner.session_disposition=="UNRESOLVED_ERROR" and gh.names()=={"DATABASE_URL"} and role_state(cluster)==([(EFFECT,False,True),(WORKER,False,True)],0)
+    held.close()
