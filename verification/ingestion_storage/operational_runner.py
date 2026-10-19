@@ -35,6 +35,17 @@ SETTLE_SECONDS=30          # an experimental interval, NOT a provider guarantee
 # The consumed predecessor, preserved: its registration and complete audit are bound by hash and are never reused.
 SETTLED_PREDECESSOR=dict(state_directory='operational-capture-queue-successor-once-20261018',registration_sha256='1034c92ee3e654bc4ccf1f37b6c5e20d0b15d1cce3f3982a3dfbdae2a402455c',
                          events_sha256='2af82ca9247366d5ada8e0873ea97abaab84cdeb8dfb81c3f3efb146708059b0',final_result_sha256='ffedfe33c342f6e808376a1617ac14a1895b863f87e4958d4edbdeaa346c5609')
+# Second settled generation (corrected preflight). The first settled generation above is CONSUMED (its run stopped in preflight) and is kept only so that its record and registration
+# remain recognisable; its namespace exists and can never be reused.
+SETTLED_R2_MODE='REQUIRED_CAPTURE_SCREENING_SETTLED_R2'
+SETTLED_R2_AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SETTLED_R2_ONCE_20261019'
+SETTLED_R2_STATE='operational-capture-queue-settled-r2-once-20261019'
+SETTLED_R2_PREDECESSOR=dict(
+    run_1=SETTLED_PREDECESSOR,
+    run_2=dict(state_directory=SETTLED_STATE,registration_sha256='fa3a94c8b27b32e0ab07119530caf001632768f7c88a3e0ff87fc385434b4634',
+               events_sha256='c4dc12776784ca678f5a1a0558f421ba405d0a243df52f5e78008a9ef66fb6cc',final_result_sha256='8116e06698669fb03a9550860ced87685fa4e483a9f93921989a40f295f528c3'))
+# mode -> (authority, state directory, bound predecessor); every settled mode applies the one fixed settling period.
+SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
 # Ordering invariants (tested): job + diagnostic_window <= work alarm (session), so a Runner-detected stop at the job limit still has its full failure window before the one-shot work alarm;
@@ -61,8 +72,8 @@ class Runner:
         self.expiry=datetime.fromisoformat(registration['expires_at'])
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.matrix_mode=registration.get('mode')==MATRIX_MODE
-        settled=registration.get('mode')==SETTLED_MODE
-        self.authority=SETTLED_AUTHORITY if settled else AUTHORITY
+        settled=registration.get('mode') in SETTLED_MODES
+        self.authority=SETTLED_MODES[registration['mode']][0] if settled else AUTHORITY
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
         self.deadlines=dict(MATRIX_DEADLINES if self.matrix_mode else DEFAULT_DEADLINES)
         self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else None)
@@ -361,7 +372,7 @@ class Runner:
             diagnostics['completion']='INCOMPLETE_RECONCILE'
         components=self.closure(access)
         result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,
-            failure=safe_failure(exc,'EXECUTION'),operation_phase=failed_phase,authority_invalidation=invalidation,
+            failure=safe_failure(exc,'EXECUTION'),preflight=dict(getattr(self.owner,'preflight_report',dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]))),operation_phase=failed_phase,authority_invalidation=invalidation,
             access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
@@ -414,7 +425,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,SETTLED_MODE:SETTLED_AUTHORITY}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()}}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
@@ -423,11 +434,12 @@ def validate_registration(body,sha):
         if (r.get('matrix')!=[list(e) for e in ENTRIES] or r.get('matrix_limits')!=MX or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_RESTRICTED_CONNECTION_MATRIX_ONLY'
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=MATRIX_STATE)
             or r.get('owner_limits')!=dict(connections=list(MATRIX_OWNER_LIMITS['connections']),commands=list(MATRIX_OWNER_LIMITS['commands'])) or r.get('state_directory')!=MATRIX_STATE):raise ValueError('MATRIX_BINDING')
-    if r.get('mode')==SETTLED_MODE:
-        if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=SETTLED_PREDECESSOR or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=SETTLED_STATE)
-            or r.get('state_directory')!=SETTLED_STATE):raise ValueError('SETTLED_BINDING')
+    if r.get('mode') in SETTLED_MODES:
+        _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
+        if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
+            or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,SETTLED_MODE) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,*SETTLED_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -448,7 +460,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(SETTLED_STATE if r['mode']==SETTLED_MODE else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input

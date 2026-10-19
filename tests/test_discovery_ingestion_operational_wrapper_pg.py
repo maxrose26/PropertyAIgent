@@ -11,8 +11,9 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval','policy_lifecycle','settled_success_retained','settled_first_connection_rejected_retained','settled_stop_during_interval_retained'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
+    retained=fault.endswith('_retained');fault=fault[:-len('_retained')] if retained else fault      # same scenario, started from the RETAINED upgraded installation of a previous run
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
     info=psycopg.conninfo.conninfo_to_dict(raw)
@@ -63,13 +64,13 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 from verification.ingestion_storage.operational_memory import OperationalMemory
                 native=OperationalMemory()
             if fault.startswith('settled_'):
-                from verification.ingestion_storage.operational_runner import SETTLED_MODE
-                registration['mode']=SETTLED_MODE
+                from verification.ingestion_storage.operational_runner import SETTLED_R2_MODE
+                registration['mode']=SETTLED_R2_MODE
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
             contacts=[]
             if fault.startswith('settled_'):
                 from verification.ingestion_storage.operational_runner import SETTLE_SECONDS
-                assert runner.settle_seconds==SETTLE_SECONDS==30 and runner.authority.endswith('SETTLED_ONCE_20261019')      # the production interval; a short one is substituted below only to keep CI short
+                assert runner.settle_seconds==SETTLE_SECONDS==30 and runner.authority.endswith('SETTLED_R2_ONCE_20261019')      # the production interval; a short one is substituted below only to keep CI short
                 runner.settle_seconds=0.6
                 original_settle=runner.settle;settled_at=[]
                 def recording_settle():
@@ -100,7 +101,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             with pytest.raises(psycopg.Error,match=reason):c.execute(activation)
                     finally:boot.execute(undo)
             runner.owner.install=install_with_ambient_negatives
-            if fault in {'reuse_installed_success','diagnostic_only'} or fault.startswith('matrix_'):
+            if fault in {'reuse_installed_success','diagnostic_only','policy_lifecycle'} or fault.startswith('matrix_') or retained:
                 # Fixture constructs the already-installed/access-disabled
                 # generation-1 state. Production remains bound to the actual
                 # accepted cleanup control hash, never this fixture hash.
@@ -119,6 +120,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 runner.owner.reuse_installed=True
                 from app.ingestion.ledger import digest
                 runner.owner.baseline_control_sha256=digest(ctl)
+                if retained:
+                    with installer.connection() as c_:installer.script(c_,Path('docs/design/ingestion-operational-required-20261018/successor-policy.sql'))      # the state a previous run leaves behind
                 for mutation,undo,expected in [
                   ('ALTER ROLE ingestion_effect_login BYPASSRLS','ALTER ROLE ingestion_effect_login NOBYPASSRLS','REUSED_RUNTIME_FLAGS_CHANGED'),
                   ('GRANT ingestion_authority_issuer TO ingestion_effect_login','REVOKE ingestion_authority_issuer FROM ingestion_effect_login GRANTED BY CURRENT_USER','REUSED_RUNTIME_MEMBERSHIPS_CHANGED')]:
@@ -130,6 +133,50 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         assert requests==before_requests
                     finally:boot.execute(undo)
                     record_property('fixture_negative_preflight',json.dumps(probe.accounting()))
+
+                if fault=='policy_lifecycle':
+                    import re as re_
+                    from app.ingestion.ledger import digest as digest_
+                    from tests.test_ingestion_preflight_policy_state import legacy_verify
+                    def fresh(apply_policy=True):
+                        o=Owner(connector,lambda *_:None,lambda:None,identity=role,expiry=runner.expiry,bindings=runner.bindings)
+                        o.reuse_installed=True;o.baseline_control_sha256=digest_(ctl);o.apply_policy=apply_policy;return o
+                    policy_file=Path('docs/design/ingestion-operational-required-20261018/successor-policy.sql')
+                    def function_statement(name):
+                        m=re_.search(r'CREATE (?:OR REPLACE )?FUNCTION public\.'+name+r'\(.*?\$(\w*)\$.*?\$\1\$;',Path('docs/design/ingestion-operational-20261016/worker.sql').read_text(),re_.S)
+                        statement_=re_.sub(r'^CREATE (OR REPLACE )?FUNCTION','CREATE OR REPLACE FUNCTION',m[0])      # worker.sql creates; the rehearsal replaces
+                        return statement_,'$'+m[1]+'$;'
+                    # 1. original installed state, preflight by a controller
+                    first=fresh();first.preflight();assert first.preflight_report['policy_state']=='ORIGINAL'
+                    # 2. the real installation path applies the reviewed successor policy; the lifecycle then completes with a verified teardown
+                    first.install();first.map_and_activate(runner.github,url_factory=uri);first.teardown(runner.github)
+                    assert set(ciphertexts)=={'DATABASE_URL'} and boot.execute("SELECT count(*) FROM pg_authid WHERE rolname=ANY(%s) AND (rolcanlogin OR rolpassword IS NOT NULL)",(['ingestion_worker_login','ingestion_effect_login'],)).fetchone()[0]==0
+                    # 3. a FRESH controller: the predecessor logic fails on the retained state (the observed failure) and the corrected logic passes
+                    with monkeypatch.context() as m_:
+                        m_.setattr(Owner,'verify_installed',legacy_verify)
+                        with pytest.raises(ValueError,match='INSTALLED_FUNCTION_CONTENT_CHANGED'):fresh().preflight()
+                    ok=fresh();ok.preflight();assert ok.preflight_report=={'reason_code':'POLICY_STATE_RECOGNISED','policy_state':'SUCCESSOR_POLICY_APPLIED','permitted_states':['ORIGINAL','SUCCESSOR_POLICY_APPLIED']}
+                    fresh().preflight()                                                                   # the already-upgraded starting state, repeatedly
+                    with pytest.raises(ValueError,match='INSTALLED_POLICY_STATE_NOT_PERMITTED_FOR_MODE'):fresh(False).preflight()      # a mode that does not apply the policy refuses it
+                    # 4. a mixed inventory (one function back at its original body) is refused, then repaired through the real policy path
+                    stmt,_end=function_statement('ingestion_bolton_allowed');boot.execute(stmt)
+                    probe=fresh()
+                    with pytest.raises(ValueError,match='INSTALLED_POLICY_STATE_MIXED'):probe.preflight()
+                    assert probe.preflight_report['policy_state']=='UNRECOGNISED' and probe.preflight_report['reason_code']=='INSTALLED_POLICY_STATE_MIXED'
+                    with first.connection() as c_:first.script(c_,policy_file)
+                    fresh().preflight()
+                    # 5. an altered body, and an altered search path, are refused in the upgraded state
+                    stmt,end=function_statement('ingestion_raise_stop');boot.execute(stmt[:-len(end)]+' '+end)
+                    with pytest.raises(ValueError,match='INSTALLED_FUNCTION_CONTENT_CHANGED'):fresh().preflight()
+                    boot.execute(stmt)
+                    fresh().preflight()
+                    proc=boot.execute("SELECT oid::regprocedure::text FROM pg_proc WHERE proname='ingestion_raise_stop' AND pronamespace='public'::regnamespace").fetchone()[0]
+                    boot.execute('ALTER FUNCTION '+proc+' SET search_path=public')
+                    with pytest.raises(ValueError,match='INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED'):fresh().preflight()
+                    boot.execute('ALTER FUNCTION '+proc+' SET search_path=pg_catalog')
+                    fresh().preflight()
+                    print('ROLLUP_POLICY_LIFECYCLE ok')
+                    return
 
                 if fault.startswith('matrix_'):
                     from verification.ingestion_storage import operational_runner as orr, restricted_matrix as rm
@@ -319,6 +366,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 lines=[]
                 result=session(journal,registration['expires_at'],lambda:'disposable hidden input',lambda raw,started:runner,output=lambda line,**kw:lines.append(line))
                 assert result['status']=='STOP_RECONCILE_NO_RETRY'
+                if retained:assert result['preflight']=={'reason_code':'POLICY_STATE_RECOGNISED','policy_state':'SUCCESSOR_POLICY_APPLIED','permitted_states':['ORIGINAL','SUCCESSOR_POLICY_APPLIED']}      # the retained state is recognised, with fixed codes only
                 saved=json.loads((journal.root/'final-result.json').read_bytes());assert saved==json.loads(json.dumps(result)) and len(lines)==1
                 assert 'private connection URL' not in journal.file.read_text() and 'disposable hidden input' not in lines[0]
                 assert result['accounting']['administration']['connections_opened']==result['accounting']['administration']['connections_closed']
@@ -370,6 +418,12 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     assert all(g['expires_at']==0 for g in ctl['grants'].values())
                     assert all(g['expires_at']==0 for g in ctl['bolton_exceptions'].values())
                     assert set(ciphertexts)=={'DATABASE_URL'}
+                if fault in {'settled_first_connection_rejected','settled_stop_during_interval'}:
+                    adm_=result['accounting']['administration']
+                    assert adm_['role_settings']['state']=='RESTORED_VERIFIED' and adm_['teardown_residuals']==[] and adm_['session_disposition'] in ('NONE','NOT_EVALUATED') and result['access']=='DISABLED_VERIFIED'
+                    assert {r_:c_ for r_,c_ in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}=={'ingestion_worker_login':None,'ingestion_effect_login':None}
+                    assert result['closure_components']['connections']['status']=='CLOSED' and result['closure_components']['process']['status']=='CLOSED' and result['cleanup']=='CLOSED'
+                    print('ROLLUP_SETTLED_FAILURE',fault,retained,adm_['commands'],adm_['connections'])
                 if fault=='blocked_query':
                     receipts=result['accounting']['runtime']['slot_receipts'];events=[e for r in receipts.values() for e in r['database']['hard_deadline_events']]
                     assert events and events[0]['cancel_outcome'] in ('CANCEL_SENT','CANCEL_FAILED','CANCEL_FAILED_TIMEOUT') and events[0]['backend_closure']=='NOT_ESTABLISHED' and events[0]['client_closed'] is True
@@ -490,7 +544,8 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert runner.owner.connections<=13 and runner.owner.commands<=240
             expected_cfg={'ingestion_effect_login':[],'ingestion_worker_login':['statement_timeout=7s','work_mem=5MB'] if fault=='role_settings_success' else []}
             assert {r:sorted(c or []) for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}==expected_cfg and runner.owner.role_settings_state=='RESTORED_VERIFIED' and runner.owner.teardown_residuals==[]
-            print('ROLLUP_ADMIN_COMPLETE',fault,runner.owner.commands,runner.owner.connections)
+            print('ROLLUP_ADMIN_COMPLETE',fault,retained,runner.owner.commands,runner.owner.connections)
+            if retained:assert runner.owner.preflight_report['policy_state']=='SUCCESSOR_POLICY_APPLIED' and runner.owner.preflight_report['reason_code']=='POLICY_STATE_RECOGNISED'
             if fault=='settled_success':
                 lines_=[json.loads(l) for l in journal.file.read_text().splitlines()];names_=[e['event'] for e in lines_]
                 assert names_.index('secret_mapping_ack')<names_.index('settling_started')<names_.index('settling_completed')<names_.index('runtime_connection_intent')
