@@ -54,8 +54,7 @@ def _recording(self,*a,**k):
         try:      # rehearsal-only: evaluate each component of the Bolton disposition against the control row AS THE WORKER SEES IT, at the moment of failure
             import time as _time
             from sqlalchemy.engine import make_url as _mk
-            u=_mk(urls['ingestion_worker_login'])
-            with psycopg.connect(host='127.0.0.1',port=5432,dbname=plan['dbname'],user='ingestion_worker_login',password=u.password,autocommit=True,connect_timeout=3) as c:
+            with psycopg.connect(os.environ['INGESTION_PROVISIONING_TEST_URL'],autocommit=True,connect_timeout=3) as c:      # the disposable bootstrap identity (the role has a connection limit of 1)
                 ctl=c.execute("SELECT outcome::jsonb FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
             authority=orr.PIPELINE_AUTHORITY+'_CAPTURE';grant=ctl.get('grants',{}).get(authority);exc=ctl.get('bolton_exceptions',{}).get(authority)
             analysis=dict(global_stop_ok=ctl.get('global_stop')=={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'},generation=ctl.get('hard_stop_generation'),exception_generation=(exc or {}).get('hard_stop_generation'),
