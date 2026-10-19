@@ -106,7 +106,7 @@ class HostedRunner(Runner):
 
     def authority_present(self):
         """Read-only check as the worker, with its own small budget and no ledger mutation: an unexpired grant must exist before the single source request is even considered."""
-        budget=DatabaseBudget(connections=1,statements=4,seconds=30,emit=self.emit,stop_file=self.journal.root/'STOP');closed=None
+        budget=DatabaseBudget(connections=1,statements=24,seconds=60,emit=self.emit,stop_file=self.journal.root/'STOP');closed=None      # the accepted per-connection profile check needs its own statements; this connection reads one row
         engine=budget.engine(self.owner.urls['ingestion_worker_login'],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name)
         try:
             with engine.connect() as connection:
