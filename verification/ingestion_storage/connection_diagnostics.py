@@ -70,6 +70,23 @@ class PreparationFailure(Exception):
         self.flags={k:v for k,v in flags.items() if k in {'exit_code','exception_kind'} and (v is None or isinstance(v,int) and not isinstance(v,bool) and -255<=v<=255 or k=='exception_kind' and v in KINDS|{'OTHER'})}
         super().__init__(stage+':'+reason)
 
+FIXED_REASON=re.compile(r'[A-Z][A-Z0-9_]{2,79}')
+FIXED_REASON_VALUE_ERRORS=frozenset({'ADMIN_COMMAND_BOUND','ADMIN_CONNECTION_BOUND','GITHUB_REQUEST_BOUND','ADMIN_RETURNED_VALUE_BOUND','EXACT_OWNER_GITHUB_ACCESS'})
+
+
+def fixed_stop_reason(exc):
+    """The controller's OWN fixed reason code for a stop, or None. Exported only when the exception is one of the controller-owned classes (defined in verification.ingestion_storage or app.ingestion:
+    Uncertain, Denied, DeadlineExceeded, ...) whose ENTIRE message is a code (capital letters, digits, underscores), or a builtin ValueError whose message is one of the listed bound codes. Library
+    exceptions, free text and anything else are None: the failure stays UNKNOWN and no exception text is ever exported."""
+    if isinstance(exc,PreparationFailure):return None      # exported through its own stage/reason fields
+    text=exc.args[0] if getattr(exc,'args',None) and len(exc.args)==1 and isinstance(exc.args[0],str) else None
+    if text is None or not FIXED_REASON.fullmatch(text):return None
+    module=type(exc).__module__ or ''
+    if module.startswith('verification.ingestion_storage') or module.startswith('app.ingestion'):return text
+    if type(exc) is ValueError and text in FIXED_REASON_VALUE_ERRORS:return text
+    return None
+
+
 def safe_failure(exc, phase):
     if phase not in PHASES: raise ValueError('DIAGNOSTIC_PHASE')
     if isinstance(exc,PreparationFailure):

@@ -14,7 +14,7 @@ from pathlib import Path
 from app.ingestion.ledger import digest,DEFAULT_LIMITS,Denied
 from . import stable_qualification as sq
 from . import restricted_route as rr
-from .connection_diagnostics import safe_failure
+from .connection_diagnostics import safe_failure,fixed_stop_reason
 from .operational_controller import DatabaseBudget
 from .operational_journal import Journal
 from .operational_owner import item,SCOPE,ROLES
@@ -45,6 +45,39 @@ def admitted(env):
             and env.get('PIPELINE_AUTHORITY')==HOSTED_AUTHORITY and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
 
 
+# The execution binding the OWNER registered with the capture grant (revision, workflow_sha256 = the controller's hash, manifest_sha256), read by the worker. It is the registration's own binding,
+# stored in the database authority, so the hosted job needs no other channel to learn what it is approved to run.
+GRANT_BINDING_SQL=("SELECT outcome::jsonb->'grants'->CAST(:a AS text)->'execution_binding',"
+                   "(outcome::jsonb->'grants'->CAST(:a AS text)->>'expires_at')::double precision>extract(epoch FROM statement_timestamp()) "
+                   "FROM public.ingestion_work_items WHERE key=repeat('0',64)")
+
+
+def _git(root,*args):
+    done=subprocess.run(['git',*args],cwd=str(root),stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL,timeout=30,env=dict(PATH='/usr/bin:/bin',HOME=os.environ.get('HOME','/'),GIT_CONFIG_NOSYSTEM='1',LC_ALL='C'))
+    if done.returncode:raise Denied('CHECKOUT_BINDING_UNOBSERVABLE')
+    return done.stdout.decode('utf-8','strict').strip()
+
+
+def actual_checkout(root=None):
+    """What this job is ACTUALLY running: the checked-out commit and tree, whether any tracked file differs from it, and the hashes of the controller module that is loaded and of the package manifest."""
+    root=Path(root or Path.cwd()).resolve()
+    from . import operational_runner as controller
+    loaded=Path(controller.__file__).resolve()
+    if root not in loaded.parents:raise Denied('CHECKOUT_BINDING_MISMATCH')      # the loaded controller is not the one in this checkout
+    return dict(revision=_git(root,'rev-parse','HEAD'),tree=_git(root,'rev-parse','HEAD^{tree}'),tracked_files_modified=bool(_git(root,'status','--porcelain','--untracked-files=no')),
+                controller_sha256=hashlib.sha256(loaded.read_bytes()).hexdigest(),manifest_sha256=hashlib.sha256((root/MANIFEST_PATH).read_bytes()).hexdigest())
+
+
+def verify_checkout_binding(actual,binding,reviewed_sha,manifest_sha256):
+    """The checkout must be exactly the approved one: clean tracked files, the commit the workflow pinned, and the revision, controller hash and manifest hash the owner registered with the grant. Any
+    mismatch is a stop BEFORE any source request. Returns a credential-free summary."""
+    ok=(isinstance(actual,dict) and isinstance(binding,dict) and set(binding)=={'revision','workflow_sha256','manifest_sha256'} and actual.get('tracked_files_modified') is False
+        and actual.get('revision')==reviewed_sha==binding['revision'] and actual.get('controller_sha256')==binding['workflow_sha256']
+        and actual.get('manifest_sha256')==binding['manifest_sha256']==manifest_sha256)
+    if not ok:raise Denied('CHECKOUT_BINDING_MISMATCH')
+    return dict(revision=actual['revision'],tree=actual['tree'],controller_sha256=actual['controller_sha256'],manifest_sha256=actual['manifest_sha256'],tracked_files_modified=False)
+
+
 def bindings_for(items):
     return {x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in items}
 
@@ -68,7 +101,7 @@ class HostedOwner:
 
 class HostedRunner(Runner):
     """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
-    def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision):
+    def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision,checkout_probe=None):
         self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
         self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.ssl=ssl;self.memory=memory;self.hostaddr=hostaddr
         self.operation_phase='INITIALISATION';self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0
@@ -81,7 +114,7 @@ class HostedRunner(Runner):
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
-        self.initial_evidence_head=evidence_head
+        self.initial_evidence_head=evidence_head;self.checkout_probe=checkout_probe or actual_checkout;self.checkout_binding=None
         self.execution=dict(revision=revision,manifest_sha256=manifest_sha256,capture_key=self.capture_key,initial_evidence_head=evidence_head,authority=PIPELINE_AUTHORITY)      # identical to the owner's pipeline_execution()
         self.pipeline_sleep=time.sleep;self.authority_check=None;self.retained_published=False
 
@@ -127,16 +160,19 @@ class HostedRunner(Runner):
             self.pipeline_sleep(POLL_SECONDS)
 
     def authority_present(self):
-        """Read-only check as the worker, with its own small budget and no ledger mutation: an unexpired grant must exist before the single source request is even considered."""
-        budget=DatabaseBudget(connections=1,statements=24,seconds=60,emit=self.emit,stop_file=self.journal.root/'STOP');closed=None      # the accepted per-connection profile check needs its own statements; this connection reads one row
+        """Read-only check as the worker, with its own small budget and no ledger mutation, BEFORE the single source request is even considered: an unexpired capture grant must exist AND this job's
+        actual checkout must be exactly the approved one (the execution binding the owner registered with that grant)."""
+        budget=DatabaseBudget(connections=1,statements=24,seconds=60,emit=self.emit,stop_file=self.journal.root/'STOP');closed=None      # the accepted per-connection profile check needs its own statements; this connection reads two rows
         engine=budget.engine(self.owner.urls['ingestion_worker_login'],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name)
         try:
             with engine.connect() as connection:
                 from sqlalchemy import text
                 count=connection.execute(text(sq.CONTROL_SQL)).fetchone()
+                granted=connection.execute(text(GRANT_BINDING_SQL),{'a':self.authority+'_CAPTURE'}).fetchone()
         finally:closed=budget.close([engine])
-        if closed.get('cleanup')!='CLOSED' or count is None or int(count[3])<1:raise Denied('CAPTURE_AUTHORITY_NOT_REGISTERED')
-        self.emit('capture_authority_observed',dict(unexpired_grants=int(count[3]),client_closure=closed.get('cleanup')))
+        if closed.get('cleanup')!='CLOSED' or count is None or int(count[3])<1 or granted is None or granted[0] is None or granted[1] is not True:raise Denied('CAPTURE_AUTHORITY_NOT_REGISTERED')
+        self.checkout_binding=verify_checkout_binding(self.checkout_probe(),granted[0],self.execution['revision'],self.execution['manifest_sha256'])      # a mismatch stops here: zero source requests
+        self.emit('capture_authority_observed',dict(unexpired_grants=int(count[3]),client_closure=closed.get('cleanup'),checkout_binding=self.checkout_binding))
         return closed
 
     def hosted_result(self,qualification):
@@ -149,7 +185,7 @@ class HostedRunner(Runner):
         if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1':
             if not screens:outcome='DISCOVERY_EXPLICIT_ZERO_SCREENING_NOT_EXERCISED'
             elif usable<len(screens):outcome='PARTIAL_PROPOSAL_COVERAGE'
-        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',execution=self.execution,cleanup=components['overall'],closure_components=components,qualification=qualification,
+        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',execution=self.execution,checkout_binding=self.checkout_binding,cleanup=components['overall'],closure_components=components,qualification=qualification,
                     rows=len((self.capture or {}).get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture) if self.capture else None,slot_receipts=self.receipts,
                     accounting=self.accounting(),authority_check_receipt=self.authority_check,usable_proposals=usable,screening_dispositions=dict(Counter(x['disposition'] for x in screens)),citation_leads=sum(len(x['citations']['occurrences']) for x in screens),
                     source_resources=(self.capture or {}).get('resources'),source_observations_attempted=self.source_attempts,application_writes=0,credential_changes=0,grants_issued=0,
@@ -179,7 +215,7 @@ class HostedRunner(Runner):
         self.diagnosing=True;self.diagnostic_started=time.monotonic()
         try:components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
         except BaseException:components=dict(overall='UNCERTAIN')
-        result=dict(status='STOP_RECONCILE_NO_RETRY',execution=self.execution,capture_sha256=digest(self.capture) if self.capture else None,cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),operation_phase=self.operation_phase,qualification=qualification,
+        result=dict(status='STOP_RECONCILE_NO_RETRY',execution=self.execution,capture_sha256=digest(self.capture) if self.capture else None,cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),checkout_binding=self.checkout_binding,operation_phase=self.operation_phase,qualification=qualification,
                     accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
                     application_writes=0,credential_changes=0,grants_issued=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:self.emit('stopped',result)
@@ -200,12 +236,12 @@ def stop_early(journal,reason,detail=None):
     print(json.dumps({'status':result['status'],'stop_reason':reason}));return result
 
 
-def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256,revision):
+def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256,revision,checkout_probe=None):
     """The hosted pipeline over INJECTED effects (the GitHub CLI runner, the source reader, the memory scope). Production passes the reviewed implementations from main(); the disposable rehearsal
     passes loopback fixtures. Returns (result, exit_code). Nothing else differs between the two."""
     holder={}
     github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=gh_runner,bound=140)
-    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision);holder['runner']=runner
+    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision,checkout_probe=checkout_probe);holder['runner']=runner
     runner.source_reader=source_reader_factory(runner)
     if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
     if github.probe(REPO+'/contents/'+EVIDENCE_ANCHOR+'?ref='+evidence_head) is None:return stop_early(journal,'EVIDENCE_BRANCH_ANCHOR_MISSING'),1      # a 404 below means something only if the branch itself is readable

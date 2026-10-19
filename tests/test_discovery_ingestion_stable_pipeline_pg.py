@@ -18,7 +18,7 @@ from verification.ingestion_storage.tls_trust import verified_trust
 from tests.storage_gh_fixture import real_gh_store
 
 WORKER='ingestion_worker_login';EFFECT='ingestion_effect_login'
-FAULTS=['success','idle_pooled_session','active_session_blocks','unexpired_grant_blocks','valid_until_mismatch_blocks','source_raises','screening_stops','owner_wait_expires']
+FAULTS=['success','idle_pooled_session','active_session_blocks','unexpired_grant_blocks','valid_until_mismatch_blocks','source_raises','screening_stops','owner_wait_expires','wrong_revision','wrong_executable']
 
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
@@ -123,7 +123,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             orunner.failed=failed_with_code
             ca,_=verified_trust()
             hosted_dir=tmp_path/'hosted-out';spawned=[]
-            plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],revision=registration['revision'],output=str(hosted_dir))
+            plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],controller_sha256=registration['controller_sha256'],revision=registration['revision'],output=str(hosted_dir))
             plan_path=tmp_path/'plan.json';plan_path.write_text(json.dumps(plan))
             def start_hosted():
                 env=dict(os.environ,INGESTION_ACCEPTANCE_DISPOSABLE='PG17_ONLY',REHEARSAL_URLS=json.dumps(urls),PYTHONPATH=str(Path.cwd()),PYTHONDONTWRITEBYTECODE='1')
@@ -204,6 +204,10 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 return
             if not (spawned and (hosted_dir/'rehearsal-done').exists()):
                 pytest.fail(json.dumps(dict(owner=dict(status=result.get('status'),failure=result.get('failure'),stop_codes=stop_codes,phase=result.get('operation_phase'),invalidation=result.get('authority_invalidation')),owner_events=[e['event'] for e in events][-25:],hosted_log=hosted_log[-1500:],hosted_files=sorted(p.name for p in hosted_dir.iterdir()) if hosted_dir.exists() else None),default=str)[:6000])
+            if fault in ('wrong_revision','wrong_executable'):      # the hosted job refuses to run an unapproved checkout: ZERO source requests, a fixed reason, authorities ended
+                assert source_calls==0 and hosted_final['status']=='STOP_RECONCILE_NO_RETRY' and hosted_final['stop_reason']=='CHECKOUT_BINDING_MISMATCH'
+                assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK')
+                return
             if fault=='source_raises':
                 assert source_calls==1 and hosted_final['status']=='STOP_RECONCILE_NO_RETRY'      # one source request; NO replay
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and not [a for a in ctl_after['grants'] if a.endswith('_SCREEN')]

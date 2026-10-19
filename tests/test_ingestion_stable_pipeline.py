@@ -509,3 +509,36 @@ def test_the_raw_source_is_below_the_contents_api_size_limit_the_readback_depend
     """The contents API returns the file body inline only up to 1 MB; the archive readback (the accepted publisher's own) and the owner's identity check depend on that. The accepted source worker bounds
     the audit it produces (and therefore the archived raw source) at 512 KiB."""
     assert 'len(raw)>512*1024' in Path('verification/ingestion_storage/operational_source.py').read_text() and 512*1024<1024**2
+
+
+# ---- final release corrections: checkout binding before any source request; fixed stop reason export
+
+def _binding():
+    return dict(revision="a"*40,workflow_sha256="b"*64,manifest_sha256="c"*64)
+
+
+def _actual(**over):
+    base=dict(revision="a"*40,tree="d"*40,tracked_files_modified=False,controller_sha256="b"*64,manifest_sha256="c"*64)
+    base.update(over);return base
+
+
+def test_checkout_binding_accepts_only_the_exact_approved_state():
+    from verification.ingestion_storage import stable_pipeline as sp
+    ok=sp.verify_checkout_binding(_actual(),_binding(),"a"*40,"c"*64)
+    assert ok["revision"]=="a"*40 and ok["tracked_files_modified"] is False
+    for bad in (_actual(revision="e"*40),_actual(controller_sha256="f"*64),_actual(manifest_sha256="f"*64),_actual(tracked_files_modified=True),None):
+        with pytest.raises(sp.Denied) as caught:sp.verify_checkout_binding(bad,_binding(),"a"*40,"c"*64)
+        assert caught.value.args[0]=="CHECKOUT_BINDING_MISMATCH"
+    with pytest.raises(sp.Denied):sp.verify_checkout_binding(_actual(),_binding(),"e"*40,"c"*64)      # the workflow-pinned commit differs from the registered one
+    with pytest.raises(sp.Denied):sp.verify_checkout_binding(_actual(),dict(_binding(),extra="x"),"a"*40,"c"*64)
+
+
+def test_fixed_stop_reason_is_exported_only_for_controller_codes():
+    from verification.ingestion_storage.connection_diagnostics import fixed_stop_reason
+    from app.ingestion.ledger import Denied
+    from verification.ingestion_storage.operational_owner import Uncertain
+    assert fixed_stop_reason(Uncertain("HOSTED_PUBLICATION_WAIT_EXPIRED"))=="HOSTED_PUBLICATION_WAIT_EXPIRED"
+    assert fixed_stop_reason(Denied("CHECKOUT_BINDING_MISMATCH"))=="CHECKOUT_BINDING_MISMATCH"
+    assert fixed_stop_reason(ValueError("ADMIN_COMMAND_BOUND"))=="ADMIN_COMMAND_BOUND"
+    for exc in (RuntimeError("SOME_LIBRARY_CODE"),ValueError("password=hunter2"),Uncertain("free text with spaces"),Uncertain("lowercase_code"),KeyError("X"),Uncertain("A","B"),Uncertain()):
+        assert fixed_stop_reason(exc) is None

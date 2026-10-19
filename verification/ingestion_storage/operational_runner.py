@@ -18,7 +18,7 @@ from .operational_publication import GitHub,Uncertain,canonical,BRANCH,blob_byte
 from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
-from .connection_diagnostics import PreparationFailure
+from .connection_diagnostics import PreparationFailure,fixed_stop_reason
 from .operational_preparation import Progress,prepare_connection
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
@@ -440,7 +440,7 @@ class Runner:
             diagnostics['completion']='INCOMPLETE_RECONCILE'
         components=self.closure(access)
         result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,
-            failure=safe_failure(exc,'EXECUTION'),preflight=dict(getattr(self.owner,'preflight_report',dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]))),operation_phase=failed_phase,authority_invalidation=invalidation,
+            failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),preflight=dict(getattr(self.owner,'preflight_report',dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]))),operation_phase=failed_phase,authority_invalidation=invalidation,
             access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
