@@ -15,11 +15,16 @@ from .storage_controller import split_sql
 from .hard_deadline import hard_deadline,abandon,DeadlineExceeded
 
 ADMIN_STATEMENT_HARD_SECONDS=12
+ADMIN_CANCEL_ALLOWANCE=3          # aggregate ceiling on administrative cancel connections for the whole run (one Owner); beyond it a deadline only closes the client
 TERMINATE_SQL="SELECT pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE pid=%s AND usename=%s AND backend_start=%s::timestamptz"
 SESSIONS_SQL='SELECT pid,usename,state,backend_start FROM pg_catalog.pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid'
 # USAGE (privileges actually INHERITED), not MEMBER: a NOINHERIT or WITH INHERIT FALSE membership answers MEMBER=true yet does not confer the privilege (found by the hosted PG17 rehearsal).
 PRIVILEGE_SQL="SELECT pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE')"
 SESSION_POLICY=dict(wait_reads=3,wait_seconds=0.5,max_terminations=2,post_reads=3)
+# The three reviewed timeout settings, applied at ROLE level to the two restricted logins only, so they hold whether or not a pooler honours startup options.
+ROLE_SETTINGS=(('statement_timeout','10s'),('lock_timeout','3s'),('idle_in_transaction_session_timeout','20s'))
+ROLE_SETTINGS_SQL='SELECT r.rolname,r.rolconfig,(SELECT count(*) FROM pg_catalog.pg_db_role_setting s WHERE s.setrole=r.oid AND s.setdatabase<>0) FROM pg_catalog.pg_roles r WHERE r.rolname=ANY(%s) ORDER BY r.rolname'
+ROLE_SETTING_VALUE=re.compile(r'[0-9]{1,9}(?:ms|s|min|h|d)?')
 
 PKG=Path('docs/design/ingestion-operational-required-20261018')
 WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
@@ -39,6 +44,7 @@ class Owner:
         self.connector=connector;self.emit=emit;self.check=check;self.identity=identity;self.expiry=expiry;self.bindings=bindings
         self.connections=0;self.opened=0;self.closed=0;self.connection_active=0.0;self.effect_uncertain=False;self.invalidation='NOT_REQUIRED_NO_AUTHORITY';self.expected_generation=0;self.reuse_installed=False;self.apply_policy=True;self.baseline_control_sha256='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf';self.commands=0;self.returned_bytes=0;self.active=0;self.urls={};self.original_control=None;self.authorities=[];self.diagnostic_mode=False;self.tearing_down=False
         self.failed_native_connections=[];self.cancel_events=[];self.sleep=time.sleep;self.session_disposition='NOT_EVALUATED';self.terminations=0
+        self.apply_role_settings=False;self.role_settings_prior=None;self.role_settings_state='NOT_REQUESTED';self.teardown_residuals=[]
 
     @contextmanager
     def connection(self):
@@ -78,7 +84,12 @@ class Owner:
                     cur=c.execute(statement,params)
                     rows=cur.fetchall() if cur.description else []
             except DeadlineExceeded:
-                self.cancel_events.append(abandon(c));raise Uncertain('ADMIN_STATEMENT_HARD_DEADLINE') from None       # cancel acknowledged or not, the effect and the backend stay unproven
+                if sum(e.get('cancel_attempts',0) for e in self.cancel_events)>=ADMIN_CANCEL_ALLOWANCE:
+                    try:c.close()
+                    except BaseException:pass
+                    self.cancel_events.append(dict(cancel_requested=False,cancel_outcome='CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED',cancel_attempts=0,cancel_seconds=0.0,client_closed=bool(c.closed),backend_closure='NOT_ESTABLISHED'))
+                else:self.cancel_events.append(abandon(c))
+                raise Uncertain('ADMIN_STATEMENT_HARD_DEADLINE') from None       # cancel acknowledged or not, the effect and the backend stay unproven
             if cur.pgresult is not None:
                 self.returned_bytes+=sum(len(cur.pgresult.get_value(r,k) or b'') for r in range(cur.pgresult.ntuples) for k in range(cur.pgresult.nfields))
             if self.returned_bytes>1024**2:raise Uncertain('ADMIN_RETURNED_VALUE_BOUND')
@@ -93,7 +104,7 @@ class Owner:
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
 
     def accounting(self):
-        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),session_terminations=self.terminations)
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),admin_cancel_allowance=ADMIN_CANCEL_ALLOWANCE,session_terminations=self.terminations,session_disposition=self.session_disposition,role_settings=dict(state=self.role_settings_state,prior_captured=self.role_settings_prior is not None),teardown_residuals=list(self.teardown_residuals))
 
     def preflight(self):
         with self.connection() as c:
@@ -174,6 +185,7 @@ class Owner:
         names=github.names()
         if 'DATABASE_URL' not in names or 'INGESTION_STORAGE_DATABASE_URL' in names or any(n in names for n in SECRETS.values()):raise ValueError('EXACT_EMPTY_OPERATIONAL_MAPPINGS_REQUIRED')
         with self.connection() as c:
+            if self.apply_role_settings:self.install_role_settings(c)      # before any password exists and before LOGIN is possible
             for role,name in SECRETS.items():
                 password=secrets.token_urlsafe(48)
                 verifier=c.pgconn.encrypt_password(password.encode(),role.encode(),algorithm=b'scram-sha-256').decode()
@@ -185,6 +197,61 @@ class Owner:
             self.script(c,PKG/'activate.sql')
             stamp=time.monotonic()
             for role in ROLES:self.timeline.setdefault(role,{})['activated']=stamp
+
+    @staticmethod
+    def _split(entries):
+        names={n for n,_ in ROLE_SETTINGS}
+        return {e.split('=',1)[0]:e.split('=',1)[1] for e in entries if e.split('=',1)[0] in names},sorted(e for e in entries if e.split('=',1)[0] not in names)
+
+    def install_role_settings(self,c):
+        """Capture the existing role configuration of the two restricted logins, then set ONLY the three reviewed timeouts (one transaction), and read back.
+
+        Existing values are kept for exact restoration; unrelated settings are never touched. Database-specific settings or an unsupported prior value of a reviewed parameter stop the run
+        BEFORE any change. A failed or uncertain installation leaves state APPLYING so the teardown restores from the capture (idempotent)."""
+        rows=self.q(c,ROLE_SETTINGS_SQL,(list(ROLES),))
+        if [r[0] for r in rows]!=sorted(ROLES):raise ValueError('ROLE_SETTINGS_ROLES_MISSING')
+        if any(r[2] for r in rows):raise ValueError('ROLE_DATABASE_SPECIFIC_SETTINGS_PRESENT')
+        prior={}
+        for name,config,_ in rows:
+            reviewed,unrelated=self._split(list(config or []))
+            if any(not ROLE_SETTING_VALUE.fullmatch(v) for v in reviewed.values()):raise ValueError('ROLE_SETTING_PRIOR_VALUE_UNSUPPORTED')
+            prior[name]=list(config or [])
+        self.role_settings_prior=prior
+        self.emit('role_settings_captured',dict(roles={n:dict(reviewed=self._split(e)[0],unrelated_names=sorted(x.split('=',1)[0] for x in self._split(e)[1])) for n,e in prior.items()}))
+        self.role_settings_state='APPLYING'
+        self.q(c,'BEGIN',effect=True)
+        for role in sorted(ROLES):
+            for param,value in ROLE_SETTINGS:
+                self.q(c,sql.SQL('ALTER ROLE {} SET {} TO {}').format(sql.Identifier(role),sql.Identifier(param),sql.Literal(value)),effect=True)
+        self.q(c,'COMMIT',effect=True)
+        after={r[0]:list(r[1] or []) for r in self.q(c,ROLE_SETTINGS_SQL,(list(ROLES),))}
+        want={n:(dict(ROLE_SETTINGS),self._split(prior[n])[1]) for n in prior}
+        if {n:(self._split(e)[0],self._split(e)[1]) for n,e in after.items()}!=want:raise Uncertain('ROLE_SETTINGS_NOT_VERIFIED')
+        self.role_settings_state='APPLIED_VERIFIED';self.emit('role_settings_applied',dict(roles=sorted(ROLES),settings=dict(ROLE_SETTINGS)))
+
+    def restore_role_settings(self):
+        """Restore the captured configuration of each reviewed parameter (SET to the prior value, or RESET when there was none) on its own connection, then read back."""
+        prior=self.role_settings_prior
+        if prior is None:return
+        with self.connection() as c:
+            self.q(c,'BEGIN',effect=True)
+            for role in sorted(ROLES):
+                was=self._split(prior[role])[0]
+                for param,_ in ROLE_SETTINGS:
+                    if param in was:self.q(c,sql.SQL('ALTER ROLE {} SET {} TO {}').format(sql.Identifier(role),sql.Identifier(param),sql.Literal(was[param])),effect=True)
+                    else:self.q(c,sql.SQL('ALTER ROLE {} RESET {}').format(sql.Identifier(role),sql.Identifier(param)),effect=True)
+            self.q(c,'COMMIT',effect=True)
+            now={r[0]:sorted(r[1] or []) for r in self.q(c,ROLE_SETTINGS_SQL,(list(ROLES),))}
+            if now!={n:sorted(e) for n,e in prior.items()}:raise Uncertain('ROLE_SETTINGS_NOT_RESTORED')
+        self.role_settings_state='RESTORED_VERIFIED'
+
+    def restore_role_settings_guarded(self):
+        if self.role_settings_prior is None:return True
+        try:self.restore_role_settings()
+        except Exception:
+            self.role_settings_state='RESTORATION_UNCERTAIN';self.teardown_residuals.append('ROLE_SETTINGS_UNRESTORED')
+            self.emit('role_settings_restoration',dict(state=self.role_settings_state,prior=self.role_settings_prior));return False
+        self.emit('role_settings_restoration',dict(state=self.role_settings_state));return True
 
     def register(self,items,authority,*,capture_key,source_calls,prepared=()):
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}
@@ -238,21 +305,30 @@ class Owner:
             # Observe actual safe fields, never password material or query text.
             roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
             memberships=self.q(c,'SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),))
-            sessions=self.q(c,SESSIONS_SQL,(list(ROLES),))
-            self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=[[s[0],s[1],s[2]] for s in sessions]))
-            disabled=roles==[(r,False,True) for r in sorted(ROLES)] and not memberships
-            self.session_disposition='NONE' if not sessions else 'NOT_EVALUATED'
+            disabled=roles==[(r,False,True) for r in sorted(ROLES)] and not memberships      # decided from the role/password/membership readbacks alone
+            try:sessions=self.q(c,SESSIONS_SQL,(list(ROLES),))
+            except Exception:                                                                # a failed FIRST session read can never suppress the secret deletion
+                sessions=None;self.session_disposition='UNVERIFIED'
+            self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=None if sessions is None else [[s[0],s[1],s[2]] for s in sessions]))
+            if sessions is not None:self.session_disposition='NONE' if not sessions else 'NOT_EVALUATED'
             if disabled and sessions:
                 try:self.resolve_sessions(c,sessions)
-                except BaseException:                                    # a failed session read or termination must never suppress the independent secret deletion
+                except Exception:                                    # a failed session read or termination must never suppress the independent secret deletion
                     if self.session_disposition in ("NONE","NOT_EVALUATED","CLEARED_BY_WAIT"):self.session_disposition="UNRESOLVED_ERROR"
                     self.emit("session_disposition",dict(disposition=self.session_disposition))
-        if not disabled:raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
-        for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
-        names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
-        if any(n in names for n in SECRETS.values()) or 'DATABASE_URL' not in names:raise Uncertain('TEARDOWN_SECRET_RECONCILE')
-        self.urls.clear()
-        if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):raise Uncertain('TEARDOWN_SESSIONS_UNRESOLVED')
+        if not disabled:
+            if self.role_settings_prior is not None:self.teardown_residuals.append('ROLE_SETTINGS_RESTORATION_NOT_ATTEMPTED');self.role_settings_state='RESTORATION_NOT_ATTEMPTED'
+            raise Uncertain('TEARDOWN_RECONCILE')              # not verified disabled: the temporary secrets are NOT deleted
+        try:
+            for name in SECRETS.values():github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
+            names=github.names();self.emit('teardown_secret_names_observed',dict(names={n:n in names for n in SECRETS.values()},database_url_present='DATABASE_URL' in names))
+            if any(n in names for n in SECRETS.values()) or 'DATABASE_URL' not in names:raise Uncertain('TEARDOWN_SECRET_RECONCILE')
+            self.urls.clear()
+        finally:
+            settings_ok=self.restore_role_settings_guarded()      # independent of the secret outcome; the secrets always come first
+        if self.session_disposition not in ('NONE','CLEARED_BY_WAIT','TERMINATED_VERIFIED_ABSENT'):
+            self.teardown_residuals.append('SESSIONS_'+self.session_disposition);raise Uncertain('TEARDOWN_SESSIONS_UNRESOLVED')
+        if not settings_ok:raise Uncertain('TEARDOWN_ROLE_SETTINGS_UNRESTORED')
 
     def resolve_sessions(self,c,sessions):
         policy=SESSION_POLICY
@@ -315,9 +391,12 @@ class Owner:
           ('SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),)),
           ('SELECT pid,usename,state FROM pg_stat_activity WHERE usename=ANY(%s)',(list(ROLES),)),
           ("SELECT public.ingestion_acceptance_control()",None),('ROLLBACK',None)]
+        keys=['begin','roles','memberships','sessions','control','rollback']
+        if self.role_settings_prior is not None:      # only when role configuration was captured: the actual configuration of the two logins, for reconciliation
+            statements.insert(5,('SELECT rolname,rolconfig FROM pg_catalog.pg_roles WHERE rolname=ANY(%s) ORDER BY rolname',(list(ROLES),)));keys.insert(5,'role_config')
         result={}
         with self.connection() as c:
-            for key,(statement,params) in zip(('begin','roles','memberships','sessions','control','rollback'),statements):
+            for key,(statement,params) in zip(keys,statements):
                 result[key]=self.q(c,statement,params)
                 self.emit('failure_diagnostic_observed',dict(field=key,value=result[key]))
         return result

@@ -5,6 +5,7 @@ independently once DISABLED status is verified; extra, unidentifiable or unprivi
 import re,threading,time
 from datetime import datetime,timezone,timedelta
 import psycopg,pytest
+from psycopg import sql
 from verification.ingestion_storage import operational_owner as oo
 from verification.ingestion_storage.operational_owner import Owner,ROLES,SECRETS
 from verification.ingestion_storage.operational_publication import Uncertain
@@ -173,3 +174,99 @@ def test_a_failed_session_read_does_not_suppress_secret_deletion(cluster):
     with pytest.raises(Uncertain,match="TEARDOWN_SESSIONS_UNRESOLVED"):owner.teardown(gh)
     assert owner.session_disposition=="UNRESOLVED_ERROR" and gh.names()=={"DATABASE_URL"} and role_state(cluster)==([(EFFECT,False,True),(WORKER,False,True)],0)
     held.close()
+
+
+# --- role-level timeout settings: capture, apply (three reviewed settings only), verify, restore ------------------------------------------------------------
+
+def rolconfig(cluster):
+    with superuser(cluster) as c:
+        return {r:sorted(cfg or []) for r,cfg in c.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',([WORKER,EFFECT],)).fetchall()}
+
+
+def apply_settings(owner):
+    owner.apply_role_settings=True
+    with owner.connection() as c:owner.install_role_settings(c)
+
+
+def test_role_settings_are_applied_verified_and_restored_preserving_unrelated_and_prior_values(cluster):
+    creator=setup(cluster)
+    with superuser(cluster) as s:
+        s.execute(f"ALTER ROLE {WORKER} SET work_mem='5MB'");s.execute(f"ALTER ROLE {WORKER} SET statement_timeout='7s'")
+    owner,events=make_owner(cluster,creator);gh=GitHubFake()
+    apply_settings(owner)
+    assert owner.commands==10 and owner.connections==1 and owner.role_settings_state=='APPLIED_VERIFIED'          # capture, BEGIN, 6 ALTER, COMMIT, readback; same connection as the mapping step
+    assert rolconfig(cluster)[WORKER]==sorted(['work_mem=5MB','statement_timeout=10s','lock_timeout=3s','idle_in_transaction_session_timeout=20s'])
+    assert rolconfig(cluster)[EFFECT]==sorted(['statement_timeout=10s','lock_timeout=3s','idle_in_transaction_session_timeout=20s'])
+    captured=[p for e,p in events if e=='role_settings_captured'][0]
+    assert captured['roles'][WORKER]=={'reviewed':{'statement_timeout':'7s'},'unrelated_names':['work_mem']}      # names of unrelated settings only, never their values
+    before=(owner.commands,owner.connections);owner.teardown(gh)
+    assert owner.role_settings_state=='RESTORED_VERIFIED' and rolconfig(cluster)=={EFFECT:[],WORKER:sorted(['work_mem=5MB','statement_timeout=7s'])} and gh.names()=={'DATABASE_URL'} and owner.teardown_residuals==[]
+    with superuser(cluster) as s:s.execute(f"ALTER ROLE {WORKER} RESET ALL")
+    plain,_=make_owner(cluster,setup(cluster));plain.teardown(GitHubFake())
+    assert owner.commands-before[0]==plain.commands+9 and owner.connections-before[1]==plain.connections+1          # restoration costs exactly 9 commands and one connection
+
+
+def test_a_partial_installation_rolls_back_and_the_restoration_is_a_verified_no_op(cluster):
+    creator=setup(cluster);owner,events=make_owner(cluster,creator);real=owner.q;seen=[]
+    def inject(c,statement,params=None,*,effect=False):
+        if isinstance(statement,sql.Composed) and ' SET ' in statement.as_string(c):
+            seen.append(1)
+            if len(seen)==4:raise Uncertain('INJECTED_PARTIAL_INSTALL')
+        return real(c,statement,params,effect=effect)
+    owner.q=inject;owner.apply_role_settings=True
+    with pytest.raises(Uncertain,match='INJECTED_PARTIAL_INSTALL'):
+        with owner.connection() as c:owner.install_role_settings(c)
+    assert owner.role_settings_state=='APPLYING' and rolconfig(cluster)=={EFFECT:[],WORKER:[]}          # one transaction: nothing was left half applied
+    assert owner.restore_role_settings_guarded() is True and owner.role_settings_state=='RESTORED_VERIFIED' and rolconfig(cluster)=={EFFECT:[],WORKER:[]}
+
+
+def test_database_specific_settings_or_unsupported_prior_values_stop_before_any_change(cluster):
+    creator=setup(cluster);owner,_=make_owner(cluster,creator)
+    with superuser(cluster) as s:s.execute(f"ALTER ROLE {WORKER} IN DATABASE postgres SET work_mem='1MB'")
+    try:
+        with pytest.raises(ValueError,match='ROLE_DATABASE_SPECIFIC_SETTINGS_PRESENT'):apply_settings(owner)
+        assert rolconfig(cluster)=={EFFECT:[],WORKER:[]} and owner.role_settings_prior is None
+    finally:
+        with superuser(cluster) as s:s.execute(f"ALTER ROLE {WORKER} IN DATABASE postgres RESET ALL")
+    with superuser(cluster) as s:s.execute(f"ALTER ROLE {EFFECT} SET lock_timeout='1.5s'")
+    owner,_=make_owner(cluster,creator)
+    with pytest.raises(ValueError,match='ROLE_SETTING_PRIOR_VALUE_UNSUPPORTED'):apply_settings(owner)
+    assert rolconfig(cluster)[WORKER]==[] and owner.role_settings_prior is None
+
+
+def test_an_uncertain_restoration_still_disables_and_deletes_the_secrets_and_reports_the_residual(cluster):
+    creator=setup(cluster);owner,events=make_owner(cluster,creator);gh=GitHubFake();apply_settings(owner);real=owner.q;commits=[]
+    def inject(c,statement,params=None,*,effect=False):
+        if statement=='COMMIT':
+            commits.append(1)
+            if len(commits)==2:raise Uncertain('INJECTED_RESTORATION_COMMIT')          # counted from here: the second teardown transaction is the restoration; it never reaches the server
+        return real(c,statement,params,effect=effect)
+    owner.q=inject
+    with pytest.raises(Uncertain,match='TEARDOWN_ROLE_SETTINGS_UNRESTORED'):owner.teardown(gh)
+    assert owner.role_settings_state=='RESTORATION_UNCERTAIN' and 'ROLE_SETTINGS_UNRESTORED' in owner.teardown_residuals
+    assert gh.names()=={'DATABASE_URL'} and role_state(cluster)==([(EFFECT,False,True),(WORKER,False,True)],0)          # access disabled and secrets gone regardless
+    assert rolconfig(cluster)[WORKER]!=[] and [p for e,p in events if e=='role_settings_restoration'][0]['state']=='RESTORATION_UNCERTAIN'
+    assert owner.accounting()['teardown_residuals']==['ROLE_SETTINGS_UNRESTORED']
+
+
+def test_a_failed_first_session_read_is_unverified_and_never_suppresses_secret_deletion_or_restoration(cluster):
+    creator=setup(cluster);owner,events=make_owner(cluster,creator);gh=GitHubFake();apply_settings(owner);real=owner.q;calls=[]
+    def inject(c,statement,params=None,*,effect=False):
+        if statement==oo.SESSIONS_SQL:
+            calls.append(1)
+            if len(calls)==1:c.close();raise Uncertain('ADMIN_STATEMENT_HARD_DEADLINE')          # what a deadline does: the connection is abandoned and closed
+        return real(c,statement,params,effect=effect)
+    owner.q=inject
+    with pytest.raises(Uncertain,match='TEARDOWN_SESSIONS_UNRESOLVED'):owner.teardown(gh)
+    assert owner.session_disposition=='UNVERIFIED' and gh.names()=={'DATABASE_URL'} and role_state(cluster)==([(EFFECT,False,True),(WORKER,False,True)],0)
+    assert owner.role_settings_state=='RESTORED_VERIFIED' and rolconfig(cluster)=={EFFECT:[],WORKER:[]} and 'SESSIONS_UNVERIFIED' in owner.teardown_residuals
+
+
+def test_administrative_cancel_connections_have_an_aggregate_ceiling(cluster,monkeypatch):
+    creator=setup(cluster);owner,events=make_owner(cluster,creator)
+    monkeypatch.setattr(oo,'ADMIN_STATEMENT_HARD_SECONDS',1)
+    owner.cancel_events=[dict(cancel_attempts=1,cancel_outcome='CANCEL_SENT') for _ in range(oo.ADMIN_CANCEL_ALLOWANCE)]
+    c=owner.connector();cancelled=[]
+    monkeypatch.setattr(type(c),'cancel_safe',lambda self,timeout=2.0:cancelled.append(1))
+    with pytest.raises(Uncertain,match='ADMIN_STATEMENT_HARD_DEADLINE'):owner.q(c,'SELECT pg_sleep(30)')
+    assert not cancelled and owner.cancel_events[-1]['cancel_outcome']=='CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED' and owner.cancel_events[-1]['client_closed'] is True and c.closed

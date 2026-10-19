@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
@@ -46,6 +46,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 c.execute('REVOKE ingestion_worker FROM ingestion_worker_login')
                 c.execute('REVOKE ingestion_storage_operator FROM ingestion_storage_login')
             boot.execute("SELECT public.ingestion_raise_stop('STORAGE_TEST_STOP')")
+            if fault=='role_settings_success':boot.execute("ALTER ROLE ingestion_worker_login SET work_mem='5MB'");boot.execute("ALTER ROLE ingestion_worker_login SET statement_timeout='7s'")      # prior configuration to be preserved and restored
             journal=Journal(tmp_path/'actual-wrapper');holder={}
             injected=[]
             def cli(command,**kwargs):
@@ -60,6 +61,11 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 from verification.ingestion_storage.operational_memory import OperationalMemory
                 native=OperationalMemory()
             runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
+            if fault.startswith('role_settings_') or fault=='first_session_query_fails':
+                real_connect=psycopg.Connection.connect.__func__
+                def options_ignored(cls,conninfo='',**kw):
+                    kw.pop('options',None);return real_connect(cls,conninfo,**kw)          # a pooler that ignores startup options, as observed live
+                monkeypatch.setattr(psycopg.Connection,'connect',classmethod(options_ignored))
             original_install=runner.owner.install
             def install_with_ambient_negatives():
                 original_install()
@@ -198,7 +204,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     record_property('restricted_route_diagnostic',json.dumps(dict(accounting=result['accounting'],status=result['status'],execution_grants=0,source_calls=0,ledger_changed=False)))
                     return
 
-            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget'}:
+            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration'}:
                 from verification.ingestion_storage.operational_outcome import session
                 from verification.ingestion_storage.tls_trust import verified_trust
                 # Production-shaped kwargs reach the real psycopg Connection
@@ -258,6 +264,31 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                         for lock in locks:lock.execute('ROLLBACK');lock.close()
                         return original_failed(exc)
                     runner.capture_once=locked_capture;runner.failed=release_then_failed
+                if fault=='role_settings_partial_install':
+                    real_q=runner.owner.q;set_seen=[]
+                    def partial_q(c,statement,params=None,*,effect=False):
+                        if isinstance(statement,sql.Composed) and ' SET ' in statement.as_string(c):
+                            set_seen.append(1)
+                            if len(set_seen)==4:raise Uncertain('DISPOSABLE_PARTIAL_ROLE_SETTINGS')      # half of the six statements were issued; the transaction never commits
+                        return real_q(c,statement,params,effect=effect)
+                    runner.owner.q=partial_q
+                if fault=='role_settings_failed_qualification':
+                    original_map_rs=runner.owner.map_and_activate
+                    def map_then_unset(*a,**k):
+                        original_map_rs(*a,**k);boot.execute('ALTER ROLE ingestion_worker_login RESET statement_timeout')      # applied, then not reflected for the worker
+                    runner.owner.map_and_activate=map_then_unset
+                if fault=='role_settings_uncertain_restoration':
+                    original_map_ur=runner.owner.map_and_activate
+                    def map_then_deny_ur(*a,**k):
+                        original_map_ur(*a,**k);boot.execute('ALTER ROLE ingestion_worker_login NOLOGIN')      # qualification fails, teardown runs
+                    runner.owner.map_and_activate=map_then_deny_ur
+                    real_q_ur=runner.owner.q;commits_ur=[]
+                    def restoration_lost(c,statement,params=None,*,effect=False):
+                        if statement=='COMMIT' and runner.owner.tearing_down:
+                            commits_ur.append(1)
+                            if len(commits_ur)==2:raise Uncertain('DISPOSABLE_RESTORATION_NOT_REACHED')      # the second teardown transaction is the restoration
+                        return real_q_ur(c,statement,params,effect=effect)
+                    runner.owner.q=restoration_lost
                 if fault=='exhausted_normal_budget':
                     original_map_budget=runner.owner.map_and_activate
                     def map_then_exhaust(*a,**k):
@@ -281,6 +312,19 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 elif fault=='invalidation_commit_unknown':
                     assert result['authority_invalidation']=='UNCERTAIN_RECONCILE' and not any(m=='DELETE' for m,p in requests)
                     assert not source_calls
+                elif fault.startswith('role_settings_'):
+                    assert not ctl['grants'] and not ctl.get('bolton_exceptions') and not source_calls and set(ciphertexts)=={'DATABASE_URL'} and result['operation_phase'] in ('RESTRICTED_CONNECTION_QUALIFICATION','CREDENTIAL_MAPPING_ACTIVATION')
+                    cfg={r:sorted(c or []) for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}
+                    admin=result['accounting']['administration']
+                    if fault=='role_settings_uncertain_restoration':
+                        assert admin['role_settings']['state']=='RESTORATION_UNCERTAIN' and admin['teardown_residuals']==['ROLE_SETTINGS_UNRESTORED'] and cfg['ingestion_worker_login']!=[] and cfg['ingestion_effect_login']!=[]
+                        assert boot.execute("SELECT rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname='ingestion_worker_login'").fetchone()==(False,True)      # disabled regardless; the residual is reported, never hidden
+                    elif fault=='role_settings_partial_install':
+                        assert admin['role_settings']['state']=='APPLYING' and cfg=={'ingestion_effect_login':[],'ingestion_worker_login':[]} and result['access']=='UNRECONCILED'      # one transaction: nothing applied, no automatic compensation, reported
+                        assert sorted(result['diagnostics']['role_config'])==[('ingestion_effect_login',None),('ingestion_worker_login',None)]
+                    else:
+                        assert result['access']=='DISABLED_VERIFIED' and admin['role_settings']['state']=='RESTORED_VERIFIED' and cfg=={'ingestion_effect_login':[],'ingestion_worker_login':[]}
+                    print('ROLLUP_ROLE_SETTINGS',fault,admin['commands'],admin['connections'],admin['role_settings']['state'])
                 elif fault=='exhausted_normal_budget':
                     # the NORMAL administrative command allowance was spent right after mapping; the reserved teardown allowance still disables access and removes the secrets
                     assert result['access']=='DISABLED_VERIFIED' and result['cleanup']=='CLOSED' and set(ciphertexts)=={'DATABASE_URL'} and not source_calls and not ctl['grants'] and not ctl.get('bolton_exceptions')
@@ -351,6 +395,19 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     finally:
                         if fault=='session_survives_privileged':survivors[0].close()          # the test process is the client: release its socket so process closure measures the controller, not the fixture
                 runner.owner.teardown=with_survivor
+            if fault=='first_session_query_fails':
+                real_q_fs=runner.owner.q;first_read=[]
+                def first_session_read_fails(c,statement,params=None,*,effect=False):
+                    if statement==__import__("verification.ingestion_storage.operational_owner",fromlist=["x"]).SESSIONS_SQL and not first_read:
+                        first_read.append(1);c.close();raise Uncertain('ADMIN_STATEMENT_HARD_DEADLINE')      # what a deadline does to the connection and the call
+                    return real_q_fs(c,statement,params,effect=effect)
+                runner.owner.q=first_session_read_fails
+                with pytest.raises(Uncertain):runner.finish()
+                assert first_read and runner.owner.session_disposition=='UNVERIFIED' and set(ciphertexts)=={'DATABASE_URL'}      # access disabled by readback, so the secrets are gone although the session state is unverified
+                assert boot.execute("SELECT count(*) FROM pg_authid WHERE rolname=ANY(%s) AND (rolcanlogin OR rolpassword IS NOT NULL)",(['ingestion_worker_login','ingestion_effect_login'],)).fetchone()[0]==0
+                assert runner.owner.role_settings_state=='RESTORED_VERIFIED' and all(c is None for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall())
+                print('ROLLUP_FIRST_SESSION_QUERY_FAILS',runner.owner.commands,runner.owner.connections,runner.owner.teardown_residuals)
+                return
             if fault=='session_survives_unprivileged':
                 with pytest.raises(Uncertain):runner.finish()
                 assert runner.owner.session_disposition=='UNRESOLVED_PRIVILEGE_NOT_PROVEN' and runner.owner.terminations==0 and set(ciphertexts)=={'DATABASE_URL'}      # unresolved, reported, secrets removed independently
@@ -393,6 +450,9 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             aggregate={k:sum(r['database'][k] for r in runner.receipts.values()) for k in ('driver_statements','connection_attempts','returned_data_value_bytes')}
             assert aggregate['driver_statements']<=1040 and aggregate['connection_attempts']<=40 and aggregate['returned_data_value_bytes']<=4*1024**2
             assert runner.owner.connections<=13 and runner.owner.commands<=240
+            expected_cfg={'ingestion_effect_login':[],'ingestion_worker_login':['statement_timeout=7s','work_mem=5MB'] if fault=='role_settings_success' else []}
+            assert {r:sorted(c or []) for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}==expected_cfg and runner.owner.role_settings_state=='RESTORED_VERIFIED' and runner.owner.teardown_residuals==[]
+            print('ROLLUP_ADMIN_COMPLETE',fault,runner.owner.commands,runner.owner.connections)
             if fault=='session_survives_privileged':
                 pid=survivor_pids[0]
                 assert runner.owner.session_disposition=='TERMINATED_VERIFIED_ABSENT' and runner.owner.terminations==1 and boot.execute('SELECT count(*) FROM pg_stat_activity WHERE pid=%s',(pid,)).fetchone()[0]==0

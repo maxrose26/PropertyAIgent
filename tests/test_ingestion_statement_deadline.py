@@ -175,3 +175,24 @@ def test_a_failed_gate_records_what_was_observed_separately_for_identity_and_tim
     assert 'SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE' in repr(caught.value) and len(obs)==1
     assert obs[0]['identity_and_flags_match'] is True and obs[0]['timeouts_match_reviewed'] is False and obs[0]['observed_timeouts']==['0','0','0'] and obs[0]['role']==WORKER      # identity was right; the timeouts were not reflected
     budget.close([])
+
+
+def test_the_cancellation_ceiling_is_aggregate_across_budgets_not_reset_per_slot(cluster,roles,local_principal,monkeypatch):
+    monkeypatch.setattr(oc,"STATEMENT_HARD_SECONDS",1)
+    earlier={"a":{"database":{"cancel_attempts":3}},"b":{"database":{"cancel_attempts":oc.CANCEL_RUN_ALLOWANCE["attempts"]-4}}}
+    used=oc.run_cancel_used(earlier)
+    assert used==oc.CANCEL_RUN_ALLOWANCE["attempts"]-1                                       # seven of eight spent by earlier slots
+    receipts=[]
+    for _ in range(2):                                                                         # two further slots, each a NEW budget, exactly as the runner builds them
+        budget=DatabaseBudget(cancel_used=oc.run_cancel_used({**earlier,**{str(i):r for i,r in enumerate(receipts)}}));engine=budget.engine(local_principal)
+        with engine.connect() as c:
+            with pytest.raises(Exception):c.execute(text("SELECT pg_sleep(30)"))
+        receipts.append({"database":budget.close([])})
+    outcomes=[r["database"]["hard_deadline_events"][0]["cancel_outcome"] for r in receipts]
+    assert outcomes==["CANCEL_SENT","CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED"] and receipts[1]["database"]["cancel_used_before"]==oc.CANCEL_RUN_ALLOWANCE["attempts"] and receipts[0]["database"]["cancel_run_allowance"]=={"attempts":8}
+    assert all(r["database"]["hard_deadline_events"][0]["client_closed"] is True for r in receipts)      # the allowance limits cancels, never closure
+
+
+def test_an_unbounded_or_negative_prior_cancel_count_is_refused():
+    with pytest.raises(Exception,match="CANCEL_RUN_ALLOWANCE_BOUND"):DatabaseBudget(cancel_used=oc.CANCEL_RUN_ALLOWANCE["attempts"]+1)
+    with pytest.raises(Exception,match="CANCEL_RUN_ALLOWANCE_BOUND"):oc.run_cancel_used({"a":{"database":{"cancel_attempts":-1}}})

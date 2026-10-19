@@ -63,6 +63,17 @@ def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
 STATEMENT_HARD_SECONDS=12
 WAITS_PER_OPERATION=2
 CANCEL_ALLOWANCE=dict(attempts=4,seconds_each=2.0)       # explicit finite allowance for cancel connections per budget; they are not logins and are accounted separately
+CANCEL_RUN_ALLOWANCE=dict(attempts=8)                    # AGGREGATE ceiling across every slot of one run (capture + all batches, carried through pause/resume receipts); a new budget never starts from zero
+
+
+def run_cancel_used(receipts):
+    """Cancel attempts already spent by every slot of this run (carried in the receipts through pause/resume); the aggregate ceiling is CANCEL_RUN_ALLOWANCE."""
+    total=0
+    for r in receipts.values():
+        n=r.get("database",{}).get("cancel_attempts",0)
+        if type(n) is not int or n<0:raise Denied("CANCEL_RUN_ALLOWANCE_BOUND")
+        total+=n
+    return total
 
 
 class DatabaseBudget:
@@ -71,7 +82,9 @@ class DatabaseBudget:
     Includes SQLAlchemy initialization, BEGIN/COMMIT/ROLLBACK. Records operation
     kinds only, never SQL parameters, URLs, credentials or row values.
     """
-    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None):
+    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2,emit=None,cancel_used=0):
+        if type(cancel_used) is not int or not 0<=cancel_used<=CANCEL_RUN_ALLOWANCE['attempts']:raise Denied('CANCEL_RUN_ALLOWANCE_BOUND')
+        self.cancel_used=cancel_used
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.emit=emit or (lambda *_:None);self.connection_diagnostics=list((previous or {}).get('connection_diagnostics',[]))
         self.failed_native_closed=True;self.hard_deadline_events=[];self.hard_stop_at=None
@@ -104,12 +117,12 @@ class DatabaseBudget:
         remaining=min(STATEMENT_HARD_SECONDS,self.seconds-self.previous_elapsed-(now-self.started))
         if self.hard_stop_at is not None:remaining=min(remaining,self.hard_stop_at-now)
         if remaining<=0:raise Denied('EXECUTION_RESERVE_REACHED')
-        remaining=max(.5,remaining)
+        if remaining<.5:raise Denied('EXECUTION_RESERVE_REACHED')      # never widen a wait past the reserve (a sub-half-second wait is refused, not stretched)
         try:
             with hard_deadline(remaining,'STATEMENT_HARD_DEADLINE'):return call()
         except DeadlineExceeded:
             attempts=sum(e.get('cancel_attempts',0) for e in self.hard_deadline_events)
-            if attempts>=CANCEL_ALLOWANCE['attempts']:
+            if attempts>=CANCEL_ALLOWANCE['attempts'] or self.cancel_used+attempts>=CANCEL_RUN_ALLOWANCE['attempts']:
                 event=dict(cancel_requested=False,cancel_outcome='CANCEL_SKIPPED_ALLOWANCE_EXHAUSTED',cancel_attempts=0,cancel_seconds=0.0,backend_closure='NOT_ESTABLISHED')
                 try:connection.close()
                 except BaseException:pass
@@ -213,7 +226,7 @@ class DatabaseBudget:
         return dict(connection_diagnostics=self.connection_diagnostics,connection_active_seconds=self.connection_seconds,connections_opened=self.previous_opened+len(self.opened),connections_closed_count=self.previous_opened+sum(bool(c.closed) for c in self.opened),slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             failed_native_connections_closed=failed_closed,socket_closure=socket_proof,hard_deadline_events=list(self.hard_deadline_events),cancel_attempts=sum(e.get('cancel_attempts',0) for e in self.hard_deadline_events),
             cancel_failures=sum(1 for e in self.hard_deadline_events if e.get('cancel_outcome') not in ('CANCEL_SENT',)),cancel_seconds=round(sum(e.get('cancel_seconds',0.0) for e in self.hard_deadline_events),3),
-            cancel_allowance=dict(CANCEL_ALLOWANCE),
+            cancel_allowance=dict(CANCEL_ALLOWANCE),cancel_run_allowance=dict(CANCEL_RUN_ALLOWANCE),cancel_used_before=self.cancel_used,
             connections_closed=failed_closed and all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and failed_closed and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 
