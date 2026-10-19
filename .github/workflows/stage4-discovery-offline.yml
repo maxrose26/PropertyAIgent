@@ -183,7 +183,7 @@ jobs:
 
   restricted-provisioning:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 14      # the existing disposable rehearsals plus the stable pipeline lifecycle
     services:
       postgres:
         image: postgres:17
