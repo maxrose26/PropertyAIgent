@@ -104,7 +104,7 @@ class Owner:
         for statement in split_sql(Path(path).read_text()):self.q(c,statement,effect=True)
 
     def accounting(self):
-        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),admin_cancel_allowance=ADMIN_CANCEL_ALLOWANCE,session_terminations=self.terminations,session_disposition=self.session_disposition,role_settings=dict(state=self.role_settings_state,prior_captured=self.role_settings_prior is not None),teardown_residuals=list(self.teardown_residuals))
+        return dict(connections=self.connections,connections_opened=self.opened,connections_closed=self.closed,failed_native_connections=len(self.failed_native_connections),failed_native_finished=sum(self.failed_native_connections),commands=self.commands,returned_data_value_bytes=self.returned_bytes,database_active_seconds=self.active+self.connection_active,uncertain_effect=self.effect_uncertain,admin_hard_deadline_events=list(self.cancel_events),admin_cancel_allowance=ADMIN_CANCEL_ALLOWANCE,session_terminations=self.terminations,first_connection_intervals={r:t.get('first_contact_intervals') for r,t in self.timeline.items()},session_disposition=self.session_disposition,role_settings=dict(state=self.role_settings_state,prior_captured=self.role_settings_prior is not None),teardown_residuals=list(self.teardown_residuals))
 
     def preflight(self):
         with self.connection() as c:
