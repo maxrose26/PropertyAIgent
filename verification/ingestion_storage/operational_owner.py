@@ -163,7 +163,8 @@ class Owner:
         observed={n:body for n,body,_,_ in rows}
         recognised=next((s for s,b in {'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded}.items() if observed==b),None)
         self.emit('installed_function_inventory',dict(hashes={n:hashlib.sha256(body.encode()).hexdigest() for n,body in observed.items()},policy_state=recognised or 'UNRECOGNISED'))
-        if len(rows)!=len(names) or any(owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for _,_,owner,config in rows):reason='INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED' if len(rows)==len(names) else 'INSTALLED_FUNCTION_CONTENT_CHANGED'
+        if set(observed)!=set(names) or len(rows)!=len(names):reason='INSTALLED_FUNCTION_CONTENT_CHANGED'      # missing, extra or duplicated (overloaded) functions
+        elif any(owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for _,_,owner,config in rows):reason='INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED'
         elif recognised is None:
             mixed=all(observed[n] in (states['ORIGINAL'][n],upgraded[n]) for n in names)
             reason='INSTALLED_POLICY_STATE_MIXED' if mixed else 'INSTALLED_FUNCTION_CONTENT_CHANGED'

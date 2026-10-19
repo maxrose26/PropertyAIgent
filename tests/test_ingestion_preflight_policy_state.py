@@ -124,3 +124,12 @@ def test_only_fixed_codes_and_a_policy_state_are_exported():
         assert not re.search(r'postgres|SELECT|\$\$|CREATE',report)
     assert codes<={'POLICY_STATE_RECOGNISED','INSTALLED_POLICY_STATE_MIXED','INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED'} and len(codes)==3
     assert Owner(lambda:None,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc),bindings={}).accounting()['preflight']['reason_code']=='NOT_REACHED'
+
+
+def test_a_duplicated_overload_with_a_missing_function_is_refused_with_a_fixed_code_not_a_crash():
+    original,_=inventories()
+    rows=rows_for(original)
+    dup=[r for r in rows if r[0]!='ingestion_raise_stop']+[rows[0]]            # same row count as expected, but one function missing and one duplicated
+    assert len(dup)==len(rows)
+    o=make(True)
+    assert reason(o,dup)=='INSTALLED_FUNCTION_CONTENT_CHANGED' and o.preflight_report['reason_code']=='INSTALLED_FUNCTION_CONTENT_CHANGED'

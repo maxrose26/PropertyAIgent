@@ -14,6 +14,7 @@ RUN2_DIRECTORY=operational-capture-queue-settled-once-20261019
 EVIDENCE_REF=repos/maxrose26/PropertyAIgent/git/ref/heads/stage4/narrow-continuation-evidence-20261016
 PY="$HOME/stage4-owner/storage-controller-venv/bin/python"
 
+trap 'rm -f "${TMPDIR:-/tmp}/.evidence-head-$$"' EXIT
 # The hidden prompt needs a real terminal you can see and type into. Refuse BEFORE anything is consumed if there is not one.
 [[ -t 0 && -t 2 ]] || { echo 'VISIBLE_INTERACTIVE_TTY_REQUIRED: run this in your own WSL terminal, not an automation tab'; exit 2; }
 
@@ -38,7 +39,6 @@ test ! -e "$HOME/stage4-owner/operational-settled-registration-20261019.json" ||
 # No earlier scope of the unit may be present: an unreadable or timed-out answer is UNKNOWN and blocks the launch.
 scope_state="$(timeout 10s systemctl --user show propertyaigent-operational-once.scope -p LoadState --value)" || { echo 'SCOPE_STATE_UNKNOWN: refusing to launch'; exit 3; }
 [[ "$scope_state" = not-found ]] || { echo "SCOPE_PRESENT_OR_UNKNOWN ($scope_state): refusing to launch"; exit 3; }
-trap 'rm -f "${TMPDIR:-/tmp}/.evidence-head-$$"' EXIT
 
 # Read-only preconditions: registration bindings, GitHub identity, and that the evidence branch head is still the one the registration binds (a moved head would only be
 # discovered AFTER the single source observation, so it is checked now, before anything is consumed).

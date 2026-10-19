@@ -35,6 +35,6 @@ def render(root=None,minutes=90,evidence_head=None):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--minutes',type=int,default=90);parser.add_argument('--evidence-head',required=True);args=parser.parse_args()
-    if not 1<=args.minutes<=120:raise SystemExit('EXPIRY_MINUTES_1_TO_120')
+    if not 1<=args.minutes<=110:raise SystemExit('EXPIRY_MINUTES_1_TO_110')      # the validator's ceiling is two hours from validation, so leave margin
     body=json.dumps(render(minutes=args.minutes,evidence_head=args.evidence_head),sort_keys=True,indent=1)+'\n'
     sys.stdout.write(body);sys.stderr.write(hashlib.sha256(body.encode()).hexdigest()+'\n')
