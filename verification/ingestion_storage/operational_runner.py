@@ -361,7 +361,7 @@ class Runner:
             diagnostics['completion']='INCOMPLETE_RECONCILE'
         components=self.closure(access)
         result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,
-            failure=safe_failure(exc,'EXECUTION'),operation_phase=failed_phase,authority_invalidation=invalidation,
+            failure=safe_failure(exc,'EXECUTION'),preflight=dict(self.owner.preflight_report),operation_phase=failed_phase,authority_invalidation=invalidation,
             access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
