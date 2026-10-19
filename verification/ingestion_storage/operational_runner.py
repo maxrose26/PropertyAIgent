@@ -395,7 +395,7 @@ class Runner:
         connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and (getattr(self,"matrix",None) is None or self.matrix.closed_ok()) and
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
-        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED') and not a['uncertain_effect'] and not self.github.mutation_uncertain
+        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
         overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
@@ -522,6 +522,9 @@ class Runner:
             root_binding=item(dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
             self.batch_bindings=self.owner.register(batches,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[root_binding,*prepared])
             self.emit('pipeline_screening_authority_registered',dict(batches=len(self.plans),children_prepared=len(prepared)))
+            # The restricted job waits on the evidence branch (no database connection) for this marker. It is NOT an authority - the authority is the database grant registered above.
+            marker=dict(authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
+            self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
             self.operation_phase='PIPELINE_AWAIT_SCREENING'
             head,_=self.await_publication(self.evidence_head,'completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
@@ -538,6 +541,10 @@ class Runner:
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',
                     source_observations_attempted=1,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+        self.emit('pipeline_owner_result',result);self.journal.save('final-result.json',result)
+        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/owner',expected_head=self.evidence_head)
+        result.update(evidence_commit=self.evidence_head,audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)
+        self.journal.save('final-result.json',result)
         return result
 
     def execute(self):

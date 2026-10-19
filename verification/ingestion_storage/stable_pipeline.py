@@ -1,0 +1,218 @@
+"""Restricted-runtime half of the stable-credential pipeline (see specifications/032-stage4-stable-credential-pipeline.md).
+
+Runs in the single-use hosted job with the two restricted credentials ALONE: no administrative credential, no Owner, no credential change, no revocation. It reuses the accepted
+capture/screening components unchanged (`Runner.slot`, `capture_once`, `screen`, `ControllerLedger`, `DatabaseBudget`, `batch_plans`, `process_batch`) by building a Runner whose "owner" is a
+stand-in that can only (a) hand over the two restricted URLs and (b) wait for the OWNER-registered screening authority, which it never issues itself.
+
+Order: admission -> bounded connection qualification (the reviewed Qualification, read-only introspection, before ANY ledger work) -> capture authority check (as the worker, read only) ->
+capture and durable retention (evidence branch, fast-forward only, before the checkpoint is durable) -> wait for the owner's screening-authority marker (evidence branch poll; no database
+connection while waiting) -> source-free queued screening -> sealed result published. There is no connection retry after qualification: a later connection failure is a stop, never a replay
+of an uncertain effect."""
+import base64,hashlib,json,os,subprocess,sys,time
+from datetime import datetime,timezone,timedelta
+from pathlib import Path
+from app.ingestion.ledger import digest,DEFAULT_LIMITS,Denied
+from . import stable_qualification as sq
+from . import restricted_route as rr
+from .connection_diagnostics import safe_failure
+from .operational_controller import DatabaseBudget
+from .operational_journal import Journal
+from .operational_owner import item,SCOPE,ROLES
+from .operational_preparation import Progress,resolve_addresses
+from .operational_publication import GitHub,Uncertain,BRANCH,REPO
+from .operational_runner import Runner,CONTRACT,PIPELINE_AUTHORITY
+from .tls_trust import verified_trust,owned_resources
+
+HOSTED_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_HOSTED_ONCE_20261020'
+EVIDENCE_DIRECTORY='docs/design/ingestion-operational-execution-stable-pipeline-20261020'
+MANIFEST_PATH='docs/design/ingestion-stable-pipeline-20261020/MANIFEST.json'
+# Hosted deadlines. Waiting for the owner counts as the administrative phase of the accepted accounting; runtime keeps the accepted 300 s aggregate.
+HOSTED_DEADLINES=dict(job=1800,diagnostic_total=1860,diagnostic_window=40,admin_diagnostic=240,admin_pre=1700,admin_total=1790,runtime_total=300)
+SCREENING_WAIT_SECONDS=480
+POLL_SECONDS=15
+FORBIDDEN_ENV=('DATABASE_URL','INGESTION_STORAGE_DATABASE_URL','GITHUB_TOKEN','PGPASSWORD','PGSERVICE','PGSERVICEFILE')
+SECRET_NAMES=tuple(sq.SECRET_ENV.values())
+
+
+def admitted(env):
+    """Single-use protected-environment admission. A GH_TOKEN is REQUIRED here (the evidence publisher) but no administrative credential may be present."""
+    sha=env.get('PIPELINE_REVIEWED_SHA','');head=env.get('PIPELINE_EVIDENCE_HEAD','')
+    hexed=lambda v:len(v)==40 and all(ch in '0123456789abcdef' for ch in v)
+    return (hexed(sha) and hexed(head) and env.get('GITHUB_SHA')==sha and env.get('GITHUB_WORKFLOW_SHA')==sha and env.get('GITHUB_REF')=='refs/heads/master'
+            and env.get('GITHUB_RUN_NUMBER')=='1' and env.get('GITHUB_RUN_ATTEMPT')=='1' and env.get('GITHUB_ACTIONS')=='true' and env.get('RUNNER_ENVIRONMENT')=='github-hosted'
+            and env.get('PIPELINE_AUTHORITY')==HOSTED_AUTHORITY and bool(env.get('GH_TOKEN')) and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
+
+
+def bindings_for(items):
+    return {x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in items}
+
+
+class HostedOwner:
+    """The only 'owner' capabilities the restricted job has: its two URLs, a non-secret timeline, and a wait for the owner-registered screening authority. It cannot register anything."""
+    def __init__(self,runner,urls):
+        self.runner=runner;self.urls=dict(urls);self.timeline={};self.authorities=[]
+
+    def accounting(self):
+        return dict(connections=0,connections_opened=0,connections_closed=0,failed_native_connections=0,failed_native_finished=0,commands=0,returned_data_value_bytes=0,database_active_seconds=0,
+                    uncertain_effect=False,administrative_credential='NOT_PRESENT')
+
+    def register(self,items,authority,*,capture_key,source_calls,prepared=()):
+        if source_calls!=0 or not authority.endswith('_SCREEN'):raise Denied('HOSTED_JOB_CANNOT_REGISTER_AUTHORITY')
+        bindings=bindings_for([*items,*prepared])
+        self.runner.await_marker(bindings)
+        return bindings
+
+
+class HostedRunner(Runner):
+    """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
+    def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256):
+        self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
+        self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.ssl=ssl;self.memory=memory;self.hostaddr=hostaddr
+        self.operation_phase='INITIALISATION';self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0
+        self.expiry=datetime.now(timezone.utc)+timedelta(seconds=HOSTED_DEADLINES['job']+60)
+        self.settle_seconds=0;self.settle_sleep=time.sleep;self.route_name='POOLER';self.restricted_hostaddr=None;self.matrix_mode=False;self.matrix=None;self.pipeline_mode=False
+        self.deadlines=dict(HOSTED_DEADLINES);self.authority=PIPELINE_AUTHORITY
+        self.owner=HostedOwner(self,urls)
+        self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None
+        self.batch_bindings={};self.evidence_head=evidence_head;self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
+        identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
+        root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
+        self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
+        self.pipeline_sleep=time.sleep;self.authority_check=None
+
+    def check(self):
+        if sq._Cancellation.requested:raise Denied('CANCELLED')
+        super().check()
+
+    def head(self):
+        return self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
+
+    def await_marker(self,bindings):
+        """Poll the evidence branch (no database connection) for the OWNER's screening-authority marker. The marker is not an authority: the authority is in the database and is enforced there when
+        the screening slot runs. A marker that disagrees with the locally recomputed bindings is UNCERTAIN. Timeout is a stop."""
+        deadline=time.monotonic()+SCREENING_WAIT_SECONDS;previous=self.evidence_head
+        self.emit('awaiting_owner_screening_authority',dict(from_head=previous,seconds=SCREENING_WAIT_SECONDS))
+        while True:
+            self.check()
+            head=self.head()
+            if head!=previous:
+                blob=self.github.call('GET',REPO+'/contents/'+EVIDENCE_DIRECTORY+'/screening-authority/registered.json?ref='+head)
+                try:marker=json.loads(base64.b64decode(blob['content']))
+                except Exception:raise Uncertain('OWNER_MARKER_UNREADABLE') from None
+                if marker.get('bindings_sha256')!=digest(bindings) or marker.get('capture_sha256')!=digest(self.capture) or marker.get('authority')!=self.authority+'_SCREEN':raise Uncertain('OWNER_MARKER_BINDING_MISMATCH')
+                self.evidence_head=head;self.emit('owner_screening_authority_marker_verified',dict(head=head));return
+            if time.monotonic()>=deadline:raise Denied('OWNER_SCREENING_AUTHORITY_WAIT_EXPIRED')
+            self.pipeline_sleep(POLL_SECONDS)
+
+    def authority_present(self):
+        """Read-only check as the worker, with its own small budget and no ledger mutation: an unexpired grant must exist before the single source request is even considered."""
+        budget=DatabaseBudget(connections=1,statements=4,seconds=30,emit=self.emit,stop_file=self.journal.root/'STOP');closed=None
+        engine=budget.engine(self.owner.urls['ingestion_worker_login'],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name)
+        try:
+            with engine.connect() as connection:
+                from sqlalchemy import text
+                count=connection.execute(text(sq.CONTROL_SQL)).fetchone()
+        finally:closed=budget.close([engine])
+        if closed.get('cleanup')!='CLOSED' or count is None or int(count[3])<1:raise Denied('CAPTURE_AUTHORITY_NOT_REGISTERED')
+        self.emit('capture_authority_observed',dict(unexpired_grants=int(count[3]),client_closure=closed.get('cleanup')))
+        return closed
+
+    def hosted_result(self,qualification):
+        from collections import Counter
+        from app.ingestion.listing_screening import screen_row
+        components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
+        screens=[screen_row(row) for row in self.capture.get('records',[])] if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1' else []
+        usable=sum(x['proposal_usable'] for x in screens)
+        outcome='CAPTURED_PROCESSING_BLOCKED' if self.capture and self.capture.get('kind')!='LISTING_RECEIPT_V1' else 'STABLE_PIPELINE_CAPTURE_SCREENING_COMPLETED_RESTRICTED_RUNTIME_ONLY'
+        if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1':
+            if not screens:outcome='DISCOVERY_EXPLICIT_ZERO_SCREENING_NOT_EXERCISED'
+            elif usable<len(screens):outcome='PARTIAL_PROPOSAL_COVERAGE'
+        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,qualification=qualification,
+                    rows=len((self.capture or {}).get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture) if self.capture else None,slot_receipts=self.receipts,
+                    accounting=self.accounting(),authority_check_receipt=self.authority_check,usable_proposals=usable,screening_dispositions=dict(Counter(x['disposition'] for x in screens)),citation_leads=sum(len(x['citations']['occurrences']) for x in screens),
+                    source_resources=(self.capture or {}).get('resources'),source_observations_attempted=self.source_attempts,application_writes=0,credential_changes=0,grants_issued=0,
+                    client_closure_vs_server_session='CLIENT_SIDE_RECEIPTS_ONLY_SERVER_SESSIONS_ARE_AN_OWNER_READBACK',pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True,
+                    memory_enforcement=dict(kind='CGROUP_V2_ACTUAL_MEMORY' if self.memory is not None else 'NOT_ESTABLISHED',aggregate_bytes=1536*1024**2 if self.memory is not None else None))
+
+    def run(self):
+        qualification=None
+        try:
+            self.operation_phase='CONNECTION_QUALIFICATION'
+            q=sq.Qualification(self.owner.urls,emit=self.emit,ssl=self.ssl,hostaddr=self.hostaddr,stop_file=self.journal.root/'STOP')
+            qualification=q.run()
+            self.emit('connection_qualification_result',dict(status=qualification['status'],stop_reason=qualification.get('stop_reason'),attempts_total=qualification['attempts_total'],accounting=qualification['accounting']))
+            if qualification['status']!='STABLE_CREDENTIALS_QUALIFIED':raise Denied('CONNECTION_QUALIFICATION_'+str(qualification.get('stop_reason')))
+            qualification={k:qualification[k] for k in ('status','attempts_total','accounting','elapsed_seconds')}
+            self.operation_phase='CAPTURE_AUTHORITY_CHECK';self.authority_check=self.authority_present()
+            self.capture_once()
+            if self.capture['kind']!='LISTING_RECEIPT_V1':
+                self.emit('capture_processing_blocked',dict(checkpoint=self.capture))
+            elif self.plans:self.screen()
+            result=self.hosted_result(qualification)
+        except BaseException as exc:
+            result=self.hosted_failure(exc,qualification)
+        return result
+
+    def hosted_failure(self,exc,qualification):
+        self.diagnosing=True;self.diagnostic_started=time.monotonic()
+        try:components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
+        except BaseException:components=dict(overall='UNCERTAIN')
+        result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),operation_phase=self.operation_phase,qualification=qualification,
+                    accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
+                    application_writes=0,credential_changes=0,grants_issued=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+        try:self.emit('stopped',result)
+        except BaseException:result['audit_stop_record']='UNCERTAIN'
+        return result
+
+    def publish_completed(self,result):
+        """The sealed execution chain and the result, on the evidence branch (the owner's signal that the restricted job is finished). Best effort on a failure path: the owner's own deadline and
+        the grant lifetime bound the authority regardless."""
+        self.journal.save('final-result.json',result)
+        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':json.dumps(result,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/completed',expected_head=self.head())
+        return self.evidence_head
+
+
+def main(argv=None):
+    import argparse
+    parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args(argv)
+    if not admitted(os.environ):raise SystemExit('PIPELINE_NOT_ADMITTED')
+    urls={role:os.environ.get(name,'') for role,name in sq.SECRET_ENV.items()}
+    if not all(urls.values()):raise SystemExit('RESTRICTED_CREDENTIALS_REQUIRED')
+    token=os.environ.pop('GH_TOKEN')
+    journal=Journal(args.output);journal.emit('consumed',dict(authority=HOSTED_AUTHORITY,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD']))
+    sq.install_cancellation()
+    from .operational_memory import OperationalMemory
+    try:memory=OperationalMemory()      # kernel-enforced ACTUAL memory (cgroup v2), established BEFORE any database connection; unavailable = stop here
+    except Exception as exc:
+        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='ACTUAL_MEMORY_ENFORCEMENT_UNAVAILABLE',detail=type(exc).__name__,database_connections_attempted=0,application_writes=0,credential_changes=0)
+        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
+    journal.emit('actual_memory_enforcement_established',dict(kind='CGROUP_V2',aggregate_bytes=1536*1024**2,controller_bytes=256*1024**2,source_bytes=1024**3,swap=0))
+    github_env=dict(PATH='/usr/bin:/bin',HOME=str(args.output.parent),GH_TOKEN=token,GH_HOST='github.com')
+    holder={}
+    github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),bound=140)
+    manifest_sha=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest()
+    progress=Progress()
+    try:
+        ca,_=verified_trust()
+        hostaddr=resolve_addresses(progress)
+    except BaseException as exc:
+        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='PREPARATION_FAILED',detail=type(exc).__name__,database_connections_attempted=0,application_writes=0,credential_changes=0)
+        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
+    from .operational_source import read
+    ssl={'sslmode':'verify-full','sslrootcert':str(ca)}
+    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=manifest_sha);holder['runner']=runner
+    runner.source_reader=lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
+    if runner.head()!=os.environ['PIPELINE_EVIDENCE_HEAD']:
+        result=dict(status='STOP_RECONCILE_NO_RETRY',stop_reason='EVIDENCE_HEAD_MOVED',database_connections_attempted=0,application_writes=0,credential_changes=0)
+        journal.emit('stopped',result);journal.save('final-result.json',result);print(json.dumps({'status':result['status'],'stop_reason':result['stop_reason']}));raise SystemExit(1)
+    result=runner.run()
+    try:runner.publish_completed(result)
+    except BaseException as exc:
+        result=dict(result,publication='UNCERTAIN_'+type(exc).__name__)
+        try:journal.save('final-result.json',result)
+        except BaseException:pass
+    print(json.dumps({k:result.get(k) for k in ('status','cleanup','rows','batches','publication')},sort_keys=True))
+    raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
+
+
+if __name__=='__main__':main()

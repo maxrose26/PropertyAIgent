@@ -25,5 +25,6 @@ echo 1 > "$SCOPE/memory.oom.group"
 [[ "$(cat "$SCOPE/memory.max")" = 1610612736 && "$(cat "$SCOPE/memory.swap.max")" = 0 && "$(cat "$SCOPE/memory.oom.group")" = 1 ]] || unavailable 'the limits were not applied'
 chown -R "$UID_NUM:$GID_NUM" "$SCOPE"
 echo $$ > "$SCOPE/cgroup.procs"     # this shell becomes the SOLE member; exec keeps the pid, so the command starts alone in the scope
-[[ "$(cat "$SCOPE/cgroup.procs")" = "$$" ]] || unavailable 'the scope is not exclusive'
+mapfile -t members < "$SCOPE/cgroup.procs"      # builtin: a forked reader would itself join the scope
+[[ ${#members[@]} -eq 1 && "${members[0]}" = "$$" ]] || unavailable 'the scope is not exclusive'
 exec setpriv --reuid="$UID_NUM" --regid="$GID_NUM" --clear-groups -- "$@"
