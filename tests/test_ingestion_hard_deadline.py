@@ -84,3 +84,20 @@ def test_nested_blocked_connect_style_wait_is_also_interrupted(cluster):
         assert time.monotonic()-started<3.0
     finally:
         waiter.close();holder.execute('ROLLBACK');holder.execute('DROP TABLE hd_lock');holder.close()
+
+
+def test_nesting_is_refused_rather_than_silently_discarding_the_outer_deadline():
+    with hard_deadline(5,'OUTER'):
+        with pytest.raises(RuntimeError,match='HARD_DEADLINE_NESTED'):
+            with hard_deadline(1,'INNER'):pass
+    with hard_deadline(5,'AGAIN'):pass                                     # the guard is released after the outer context exits
+
+
+def test_a_signal_that_races_the_normal_exit_is_ignored_not_raised():
+    with hard_deadline(30,'X'):
+        captured=signal.getsignal(signal.SIGUSR1)
+    assert callable(captured) and signal.getsignal(signal.SIGUSR1)!=captured
+    assert captured(signal.SIGUSR1,None) is None                                    # delivered after the call completed: ignored, never raised
+    with pytest.raises(DeadlineExceeded):
+        with hard_deadline(30,'Y'):
+            live_handler=signal.getsignal(signal.SIGUSR1);live_handler(signal.SIGUSR1,None)      # delivered while the call is in progress: raised
