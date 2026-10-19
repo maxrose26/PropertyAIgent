@@ -150,8 +150,8 @@ class Qualification:
                                   credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=None, receipt=None, receipt_basis='UNKNOWN'))      # counted as STARTED before anything can be interrupted; replaced when the attempt completes
         budget = None
         try:
+          budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)      # not interruptible: a constructed budget is always assigned and therefore always closed
           with interruptible():
-            budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)
             try:
                 engine = budget.engine(self.urls[role], ssl=self.ssl, hostaddr=self.hostaddr, route='POOLER')
             except Denied:

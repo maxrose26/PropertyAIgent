@@ -116,15 +116,17 @@ jobs:
           srv=socket.socket();srv.bind(("127.0.0.1",0));srv.listen(1);port=srv.getsockname()[1]
           seen=[]
           def serve():
-              conn,_=srv.accept();conn.settimeout(10)
               try:
+                  conn,_=srv.accept();conn.settimeout(10)
                   conn.recv(8);conn.sendall(b"S")
                   try:ctx.wrap_socket(conn,server_side=True)
                   except ssl.SSLError as e:seen.append(type(e).__name__)
-              finally:conn.close()
-          t=threading.Thread(target=serve);t.start()
+                  conn.close()
+              except OSError:pass
+          srv.settimeout(20)
+          t=threading.Thread(target=serve,daemon=True);t.start()
           try:
-              psycopg.connect(host="localhost",hostaddr="127.0.0.1",port=port,dbname="x",user="x",password="x",sslmode="verify-full",sslrootcert=str(ca),connect_timeout=10)
+              psycopg.connect(host="localhost",hostaddr="127.0.0.1",port=port,dbname="x",user="x",password="x",sslmode="verify-full",sslrootcert=str(ca),gssencmode="disable",connect_timeout=10)
           except psycopg.OperationalError as e:
               assert "certificate verify failed" in str(e), "unexpected failure (not a TLS verification failure): "+type(e).__name__
           else:

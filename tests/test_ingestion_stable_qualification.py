@@ -3,7 +3,7 @@ import json,os,signal
 from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
-import pytest
+import pytest,psycopg
 from verification.ingestion_storage import stable_qualification as sq
 from verification.ingestion_storage import restricted_route as rr
 from verification.ingestion_storage.operational_controller import Denied
@@ -278,7 +278,7 @@ def test_a_request_while_the_attempt_record_is_being_emitted_never_loses_or_trun
     assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and events.count('qualification_attempt')==1 and r['roles'][WORKER]['attempts'][0]['receipt_basis']=='MEASURED'
 
 
-def test_a_request_inside_the_connection_section_is_the_interrupted_path_and_the_budget_is_still_closed():
+def test_a_request_inside_the_engine_section_is_the_interrupted_path_and_the_budget_is_still_closed():
     saved=_handler()
     class Budget(_FailingBudget):
         closed=0
@@ -290,15 +290,32 @@ def test_a_request_inside_the_connection_section_is_the_interrupted_path_and_the
     assert a['outcome']=='INTERRUPTED' and a['reason_code']=='CANCELLED' and r['stop_reason']=='CANCELLED' and Budget.closed==1 and a['receipt_basis']=='MEASURED'
 
 
-def test_a_request_before_the_budget_exists_is_the_interrupted_path_with_unknown_measurements():
-    saved=_handler();calls=[]
-    def factory(**kw):calls.append(1);os.kill(os.getpid(),signal.SIGTERM);raise AssertionError('unreached')
+def test_a_request_during_budget_construction_is_deferred_so_the_budget_is_assigned_and_closed():
+    saved=_handler()
+    class Budget(_FailingBudget):
+        closed=0
+        def __init__(self,**kw):os.kill(os.getpid(),signal.SIGTERM);super().__init__(**kw)      # lands while the budget is being constructed: only recorded
     try:
-        q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=factory);r=q.run()
+        q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=Budget);r=q.run()
     finally:_restore(saved)
     a=r['roles'][WORKER]['attempts'][0]
-    assert calls==[1] and a['outcome']=='INTERRUPTED' and a['reason_code']=='CANCELLED' and a['receipt'] is None and a['receipt_basis']=='UNKNOWN' and a['client_closure_verified'] is False
-    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and r['accounting']['attempts_started']['value']==1 and r['accounting']['metrics']['connection_attempts']['basis']=='LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN' and r['use_blocked'] is True
+    assert Budget.closed==1 and a['receipt_basis']=='MEASURED' and r['stop_reason']=='CANCELLED' and r['attempts_total']==1
+
+
+def test_a_request_during_the_spacing_wait_stops_as_cancelled_without_a_new_attempt():
+    saved=_handler();n=[]
+    class Budget(_FailingBudget):
+        def engine(self,url,**kw):
+            @contextmanager
+            def connect():
+                raise psycopg.OperationalError('password authentication failed for user "x"')
+                yield
+            return SimpleNamespace(connect=connect)
+    def sleep(_):os.kill(os.getpid(),signal.SIGTERM)
+    try:
+        q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=Budget,sleep=sleep);r=q.run()
+    finally:_restore(saved)
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1
 
 
 def test_the_handler_outside_an_interruptible_region_only_records_the_request():

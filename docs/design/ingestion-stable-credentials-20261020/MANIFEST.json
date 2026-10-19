@@ -34,6 +34,7 @@
   "docs/design/ingestion-operational-20261016/worker.sql",
   "docs/design/ingestion-operational-required-20261018/activate.sql",
   "docs/design/ingestion-operational-required-20261018/successor-policy.sql",
+  "docs/design/ingestion-stable-credentials-20261020/HANDOFF.md",
   "docs/design/ingestion-stable-credentials-20261020/PACKAGE.md",
   "docs/design/ingestion-stable-credentials-20261020/base_constants.json",
   "docs/design/ingestion-stable-credentials-20261020/owner-run.sh",
