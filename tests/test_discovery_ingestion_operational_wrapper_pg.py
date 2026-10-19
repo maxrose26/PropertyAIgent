@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_publication import GitHub,Uncert
 from tests.storage_gh_fixture import real_gh_store
 
 @pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
-@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected'])
+@pytest.mark.parametrize('fault',['success','mapping_lost_ack','teardown_lost_ack','closure_failure','worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','reuse_installed_success','diagnostic_only','matrix_success','matrix_classified_continue','matrix_unclassified_stop','matrix_tls_stop','matrix_identity_stop','matrix_budget_stop','matrix_admin_bound_reserve','matrix_close_uncertain','session_survives_privileged','session_survives_unprivileged','blocked_query','exhausted_normal_budget','role_settings_success','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','first_session_query_fails','settled_success','settled_first_connection_rejected','settled_stop_during_interval'])
 def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path,record_property,real_gh_store,fault,monkeypatch):
     raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
     if not raw:pytest.skip('fixed disposable PG17 required')
@@ -222,7 +222,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                     record_property('restricted_route_diagnostic',json.dumps(dict(accounting=result['accounting'],status=result['status'],execution_grants=0,source_calls=0,ledger_changed=False)))
                     return
 
-            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','settled_first_connection_rejected'}:
+            if fault in {'worker_connect','post_grant_connect','invalidation_commit_unknown','source_raises','mapping_second_lost_ack','blocked_query','exhausted_normal_budget','role_settings_partial_install','role_settings_failed_qualification','role_settings_uncertain_restoration','settled_first_connection_rejected','settled_stop_during_interval'}:
                 from verification.ingestion_storage.operational_outcome import session
                 from verification.ingestion_storage.tls_trust import verified_trust
                 # Production-shaped kwargs reach the real psycopg Connection
@@ -307,6 +307,10 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                             if len(commits_ur)==2:raise Uncertain('DISPOSABLE_RESTORATION_NOT_REACHED')      # the second teardown transaction is the restoration
                         return real_q_ur(c,statement,params,effect=effect)
                     runner.owner.q=restoration_lost
+                if fault=='settled_stop_during_interval':
+                    def stop_during_interval(seconds):
+                        (journal.root/'STOP').write_text('stop');time.sleep(0.01)      # an owner STOP during the settling period
+                    runner.settle_sleep=stop_during_interval
                 if fault=='exhausted_normal_budget':
                     original_map_budget=runner.owner.map_and_activate
                     def map_then_exhaust(*a,**k):
@@ -340,6 +344,10 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 elif fault=='invalidation_commit_unknown':
                     assert result['authority_invalidation']=='UNCERTAIN_RECONCILE' and not any(m=='DELETE' for m,p in requests)
                     assert not source_calls
+                elif fault=='settled_stop_during_interval':
+                    assert result['operation_phase']=='CREDENTIAL_SETTLING' and result['access']=='DISABLED_VERIFIED' and result['cleanup']=='CLOSED' and not observed_routes      # no restricted contact at all
+                    assert not ctl['grants'] and not ctl.get('bolton_exceptions') and not source_calls and set(ciphertexts)=={'DATABASE_URL'} and not result['accounting']['runtime']['slot_receipts']
+                    names_=[json.loads(l)['event'] for l in journal.file.read_text().splitlines()];assert 'settling_started' in names_ and 'settling_completed' not in names_ and 'runtime_connection_intent' not in names_
                 elif fault.startswith('role_settings_'):
                     assert not ctl['grants'] and not ctl.get('bolton_exceptions') and not source_calls and set(ciphertexts)=={'DATABASE_URL'} and result['operation_phase'] in ('RESTRICTED_CONNECTION_QUALIFICATION','CREDENTIAL_MAPPING_ACTIVATION')
                     cfg={r:sorted(c or []) for r,c in boot.execute('SELECT rolname,rolconfig FROM pg_roles WHERE rolname=ANY(%s)',(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()}

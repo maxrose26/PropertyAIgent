@@ -77,5 +77,5 @@ def test_owner_script_checks_everything_before_anything_is_consumed():
     assert positions==sorted(positions)
     assert 'RuntimeMaxSec=810s' in text and 'MemoryMax=1610612736' in text and 'timeout 10s systemctl' in text and 'operational-capture-queue-settled-once-20261019' in text
     assert 'REQUIRED_CAPTURE_SCREENING_SETTLED' in text and '@@' not in text and 'pkill' not in text and 'kill -9' not in text
-    assert 'operational-settled-registration-20261019.json' in text and 'operational-acceptance-registration' not in text
+    assert 'operational-settled-registration-20261019.json' in text and text.count('operational-acceptance-registration-20261019.json')==2 and orr.SETTLED_PREDECESSOR['registration_sha256'] in text
     assert text.count('2af82ca9247366d5ada8e0873ea97abaab84cdeb8dfb81c3f3efb146708059b0')==1 and orr.SETTLED_PREDECESSOR['events_sha256'] in text and orr.SETTLED_PREDECESSOR['final_result_sha256'] in text

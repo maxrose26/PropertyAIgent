@@ -93,3 +93,31 @@ def test_the_authority_and_namespace_are_unused_and_distinct_from_every_earlier_
     states={m for m in re.findall(r"operational-[a-z-]+-20261\d{3}",sources)}
     assert orr.SETTLED_STATE not in states-{orr.SETTLED_STATE} and orr.SETTLED_STATE.endswith('20261019') and orr.SETTLED_STATE!=orr.SETTLED_PREDECESSOR['state_directory']
     assert orr.SETTLED_AUTHORITY!=orr.AUTHORITY
+
+
+def test_settle_sits_between_activation_and_the_first_restricted_slot_in_setup():
+    import ast
+    tree=ast.parse(Path('verification/ingestion_storage/operational_runner.py').read_text())
+    setup=[n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='setup'][0]
+    calls=[(n.lineno,ast.unparse(n.func)) for n in ast.walk(setup) if isinstance(n,ast.Call)]
+    line=lambda name:min(l for l,f in calls if f==name)
+    assert line('self.owner.map_and_activate')<line('self.settle')<line('self.slot')<line('self.owner.register')      # activation, then the interval, then the first contact, then any grant
+    assert sum(1 for l,f in calls if f=='self.slot')==1                                                             # the only slot in setup is the qualification slot
+
+
+def test_the_settled_grants_are_not_covered_by_the_consumed_cleanup_tool():
+    # Disclosed rather than hidden: the consumed revoke-only cleanup names one earlier grant. For the settled run the failure path (invalidate_failure + teardown) is the invalidation.
+    src=Path('verification/ingestion_storage/operational_cleanup.py').read_text()
+    assert orr.SETTLED_AUTHORITY not in src and "AUTHORISE_BOLTON_CAPTURE_QUEUE_ONCE_20261018_CAPTURE" in src
+
+
+def test_the_owner_stop_file_ends_the_interval_at_the_next_step(tmp_path,monkeypatch):
+    runner,journal=make(tmp_path);clock=Clock()
+    monkeypatch.setattr(orr,'time',types.SimpleNamespace(monotonic=clock.monotonic,sleep=clock.sleep,time=time.time,perf_counter=time.perf_counter))
+    runner.check=lambda:None
+    def sleep(seconds):
+        clock.sleep(seconds)
+        if len(clock.sleeps)==2:(journal.root/'STOP').write_text('stop')
+    runner.settle_sleep=sleep
+    with pytest.raises(Denied):runner.settle()
+    assert len(clock.sleeps)==2 and 'settling_completed' not in [e['event'] for e in events(journal)]

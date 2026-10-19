@@ -30,6 +30,9 @@ printf 'settled_namespace_absent=%s\n' "$STATE_DIRECTORY"
 printf '%s  %s\n%s  %s\n' \
   2af82ca9247366d5ada8e0873ea97abaab84cdeb8dfb81c3f3efb146708059b0 "$STATE_ROOT/$PRED_DIRECTORY/events.jsonl" \
   ffedfe33c342f6e808376a1617ac14a1895b863f87e4958d4edbdeaa346c5609 "$STATE_ROOT/$PRED_DIRECTORY/final-result.json" | sha256sum --check
+test ! -e "$HOME/stage4-owner/operational-acceptance-registration-20261019.json" || printf '%s  %s\n' 1034c92ee3e654bc4ccf1f37b6c5e20d0b15d1cce3f3982a3dfbdae2a402455c "$HOME/stage4-owner/operational-acceptance-registration-20261019.json" | sha256sum --check      # the consumed predecessor registration, if still present, is unmodified
+test -z "$(timeout 10s systemctl --user list-units --all --no-legend 'propertyaigent-operational-once.scope' 2>/dev/null)"      # no earlier scope of this unit is still present
+trap 'rm -f "${TMPDIR:-/tmp}/.evidence-head-$$"' EXIT
 
 # Read-only preconditions: registration bindings, GitHub identity, and that the evidence branch head is still the one the registration binds (a moved head would only be
 # discovered AFTER the single source observation, so it is checked now, before anything is consumed).

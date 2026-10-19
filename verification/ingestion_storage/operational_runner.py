@@ -156,6 +156,9 @@ class Runner:
         self.capture_bindings=self.owner.register([root],self.authority+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
         self.emit('required_setup_committed',dict(capture_key=self.capture_key))
 
+    def stop_requested(self):
+        if (self.journal.root/'STOP').exists():raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')      # the owner STOP file, honoured at every step of the interval
+
     def settle(self):
         """One fixed settling period after BOTH passwords and the activation are committed and BEFORE either restricted account is first contacted.
 
@@ -168,8 +171,8 @@ class Runner:
         while True:
             left=self.settle_seconds-(time.monotonic()-began)
             if left<=0:break
-            self.check();self.settle_sleep(min(1.0,left))
-        self.check()
+            self.check();self.stop_requested();self.settle_sleep(min(1.0,left))
+        self.check();self.stop_requested()
         self.emit('settling_completed',dict(planned_seconds=self.settle_seconds,elapsed_seconds=round(time.monotonic()-began,3)))
 
     def setup_matrix(self):
