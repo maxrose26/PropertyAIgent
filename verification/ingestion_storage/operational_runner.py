@@ -14,11 +14,11 @@ from app.ingestion.idox_adapter import IdoxListingContract
 from app.ingestion.batching import capture_once,batch_plans,process_batch
 from verification.discovery.idox_window import WindowConfig
 from .operational_controller import DatabaseBudget,ControllerLedger,batch_allocation,run_cancel_used
-from .operational_publication import GitHub,Uncertain,canonical,BRANCH
+from .operational_publication import GitHub,Uncertain,canonical,BRANCH,blob_bytes
 from .operational_journal import Journal
 from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
-from .connection_diagnostics import PreparationFailure
+from .connection_diagnostics import PreparationFailure,fixed_stop_reason
 from .operational_preparation import Progress,prepare_connection
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
@@ -63,6 +63,31 @@ STABLE_REVOKE_STATE='operational-stable-revocation-once-20261020'
 STABLE_VALIDITY_DAYS=90      # initial password validity; renewal extends VALID UNTIL only (no password change)
 STABLE_MODES={STABLE_PROVISION_MODE:(STABLE_PROVISION_AUTHORITY,STABLE_PROVISION_STATE,'THIS_FINITE_STABLE_CREDENTIAL_PROVISIONING_ONLY'),
               STABLE_REVOKE_MODE:(STABLE_REVOKE_AUTHORITY,STABLE_REVOKE_STATE,'THIS_FINITE_STABLE_CREDENTIAL_REVOCATION_ONLY')}
+# Stable-credential pipeline OWNER controller: fixed read-only readback -> capture authority -> (restricted hosted job retains the capture) -> screening authority -> (hosted job screens) ->
+# authority invalidation -> final readback. It never holds the restricted passwords and never changes a credential; the restricted job never holds the administrative credential.
+PIPELINE_MODE='STABLE_PIPELINE_AUTHORITY'
+PIPELINE_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_AUTHORITY_ONCE_20261020'
+PIPELINE_STATE='operational-stable-pipeline-once-20261020'
+PIPELINE_BINDING=dict(
+    valid_until='2027-01-17T16:14:12+00:00',hard_stop_generation=1,grant_minutes=55,screening_grant_minutes=30,poll_seconds=30,capture_wait_seconds=2700,screening_wait_seconds=600,
+    provisioning=dict(registration_sha256='b7e00b48d659b4fa83cd72d14efe734846c2d9d2e699f6998e509e3c3f280264',events_sha256='a26f9d1f51d8e908431cfdebf2bf20f6362b7bcbcecb35717a13935017155a19',
+                      final_result_sha256='51aea5d5ce0a3515b369b0d098a5c3da73a210ff86034f1f9e368d654274d3e6'),
+    qualification=dict(run_id=39284253302,artifact_id=12212818855,artifact_zip_sha256='b02da6fcf1658f627f4935db0a998fb3764498b3e15b6d57ad2ab135ba15db58',revision='46b9356d352efcde39df9e1505db582543adecee'),
+    hosted_workflow='.github/workflows/stage4-stable-pipeline-once.yml')
+# Finite owner totals (normal, through invalidation and the final readback, including failure diagnostics). MEASURED, not estimated: the real Owner methods run against a scripted connection
+# (tests/test_ingestion_pipeline_invalidation.py) count 52 statements / 5 connections on the normal path (readback 9, capture authority 11, ledger read 5, screening authority 22 for the
+# maximum 12 batches, ledger read 5), 73 / 7 through the end-of-run invalidation (12) and final readback (9), and at most 71 when a failure at the very end of the normal path is followed by
+# the reserved invalidation (12) and diagnostics (7). The allowances keep a reserve so that ENDING an authority and diagnosing can never be refused for want of capacity. The earlier
+# placeholder (48 / 60 / 72) was exhausted by the normal path (52 > 48), which is how the invalidation was left undone in the first rehearsal.
+PIPELINE_OWNER_LIMITS=dict(connections=(8,10),commands=(56,80,96))
+# GitHub requests (owner): the worst case is itemised and asserted in tests/test_ingestion_stable_pipeline.py::owner_worst_case_github_requests (polls of the two bounded waits at 30 s, each distinct head
+# examined up to three times, the freshness and anchor probes, both publications with their readbacks, the account check and the failure-path read); the bound keeps a reserve above it.
+PIPELINE_GITHUB_BOUND=180
+# Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
+# admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
+PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
+PIPELINE_DEADLINES=dict(job=4200,diagnostic_total=4320,diagnostic_window=60,admin_diagnostic=4300,admin_pre=4100,admin_total=4180,runtime_total=1)
+PIPELINE_BACKSTOP_SECONDS=4600
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -87,7 +112,7 @@ def restricted_url(role,password):
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
-    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
+    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
@@ -96,17 +121,19 @@ class Runner:
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.matrix_mode=registration.get('mode')==MATRIX_MODE
         settled=registration.get('mode') in SETTLED_MODES
-        self.authority=SETTLED_MODES[registration['mode']][0] if settled else AUTHORITY
+        self.pipeline_mode=registration.get('mode')==PIPELINE_MODE
+        self.authority=SETTLED_MODES[registration['mode']][0] if settled else PIPELINE_AUTHORITY if self.pipeline_mode else AUTHORITY
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
         direct=registration.get('mode')==DIRECT_MODE
         stable=registration.get('mode') in STABLE_MODES
         self.route_name='DIRECT' if direct else 'POOLER';self.restricted_hostaddr=None
-        self.deadlines=dict(MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
-        if direct or stable:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
+        self.deadlines=dict(PIPELINE_DEADLINES if self.pipeline_mode else MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
+        if direct or stable or self.pipeline_mode:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
+        if self.pipeline_mode:self.owner.expected_generation=PIPELINE_BINDING['hard_stop_generation']
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,*STABLE_MODES)
+        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,*STABLE_MODES)
         self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
@@ -377,7 +404,7 @@ class Runner:
         connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and (getattr(self,"matrix",None) is None or self.matrix.closed_ok()) and
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
-        safe=access=='DISABLED_VERIFIED' and not a['uncertain_effect'] and not self.github.mutation_uncertain
+        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
         overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
@@ -390,13 +417,19 @@ class Runner:
         # A known failure may invoke the fixed safety disposition. An uncertain
         # admin mutation is never automatically replayed or compensated.
         try:
-            if self.github.mutation_uncertain:
+            if self.github.mutation_uncertain and not self.pipeline_mode:      # in pipeline mode the revocation is database-only and is attempted regardless (an uncertain GitHub publication must never leave an authority live)
                 invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
-            invalidation=self.owner.invalidate_failure()
-            if (invalidation=='ACKNOWLEDGED_READBACK' or (not self.owner.authorities and self.owner.urls and not self.owner.effect_uncertain)):
-                with self.phase_as('teardown'):self.owner.teardown(self.github)
-                access='DISABLED_VERIFIED'
+            if self.pipeline_mode:
+                self.owner.diagnostic_mode=True      # the reserved failure allowance: ending an authority must never be refused for want of administrative capacity
+                invalidation=self.owner.invalidate_authorities()      # revocation-only: independent of every stop-state; credentials, memberships and secrets are untouched
+                if invalidation in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'):access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
+                elif invalidation=='NOT_REQUIRED_NO_AUTHORITY':access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED'
+            else:
+                invalidation=self.owner.invalidate_failure()
+                if (invalidation=='ACKNOWLEDGED_READBACK' or (not self.owner.authorities and self.owner.urls and not self.owner.effect_uncertain)):
+                    with self.phase_as('teardown'):self.owner.teardown(self.github)
+                    access='DISABLED_VERIFIED'
         except BaseException:
             if not self.github.mutation_uncertain:invalidation=self.owner.invalidation
         try:
@@ -407,7 +440,7 @@ class Runner:
             diagnostics['completion']='INCOMPLETE_RECONCILE'
         components=self.closure(access)
         result=dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,
-            failure=safe_failure(exc,'EXECUTION'),preflight=dict(getattr(self.owner,'preflight_report',dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]))),operation_phase=failed_phase,authority_invalidation=invalidation,
+            failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),preflight=dict(getattr(self.owner,'preflight_report',dict(reason_code='NOT_REACHED',policy_state='NOT_EVALUATED',permitted_states=[]))),operation_phase=failed_phase,authority_invalidation=invalidation,
             access=access,diagnostics=diagnostics,owned_cleanup=components['process'],
             accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
             application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
@@ -450,8 +483,159 @@ class Runner:
         return dict(status='STABLE_CREDENTIALS_REVOKED_ACCESS_DISABLED',cleanup='CLOSED',access='DISABLED_VERIFIED',closure_components=components,accounting=self.accounting(),owned_cleanup=components['process'],
                     role_settings='LEFT_IN_PLACE_REVIEWED_VALUES',source_observations_attempted=0,execution_grants_created=0,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
 
+    EVIDENCE_CONTENTS='repos/maxrose26/PropertyAIgent/contents/'
+    EVIDENCE_REF='repos/maxrose26/PropertyAIgent/git/ref/heads/'
+
+    def evidence_head_now(self):
+        return self.github.call('GET',self.EVIDENCE_REF+BRANCH)['object']['sha']
+
+    def evidence_file(self,head,relative):
+        """The file in the evidence directory AT the given commit, verified by its git blob identity; None if it is not there (HTTP 404)."""
+        blob=self.github.probe(self.EVIDENCE_CONTENTS+self.r['evidence_directory']+'/'+relative+'?ref='+head)
+        if blob is None:return None
+        blob_bytes(blob);return blob
+
+    EVIDENCE_ANCHOR='README.md'      # a file that exists on the evidence branch; a 404 for the evidence files means something only if the same read of the branch finds this one
+    REPROBES=3      # each distinct head is examined at most this many times (on successive polls): a just-published commit can briefly answer 404 from another replica
+
+    def require_evidence_anchor(self,head):
+        if self.github.probe(self.EVIDENCE_CONTENTS+self.EVIDENCE_ANCHOR+'?ref='+head) is None:raise Uncertain('EVIDENCE_BRANCH_ANCHOR_MISSING')
+
+    def require_fresh_evidence_directory(self):
+        """The two restricted-job markers must not exist yet: a leftover from any earlier run would otherwise be mistaken for this run's publication."""
+        head=self.evidence_head_now()
+        if head!=self.evidence_head:raise Uncertain('EVIDENCE_HEAD_MOVED')
+        self.require_evidence_anchor(head)
+        for relative in ('capture/source.json','capture-retained/retained.json','completed/final-result.json'):
+            if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
+
+    def pipeline_execution(self):
+        """The identity of THIS execution that every marker and result must carry: the reviewed revision, the manifest, the capture root it concerns, the evidence head it was registered against, and its authority.
+        A file that merely exists is never accepted; its content must name this execution."""
+        return dict(revision=self.r['revision'],manifest_sha256=self.r['manifest_sha256'],capture_key=self.capture_key,initial_evidence_head=self.r['evidence_head'],authority=self.authority)
+
+    def verify_retained_marker(self,blob,checkpoint,source_raw):
+        """The restricted job's retained marker must name this execution and exactly this capture: the checkpoint the DATABASE holds (digest and kind) and the archive bytes on the evidence branch."""
+        try:marker=json.loads(blob_bytes(blob))
+        except ValueError:raise Uncertain('HOSTED_MARKER_UNREADABLE') from None
+        archive=checkpoint['durable_archive']
+        if (not isinstance(marker,dict) or marker.get('execution')!=self.pipeline_execution() or marker.get('capture_sha256')!=digest(checkpoint) or marker.get('kind')!=checkpoint.get('kind')
+            or marker.get('archive_sha256')!=hashlib.sha256(source_raw).hexdigest() or marker.get('archive_sha256')!=archive.get('sha256')):raise Uncertain('HOSTED_MARKER_BINDING')
+        return marker
+
+    def verify_hosted_result(self,blob,*,require_capture=True):
+        """The restricted job's result must name this execution and, once a capture exists, exactly this capture (after the screening authority was registered the capture digest is required)."""
+        raw=blob_bytes(blob)
+        try:result=json.loads(raw)
+        except ValueError:raise Uncertain('HOSTED_RESULT_UNREADABLE') from None
+        if not isinstance(result,dict) or result.get('execution')!=self.pipeline_execution() or (require_capture and result.get('capture_sha256')!=digest(self.capture)):raise Uncertain('HOSTED_RESULT_BINDING')
+        return raw,result
+
+    def await_any(self,relatives,seconds):
+        """Bounded wait until one of `relatives` EXISTS in the evidence directory at the CURRENT head of the evidence branch (earlier entries take priority when several exist). Presence-based, never
+        change-based: the restricted job publishes several commits within seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would
+        miss the one it is waiting for). Each distinct head is examined at most REPROBES times (on successive polls, so one transient 404 cannot hide a published file); the first examination is of the head as it stands. Timeout is a stop (no retry, no replay). Returns (head, relative, blob)."""
+        deadline=time.monotonic()+seconds;probes={}
+        while True:
+            self.check();self.stop_requested()
+            head=self.evidence_head_now()
+            if probes.get(head,0)<self.REPROBES:
+                probes[head]=probes.get(head,0)+1
+                for relative in relatives:
+                    blob=self.evidence_file(head,relative)
+                    if blob is not None:return head,relative,blob
+            if time.monotonic()>=deadline:raise Denied('HOSTED_PUBLICATION_WAIT_EXPIRED')
+            getattr(self,'pipeline_sleep',time.sleep)(PIPELINE_BINDING['poll_seconds'])
+
+    def await_file(self,relative,seconds):
+        head,_,blob=self.await_any((relative,),seconds);return head,blob
+
+    def pipeline(self):
+        """Owner side of the stable-credential pipeline (see specifications/032-stage4-stable-credential-pipeline.md). Never touches a credential, membership, role setting or secret."""
+        pb=PIPELINE_BINDING
+        account=self.github.call('GET','user')
+        if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
+        expected=dict(identity=self.owner.identity,hard_stop_generation=pb['hard_stop_generation'],valid_until=pb['valid_until'])
+        self.operation_phase='PIPELINE_READBACK_BEFORE_GRANT'
+        before=self.owner.pipeline_readback(expected,label='BEFORE_ANY_GRANT')
+        identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256'])
+        root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
+        self.capture_key=root['key']
+        self.operation_phase='PIPELINE_CAPTURE_AUTHORITY'
+        self.require_fresh_evidence_directory()
+        self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(minutes=pb['grant_minutes']))
+        self.owner.require_control_sha256=self.owner.baseline_control_sha256
+        self.capture_bindings=self.owner.register([root],self.authority+'_CAPTURE',capture_key=self.capture_key,source_calls=1)
+        self.owner.require_control_sha256=None
+        self.emit('pipeline_capture_authority_registered',dict(capture_key=self.capture_key,grant_expires_at=self.owner.grant_expiry.isoformat(),restricted_job='WAITING_FOR_DISPATCH_OR_RUNNING'))
+        self.operation_phase='PIPELINE_AWAIT_DURABLE_RETENTION'
+        # The restricted job archives the raw source BEFORE the ledger checkpoint is durable (accepted order) and then publishes the retained marker: that marker (which implies the archive) is what is awaited.
+        head,relative,retained=self.await_any(('capture-retained/retained.json','completed/final-result.json'),pb['capture_wait_seconds'])
+        self.evidence_head=head
+        if relative!='capture-retained/retained.json':      # the restricted job ended WITHOUT retaining a capture: its (execution-bound) result is read, and the ceremony ends now rather than at the end of the retention window
+            _,ended=self.verify_hosted_result(retained,require_capture=False)
+            self.emit('pipeline_hosted_ended_before_retention',dict(status=ended.get('status'),phase=ended.get('operation_phase'),failure=ended.get('failure')))
+            raise Denied('HOSTED_ENDED_BEFORE_RETENTION')
+        blob=self.evidence_file(head,'capture/source.json')
+        if blob is None:raise Uncertain('HOSTED_ARCHIVE_MISSING')
+        rows=self.owner.read_items([self.capture_key])
+        state,checkpoint=rows.get(self.capture_key,(None,None))
+        archive=(checkpoint or {}).get('durable_archive') if isinstance(checkpoint,dict) else None
+        if state!='COMPLETE' or not isinstance(checkpoint,dict) or checkpoint.get('kind')!='LISTING_RECEIPT_V1' or not archive:raise Uncertain('CAPTURE_NOT_DURABLY_RETAINED')
+        if archive.get('sha256')!=hashlib.sha256(blob_bytes(blob)).hexdigest() or archive.get('path')!=self.r['evidence_directory']+'/capture/source.json':raise Uncertain('CAPTURE_ARCHIVE_BINDING')
+        self.verify_retained_marker(retained,checkpoint,blob_bytes(blob))      # existence is not acceptance: the marker names this execution and exactly this capture
+        self.capture=checkpoint
+        if len(self.capture.get('records',[]))>60:raise Uncertain('CAPTURE_ROW_BOUND')      # the accepted capture ceiling, enforced by the owner itself before anything further is registered
+        self.plans=batch_plans(self.capture_key,self.capture)
+        self.emit('pipeline_capture_retained',dict(capture_sha256=digest(self.capture),rows=len(self.capture.get('records',[])),batches=len(self.plans),archive_sha256=archive['sha256']))
+        if self.plans:
+            self.operation_phase='PIPELINE_SCREENING_AUTHORITY'
+            self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(minutes=pb['screening_grant_minutes']))
+            prepared=[]
+            for record in self.capture['records']:
+                prepared.append(item(dict(subject=dict(kind='APPLICATION',council='bolton',reference=record['reference']),task='SCREENING',contract='listing-screen-v1',revision=digest(record)),dependencies=[self.capture_key]))
+            batches=[item({k:p[k] for k in ('subject','task','contract','revision')},dependencies=p['dependencies'],checkpoint=p['checkpoint']) for p in self.plans]
+            root_binding=item(dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
+            self.batch_bindings=self.owner.register(batches,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[root_binding,*prepared])
+            self.emit('pipeline_screening_authority_registered',dict(batches=len(self.plans),children_prepared=len(prepared)))
+            # The restricted job waits on the evidence branch (no database connection) for this marker. It is NOT an authority - the authority is the database grant registered above.
+            marker=dict(execution=self.pipeline_execution(),authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
+            self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
+            self.operation_phase='PIPELINE_AWAIT_SCREENING'
+            head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
+            self.evidence_head=head
+            raw,hosted=self.verify_hosted_result(blob)
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))
+            done=self.owner.read_items([p['key'] for p in self.plans])
+            incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')
+            self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
+        else:      # an explicit zero: there is nothing to screen, but the restricted job may still be finishing - its (execution- and capture-bound) result is awaited before the readbacks
+            self.operation_phase='PIPELINE_AWAIT_SCREENING'
+            head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
+            self.evidence_head=head
+            raw,hosted=self.verify_hosted_result(blob)
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
+            self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS',hosted=hosted_summary))
+        self.operation_phase='PIPELINE_INVALIDATION'
+        self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
+        invalidation=self.owner.invalidate_authorities()
+        after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
+        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
+        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
+        finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+        result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
+                    readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
+                    capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',
+                    source_observations_attempted=1,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+        self.emit('pipeline_owner_result',result);self.journal.save('final-result.json',result)
+        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/owner',expected_head=self.evidence_head)
+        result.update(evidence_commit=self.evidence_head,audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)
+        self.journal.save('final-result.json',result)
+        return result
+
     def execute(self):
         try:
+            if self.pipeline_mode:return self.pipeline()
             if self.matrix_mode:
                 self.setup_matrix()
                 with self.phase_as('teardown'):self.owner.teardown(self.github)
@@ -486,7 +670,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         holder={}
         try:from .operational_source import read
         except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
-        github=GitHub(journal.emit,lambda:holder['runner'].check())
+        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode')==PIPELINE_MODE else {}))
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
         try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
@@ -499,7 +683,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()}}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
@@ -518,12 +702,16 @@ def validate_registration(body,sha):
             or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=stable_state)
             or r.get('owner_limits')!=dict(connections=list(STABLE_OWNER_LIMITS['connections']),commands=list(STABLE_OWNER_LIMITS['commands']))
             or not ((type(r.get('validity_days')) is int and r['validity_days']==STABLE_VALIDITY_DAYS) if r['mode']==STABLE_PROVISION_MODE else 'validity_days' not in r) or 'restricted_route' in r or 'settling_seconds' in r):raise ValueError('STABLE_CREDENTIAL_BINDING')
+    if r.get('mode')==PIPELINE_MODE:
+        if (r.get('pipeline')!=PIPELINE_BINDING or r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='OWNER_GRANT_AND_EXCEPTION_FOR_THE_HOSTED_RESTRICTED_JOB' or r.get('risk_application')!='THIS_FINITE_STABLE_PIPELINE_ONCE'
+            or r.get('state_directory')!=PIPELINE_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=PIPELINE_STATE)
+            or r.get('owner_limits')!=dict(connections=list(PIPELINE_OWNER_LIMITS['connections']),commands=list(PIPELINE_OWNER_LIMITS['commands'])) or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r):raise ValueError('STABLE_PIPELINE_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
             or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -544,7 +732,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -552,7 +740,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
