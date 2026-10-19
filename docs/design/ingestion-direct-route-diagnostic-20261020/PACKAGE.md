@@ -1,0 +1,21 @@
+# Direct-route restricted-connection diagnostic — release package (one run, owner-local; prepared, not released)
+
+Aim: show whether the two restricted logins can authenticate on the project's **direct** Postgres endpoint (no shared pooler, so no pooler credential cache), reusing the accepted queue, permissions and recovery controls. It issues **no ingestion grant**; it is not a capture or screening run. Nothing here is authorised until the Product Owner releases it, and it can only run once the project's IPv4 add-on is active (an owner dashboard action that is not part of this package).
+
+## Exact route (registration-bound, no fallback)
+- Host `db.zcikcfgpblzuzpanpdqd.supabase.co`, port 5432, database `postgres`, user = the **plain role** (`ingestion_worker_login`, `ingestion_effect_login`); TLS `verify-full` against the checked-in CA with hostname verification; the host is resolved once by a bounded, credential-free IPv4-only lookup and the connection is pinned to that address (the administrative pooler address is never reused). The same startup options as before are sent.
+- The run has exactly one route, fixed by its registration. A pooler URL, a wrong user form, a wrong host or a missing resolved address is refused before any restricted contact; nothing selects another route after a failure.
+- The administrative route (pooler, `postgres.<ref>`) and the production application's connection settings are unchanged.
+
+## What the run does (every effect, reversed in the same run)
+1. Preflight, read-only except a rolled-back transaction: migration identity flags, ownership, exact stops (consumed Salford global stop, manual `STORAGE_TEST_STOP`, hard-stop generation 1, control digest), both logins `NOLOGIN`/NULL password/no memberships/no sessions, and the installed function inventory, which must be exactly the retained successor-policy state (this mode applies no policy).
+2. Setup, as the migration identity: restore the two reviewed capability-role memberships; capture and set the three role-level timeouts (`10s`/`3s`/`20s`) on the two restricted roles; set a **fresh password with `VALID UNTIL`** on each login; store two temporary protected environment secrets (two GitHub secret writes); `ALTER ROLE … LOGIN` on both. **From this point two restricted logins are enabled for new connections** until teardown.
+3. Diagnostic: **one connection attempt for the worker login; only if it succeeds, one for the effect login**, each to the direct host over verified TLS to the pinned address, running only the fixed identity/flags/effective-timeout check. A rejection of either stops the run.
+4. Teardown, in every outcome: `NOLOGIN`, password NULL, memberships revoked, role settings restored from the capture, both temporary secrets deleted, session/membership/role readbacks, process and socket closure. Residual sessions or an unrestored setting are reported, never called closed.
+No authority, grant, Bolton exception, source request, queue row or application write exists on this path, and there is no settling period and no retry.
+
+## Finite budgets
+Administration (totals, normal / through teardown / including failure diagnostics): ≤ 60 / 80 / 92 commands over ≤ 5 / 6 connections (rehearsal: 65 commands / 5 connections on success; 72 / 6 on a failed qualification). Runtime: 2 connection attempts, 0 statements beyond the check. Hidden input 120 s, active window 270 s, work alarm 215 s, outer 420 s, systemd backstop 450 s. GitHub: 1 preparation call, plus the lifecycle's secret writes and readbacks within the existing request bound.
+
+## Offline compatibility versus unproved production compatibility
+Proved offline (disposable PG17 and loopback TLS): route binding, principal identity, pinned-address use, real certificate and hostname verification against the direct hostname (accepted for a matching certificate, refused for a wrong hostname and for an untrusted chain), the complete lifecycle including rejection and teardown. **Not proved:** that the production endpoint's certificate chains to the checked-in CA and matches the hostname, that custom roles authenticate on the direct host exactly as in the disposable server, and that the IPv4 add-on makes the host reachable from the owner's WSL and from Render. The diagnostic exists to establish exactly that, once.
