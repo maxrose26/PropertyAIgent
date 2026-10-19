@@ -16,6 +16,7 @@ PATTERNS = (
     ('TLS_CA_UNAVAILABLE', r'root certificate file[^\n]{0,512}(?:does not exist|could not read|permission denied)'),
     ('TLS_CHAIN_REJECTED', r'(?:certificate verify failed|certificate verification failed)'),
     ('AUTHENTICATION_REJECTED', r'password authentication failed for user'),
+    ('CIRCUIT_BREAKER_INDICATED', r'circuit breaker'),
     ('ROUTING_IDENTITY_REJECTED', r'\btenant or user not found\b'),
     ('AUTHORIZATION_REJECTED', r'\bno pg_hba.conf entry\b'),
     ('PERMISSION_DENIED', r'permission denied for database'),
@@ -28,6 +29,8 @@ PATTERNS = (
 def classify_native(original, state):
     import psycopg
     if not isinstance(original, psycopg.Error):return 'UNKNOWN','NONE'
+    if original.args and isinstance(original.args[0],str) and len(original.args[0])<=16384 and re.search(r'circuit breaker',original.args[0],re.I):
+        return 'CIRCUIT_BREAKER_INDICATED','LOCAL_ALLOWLIST'      # a pooler protection indication stops any continuation, even when it arrives with an authentication SQLSTATE
     if state in STATES:return STATES[state],'SQLSTATE'
     # Work only on bounded native messages. Do not truncate a huge message and
     # then classify a misleading prefix. Unknown/ambiguous remains UNKNOWN.

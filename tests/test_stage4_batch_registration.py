@@ -47,6 +47,10 @@ def test_workflow_scope():
             # Exact separately approved TLS successor; no general environment exemption.
             assert hashlib.sha256(path.read_bytes()).hexdigest()=='618b2f2723b7381772a27e3af75a7ff098166b22f0d7dbaafc2a1f98e3f08684'
             continue
+        if path.name=='stage4-stable-credential-qualification-once.yml':
+            # Exact separately authorised restricted-credential qualification (restricted secrets only; no administrative secret); no blanket exception.
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='625cd29355ebae37ffa2271edd2ceb431c341b9c964d4ac246f23924b7fcb1f1'
+            continue
         if path.name=='stage4-ingestion-storage-catalogue-once.yml':
             # Exact separately authorised catalogue-only access; no blanket exception.
             assert hashlib.sha256(path.read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'

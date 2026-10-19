@@ -77,7 +77,7 @@ j=Journal(sys.argv[1])
 class Worker:
  def execute(self):return {'status':'FAILED','cleanup':'UNCERTAIN','accounting':{}}
 def blocked(*a,**k):time.sleep(30)
-session(j,(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat(),lambda:'hidden',lambda raw,started:Worker(),output=blocked,timing=dict(input_seconds=1,active_seconds=10,work_seconds=8,diagnostic_seconds=1,report_seconds=.1,outer_seconds=12))
+session(j,(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat(),lambda:'hidden',lambda raw,started:Worker(),output=blocked,timing=dict(input_seconds=1,active_seconds=10,work_seconds=8,diagnostic_seconds=1,report_seconds=1,outer_seconds=12))
 """
     began=time.monotonic()
     r=subprocess.run([sys.executable,'-c',script,str(tmp_path/'blocked')],capture_output=True,timeout=20)
