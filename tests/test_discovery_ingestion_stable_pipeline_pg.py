@@ -125,9 +125,9 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             def register(items_,authority,**kw):
                 out=original_register(items_,authority,**kw)
                 if authority.endswith('_CAPTURE') and fault!='owner_wait_expires':
-                for conn in held:      # the pooler recycles an idle backend; with a connection limit of 1 a held backend would otherwise be the role's only slot
-                    conn.close()
-                held.clear();start_hosted()      # the restricted job is dispatched only after the owner registered the capture authority
+                    for conn in held:      # the pooler recycles an idle backend; with a connection limit of 1 a held backend would otherwise be the role's only slot
+                        conn.close()
+                    held.clear();start_hosted()      # the restricted job is dispatched only after the owner registered the capture authority
                 return out
             orunner.owner.register=register
             # the rehearsal compares process-level resource baselines; the hosted job is a different process
