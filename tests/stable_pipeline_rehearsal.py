@@ -43,6 +43,14 @@ def gh_runner(command,**kw):
     return subprocess.run([plan['gh'],*command[1:]],env=plan['gh_env'],**kw)
 
 journal=Journal(plan['output'])
+import re
+_FIXED=re.compile(r'[A-Z][A-Z0-9_]{2,79}')
+_original_failure=sp.HostedRunner.hosted_failure
+def _hosted_failure_with_code(self,exc,qualification):      # rehearsal only: the fixed reason code a hosted stop carries
+    text=exc.args[0] if getattr(exc,'args',None) and isinstance(exc.args[0],str) else ''
+    Path(plan['output']).joinpath('rehearsal-stop-code').write_text(json.dumps(dict(exception=type(exc).__name__,code=text if _FIXED.fullmatch(text) else 'NOT_A_FIXED_CODE',phase=self.operation_phase)))
+    return _original_failure(self,exc,qualification)
+sp.HostedRunner.hosted_failure=_hosted_failure_with_code
 # rehearsal-only diagnostic: the production failure classification deliberately exports no message; the DISPOSABLE server's own error text is recorded beside the audit
 from app.ingestion import coordinator as _coordinator
 _original=_coordinator.Coordinator.idox_source

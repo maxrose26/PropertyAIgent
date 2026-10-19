@@ -113,6 +113,14 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             orunner=Runner(dict(registration,mode=orr.PIPELINE_MODE),owner_journal,connector,source_reader=lambda row:(_ for _ in ()).throw(AssertionError('owner never reads a source')),github=github_o,url_factory=uri,identity=role,memory=None);holder2['runner']=orunner
             orunner.owner.reuse_installed=True;orunner.owner.baseline_control_sha256=baseline
             orunner.pipeline_sleep=lambda s:time.sleep(min(s,1.0))
+            import re as re_
+            stop_codes=[];FIXED_CODE=re_.compile(r'[A-Z][A-Z0-9_]{2,79}')
+            original_failed=orunner.failed
+            def failed_with_code(exc):      # rehearsal only: the exception's message when (and only when) it is one of the fixed reason codes of the controllers; anything else is never exported
+                text=exc.args[0] if getattr(exc,'args',None) and isinstance(exc.args[0],str) else ''
+                stop_codes.append(dict(exception=type(exc).__name__,code=text if FIXED_CODE.fullmatch(text) else 'NOT_A_FIXED_CODE'))
+                return original_failed(exc)
+            orunner.failed=failed_with_code
             ca,_=verified_trust()
             hosted_dir=tmp_path/'hosted-out';spawned=[]
             plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=info['dbname'],gh=metadata.gh,gh_env=metadata.fixture_env(),evidence_head=registration['evidence_head'],manifest_sha256=registration['manifest_sha256'],revision=registration['revision'],output=str(hosted_dir))
@@ -143,7 +151,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                     try:conn.close()
                     except Exception:pass
             owner_summary=dict(fault=fault,status=result.get('status'),cleanup=result.get('cleanup'),access=result.get('access'),invalidation=result.get('authority_invalidation'),phase=result.get('operation_phase'),
-                               failure=result.get('failure'),accounting=orunner.owner.accounting(),owner_connections=orunner.owner.connections,owner_commands=orunner.owner.commands,github_requests=orunner.github.requests)
+                               failure=result.get('failure'),stop_codes=stop_codes,hosted_stop_code=(json.loads((hosted_dir/'rehearsal-stop-code').read_text()) if (hosted_dir/'rehearsal-stop-code').exists() else None),accounting=orunner.owner.accounting(),owner_connections=orunner.owner.connections,owner_commands=orunner.owner.commands,github_requests=orunner.github.requests)
             print('PIPELINE_OWNER_RESULT',json.dumps(owner_summary,default=str,sort_keys=True))      # before any assertion can hide it
             record_property('pipeline_owner_result',json.dumps(owner_summary,default=str,sort_keys=True))
             hosted_log=(tmp_path/'hosted.log').read_text() if (tmp_path/'hosted.log').exists() else ''
@@ -152,7 +160,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             ctl_after=control()
             if fault in ('success','idle_pooled_session') and hosted_final and hosted_final['status']=='STOP_RECONCILE_NO_RETRY':
                 events_=[json.loads(l) for l in (hosted_dir/'events.jsonl').read_text().splitlines()] if (hosted_dir/'events.jsonl').exists() else []
-                pytest.fail(json.dumps(dict(hosted=dict(operation_phase=hosted_final.get('operation_phase'),failure=hosted_final.get('failure')),qualification=hosted_final.get('qualification'),
+                pytest.fail(json.dumps(dict(owner_stop_codes=stop_codes,hosted_stop_code=(hosted_dir/'rehearsal-stop-code').read_text() if (hosted_dir/'rehearsal-stop-code').exists() else None,hosted=dict(operation_phase=hosted_final.get('operation_phase'),failure=hosted_final.get('failure')),qualification=hosted_final.get('qualification'),
                             events=[(e['event'],e['payload'] if e['event'] in ('stopped','source_invocation_returned','capture_authority_observed') and len(json.dumps(e['payload']))<1500 else None) for e in events_][-14:],log=hosted_log[-1500:],rehearsal_exception=(hosted_dir/'rehearsal-exception').read_text() if (hosted_dir/'rehearsal-exception').exists() else None,steps=(hosted_dir/'rehearsal-steps').read_text() if (hosted_dir/'rehearsal-steps').exists() else None,control=json.dumps({k:v for k,v in control().items() if k!='grants'},default=str)[:600],grants=json.dumps({a:dict(expires=g.get('expires_at'),source_calls=g.get('source_calls')) for a,g in control().get('grants',{}).items()},default=str)[:600],exceptions=json.dumps({a:dict(expires=e.get('expires_at'),gen=e.get('hard_stop_generation')) for a,e in control().get('bolton_exceptions',{}).items()},default=str)[:600]),default=str)[:9000])
             text=owner_journal.file.read_text()+json.dumps(result)+((hosted_dir/'events.jsonl').read_text() if (hosted_dir/'events.jsonl').exists() else '')
             for r,p in passwords.items():assert p and p not in text and p not in hosted_log      # no password or verifier value in any audit, result or log
@@ -195,7 +203,7 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and result['access']=='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED' and not spawned and source_calls==0
                 return
             if not (spawned and (hosted_dir/'rehearsal-done').exists()):
-                pytest.fail(json.dumps(dict(owner=dict(status=result.get('status'),failure=result.get('failure'),phase=result.get('operation_phase'),invalidation=result.get('authority_invalidation')),owner_events=[e['event'] for e in events][-25:],hosted_log=hosted_log[-1500:],hosted_files=sorted(p.name for p in hosted_dir.iterdir()) if hosted_dir.exists() else None),default=str)[:6000])
+                pytest.fail(json.dumps(dict(owner=dict(status=result.get('status'),failure=result.get('failure'),stop_codes=stop_codes,phase=result.get('operation_phase'),invalidation=result.get('authority_invalidation')),owner_events=[e['event'] for e in events][-25:],hosted_log=hosted_log[-1500:],hosted_files=sorted(p.name for p in hosted_dir.iterdir()) if hosted_dir.exists() else None),default=str)[:6000])
             if fault=='source_raises':
                 assert source_calls==1 and hosted_final['status']=='STOP_RECONCILE_NO_RETRY'      # one source request; NO replay
                 assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and not [a for a in ctl_after['grants'] if a.endswith('_SCREEN')]
