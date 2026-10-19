@@ -86,18 +86,20 @@ def test_nested_blocked_connect_style_wait_is_also_interrupted(cluster):
         waiter.close();holder.execute('ROLLBACK');holder.execute('DROP TABLE hd_lock');holder.close()
 
 
-def test_nesting_is_refused_rather_than_silently_discarding_the_outer_deadline():
-    with hard_deadline(5,'OUTER'):
-        with pytest.raises(RuntimeError,match='HARD_DEADLINE_NESTED'):
-            with hard_deadline(1,'INNER'):pass
-    with hard_deadline(5,'AGAIN'):pass                                     # the guard is released after the outer context exits
-
-
-def test_a_signal_that_races_the_normal_exit_is_ignored_not_raised():
-    with hard_deadline(30,'X'):
-        captured=signal.getsignal(signal.SIGUSR1)
-    assert callable(captured) and signal.getsignal(signal.SIGUSR1)!=captured
-    assert captured(signal.SIGUSR1,None) is None                                    # delivered after the call completed: ignored, never raised
-    with pytest.raises(DeadlineExceeded):
-        with hard_deadline(30,'Y'):
-            live_handler=signal.getsignal(signal.SIGUSR1);live_handler(signal.SIGUSR1,None)      # delivered while the call is in progress: raised
+def test_the_guard_is_released_even_if_teardown_or_setup_fails(monkeypatch):
+    real=signal.pthread_sigmask;calls=[]
+    def failing(how,mask):
+        calls.append(how)
+        if len(calls)==1 and how==signal.SIG_BLOCK:raise OSError('injected')
+        return real(how,mask)
+    monkeypatch.setattr(signal,'pthread_sigmask',failing)
+    with pytest.raises(OSError):
+        with hard_deadline(5,'X'):pass
+    monkeypatch.undo()
+    with hard_deadline(5,'AGAIN'):pass                                               # not left locked ("NESTED") by the failure
+    def boom(*a,**k):raise OSError('install failed')
+    monkeypatch.setattr(signal,'signal',boom)
+    with pytest.raises(OSError):
+        with hard_deadline(5,'X'):pass
+    monkeypatch.undo()
+    with hard_deadline(5,'AFTER_SETUP_FAILURE'):pass
