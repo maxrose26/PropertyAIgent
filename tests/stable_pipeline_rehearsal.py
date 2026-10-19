@@ -53,6 +53,16 @@ def _recording(self,*a,**k):
         Path(plan['output']).joinpath('rehearsal-exception').write_text(json.dumps(dict(kind=type(exc).__name__,text=str(exc)[:800],primary=getattr(diag,'message_primary',None),context=getattr(diag,'context',None))))
         raise
 _coordinator.Coordinator.idox_source=_recording
+from app.ingestion import sql_ledger as _sql_ledger
+_steps=[]
+_original_step=_sql_ledger.SQLLedger._step if hasattr(_sql_ledger,'SQLLedger') else None
+if _original_step is not None:
+    def _recording_step(self,op,key,fence=0,payload=None,connection=None):
+        try:
+            out=_original_step(self,op,key,fence,payload,connection);_steps.append((op,'OK'));return out
+        except BaseException as exc:
+            _steps.append((op,type(exc).__name__));Path(plan['output']).joinpath('rehearsal-steps').write_text(json.dumps(_steps));raise
+    _sql_ledger.SQLLedger._step=_recording_step
 result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=None,
                           evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'])
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
