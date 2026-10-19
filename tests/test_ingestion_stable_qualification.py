@@ -1,5 +1,5 @@
 """The finite qualification of the stable restricted credentials: attempt policy, spacing, stop reasons, closure gating, single use, admission, and the per-attempt classification."""
-import json
+import json,os,signal
 from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
@@ -232,3 +232,67 @@ def test_an_unexpected_error_keeps_the_attempts_already_made_in_the_accounting()
         return original(role,ordinal,waited)
     q.attempt=attempt;r=q.run()
     assert r['attempts_total']==2 and r['stop_reason']=='UNRECOGNISED_FAILURE' and 'private text' not in json.dumps(r) and r['roles'][WORKER]['qualified'] is True
+
+
+def _handler():
+    def cancel(signum,frame):raise sq.Cancelled()
+    saved={s:signal.getsignal(s) for s in (signal.SIGTERM,signal.SIGINT)}
+    for s in saved:signal.signal(s,cancel)
+    return saved
+
+
+def _restore(saved):
+    for s,h in saved.items():signal.signal(s,h)
+
+
+def test_a_cancellation_while_the_budget_is_being_closed_leaves_a_started_unknown_attempt_not_a_lost_one():
+    saved=_handler()
+    class Budget:
+        def __init__(self,**kw):self.connection_diagnostics=[]
+        def engine(self,url,**kw):
+            @contextmanager
+            def connect():
+                raise RuntimeError('x')
+                yield
+            return SimpleNamespace(connect=connect)
+        def close(self,_):os.kill(os.getpid(),signal.SIGTERM);return dict(cleanup='CLOSED',connections_closed=True)
+    try:
+        q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=Budget);r=q.run()
+    finally:_restore(saved)
+    a=r['roles'][WORKER]['attempts'][0]
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and a['outcome']=='INTERRUPTED' and a['receipt'] is None and a['receipt_basis']=='UNKNOWN' and a['client_closure_verified'] is False
+    assert r['accounting']['attempts_started']['value']==1 and all(m['basis']=='LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN' for m in r['accounting']['metrics'].values()) and r['accounting']['client_closure']['status']=='NOT_VERIFIED_FOR_SOME_ATTEMPT'
+
+
+def test_a_cancellation_before_the_budget_exists_still_counts_the_attempt_as_started_and_unknown():
+    saved=_handler()
+    def factory(**kw):os.kill(os.getpid(),signal.SIGTERM);raise AssertionError('unreached')
+    try:
+        q=sq.Qualification(URLS,emit=lambda *_:None,ssl={},hostaddr='192.0.2.1',budget_factory=factory);r=q.run()
+    finally:_restore(saved)
+    a=r['roles'][WORKER]['attempts'][0]
+    assert r['stop_reason']=='CANCELLED' and r['attempts_total']==1 and a['outcome'] in ('INTERRUPTED','STARTED_UNRESOLVED') and a['receipt'] is None and a['client_closure_verified'] is False
+    assert r['accounting']['attempts_started']['value']==1 and r['accounting']['metrics']['connection_attempts']['basis']!='MEASURED' and r['use_blocked'] is True
+
+
+def test_a_receipt_missing_a_numeric_field_is_not_a_measured_zero():
+    partial=dict(receipt=dict(connection_attempts=1,driver_statements=None,returned_data_value_bytes=0,connection_active_seconds=0.1,connections_opened=0,connections_closed_count=0,cancel_attempts=0,cancel_failures=0,cancel_seconds=0.0,hard_deadline_events=[]),client_closure_verified=True)
+    acc=sq.Qualification.accounting_for([partial])
+    assert acc['metrics']['driver_commands']=={'value':0,'basis':'LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN'}
+    nokey=dict(receipt={'cleanup':'CLOSED'},client_closure_verified=True)
+    assert sq.Qualification.accounting_for([nokey])['metrics']['connection_attempts']['basis']=='LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN'
+
+
+def test_a_cancelled_preparation_is_reported_as_cancelled_not_as_a_credential_rejection():
+    r=sq.preparation_failure_result('Cancelled')
+    assert r['stop_reason']=='CANCELLED' and r['accounting']['attempts_started']['value']==0 and all(m['basis']=='NOT_STARTED' for m in r['accounting']['metrics'].values())
+
+
+def test_a_signal_during_a_shielded_record_is_delivered_only_after_the_record_is_complete():
+    saved=_handler();done=[]
+    try:
+        with pytest.raises(sq.Cancelled):
+            with sq.shielded():
+                os.kill(os.getpid(),signal.SIGTERM);done.append('record written')      # still running: the signal is pending, not delivered
+    finally:_restore(saved)
+    assert done==['record written']

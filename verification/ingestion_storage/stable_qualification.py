@@ -13,6 +13,7 @@ for the worker only - the control row it holds SELECT on). It cannot see other s
 A failed qualification cannot disable anything (that needs the privileged revocation path): it reports the retained access and a blocked-for-use state.
 A manual stop in production is cancelling the workflow run (the STOP file under the output directory exists for local rehearsals; a hosted runner is ephemeral and nobody can create it)."""
 import argparse,json,os,signal,sys,time
+from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 from .connection_diagnostics import safe_failure
@@ -60,6 +61,16 @@ class ProfileViolation(Exception):pass
 
 class Cancelled(BaseException):
     """The run was cancelled (SIGTERM/SIGINT). A BaseException so that no generic handler can mistake it for a failure class."""
+
+
+@contextmanager
+def shielded():
+    """Defer cancellation signals while a durable record is written; a pending signal is delivered on exit, AFTER the record is complete (so a record is never half written and an attempt never lost)."""
+    try:previous = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
+    except (AttributeError, ValueError, OSError):previous = None
+    try:yield
+    finally:
+        if previous is not None:signal.pthread_sigmask(signal.SIG_SETMASK, previous)
 
 
 RETAINED_ACCESS = 'BOTH_LOGINS_REMAIN_ENABLED_UNTIL_THE_OWNER_RUNS_THE_PRIVILEGED_REVOCATION'
@@ -116,9 +127,13 @@ class Qualification:
         if self.urls[role] != self.first_urls[role]:raise Stop('UNEXPECTED_PROFILE')
         from sqlalchemy.engine import make_url
         if rr.identify(make_url(self.urls[role])) != ('POOLER', role):raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT')
-        budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)
         began = self.clock();probe = None;reason = None;status = 'FAILED';cancelled = False;refused = False
+        slot = len(self.attempts)
+        self.attempts.append(dict(role=role, ordinal=ordinal, spacing_waited_seconds=round(waited, 3), outcome='STARTED_UNRESOLVED', reason_code=None, client_closure_verified=False, elapsed_seconds=None,
+                                  credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=None, receipt=None, receipt_basis='UNKNOWN'))      # counted as STARTED before anything can be interrupted; replaced when the attempt completes
+        budget = None
         try:
+            budget = self.budget_factory(connections=1, statements=24, seconds=60, emit=self.emit, stop_file=self.stop_file)
             try:
                 engine = budget.engine(self.urls[role], ssl=self.ssl, hostaddr=self.hostaddr, route='POOLER')
             except Denied:
@@ -138,14 +153,17 @@ class Qualification:
         except Cancelled:status, reason, cancelled = 'INTERRUPTED', 'CANCELLED', True
         finally:
             receipt = None
-            try:receipt = self.sanitise(budget.close([]))
-            except Exception:receipt = None      # closing failed or was interrupted: the measurements and the closure are UNKNOWN, never zero and never verified
+            try:receipt = self.sanitise(budget.close([])) if budget is not None else None
+            except Exception:receipt = None      # closing failed: the measurements and the closure are UNKNOWN, never zero and never verified
+            except Cancelled:receipt, cancelled, status, reason = None, True, 'INTERRUPTED', 'CANCELLED'      # interrupted while closing: UNKNOWN as well
         closure_ok = receipt is not None and receipt.get('cleanup') == 'CLOSED' and receipt.get('connections_closed') is True
         record = dict(role=role, ordinal=ordinal, spacing_waited_seconds=round(waited, 3), outcome=status, reason_code=reason, client_closure_verified=bool(closure_ok), elapsed_seconds=round(self.clock() - began, 3),
                       credential='UNCHANGED_SINCE_FIRST_ATTEMPT', probe=probe, receipt=receipt, receipt_basis='MEASURED' if receipt is not None else 'UNKNOWN')
-        self.attempts.append(record);self.emit('qualification_attempt', record)
-        try:self.progress(self.accounting())
-        except Exception:pass      # a failed progress write never changes the sequence; the per-attempt event above is the durable record
+        self.attempts[slot] = record
+        with shielded():
+            self.emit('qualification_attempt', record)
+            try:self.progress(self.accounting())
+            except Exception:pass      # a failed progress write never changes the sequence; the per-attempt event above is the durable record
         if cancelled:raise Cancelled()
         if refused:raise Stop('ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT')
         return record
@@ -160,12 +178,18 @@ class Qualification:
         """Whitelist of the budget receipt's own fields (allow-listed classifications, counters, durations); it never contains a URL, password, message or query text."""
         return json.loads(json.dumps({k: receipt.get(k) for k in cls.RECEIPT_KEYS if k in receipt}, default=str))
 
-    @staticmethod
-    def accounting_for(attempts):
-        started = len(attempts);measured = [a for a in attempts if a.get('receipt') is not None]
+    NUMERIC_KEYS = ('connection_attempts', 'driver_statements', 'returned_data_value_bytes', 'connection_active_seconds', 'connections_opened', 'connections_closed_count', 'cancel_attempts', 'cancel_failures', 'cancel_seconds')
+
+    @classmethod
+    def complete(cls, receipt):
+        return isinstance(receipt, dict) and all(isinstance(receipt.get(k), (int, float)) and not isinstance(receipt.get(k), bool) for k in cls.NUMERIC_KEYS) and isinstance(receipt.get('hard_deadline_events'), list)
+
+    @classmethod
+    def accounting_for(cls, attempts):
+        started = len(attempts);measured = [a for a in attempts if cls.complete(a.get('receipt'))]
         basis = 'NOT_STARTED' if started == 0 else 'MEASURED' if len(measured) == started else 'LOWER_BOUND_ONLY_SOME_RECEIPT_UNKNOWN'
         def total(key, nested=None):
-            return sum((a['receipt'].get(key) or 0) for a in measured) if nested is None else sum(len(a['receipt'].get(key) or []) for a in measured)
+            return sum(a['receipt'][key] for a in measured) if nested is None else sum(len(a['receipt'][key]) for a in measured)
         metrics = {'connection_attempts': total('connection_attempts'), 'driver_commands': total('driver_statements'), 'returned_database_value_bytes': total('returned_data_value_bytes'),
                    'connection_active_seconds': round(total('connection_active_seconds'), 3), 'connections_opened': total('connections_opened'), 'connections_closed': total('connections_closed_count'),
                    'cancel_attempts': total('cancel_attempts'), 'cancel_failures': total('cancel_failures'), 'cancel_seconds': round(total('cancel_seconds'), 3), 'hard_deadline_events': total('hard_deadline_events', nested=True)}
@@ -220,7 +244,7 @@ class Qualification:
 
 def preparation_failure_result(kind):
     """Preparation stopped before any database work: the measurements are NOT_STARTED (explicitly), the closure is NOT_APPLICABLE - neither is a measured zero or a verified closure."""
-    return dict(status='QUALIFICATION_STOPPED', stop_reason='ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT', attempts_total=0, use_blocked=True, use_blocked_semantics=USE_BLOCKED_SEMANTICS, detail=kind,
+    return dict(status='QUALIFICATION_STOPPED', stop_reason='CANCELLED' if kind == 'Cancelled' else 'ROUTE_OR_CREDENTIAL_REJECTED_BEFORE_CONNECT', attempts_total=0, use_blocked=True, use_blocked_semantics=USE_BLOCKED_SEMANTICS, detail=kind,
                 accounting=Qualification.accounting_for([]), retained_access=RETAINED_ACCESS, owner_verifications_required=list(OWNER_VERIFICATIONS), grants_issued=0, exceptions_registered=0, source_requests=0,
                 application_writes=0, administrative_credential_present=False, grant_may_be_issued_from_this_milestone=False)
 
@@ -241,7 +265,8 @@ def main(argv=None):
     except (Exception, Cancelled) as exc:
         result = preparation_failure_result(type(exc).__name__)
     else:result = q.run()      # run() keeps every attempt already made, whatever happens
-    journal.emit('final', result);journal.save('final-result.json', result)
+    with shielded():
+        journal.emit('final', result);journal.save('final-result.json', result)
     print(json.dumps({k: result.get(k) for k in ('status', 'stop_reason', 'attempts_total', 'use_blocked')}, sort_keys=True))
     raise SystemExit(0 if result['status'] == 'STABLE_CREDENTIALS_QUALIFIED' else 1)
 
