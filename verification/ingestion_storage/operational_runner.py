@@ -95,7 +95,10 @@ OBSERVER_AUTHORITY='AUTHORISE_INGESTION_CONTROL_OBSERVATION_ONCE_20261021'
 OBSERVER_STATE='operational-control-observation-once-20261021'
 OBSERVER_OWNER_LIMITS=dict(connections=(1,1),commands=(12,12,12))
 OBSERVER_TIMING=dict(input_seconds=120,active_seconds=30,work_seconds=24,diagnostic_seconds=3,report_seconds=2,outer_seconds=180)
-OBSERVER_DEADLINES=dict(job=20,diagnostic_total=27,diagnostic_window=3,admin_diagnostic=25,admin_pre=14,admin_total=18,runtime_total=1)
+OBSERVER_DEADLINES=dict(job=20,diagnostic_total=27,diagnostic_window=3,admin_diagnostic=25,admin_pre=8,admin_total=18,runtime_total=1)
+# Structural ceiling on database-active time: connect (3 s) + the last statement that can start (no new statement starts after admin_pre = 8 s) with its own 4 s deadline + one 2 s cancel + a 1 s close
+# = 18 s <= 20 s. The cancel, if a statement hangs, is a bounded separate network request (at most the owner's cancel allowance); it is not a second session.
+OBSERVER_STATEMENT_SECONDS=4
 OBSERVER_BACKSTOP_SECONDS=240
 OBSERVER_PREDECESSOR=dict(consumed_run=dict(run_id=39388007668,artifact_id=12248515861,artifact_zip_sha256='934a798296e7beba6bd5bb0860a820a5ef3104c7b0c18b111c81c616b3c0ee22'),
                           owner_events_sha256='35dedf6a87c3b10d4e23af54590c49bb5af4393358dd79ee9f95675be5035449',owner_final_result_sha256='8c26067b366efc208fec0bbb7affdaed80ab355b0e50c867a6d538dad7a26381',
@@ -151,6 +154,7 @@ class Runner:
         self.deadlines=dict(OBSERVER_DEADLINES if self.observer_mode else PIPELINE_DEADLINES if self.pipeline_mode else MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
         self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=OBSERVER_OWNER_LIMITS if self.observer_mode else MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
         if direct or stable or self.pipeline_mode or self.observer_mode:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
+        if self.observer_mode:self.owner.statement_hard_seconds=OBSERVER_STATEMENT_SECONDS
         if self.pipeline_mode:self.owner.expected_generation=PIPELINE_BINDING['hard_stop_generation']
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
@@ -675,7 +679,7 @@ class Runner:
         except BaseException:components=dict(overall='UNCERTAIN',process=dict(status='UNCERTAIN'))
         return dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),operation_phase=self.operation_phase,
                     accounting=self.accounting(),access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',source_observations_attempted=0,execution_grants_created=0,application_writes=0,committed_writes=0,
-                    pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+                    transient_owner_capability='ABORTED_BY_DISCONNECT_NOT_READ_BACK_IF_THE_FAILURE_FOLLOWED_THE_GRANT',pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
 
     def execute(self):
         try:

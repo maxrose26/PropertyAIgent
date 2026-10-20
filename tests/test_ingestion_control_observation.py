@@ -144,6 +144,8 @@ def test_the_timing_constants_keep_the_session_invariants_and_the_stated_limits(
     assert t['active_seconds']==30 and t['input_seconds']==120      # 30 supervised-active seconds after the hidden input
     assert d['job']+d['diagnostic_window']<=t['work_seconds'] and t['work_seconds']+d['diagnostic_window']<=d['diagnostic_total']<=t['active_seconds']-t['report_seconds']
     assert d['admin_pre']<d['admin_total']<d['admin_diagnostic']
+    ceiling=3+orr.OBSERVER_STATEMENT_SECONDS+2+1      # connect + last statement + cancel + close, when no new statement starts after admin_pre
+    assert d['admin_pre']+0<=8 and ceiling<=oo.Owner.OBSERVER_MAX_DB_ACTIVE_SECONDS and orr.OBSERVER_STATEMENT_SECONDS<oo.ADMIN_STATEMENT_HARD_SECONDS
     assert oo.Owner.OBSERVER_MAX_DB_ACTIVE_SECONDS==20 and oo.Owner.OBSERVER_MAX_STATEMENTS==12
     assert t['input_seconds']+t['active_seconds']+30>=t['outer_seconds'] and orr.OBSERVER_BACKSTOP_SECONDS>t['outer_seconds']
 
@@ -174,3 +176,42 @@ def test_the_observer_names_are_unused_by_every_consumed_mode():
     consumed={orr.PIPELINE_AUTHORITY,orr.PIPELINE_STATE}
     assert orr.OBSERVER_AUTHORITY not in consumed and orr.OBSERVER_STATE not in consumed and orr.OBSERVER_MODE not in (orr.PIPELINE_MODE,orr.STABLE_PROVISION_MODE,orr.STABLE_REVOKE_MODE)
     assert orr.OBSERVER_PREDECESSOR['consumed_run']['run_id']==39388007668
+
+
+# ---------------------------------------------------------------- review fixes
+def test_a_failure_after_the_grant_never_commits_and_the_connection_is_closed():
+    class Failing(FakeAdmin):
+        def execute(self,statement,params=None):
+            text=' '.join(str(statement).split())
+            if text.startswith('SELECT outcome::jsonb'):self.statements.append(text);raise RuntimeError('connection lost')
+            return super().execute(statement,params)
+    db=Failing(control());o=owner_for(db,[])
+    with pytest.raises(RuntimeError):o.control_observation()
+    assert db.closed and not any(s.startswith(('COMMIT','UPDATE','INSERT','CREATE','ALTER','DELETE')) for s in db.statements) and db.in_tx      # the open transaction is aborted by the disconnect, never committed
+
+
+def test_the_statement_deadline_is_the_observer_s_own_and_other_modes_keep_twelve_seconds(tmp_path):
+    r=runner_for(tmp_path,FakeAdmin(control()))
+    assert r.owner.statement_hard_seconds==orr.OBSERVER_STATEMENT_SECONDS==4 and oo.Owner.statement_hard_seconds==oo.ADMIN_STATEMENT_HARD_SECONDS==12
+    result=r.execute()
+    assert result['status']=='CONTROL_OBSERVED_NO_COMMITTED_MUTATION'
+
+
+def test_the_failure_result_says_the_capability_could_not_be_read_back_after_a_failure(tmp_path):
+    result=runner_for(tmp_path,FakeAdmin(control(),capability=(True,True))).execute()
+    assert 'NOT_READ_BACK' in result['transient_owner_capability']
+
+
+def test_pathological_values_are_bounded_or_withheld():
+    c=control();c['manual_stop']='X'*5000;c['global_stop']={'reason':'Y'*5000};c['grants']['LIVE']['expires_at']='tomorrow';c['grants']['LIVE']['login']='L'*500;c['grants']['LIVE']['source_calls']='many'
+    c['grants']['LIVE']['execution_binding']={'revision':'not-a-hash'};c['council_deferred_until']={str(i):i for i in range(500)}
+    p=oo.Owner.project_control(c,NOW)
+    assert len(p['manual_stop'])==512 and p['global_stop']=='OVERSIZE_NOT_EXPORTED' and p['council_deferred_until']=='OVERSIZE_NOT_EXPORTED'
+    live=[g for g in p['grants'] if g['authority']=='LIVE'][0]
+    assert live['state']=='UNREADABLE' and live['expires_at'] is None and len(live['login'])==100 and live['source_calls'] is None and live['execution_binding_revision'] is None
+    assert len(json.dumps(p))<20000
+
+
+def test_the_prepared_runner_gives_the_observer_a_zero_github_bound():
+    source=Path(orr.__file__).read_text()
+    assert "dict(bound=0) if r.get('mode')==OBSERVER_MODE" in source

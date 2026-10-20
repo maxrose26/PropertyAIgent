@@ -92,6 +92,7 @@ class Owner:
     # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
     DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
     limits=DEFAULT_LIMITS      # class default for any Owner not built through __init__
+    statement_hard_seconds=ADMIN_STATEMENT_HARD_SECONDS      # the observation mode lowers this on its own Owner; every other mode keeps 12 s
 
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
@@ -134,7 +135,7 @@ class Owner:
         started=time.monotonic()
         try:
             try:
-                with hard_deadline(ADMIN_STATEMENT_HARD_SECONDS,'ADMIN_STATEMENT_HARD_DEADLINE'):
+                with hard_deadline(self.statement_hard_seconds,'ADMIN_STATEMENT_HARD_DEADLINE'):
                     cur=c.execute(statement,params)
                     rows=cur.fetchall() if cur.description else []
             except DeadlineExceeded:
@@ -551,15 +552,23 @@ class Owner:
         any key list). `now` is the SERVER's clock. Two digests: of the whole record, and of the stop fields alone (the exact stop binding a policy could pin)."""
         if not isinstance(ctl,dict):raise ValueError('CONTROL_SHAPE')
         def state(expires):
-            if not isinstance(expires,(int,float)) or isinstance(expires,bool):return 'UNREADABLE'
+            if not isinstance(expires,(int,float)) or isinstance(expires,bool) or not math.isfinite(expires):return 'UNREADABLE'
             return 'REVOKED_ZERO' if expires==0 else 'EXPIRED' if expires<=now else 'UNEXPIRED'
+        import math
+        def text(value,limit=100):
+            return value[:limit] if isinstance(value,str) else None
+        def small(value):
+            try:return value if len(json.dumps(value,sort_keys=True))<=512 else 'OVERSIZE_NOT_EXPORTED'
+            except (TypeError,ValueError):return 'UNREADABLE'
+        def integer(value):
+            return value if type(value) is int and -10**9<=value<=10**9 else None
         grants=ctl.get('grants',{});exceptions=ctl.get('bolton_exceptions',{})
         if not isinstance(grants,dict) or not isinstance(exceptions,dict):raise ValueError('CONTROL_SHAPE')
-        stop=dict(global_stop=ctl.get('global_stop'),manual_stop=ctl.get('manual_stop'),last_hard_stop=ctl.get('last_hard_stop'),hard_stop_generation=ctl.get('hard_stop_generation'))
-        out=dict(**stop,council_deferred_until=ctl.get('council_deferred_until'),control_keys=sorted(str(k) for k in ctl),
-                 grants=[dict(authority=a,expires_at=g.get('expires_at'),state=state(g.get('expires_at')),source_calls=g.get('source_calls'),writes=g.get('writes'),login=g.get('login'),key_count=len(g.get('keys') or []),
-                              execution_binding_revision=(g.get('execution_binding') or {}).get('revision')) for a,g in sorted(grants.items()) if isinstance(g,dict)],
-                 bolton_exceptions=[dict(authority=a,expires_at=e.get('expires_at'),state=state(e.get('expires_at')),transport=e.get('transport'),hard_stop_generation=e.get('hard_stop_generation'),
+        stop=dict(global_stop=small(ctl.get('global_stop')),manual_stop=text(ctl.get('manual_stop'),512),last_hard_stop=text(ctl.get('last_hard_stop'),512),hard_stop_generation=integer(ctl.get('hard_stop_generation')))
+        out=dict(**stop,council_deferred_until=small(ctl.get('council_deferred_until')),control_keys=sorted(str(k) for k in ctl),
+                 grants=[dict(authority=text(a),expires_at=g.get('expires_at') if state(g.get('expires_at'))!='UNREADABLE' else None,state=state(g.get('expires_at')),source_calls=integer(g.get('source_calls')),writes=integer(g.get('writes')),login=text(g.get('login')),key_count=len(g.get('keys') or []) if isinstance(g.get('keys'),list) else None,
+                              execution_binding_revision=(lambda r:r if isinstance(r,str) and re.fullmatch(r'[0-9a-f]{40}',r) else None)((g.get('execution_binding') or {}).get('revision') if isinstance(g.get('execution_binding'),dict) else None)) for a,g in sorted(grants.items()) if isinstance(g,dict)],
+                 bolton_exceptions=[dict(authority=text(a),expires_at=e.get('expires_at') if state(e.get('expires_at'))!='UNREADABLE' else None,state=state(e.get('expires_at')),transport=text(e.get('transport')),hard_stop_generation=integer(e.get('hard_stop_generation')),
                                          grant_binding_matches=bool(isinstance(grants.get(a),dict) and e.get('grant_binding')=={k:v for k,v in grants[a].items() if k not in ('source_calls','writes')})) for a,e in sorted(exceptions.items()) if isinstance(e,dict)])
         out['counts']=dict(grants=len(out['grants']),grants_unexpired=sum(g['state']=='UNEXPIRED' for g in out['grants']),exceptions=len(out['bolton_exceptions']),exceptions_unexpired=sum(e['state']=='UNEXPIRED' for e in out['bolton_exceptions']))
         out['stop_state_sha256']=digest(stop);out['control_sha256']=digest(ctl)
