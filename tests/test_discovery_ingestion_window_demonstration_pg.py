@@ -38,6 +38,18 @@ G3=oo.GENERATION3_STOP
 FAULTS=['success','source_raises','screening_stops','owner_wait_expires','wrong_revision','wrong_manifest','wrong_executable','baseline_changed_blocks','baseline_digest_differs_blocks']
 
 
+class OwnerScope:
+    """The production contract of OperationalMemory (snapshot() only while enforcing, close() once) driving the REAL owner guard, so the owner's publication-then-closure ordering is exercised end to end. The real cgroup-v2 scope
+    is exercised by tests/owner_scope_publication_proof.py in the stage4-hosted-memory-proof workflow."""
+    source=None
+    def __init__(self):self.closed=False
+    def snapshot(self):
+        if self.closed:raise AssertionError('snapshot after close')
+    def close(self):
+        self.closed=True
+        return dict(owned_groups_removed=True,owned_survivors=0,memory=dict(aggregate=dict(events=dict(oom_kill=0))))
+
+
 def run_window_policy(w,name='window-policy'):
     journal=Journal(w.tmp_path/name);holder={}
     github=GitHub(journal.emit,lambda:holder['r'].check(),bound=0)
@@ -89,8 +101,12 @@ def test_window_demonstration_lifecycle(world,fault,monkeypatch):
     monkeypatch.setitem(orr.WINDOW_BINDING,'capture_wait_seconds',3 if fault=='owner_wait_expires' else 120);monkeypatch.setitem(orr.WINDOW_BINDING,'screening_wait_seconds',120)
     ctl_before=w.control()
     owner_journal=Journal(tmp_path/'owner');holder={}
-    github=GitHub(owner_journal.emit,lambda:holder['r'].check(),runner=w.cli,bound=orr.PIPELINE_GITHUB_BOUND)
-    orunner=Runner(registration,owner_journal,w.connector,source_reader=lambda row:(_ for _ in ()).throw(AssertionError('owner never reads a source')),github=github,url_factory=w.uri,identity=w.role,memory=None);holder['r']=orunner
+    owner_scope=OwnerScope();after_close=[]
+    def counted_cli(command,**kw):
+        if owner_scope.closed:after_close.append(command)      # any GitHub request made after the owner's scope was closed
+        return w.cli(command,**kw)
+    github=GitHub(owner_journal.emit,lambda:holder['r'].check(),runner=counted_cli,bound=orr.PIPELINE_GITHUB_BOUND)
+    orunner=Runner(registration,owner_journal,w.connector,source_reader=lambda row:(_ for _ in ()).throw(AssertionError('owner never reads a source')),github=github,url_factory=w.uri,identity=w.role,memory=owner_scope);holder['r']=orunner
     orunner.pipeline_sleep=lambda s:time.sleep(min(s,1.0))
     stop_codes=[];original_failed=orunner.failed
     def failed_with_code(exc):
@@ -145,6 +161,7 @@ def test_window_demonstration_lifecycle(world,fault,monkeypatch):
         published=json.loads(base64.b64decode(blob_now['content']))
         assert published['closure_stage']=='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE' and published['execution']==hosted_final['execution'] and published['execution']['authority']==orr.WINDOW_AUTHORITY
     assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'),summary
+    assert owner_scope.closed and after_close==[]      # the owner's scope is closed exactly once, and nothing was sent to GitHub afterwards
     if fault=='owner_wait_expires':
         assert result['status']=='STOP_RECONCILE_NO_RETRY' and not spawned and source_calls==0 and list(ours)==[CAP] and ctl_after['hard_stop_generation']==3
         return
@@ -169,6 +186,11 @@ def test_window_demonstration_lifecycle(world,fault,monkeypatch):
     assert hosted_final['checkout_binding']['manifest_sha256']==window_manifest and hosted_final['checkout_binding']['tracked_files_modified'] is False      # what the production reader actually verified
     assert result['hosted']['cleanup']=='PENDING_MEMORY_SCOPE_CLOSURE' and hosted_final['rows']==22 and hosted_final['batches']==5 and hosted_final['credential_changes']==0 and hosted_final['application_writes']==0
     assert result['readback_after']['findings']==[] and result['readback_before']['findings']==[]
+    assert result['closure_stage']=='FINAL_AFTER_PUBLICATION' and result['publication']=='PUBLISHED' and result['published_cleanup']=='PENDING_MEMORY_SCOPE_CLOSURE' and result['authority_invalidation']=='ACKNOWLEDGED_READBACK'      # publication first, then closure, then the definitive record
+    head_owner=json.loads(w.metadata.cli(['gh','api','--method','GET',sp.REPO+'/git/ref/heads/'+sp.BRANCH]).stdout)['object']['sha']
+    owner_blob=json.loads(w.metadata.cli(['gh','api','--method','GET',sp.REPO+'/contents/'+orr.WINDOW_EVIDENCE_DIRECTORY+'/owner/final-result.json?ref='+head_owner]).stdout)
+    owner_published=json.loads(base64.b64decode(owner_blob['content']))      # the owner's own publication, which the 20 October run never made
+    assert owner_published['closure_stage']=='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE' and owner_published['status']=='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' and owner_published['authority_invalidation']=='ACKNOWLEDGED_READBACK'
     assert all(state=='COMPLETE' for _,state in w.items() if state)
     root=oo.item(dict(subject=oo.WINDOW_SCOPE,task='DISCOVERY',contract=orr.CONTRACT,revision=window_manifest),max_attempts=1,limits=dict(oo.DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
     assert any(key==root['key'] for key,_ in w.items())      # the retained root is the WINDOW scope's, not the day's
