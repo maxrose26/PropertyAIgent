@@ -110,6 +110,14 @@ def restricted_url(role,password):
     if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
     return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
 
+def hosted_finished(hosted_summary,incomplete):
+    """Whether the restricted job's PUBLISHED result is a completed run. The job publishes while its memory scope is still enforcing, so a success is published as `PENDING_MEMORY_SCOPE_CLOSURE`
+    (accepted only together with `closure_stage == PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE`); the complete closure is in the sealed workflow artifact, which is the authority for it. A stop is never completed."""
+    cleanup=hosted_summary.get('cleanup')
+    closed=cleanup in ('CLOSED',None) or (cleanup=='PENDING_MEMORY_SCOPE_CLOSURE' and hosted_summary.get('closure_stage')=='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE')
+    return not incomplete and closed and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+
+
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
     deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
@@ -608,7 +616,7 @@ class Runner:
             head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
             raw,hosted=self.verify_hosted_result(blob)
-            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),closure_stage=hosted.get('closure_stage'),rows=hosted.get('rows'),batches=hosted.get('batches'))
             done=self.owner.read_items([p['key'] for p in self.plans])
             incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')
             self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
@@ -617,7 +625,7 @@ class Runner:
             head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
             raw,hosted=self.verify_hosted_result(blob)
-            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),closure_stage=hosted.get('closure_stage'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
             self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS',hosted=hosted_summary))
         self.operation_phase='PIPELINE_INVALIDATION'
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
@@ -625,7 +633,7 @@ class Runner:
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
         components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
         if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
-        finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+        finished=hosted_finished(hosted_summary,incomplete)
         result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',

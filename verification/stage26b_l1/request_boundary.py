@@ -177,6 +177,7 @@ class Boundary:
         self.budget.reject('PARTIAL_RETRIEVAL', 'unapproved route class')
 
     def request(self, method, url, *, body=None, headers=None, redirected=False):
+        self.last_response = None      # a pre-dispatch rejection must not report an earlier request's response
         self.validate(method, url, body)
         if redirected:
             self.redirects += 1
@@ -184,6 +185,7 @@ class Boundary:
         while True:
             self.budget.charge_request(self.policy)
             self.requests += 1
+            self.last_response = None      # facts of THIS request only: a dispatch that raises must not report an earlier response
             response = None
             charged = 0
             try:

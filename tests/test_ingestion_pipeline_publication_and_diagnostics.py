@@ -202,3 +202,29 @@ def test_response_shape_never_raises_and_exports_only_allow_listed_facts():
 def test_hosted_failure_text_exports_the_publication_reason_code_only(tmp_path):
     assert fixed_stop_reason(ValueError('GITHUB_PUBLICATION_RESERVE_EXHAUSTED'))=='GITHUB_PUBLICATION_RESERVE_EXHAUSTED'
     assert fixed_stop_reason(ValueError('some other value error text')) is None
+
+
+# ---------------------------------------------------------------- review fixes
+def test_the_owner_accepts_a_published_pending_closure_only_with_its_stage_and_never_for_a_stop():
+    from verification.ingestion_storage.operational_runner import hosted_finished
+    ok=dict(status='STABLE_PIPELINE_CAPTURE_SCREENING_COMPLETED_RESTRICTED_RUNTIME_ONLY',cleanup='PENDING_MEMORY_SCOPE_CLOSURE',closure_stage='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE')
+    assert hosted_finished(ok,[]) is True
+    assert hosted_finished(dict(ok,closure_stage=None),[]) is False and hosted_finished(dict(ok,closure_stage='FINAL_AFTER_PUBLICATION'),[]) is False
+    assert hosted_finished(dict(ok,status='STOP_RECONCILE_NO_RETRY'),[]) is False and hosted_finished(ok,['batch']) is False
+    assert hosted_finished(dict(ok,cleanup='UNCERTAIN'),[]) is False
+    assert hosted_finished(dict(status='X',cleanup='CLOSED'),[]) is True and hosted_finished(dict(status='X'),[]) is True      # earlier shapes still accepted
+
+
+def test_transport_facts_are_those_of_the_failing_request_only():
+    from verification.discovery.idox_window import WindowBoundary
+    state={'n':0}
+    def dispatch(method,url,**kw):
+        state['n']+=1
+        if state['n']>1:raise RuntimeError('dispatch failed')
+        return Resp(200,'text/html')
+    b=WindowBoundary(dispatch)
+    b.request('GET',b.config.form_url);assert b.last_response['http_status']==200
+    with pytest.raises(Exception):b.request('GET',b.config.form_url)      # the dispatch itself raises on the next request
+    assert b.last_response is None
+    with pytest.raises(Exception):b.request('POST','https://elsewhere.example/x',body=b'a=b')      # rejected before any dispatch
+    assert b.last_response is None
