@@ -118,7 +118,7 @@ class HostedRunner(Runner):
         self.owner=HostedOwner(self,urls)
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None
         self.batch_bindings={};self.evidence_head=evidence_head;self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
-        identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
+        identity=dict(subject=self.scope,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
         self.initial_evidence_head=evidence_head;self.checkout_probe=checkout_probe or (lambda:actual_checkout(manifest_path=self.MANIFEST));self.checkout_binding=None
@@ -284,7 +284,7 @@ def read_secrets(stream):
     return lines[0],{'ingestion_worker_login':lines[1],'ingestion_effect_login':lines[2]}
 
 
-def main(argv=None,*,authority=None,runner_class=None,manifest_path=None,github_bound=140):
+def main(argv=None,*,authority=None,runner_class=None,manifest_path=None,github_bound=140,scope=None):
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args(argv)
     if not admitted(os.environ,authority):raise SystemExit('PIPELINE_NOT_ADMITTED')
@@ -304,7 +304,7 @@ def main(argv=None,*,authority=None,runner_class=None,manifest_path=None,github_
         stop_early(journal,'PREPARATION_FAILED',type(exc).__name__);raise SystemExit(1)
     from .operational_source import read
     def source_reader_factory(runner):
-        return lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
+        return lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start=(scope or SCOPE)['start'],end=(scope or SCOPE)['end']),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
     result,code=run_hosted(urls=urls,journal=journal,gh_runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),source_reader_factory=source_reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},
                            hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(manifest_path or MANIFEST_PATH).read_bytes()).hexdigest(),revision=os.environ['PIPELINE_REVIEWED_SHA'],runner_class=runner_class,github_bound=github_bound)
     raise SystemExit(code)

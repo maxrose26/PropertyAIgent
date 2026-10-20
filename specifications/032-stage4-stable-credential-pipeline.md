@@ -165,3 +165,31 @@ A normal council refusal at the form is diagnostic evidence and raises no stop. 
 ### 13.7 Not in scope
 Standing credentials, application writes, B2, scheduling, deployment, Stage advancement, any broader cap change, generation reset, or removal of any historical record.
 
+## 14. One complete-window demonstration under generation 3 (23 October)
+
+**Intelligence layer.** Planning Applications / Planning Documents: the first accepted, durably retained, source-free-screened Bolton listing capture of a window whose completeness is *proved by the source's own explicit total*. No new layer, no new Site concept.
+
+### 14.1 What the 22 October capture showed (corrected assessment)
+The accepted capture made four requests to Bolton (form GET, search POST, sort POST, criteria echo; 157,764 bytes; 0 redirects; 0 retries) and returned **four verified listing rows for 16 October with no total**. The contract requires `enumeration_evidence == COUNT_RECONCILED`; the page gave `TOTAL_UNKNOWN`, so the capture stopped fail-safe (generation 3) with nothing retained. Precisely:
+* The **recognised `p.pager` element was absent**. That is a fact about one element in one page. It is **not** evidence that every possible count or pagination signal was absent: the page body was not retained, so no other signal can be excluded or confirmed offline.
+* An earlier real observation (14 October: a historical single-day window of 8 rows, `historical_pager: NOT_PRESENT`) and this one are consistent with the pager appearing only when results span more than one page. That is an **observed pattern across two observations, not proven council design**. The retained multi-page windows (for example 22 references over 3 pages, 28 September to 4 October) all show `Showing a-b of N`.
+* `.searchinfo` was a recon-time hypothesis in a fixture and has never been observed in a retained real Bolton body; it is not a parser gap.
+* Completeness is not inferred from a short page, absent pagination or matching date criteria alone, and nothing here changes that.
+
+### 14.2 The demonstration
+One window already observed to carry an explicit pager - **Bolton RECEIVED 28 September to 4 October 2026** - is captured through the **unchanged** accepted pipeline: one form GET, listing only from a valid form, the **existing completeness contract**, durable retention before the ledger checkpoint, the existing queue and the existing source-free screening. **Only the exact scope and the stop state differ** (scope constant, generation 3). No parser, adapter, storage, queue or screening change. **Resource ceilings are unchanged** (10 requests, 3,000,000 bytes, 500,000 bytes per response, 45 s, 6 pages, 60 rows, 12 screening batches, 0 retries, 0 redirects followed). If the window does not satisfy them today (more than 60 rows or 6 pages, or ten rows or fewer so that no pager is shown) the run stops fail-safe, as designed, and the ceilings are **not** expanded.
+
+### 14.3 Policy v5 and the control-state evidence it needs
+The capture stop left the control record in generation 3, which policy v4 does not recognise. Policy v5 is derived mechanically from v4 (tests regenerate it byte for byte). In the exact generation-3 stop state only, and for the one exact scope only, it admits exactly two further names, `AUTHORISE_INGESTION_BOLTON_WINDOW_DEMONSTRATION_ONCE_20261023_CAPTURE` (source_calls 1) and `..._SCREEN` (source_calls 0), and exempts only those two names from the cap of three exception keys, only at generation 3. Nothing else changes.
+
+**Observed versus derived (stated, not assumed).** Observed (owner failure diagnostic, 22 October): generation 3, manual stop `IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE`, global stop intact, zero unexpired grants; the capture authority revoked with a committed readback. **Derived, not yet observed:** `last_hard_stop` (= the same reason, because `coordinator.py` calls `ledger.stop(IDOX...)` and `ingestion_raise_stop` sets both fields), the stop-state digest `ff287601...f39f7b` (the same computation that reproduced the observed generation-2 digest) and the whole-record digest (unknown until observed). The policy ceremony's first step *is* the missing observation: it observes the control record and **refuses before touching anything** unless the stop state equals the derived values exactly and the consumed probe and capture entries are present and revoked with neither window name present; the whole-record digest it observes is the one the capture ceremony is then bound to. A mismatch costs one read-only ceremony and installs nothing.
+
+### 14.4 What success would and would not mean
+Success would demonstrate that the **complete-window pipeline** works end to end under the real source, storage, queue and screening. It would **not** resolve sparse-day coverage, would not establish how Bolton presents any window other than this one, would not advance Stage 4, and **would not authorise scheduling** or any recurring or automatic run.
+
+### 14.5 Separate product requirement, not implemented here: sparse-day acquisition
+Days with few results (single page, no total) will recur. Verified records from such windows should eventually remain usable *without* unsupported completeness, absence or coverage claims: a distinct partial-observation receipt kind, its own archive/checkpoint/batching admissions, an explicit "window completeness not claimed" flag, an accountable non-stopping outcome for `TOTAL_UNKNOWN`, and downstream prohibitions on absence inference, new-application detection and watermark advance. This is recorded as a requirement for its own specification; **nothing in this candidate implements or pre-empts it**, and the fail-safe stop on `TOTAL_UNKNOWN` is unchanged.
+
+### 14.6 Unchanged
+Standing credentials, historical stops and entries, consumed authorities and runs, generation numbers, application writes (none), B2, deployment, scheduling, Stage 4 (OPEN).
+

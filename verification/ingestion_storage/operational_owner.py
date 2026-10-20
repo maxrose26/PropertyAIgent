@@ -30,11 +30,18 @@ PKG=Path('docs/design/ingestion-operational-required-20261018')
 WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
 GENERATION2_POLICY=Path('docs/design/ingestion-form-probe-20261021/policy-generation2.sql')
 GENERATION2_CAPTURE_POLICY=Path('docs/design/ingestion-capture-acceptance-20261022/policy-capture-allowance.sql')
+GENERATION3_WINDOW_POLICY=Path('docs/design/ingestion-window-demonstration-20261023/policy-window-allowance.sql')
 GENERATION2_STOP=dict(manual_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',last_hard_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',hard_stop_generation=2,
                       stop_state_sha256='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21',control_sha256='d2abd06f56e0c86d4b7c9e4f73f1df2f7fb91c4f32c98e09004bb278113886a9')
+# DERIVED, NOT YET OBSERVED: the stop the consumed 22 October capture raised. The owner's failure diagnostic observed generation 3, manual stop IDOX and no unexpired grant; coordinator.py calls
+# ledger.stop(IDOX...) and ingestion_raise_stop sets manual_stop AND last_hard_stop to the same reason, so last_hard_stop is IDOX and this digest is the same project_control computation that reproduced the observed
+# generation-2 digest. The policy ceremony's own first step observes the record and refuses unless it equals this exactly.
+GENERATION3_STOP=dict(manual_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',last_hard_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',hard_stop_generation=3,
+                      stop_state_sha256='ff2876015380e16d3ce794b289d207e15e0e39f62fb44cf104c1608edcb39f7b')
 STOP={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'}
 STOP_SHA='a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e'
 SCOPE=dict(kind='DISCOVERY_SCOPE',council='bolton',start='2026-10-16',end='2026-10-16',semantics='RECEIVED')
+WINDOW_SCOPE=dict(kind='DISCOVERY_SCOPE',council='bolton',start='2026-09-28',end='2026-10-04',semantics='RECEIVED')      # the window already observed with an explicit pager (22 references over 3 pages)
 ROLES={'ingestion_worker_login':'ingestion_worker','ingestion_effect_login':'ingestion_effect_broker'}
 SECRETS={'ingestion_worker_login':'INGESTION_WORKER_DATABASE_URL','ingestion_effect_login':'INGESTION_EFFECT_DATABASE_URL'}
 
@@ -238,11 +245,19 @@ class Owner:
         if set(v4)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'} or not set(v4)<=set(upgraded):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
         return {**upgraded,**v4}
 
+    @classmethod
+    def window_inventory(cls):
+        """The GENERATION3_WINDOW_POLICY_APPLIED inventory: the successor-policy inventory with exactly the two functions redefined by policy v5."""
+        _,upgraded,_=cls.reviewed_inventories(True)
+        v5={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(GENERATION3_WINDOW_POLICY.read_text())}
+        if set(v5)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'} or not set(v5)<=set(upgraded):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
+        return {**upgraded,**v5}
+
     def verify_installed(self,c):
         """Accept exactly one coherent reviewed inventory, bound to the execution mode, with the reviewed owner and search path on every function. Reports a fixed reason code and the
         recognised policy state (never exception text). Preflight fails closed before any change."""
         states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
-        every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory(),'GENERATION2_CAPTURE_POLICY_APPLIED':self.capture_inventory()}
+        every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory(),'GENERATION2_CAPTURE_POLICY_APPLIED':self.capture_inventory(),'GENERATION3_WINDOW_POLICY_APPLIED':self.window_inventory()}
         if self.permitted_policy_states is not None:      # a mode may name exactly the retained state it is bound to (it then neither applies the policy nor accepts any other state)
             permitted={k:v for k,v in every.items() if k in self.permitted_policy_states}
         names=list(upgraded)
@@ -259,7 +274,7 @@ class Owner:
         else:reason=None
         self.preflight_report=dict(reason_code=reason or 'POLICY_STATE_RECOGNISED',policy_state=recognised or 'UNRECOGNISED',permitted_states=sorted(permitted))
         if reason:raise ValueError(reason)
-        self.expected_generation=2 if recognised in ('GENERATION2_POLICY_APPLIED','GENERATION2_CAPTURE_POLICY_APPLIED') else 1      # the generation the reviewed inventory is bound to
+        self.expected_generation=3 if recognised=='GENERATION3_WINDOW_POLICY_APPLIED' else 2 if recognised in ('GENERATION2_POLICY_APPLIED','GENERATION2_CAPTURE_POLICY_APPLIED') else 1      # the generation the reviewed inventory is bound to
 
     def install(self):
         if self.reuse_installed:
