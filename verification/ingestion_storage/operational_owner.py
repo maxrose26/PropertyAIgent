@@ -542,6 +542,52 @@ class Owner:
         if record['statements']>self.PIPELINE_MAX_STATEMENTS:raise Uncertain('PIPELINE_READBACK_STATEMENT_BOUND')
         return record
 
+    OBSERVER_MAX_STATEMENTS=12      # bound named in the registration; the observation itself uses 6
+    OBSERVER_MAX_DB_ACTIVE_SECONDS=20
+
+    @staticmethod
+    def project_control(ctl,now):
+        """A bounded projection of the control record: the stop state, and the identity and expiry state of every grant and Bolton exception (names, expiry numbers and states only - never the bindings or
+        any key list). `now` is the SERVER's clock. Two digests: of the whole record, and of the stop fields alone (the exact stop binding a policy could pin)."""
+        if not isinstance(ctl,dict):raise ValueError('CONTROL_SHAPE')
+        def state(expires):
+            if not isinstance(expires,(int,float)) or isinstance(expires,bool):return 'UNREADABLE'
+            return 'REVOKED_ZERO' if expires==0 else 'EXPIRED' if expires<=now else 'UNEXPIRED'
+        grants=ctl.get('grants',{});exceptions=ctl.get('bolton_exceptions',{})
+        if not isinstance(grants,dict) or not isinstance(exceptions,dict):raise ValueError('CONTROL_SHAPE')
+        stop=dict(global_stop=ctl.get('global_stop'),manual_stop=ctl.get('manual_stop'),last_hard_stop=ctl.get('last_hard_stop'),hard_stop_generation=ctl.get('hard_stop_generation'))
+        out=dict(**stop,council_deferred_until=ctl.get('council_deferred_until'),control_keys=sorted(str(k) for k in ctl),
+                 grants=[dict(authority=a,expires_at=g.get('expires_at'),state=state(g.get('expires_at')),source_calls=g.get('source_calls'),writes=g.get('writes'),login=g.get('login'),key_count=len(g.get('keys') or []),
+                              execution_binding_revision=(g.get('execution_binding') or {}).get('revision')) for a,g in sorted(grants.items()) if isinstance(g,dict)],
+                 bolton_exceptions=[dict(authority=a,expires_at=e.get('expires_at'),state=state(e.get('expires_at')),transport=e.get('transport'),hard_stop_generation=e.get('hard_stop_generation'),
+                                         grant_binding_matches=bool(isinstance(grants.get(a),dict) and e.get('grant_binding')=={k:v for k,v in grants[a].items() if k not in ('source_calls','writes')})) for a,e in sorted(exceptions.items()) if isinstance(e,dict)])
+        out['counts']=dict(grants=len(out['grants']),grants_unexpired=sum(g['state']=='UNEXPIRED' for g in out['grants']),exceptions=len(out['bolton_exceptions']),exceptions_unexpired=sum(e['state']=='UNEXPIRED' for e in out['bolton_exceptions']))
+        out['stop_state_sha256']=digest(stop);out['control_sha256']=digest(ctl)
+        return out
+
+    def control_observation(self):
+        """The FIXED single-connection observation of the control record. NOTHING IS COMMITTED. The administrative identity has no table privilege, so (exactly as the accepted preflight and the accepted
+        invalidation readback do) the temporary owner capability exists only inside a transaction that is ROLLED BACK, and its absence is read back. That GRANT is a statement that would write the role
+        catalog if it were committed; it is the only way the record can be read, and it is reported as such. No other write, no termination, no secret, no source request. The projection is persisted to
+        the audit journal before anything else can happen."""
+        started=time.monotonic();before=self.commands;active_before=self.connection_active
+        with self.connection() as c:
+            flags=tuple(self.q(c,"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_catalog.pg_roles WHERE rolname=current_user")[0])
+            if flags!=(self.identity,self.identity,False,True,True,True):raise ValueError('MIGRATION_IDENTITY')
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            row=self.q(c,"SELECT outcome::jsonb,extract(epoch FROM statement_timestamp()) FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0]
+            self.q(c,'ROLLBACK',effect=True)
+            capability=tuple(self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0])
+        if capability!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        ctl=row[0] if isinstance(row[0],dict) else json.loads(row[0])
+        record=dict(statements=self.commands-before,elapsed_seconds=round(time.monotonic()-started,3),database_active_seconds=round(self.connection_active-active_before,3),server_epoch=float(row[1]),
+                    projection=self.project_control(ctl,float(row[1])),transient_owner_capability='ROLLED_BACK_AND_READ_BACK_ABSENT',committed_writes=0,query_text_read=False,password_values_read=False)
+        self.emit('control_observation',record)      # persisted (chained, synced) before the result can be acted on
+        if record['statements']>self.OBSERVER_MAX_STATEMENTS:raise Uncertain('OBSERVER_STATEMENT_BOUND')
+        if record['database_active_seconds']>self.OBSERVER_MAX_DB_ACTIVE_SECONDS:raise Uncertain('OBSERVER_DB_ACTIVE_BOUND')
+        return record
+
     def read_items(self,keys):
         """Bounded owner read of named ledger rows (state and checkpoint only). The administrative identity has no table privilege; this uses the accepted preflight technique: the temporary
         owner capability exists only inside a transaction that is ROLLED BACK, and its absence is read back."""

@@ -88,6 +88,18 @@ PIPELINE_GITHUB_BOUND=180
 PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
 PIPELINE_DEADLINES=dict(job=4200,diagnostic_total=4320,diagnostic_window=60,admin_diagnostic=4300,admin_pre=4100,admin_total=4180,runtime_total=1)
 PIPELINE_BACKSTOP_SECONDS=4600
+# Control observation (read the control record, commit nothing, issue no authority, make no source request). Finite: one connection, 12 statements (the observation uses 6), 20 database-active
+# seconds, 30 supervised-active seconds after the hidden input. Ordering invariants as for every mode: job + window <= work alarm; work alarm + window <= diagnostic_total <= active - reporting.
+OBSERVER_MODE='CONTROL_OBSERVATION'
+OBSERVER_AUTHORITY='AUTHORISE_INGESTION_CONTROL_OBSERVATION_ONCE_20261021'
+OBSERVER_STATE='operational-control-observation-once-20261021'
+OBSERVER_OWNER_LIMITS=dict(connections=(1,1),commands=(12,12,12))
+OBSERVER_TIMING=dict(input_seconds=120,active_seconds=30,work_seconds=24,diagnostic_seconds=3,report_seconds=2,outer_seconds=180)
+OBSERVER_DEADLINES=dict(job=20,diagnostic_total=27,diagnostic_window=3,admin_diagnostic=25,admin_pre=14,admin_total=18,runtime_total=1)
+OBSERVER_BACKSTOP_SECONDS=240
+OBSERVER_PREDECESSOR=dict(consumed_run=dict(run_id=39388007668,artifact_id=12248515861,artifact_zip_sha256='934a798296e7beba6bd5bb0860a820a5ef3104c7b0c18b111c81c616b3c0ee22'),
+                          owner_events_sha256='35dedf6a87c3b10d4e23af54590c49bb5af4393358dd79ee9f95675be5035449',owner_final_result_sha256='8c26067b366efc208fec0bbb7affdaed80ab355b0e50c867a6d538dad7a26381',
+                          pipeline_registration_sha256='8ae69f3ce95c4285ba2138ddb815953c3b68f85e790101d07a323cdabb4de5c0',integrated_corrective_revision='895fcbe8ea412213ebc795c7800ea635c8260585')
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -120,7 +132,7 @@ def hosted_finished(hosted_summary,incomplete):
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
-    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
+    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False;observer_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
@@ -130,18 +142,19 @@ class Runner:
         self.matrix_mode=registration.get('mode')==MATRIX_MODE
         settled=registration.get('mode') in SETTLED_MODES
         self.pipeline_mode=registration.get('mode')==PIPELINE_MODE
+        self.observer_mode=registration.get('mode')==OBSERVER_MODE
         self.authority=SETTLED_MODES[registration['mode']][0] if settled else PIPELINE_AUTHORITY if self.pipeline_mode else AUTHORITY
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
         direct=registration.get('mode')==DIRECT_MODE
         stable=registration.get('mode') in STABLE_MODES
         self.route_name='DIRECT' if direct else 'POOLER';self.restricted_hostaddr=None
-        self.deadlines=dict(PIPELINE_DEADLINES if self.pipeline_mode else MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
-        if direct or stable or self.pipeline_mode:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
+        self.deadlines=dict(OBSERVER_DEADLINES if self.observer_mode else PIPELINE_DEADLINES if self.pipeline_mode else MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=OBSERVER_OWNER_LIMITS if self.observer_mode else MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
+        if direct or stable or self.pipeline_mode or self.observer_mode:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
         if self.pipeline_mode:self.owner.expected_generation=PIPELINE_BINDING['hard_stop_generation']
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,*STABLE_MODES)
+        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,OBSERVER_MODE,*STABLE_MODES)
         self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
@@ -421,6 +434,7 @@ class Runner:
 
     def failed(self,exc):
         """Shared production/rehearsal exit, independent of ledger construction."""
+        if self.observer_mode:return self.observer_failed(exc)
         from .connection_diagnostics import safe_failure
         self.diagnosing=True;self.diagnostic_started=time.monotonic()
         failed_phase=self.operation_phase
@@ -644,8 +658,28 @@ class Runner:
         self.journal.save('final-result.json',result)
         return result
 
+    def observe(self):
+        """One fixed control observation and a closure. No grant, exception, stop, credential, membership, role setting, secret or source request exists on this path, and no GitHub request is admitted."""
+        self.operation_phase='CONTROL_OBSERVATION'
+        record=self.owner.control_observation()
+        components=self.closure('NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED')
+        if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+        return dict(status='CONTROL_OBSERVED_NO_COMMITTED_MUTATION',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),observation=record,owned_cleanup=components['process'],access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',
+                    source_observations_attempted=0,execution_grants_created=0,application_writes=0,committed_writes=0,github_requests=self.github.requests,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+
+    def observer_failed(self,exc):
+        """Read-only failure path: report and close. Never an invalidation, a teardown, a GitHub request or a retry."""
+        from .connection_diagnostics import safe_failure
+        self.diagnosing=True;self.diagnostic_started=time.monotonic()
+        try:components=self.closure('NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED')
+        except BaseException:components=dict(overall='UNCERTAIN',process=dict(status='UNCERTAIN'))
+        return dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),operation_phase=self.operation_phase,
+                    accounting=self.accounting(),access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',source_observations_attempted=0,execution_grants_created=0,application_writes=0,committed_writes=0,
+                    pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+
     def execute(self):
         try:
+            if self.observer_mode:return self.observe()
             if self.pipeline_mode:return self.pipeline()
             if self.matrix_mode:
                 self.setup_matrix()
@@ -681,7 +715,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         holder={}
         try:from .operational_source import read
         except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
-        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode')==PIPELINE_MODE else {}))
+        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode')==PIPELINE_MODE else dict(bound=0) if r.get('mode')==OBSERVER_MODE else {}))
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
         try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
@@ -694,7 +728,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY}.get(r.get('mode'))
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY,OBSERVER_MODE:OBSERVER_AUTHORITY}.get(r.get('mode'))
     if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
@@ -717,12 +751,17 @@ def validate_registration(body,sha):
         if (r.get('pipeline')!=PIPELINE_BINDING or r.get('predecessor')!=DIRECT_PREDECESSOR or r.get('execution_authority')!='OWNER_GRANT_AND_EXCEPTION_FOR_THE_HOSTED_RESTRICTED_JOB' or r.get('risk_application')!='THIS_FINITE_STABLE_PIPELINE_ONCE'
             or r.get('state_directory')!=PIPELINE_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=PIPELINE_STATE)
             or r.get('owner_limits')!=dict(connections=list(PIPELINE_OWNER_LIMITS['connections']),commands=list(PIPELINE_OWNER_LIMITS['commands'])) or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r):raise ValueError('STABLE_PIPELINE_BINDING')
+    if r.get('mode')==OBSERVER_MODE:
+        if (r.get('predecessor')!=OBSERVER_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_CONTROL_OBSERVATION_ONLY'
+            or r.get('state_directory')!=OBSERVER_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=OBSERVER_STATE)
+            or r.get('owner_limits')!=dict(connections=list(OBSERVER_OWNER_LIMITS['connections']),commands=list(OBSERVER_OWNER_LIMITS['commands'])) or r.get('observation')!=dict(statements=12,database_active_seconds=20,supervised_active_seconds=30,connections=1)
+            or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r):raise ValueError('CONTROL_OBSERVATION_BINDING')
     if r.get('mode') in SETTLED_MODES:
         _,settled_state,settled_predecessor=SETTLED_MODES[r['mode']]
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
             or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(minutes=30) if r.get('mode')==OBSERVER_MODE else timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -743,7 +782,7 @@ def main():
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -751,7 +790,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
