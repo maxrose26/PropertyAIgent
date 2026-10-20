@@ -53,6 +53,11 @@ def disposable():
         boot.execute("CREATE EXTENSION pg_stat_statements WITH SCHEMA extensions VERSION '1.11'")
         boot.execute(sql.SQL('GRANT USAGE ON SCHEMA extensions TO {}').format(sql.Identifier(ROLE)))
         try:
+            with connector() as c:      # the same installation sequence as the pipeline lifecycle test: the provisioning package, then the operational installer
+                c.execute((PACKAGE/'install.sql').read_text())
+                c.execute('REVOKE ingestion_worker FROM ingestion_worker_login')
+                c.execute('REVOKE ingestion_storage_operator FROM ingestion_storage_login')
+            boot.execute("SELECT public.ingestion_raise_stop('STORAGE_TEST_STOP')")
             installer=Owner(connector,lambda *_:None,lambda:None,identity=ROLE,expiry=datetime.now(timezone.utc)+timedelta(minutes=30),bindings={})
             installer.install()      # the real ledger, the real roles, the real ADMIN-only membership of the migration identity
             boot.execute("SELECT public.ingestion_raise_stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE')")
