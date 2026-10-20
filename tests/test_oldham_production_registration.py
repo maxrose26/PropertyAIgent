@@ -71,6 +71,10 @@ def test_environment_is_exclusive_to_live_job():
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='6a947476c83928ce0cb9c70d7edcf6626f448ae468eb2bba53d93fe36ab47828'
                 continue
+            if (path,job_id)==('.github/workflows/stage4-capture-acceptance-once.yml','capture'):
+                import hashlib
+                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='5ea2106486e8aecb793fbf894b190cdc0af16611fa5c86f2595df022056a312a'
+                continue
             if (path,job_id)==('.github/workflows/stage4-ingestion-storage-catalogue-once.yml','catalogue'):
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'

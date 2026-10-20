@@ -163,7 +163,7 @@ def test_the_expiry_caps_and_authorities_are_separate_per_mode():
 
 
 def test_every_credential_mode_validates_the_hidden_input_before_consuming_the_registration():
-    assert set(orr.INPUT_PRECHECKED_MODES)=={orr.OBSERVER_MODE,orr.POLICY_MODE,orr.PROBE_MODE}
+    assert set(orr.INPUT_PRECHECKED_MODES)=={orr.OBSERVER_MODE,orr.POLICY_MODE,orr.PROBE_MODE,orr.CAPTURE_POLICY_MODE,orr.CAPTURE_MODE}
     assert orr.PIPELINE_MODE not in orr.INPUT_PRECHECKED_MODES      # the consumed pipeline mode keeps its original order
 
 

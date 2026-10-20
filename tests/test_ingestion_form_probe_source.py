@@ -208,3 +208,48 @@ def test_the_credential_free_child_runs_the_form_probe_worker_and_writes_one_bou
     assert audit['probe']=='FORM_ONLY' and audit['observation']['outcome']=='FORM_RECOGNISED' and audit['cleanup']=='SESSION_BOUNDARY_CLOSED' and output.stat().st_size<512*1024
     with pytest.raises(ValueError):src.read('detail_probe',{},root=tmp_path)      # only the reviewed worker kinds exist
 
+
+# ---------------------------------------------------------------- the REAL checkout reader, with each mode's own manifest (no injected fake)
+def _git_head():
+    import subprocess
+    return subprocess.run(['git','rev-parse','HEAD'],cwd=ROOT_DIR,stdout=subprocess.PIPE,check=True).stdout.decode().strip()
+
+
+def _registered(manifest_path):
+    import hashlib
+    return dict(revision=_git_head(),workflow_sha256=hashlib.sha256((ROOT_DIR/'verification/ingestion_storage/operational_runner.py').read_bytes()).hexdigest(),
+                manifest_sha256=hashlib.sha256((ROOT_DIR/manifest_path).read_bytes()).hexdigest())
+
+
+ROOT_DIR=__import__('pathlib').Path(__file__).resolve().parents[1]
+
+
+def test_each_hosted_mode_reads_its_own_registered_manifest_and_the_pipeline_default_is_unchanged():
+    from verification.ingestion_storage import form_probe as fpr,stable_pipeline as spl
+    assert spl.HostedRunner.MANIFEST==spl.MANIFEST_PATH=='docs/design/ingestion-stable-pipeline-20261020/MANIFEST.json'
+    assert fpr.ProbeHostedRunner.MANIFEST==fpr.PROBE_MANIFEST_PATH=='docs/design/ingestion-form-probe-20261021/MANIFEST.json' and fpr.PROBE_MANIFEST_PATH!=spl.MANIFEST_PATH
+    for path in (spl.MANIFEST_PATH,fpr.PROBE_MANIFEST_PATH):assert (ROOT_DIR/path).is_file()
+
+
+def test_the_real_reader_passes_the_correct_probe_binding_and_stops_wrong_bindings_before_any_source_request():
+    import subprocess
+    from verification.ingestion_storage import form_probe as fpr,stable_pipeline as spl
+    from app.ingestion.ledger import Denied
+    if subprocess.run(['git','status','--porcelain','--untracked-files=no'],cwd=ROOT_DIR,stdout=subprocess.PIPE).stdout.strip():pytest.skip('the real reader requires a clean tracked tree (CI checkout)')
+    actual=spl.actual_checkout(ROOT_DIR,manifest_path=fpr.PROBE_MANIFEST_PATH)
+    good=_registered(fpr.PROBE_MANIFEST_PATH)
+    assert actual['manifest_sha256']==good['manifest_sha256'] and actual['tracked_files_modified'] is False
+    summary=spl.verify_checkout_binding(actual,good,good['revision'],good['manifest_sha256'])
+    assert summary['revision']==good['revision'] and summary['manifest_sha256']==good['manifest_sha256']
+    wrong_reader=spl.actual_checkout(ROOT_DIR)      # the pipeline manifest: exactly what 20 October's probe hashed
+    for bad,reviewed,manifest in (
+            (dict(good,manifest_sha256=_registered(spl.MANIFEST_PATH)['manifest_sha256']),good['revision'],good['manifest_sha256']),      # the other mode's manifest registered
+            (good,good['revision'],_registered(spl.MANIFEST_PATH)['manifest_sha256']),      # the job computed the other mode's manifest
+            (dict(good,revision='e'*40),good['revision'],good['manifest_sha256']),      # a different registered revision
+            (good,'e'*40,good['manifest_sha256']),      # a different pinned revision
+            (dict(good,workflow_sha256='b'*64),good['revision'],good['manifest_sha256']),      # a different executable
+            (dict(good,extra=1),good['revision'],good['manifest_sha256']),
+            ):
+        with pytest.raises(Denied,match='CHECKOUT_BINDING_MISMATCH'):spl.verify_checkout_binding(actual,bad,reviewed,manifest)
+    with pytest.raises(Denied,match='CHECKOUT_BINDING_MISMATCH'):spl.verify_checkout_binding(wrong_reader,good,good['revision'],good['manifest_sha256'])      # the original defect can never pass
+    with pytest.raises(Denied,match='CHECKOUT_BINDING_MISMATCH'):spl.verify_checkout_binding(dict(actual,tracked_files_modified=True),good,good['revision'],good['manifest_sha256'])
