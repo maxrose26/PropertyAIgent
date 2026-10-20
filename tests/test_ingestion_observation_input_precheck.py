@@ -172,3 +172,41 @@ def test_the_observation_statements_and_limits_are_unchanged():
     assert orr.OBSERVER_TIMING==dict(input_seconds=120,active_seconds=30,work_seconds=24,diagnostic_seconds=3,report_seconds=2,outer_seconds=180)
     from verification.ingestion_storage import operational_owner as oo
     assert oo.Owner.OBSERVER_MAX_STATEMENTS==12 and oo.Owner.OBSERVER_MAX_DB_ACTIVE_SECONDS==20
+
+
+# ---------------------------------------------------------------- review additions
+def test_the_core_limit_is_zero_and_the_memory_scope_exists_before_the_prompt(tmp_path,monkeypatch):
+    order=[]
+    h=Harness(tmp_path,monkeypatch,GOOD)
+    import resource
+    real_setrlimit=resource.setrlimit
+    monkeypatch.setattr(resource,'setrlimit',lambda which,limits:(order.append(('setrlimit',which,limits)),real_setrlimit(which,limits))[1])
+    import verification.ingestion_storage.operational_memory as om
+    original_memory=om.OperationalMemory
+    monkeypatch.setattr(om,'OperationalMemory',lambda:(order.append(('memory',)),original_memory())[1])
+    import verification.ingestion_storage.credential_mapping as cm
+    original_prompt=cm.secure_migration_input
+    monkeypatch.setattr(cm,'secure_migration_input',lambda:(order.append(('prompt',)),original_prompt())[1])
+    with pytest.raises(SystemExit):orr.main()
+    kinds=[o[0] if o[0]!='setrlimit' else ('core' if o[1]==resource.RLIMIT_CORE and o[2]==(0,0) else 'other') for o in order]
+    assert kinds.index('memory')<kinds.index('core')<kinds.index('prompt')      # scope first, then the core limit, then the single prompt
+
+
+def test_the_real_session_accepts_the_one_shot_reader_and_the_audit_stays_truthful(tmp_path):
+    from verification.ingestion_storage.operational_outcome import session
+    from verification.ingestion_storage.operational_journal import Journal
+    journal=Journal(tmp_path/'j');box=[GOOD]
+    def reader():
+        value,box[0]=box[0],None;return value
+    seen=[]
+    class Worker:
+        def execute(self):return dict(status='CONTROL_OBSERVED_NO_COMMITTED_MUTATION',cleanup='CLOSED')
+        def failed(self,exc):return dict(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN')
+    def prepare(raw,started):
+        seen.append(raw);return Worker()
+    result=session(journal,'2099-01-01T00:00:00+00:00',reader,prepare,timing=orr.OBSERVER_TIMING,output=lambda *a,**k:None)
+    assert seen==[GOOD] and result['status']=='CONTROL_OBSERVED_NO_COMMITTED_MUTATION' and box==[None]
+    events=[json.loads(l) for l in (tmp_path/'j'/'events.jsonl').read_text().splitlines()]
+    done=[e for e in events if e['event']=='credential_input_completed'][0]
+    assert done['payload']['elapsed_seconds']<1      # the session saw an immediate reader; the real prompt time is in hidden_input_prechecked.seconds
+    assert SECRET not in (tmp_path/'j'/'events.jsonl').read_text()
