@@ -139,5 +139,6 @@ def test_a_second_run_after_the_failures_is_still_clean(disposable,tmp_path):
     for scenario in ('a','b'):
         def hook(text,tap):
             if scenario=='a' and text.startswith('SELECT outcome::jsonb'):raise RuntimeError('injected')
+        (tmp_path/scenario).mkdir()
         run_observer(tmp_path/scenario,connector,hook)
     assert catalog(boot)==before
