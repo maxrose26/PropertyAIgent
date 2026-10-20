@@ -155,7 +155,7 @@ def run(dispatch, config=WindowConfig()):
                 out['records'].append(asdict(r))
             seen+=len(p.rows)
             out['pages'].append({'ordinal':ordinal,'first':p.first,'last':p.last,'total':p.total,
-                'rows':len(p.rows),'body_sha256':p.fingerprint,'terminal':p.terminal})
+                'rows':len(p.rows),'page_size':p.page_size,'body_sha256':p.fingerprint,'terminal':p.terminal})
             if p.next_url is None:
                 # Contract candidate only: transport result never self-admits a source.
                 out['enumeration_evidence']='COUNT_RECONCILED' if p.terminal and total==seen else 'TOTAL_UNKNOWN'
