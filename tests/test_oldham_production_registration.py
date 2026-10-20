@@ -75,6 +75,10 @@ def test_environment_is_exclusive_to_live_job():
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='5ea2106486e8aecb793fbf894b190cdc0af16611fa5c86f2595df022056a312a'
                 continue
+            if (path,job_id)==('.github/workflows/stage4-window-demonstration-once.yml','window'):
+                import hashlib
+                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='101a5fb89c8164a90e9f3ab50e17bbee29f9ba81a5210f2b37708169a017fc2d'
+                continue
             if (path,job_id)==('.github/workflows/stage4-ingestion-storage-catalogue-once.yml','catalogue'):
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'

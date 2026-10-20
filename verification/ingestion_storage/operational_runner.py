@@ -20,7 +20,7 @@ from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
 from .connection_diagnostics import PreparationFailure,fixed_stop_reason
 from .operational_preparation import Progress,prepare_connection
-from .operational_owner import GENERATION2_STOP,GENERATION2_POLICY,GENERATION2_CAPTURE_POLICY,STOP
+from .operational_owner import GENERATION2_STOP,GENERATION2_POLICY,GENERATION2_CAPTURE_POLICY,GENERATION3_STOP,GENERATION3_WINDOW_POLICY,WINDOW_SCOPE,STOP
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
@@ -166,7 +166,28 @@ CAPTURE_BINDING=dict(valid_until=PIPELINE_BINDING['valid_until'],hard_stop_gener
                      qualification=PIPELINE_BINDING['qualification'],
                      source=dict(form_requests=1,listing_requests_after_a_valid_form=9,total_requests=10,redirects=0,retries=0,bytes=3000000,rows=60,pages=6,body_retained='RAW_ARCHIVED_BEFORE_CHECKPOINT'))
 CAPTURE_PREDECESSOR=dict(form_probe=FORM_PROBE_OUTCOME,observed_stop=dict(GENERATION2_STOP),policy_capture_allowance=dict(authority=CAPTURE_POLICY_AUTHORITY,state_directory=CAPTURE_POLICY_STATE,policy_file=str(GENERATION2_CAPTURE_POLICY)))
-INPUT_PRECHECKED_MODES=(OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE)      # every mode that needs the migration credential on this path validates the hidden input BEFORE the registration is consumed
+# ====================================================================================== generation-3 WINDOW DEMONSTRATION (specification 032 section 14)
+# The 22 October capture acceptance stopped fail-safe (generation 3) because the single-day page carried no total. One complete-window demonstration is prepared for a window already OBSERVED to carry an explicit
+# pager (Bolton RECEIVED 28 September to 4 October 2026: 22 references over 3 pages). Same completeness contract, storage, queue and screening; same resource ceilings; a different exact scope and stop state.
+WINDOW_POLICY_MODE='BOLTON_POLICY_WINDOW_ALLOWANCE'
+WINDOW_POLICY_AUTHORITY='AUTHORISE_INGESTION_POLICY_WINDOW_ALLOWANCE_ONCE_20261023'
+WINDOW_POLICY_STATE='operational-policy-window-allowance-once-20261023'
+WINDOW_MODE='BOLTON_WINDOW_DEMONSTRATION'
+WINDOW_AUTHORITY='AUTHORISE_INGESTION_BOLTON_WINDOW_DEMONSTRATION_ONCE_20261023'      # the ledger grants and the named exceptions are WINDOW_AUTHORITY + '_CAPTURE' and + '_SCREEN' (the exact names policy v5 recognises)
+WINDOW_STATE='operational-bolton-window-demonstration-once-20261023'
+WINDOW_EVIDENCE_DIRECTORY='docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023'
+WINDOW_HOSTED_AUTHORITY='AUTHORISE_INGESTION_BOLTON_WINDOW_DEMONSTRATION_HOSTED_ONCE_20261023'
+WINDOW_WORKFLOW='.github/workflows/stage4-window-demonstration-once.yml'
+CAPTURE_ACCEPTANCE_OUTCOME=dict(authority=CAPTURE_AUTHORITY,state_directory=CAPTURE_STATE,hosted_run_id=39503161500,hosted_artifact_id=12302266713,source_requests=4,received_body_bytes=157764,rows=4,enumeration_evidence='TOTAL_UNKNOWN',
+                                stop_reason='IDOX_WINDOW_BINDING_OR_COMPLETENESS',resulting_generation=3,
+                                owner_events_sha256='751eda655375d19a945a2a1cddc8524979f3fd44ad5b35e9dbd76f212385438e',owner_final_result_sha256='05d87b20a561d24a4cfd145c7f2f2b9332e9e907e680aab2b2cf1ccc387d10b2',
+                                hosted_events_sha256='f4d18f2cb00d1d87b18b086ec225f70e992145febae3a3cf853a3531a84aa5a6',hosted_final_result_sha256='e087fefc90f68b4eeecf745485ee892ca22dac9659e8009a52198b4190053a3d')
+WINDOW_POLICY_OWNER_LIMITS=dict(CAPTURE_POLICY_OWNER_LIMITS)      # the same finite shape as the v3 and v4 ceremonies: observation, one inventory-verified installation, observation
+WINDOW_POLICY_PREDECESSOR=dict(capture_acceptance=CAPTURE_ACCEPTANCE_OUTCOME,derived_stop=dict(GENERATION3_STOP),policy_capture_allowance=dict(authority=CAPTURE_POLICY_AUTHORITY,state_directory=CAPTURE_POLICY_STATE,policy_file=str(GENERATION2_CAPTURE_POLICY)))
+WINDOW_BINDING=dict(CAPTURE_BINDING,hard_stop_generation=GENERATION3_STOP['hard_stop_generation'],manual_stop=GENERATION3_STOP['manual_stop'],last_hard_stop=GENERATION3_STOP['last_hard_stop'],stop_state_sha256=GENERATION3_STOP['stop_state_sha256'],
+                    hosted_workflow=WINDOW_WORKFLOW,hosted_authority=WINDOW_HOSTED_AUTHORITY,scope=dict(WINDOW_SCOPE))
+WINDOW_PREDECESSOR=dict(capture_acceptance=CAPTURE_ACCEPTANCE_OUTCOME,derived_stop=dict(GENERATION3_STOP),policy_window_allowance=dict(authority=WINDOW_POLICY_AUTHORITY,state_directory=WINDOW_POLICY_STATE,policy_file=str(GENERATION3_WINDOW_POLICY)))
+INPUT_PRECHECKED_MODES=(OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE)      # every mode that needs the migration credential on this path validates the hidden input BEFORE the registration is consumed
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -222,7 +243,9 @@ def hosted_finished(hosted_summary,incomplete):
 
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
-    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False;observer_mode=False;policy_mode=False;probe_mode=False;capture_mode=False;capture_policy_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
+    scope=SCOPE      # the exact discovery scope the capture root concerns; the window demonstration overrides it
+    window_config=WindowConfig('bolton','RECEIVED',date(2026,10,16),date(2026,10,16),0)      # the scope the contract is configured for
+    deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False;observer_mode=False;policy_mode=False;probe_mode=False;capture_mode=False;capture_policy_mode=False;window_mode=False;window_policy_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
     def __init__(self,registration,journal,connector,*,source_reader,github,
                  url_factory,identity='postgres',ssl=None,memory=None,hostaddr=None,started=None):
         self.r=registration;self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.url_factory=url_factory;self.ssl=ssl;self.memory=memory
@@ -231,11 +254,15 @@ class Runner:
         self.bindings=dict(revision=registration['revision'],workflow_sha256=registration['controller_sha256'],manifest_sha256=registration['manifest_sha256'])
         self.matrix_mode=registration.get('mode')==MATRIX_MODE
         settled=registration.get('mode') in SETTLED_MODES
-        self.probe_mode=registration.get('mode')==PROBE_MODE;self.capture_mode=registration.get('mode')==CAPTURE_MODE;self.capture_policy_mode=registration.get('mode')==CAPTURE_POLICY_MODE
-        self.policy_mode=registration.get('mode') in (POLICY_MODE,CAPTURE_POLICY_MODE)
-        self.pipeline_mode=registration.get('mode') in (PIPELINE_MODE,PROBE_MODE,CAPTURE_MODE)      # the probe is a pipeline variant: same revocation-only failure path, same owner waits
+        self.probe_mode=registration.get('mode')==PROBE_MODE;self.capture_mode=registration.get('mode') in (CAPTURE_MODE,WINDOW_MODE);self.capture_policy_mode=registration.get('mode')==CAPTURE_POLICY_MODE
+        self.window_mode=registration.get('mode')==WINDOW_MODE;self.window_policy_mode=registration.get('mode')==WINDOW_POLICY_MODE
+        self.policy_mode=registration.get('mode') in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE)
+        self.pipeline_mode=registration.get('mode') in (PIPELINE_MODE,PROBE_MODE,CAPTURE_MODE,WINDOW_MODE)      # the probe is a pipeline variant: same revocation-only failure path, same owner waits
         self.observer_mode=registration.get('mode')==OBSERVER_MODE
         self.authority=SETTLED_MODES[registration['mode']][0] if settled else (PROBE_AUTHORITY if self.probe_mode else CAPTURE_AUTHORITY if self.capture_mode else PIPELINE_AUTHORITY) if self.pipeline_mode else AUTHORITY
+        if self.window_mode:self.authority=WINDOW_AUTHORITY
+        self.scope=WINDOW_SCOPE if self.window_mode else SCOPE
+        if self.window_mode:self.window_config=WindowConfig('bolton','RECEIVED',date.fromisoformat(WINDOW_SCOPE['start']),date.fromisoformat(WINDOW_SCOPE['end']),0)
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
         direct=registration.get('mode')==DIRECT_MODE
         stable=registration.get('mode') in STABLE_MODES
@@ -247,11 +274,13 @@ class Runner:
             self.owner.permitted_policy_states=('GENERATION2_POLICY_APPLIED',);self.owner.stop_manual=PROBE_BINDING['manual_stop'];self.owner.stop_sha=PROBE_BINDING['stop_state_sha256']
         if self.capture_mode:      # bound to exactly the reviewed policy-v4 inventory and the exact observed generation-2 baseline
             self.owner.permitted_policy_states=('GENERATION2_CAPTURE_POLICY_APPLIED',);self.owner.stop_manual=CAPTURE_BINDING['manual_stop'];self.owner.stop_sha=CAPTURE_BINDING['stop_state_sha256']
+        if self.window_mode:      # bound to exactly the reviewed policy-v5 inventory and the exact generation-3 stop state
+            self.owner.permitted_policy_states=('GENERATION3_WINDOW_POLICY_APPLIED',);self.owner.stop_manual=WINDOW_BINDING['manual_stop'];self.owner.stop_sha=WINDOW_BINDING['stop_state_sha256']
         if self.observer_mode:self.owner.statement_hard_seconds=OBSERVER_STATEMENT_SECONDS
-        if self.pipeline_mode:self.owner.expected_generation=(PROBE_BINDING if self.probe_mode else CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING)['hard_stop_generation']
+        if self.pipeline_mode:self.owner.expected_generation=(PROBE_BINDING if self.probe_mode else WINDOW_BINDING if self.window_mode else CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING)['hard_stop_generation']
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,*STABLE_MODES)
+        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE,*STABLE_MODES)
         self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
@@ -307,7 +336,7 @@ class Runner:
         try:
             engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])
-            yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,WindowConfig('bolton','RECEIVED',date(2026,10,16),date(2026,10,16),0),QUALIFICATION)}),budget
+            yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,self.window_config,QUALIFICATION)}),budget
             success=True
         finally:
             account=budget.close(engines);elapsed=time.monotonic()-started
@@ -403,7 +432,7 @@ class Runner:
             batches=[item({k:p[k] for k in ('subject','task','contract','revision')},dependencies=p['dependencies'],checkpoint=p['checkpoint']) for p in self.plans]
             # The completed capture is also bound for exact retained-parent
             # reads; it is not inserted or granted another source allowance.
-            root_binding=item(dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
+            root_binding=item(dict(subject=self.scope,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
             self.batch_bindings=self.owner.register(batches,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[root_binding,*prepared])
         self.save_progress()
 
@@ -674,13 +703,13 @@ class Runner:
 
     def pipeline(self):
         """Owner side of the stable-credential pipeline (see specifications/032-stage4-stable-credential-pipeline.md). Never touches a credential, membership, role setting or secret."""
-        pb=CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING
+        pb=WINDOW_BINDING if self.window_mode else CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING
         account=self.github.call('GET','user')
         if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
         expected=dict(identity=self.owner.identity,hard_stop_generation=pb['hard_stop_generation'],valid_until=pb['valid_until'],**(dict(manual_stop=pb['manual_stop']) if self.capture_mode else {}))
         self.operation_phase='PIPELINE_READBACK_BEFORE_GRANT'
         before=self.owner.pipeline_readback(expected,label='BEFORE_ANY_GRANT')
-        identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256'])
+        identity=dict(subject=self.scope,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256'])
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key']
         self.operation_phase='PIPELINE_CAPTURE_AUTHORITY'
@@ -717,7 +746,7 @@ class Runner:
             for record in self.capture['records']:
                 prepared.append(item(dict(subject=dict(kind='APPLICATION',council='bolton',reference=record['reference']),task='SCREENING',contract='listing-screen-v1',revision=digest(record)),dependencies=[self.capture_key]))
             batches=[item({k:p[k] for k in ('subject','task','contract','revision')},dependencies=p['dependencies'],checkpoint=p['checkpoint']) for p in self.plans]
-            root_binding=item(dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
+            root_binding=item(dict(subject=self.scope,task='DISCOVERY',contract=CONTRACT,revision=self.r['manifest_sha256']))
             self.batch_bindings=self.owner.register(batches,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[root_binding,*prepared])
             self.emit('pipeline_screening_authority_registered',dict(batches=len(self.plans),children_prepared=len(prepared)))
             # The restricted job waits on the evidence branch (no database connection) for this marker. It is NOT an authority - the authority is the database grant registered above.
@@ -822,6 +851,41 @@ class Runner:
                     stop_state_sha256=baseline['stop_state_sha256'],source_observations_attempted=0,execution_grants_created=0,application_writes=0,github_requests=self.github.requests,pipeline_retry='HELD',stage4='OPEN',
                     historical_uncertainty_preserved=True)
 
+    def require_post_capture_baseline(self,record):
+        """The control record must be EXACTLY the derived generation-3 stop state (stop fields and digest), with the consumed probe and capture entries present and REVOKED, the screening entry of the consumed capture never registered,
+        nothing unexpired and neither window name present. The stop values are derived (see operational_owner.GENERATION3_STOP); this is the observation that verifies them before anything is installed."""
+        p=record['projection'];g=GENERATION3_STOP
+        probe=PROBE_AUTHORITY+'_PROBE';cap=CAPTURE_AUTHORITY+'_CAPTURE';names={WINDOW_AUTHORITY+'_CAPTURE',WINDOW_AUTHORITY+'_SCREEN',CAPTURE_AUTHORITY+'_SCREEN'}
+        grants={x['authority']:x['state'] for x in p['grants']};exceptions={x['authority']:x['state'] for x in p['bolton_exceptions']}
+        if (p['global_stop']!=STOP or p['manual_stop']!=g['manual_stop'] or p['last_hard_stop']!=g['last_hard_stop'] or p['hard_stop_generation']!=g['hard_stop_generation'] or p['stop_state_sha256']!=g['stop_state_sha256']
+            or p['counts']['grants_unexpired']!=0 or p['counts']['exceptions_unexpired']!=0 or any(x.get(a)!='REVOKED_ZERO' for x in (grants,exceptions) for a in (probe,cap)) or names&(set(grants)|set(exceptions))):raise Uncertain('OBSERVED_BASELINE_CHANGED')
+        return p
+
+    def install_policy_window_allowance(self):
+        """The ONE policy ceremony of the window demonstration: observe the record and require the exact generation-3 stop state, verify the installed policy-v4 inventory, install the two reviewed function definitions (policy v5),
+        verify the exact v5 inventory, read the transient capability back absent and verify the control record is byte-for-byte unchanged. Records the control digest the window ceremony is bound to. No GitHub or source request."""
+        self.operation_phase='POLICY_PRECHECK'
+        before=self.owner.control_observation()
+        baseline=self.require_post_capture_baseline(before)
+        self.operation_phase='POLICY_INSTALL'
+        self.owner.permitted_policy_states=('GENERATION2_CAPTURE_POLICY_APPLIED',)
+        with self.owner.connection() as c:
+            self.owner.verify_installed(c)      # exactly the reviewed v4 inventory, reviewed owner and search path, or nothing is installed
+            self.owner.script(c,GENERATION3_WINDOW_POLICY)
+            self.owner.permitted_policy_states=('GENERATION3_WINDOW_POLICY_APPLIED',)
+            self.owner.verify_installed(c)      # exactly the reviewed v5 inventory now
+            capability=tuple(self.owner.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET'),pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0])
+        if capability!=(False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        self.operation_phase='POLICY_POSTCHECK'
+        after=self.owner.control_observation()
+        if after['projection']['control_sha256']!=baseline['control_sha256'] or after['projection']['stop_state_sha256']!=baseline['stop_state_sha256']:raise Uncertain('CONTROL_RECORD_CHANGED_BY_POLICY_INSTALLATION')
+        components=self.closure('NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED')
+        if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+        return dict(status='POLICY_WINDOW_ALLOWANCE_INSTALLED_CONTROL_RECORD_UNCHANGED',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',
+                    installed_policy='GENERATION3_WINDOW_POLICY_APPLIED',inventory_verified=True,transient_owner_capability='ABSENT_READ_BACK',control_sha256_before=baseline['control_sha256'],control_sha256_after=after['projection']['control_sha256'],
+                    stop_state_sha256=baseline['stop_state_sha256'],source_observations_attempted=0,execution_grants_created=0,application_writes=0,github_requests=self.github.requests,pipeline_retry='HELD',stage4='OPEN',
+                    historical_uncertainty_preserved=True)
+
     def form_probe(self):
         """Owner side of the Bolton form probe (specification section 12): fixed readback (bound to the reviewed v3 inventory and the observed generation-2 baseline), ONE grant plus its named exception,
         a bounded wait for the restricted job's result, the database's own record of the probe, then revocation-only invalidation and the final readback. Never touches a credential, membership, role setting or secret."""
@@ -893,6 +957,7 @@ class Runner:
     def execute(self):
         try:
             if self.observer_mode:return self.observe()
+            if self.window_policy_mode:return self.install_policy_window_allowance()
             if self.capture_policy_mode:return self.install_policy_capture_allowance()
             if self.policy_mode:return self.install_policy_generation2()
             if self.probe_mode:return self.form_probe()
@@ -931,7 +996,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         holder={}
         try:from .operational_source import read
         except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
-        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode') in (PIPELINE_MODE,CAPTURE_MODE) else dict(bound=PROBE_GITHUB_BOUND) if r.get('mode')==PROBE_MODE else dict(bound=0) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE) else {}))
+        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode') in (PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE) else dict(bound=PROBE_GITHUB_BOUND) if r.get('mode')==PROBE_MODE else dict(bound=0) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else {}))
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
         try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
@@ -944,8 +1009,8 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY,OBSERVER_MODE:OBSERVER_AUTHORITY,POLICY_MODE:POLICY_AUTHORITY,PROBE_MODE:PROBE_AUTHORITY,CAPTURE_POLICY_MODE:CAPTURE_POLICY_AUTHORITY,CAPTURE_MODE:CAPTURE_AUTHORITY}.get(r.get('mode'))
-    if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=SCOPE or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY,OBSERVER_MODE:OBSERVER_AUTHORITY,POLICY_MODE:POLICY_AUTHORITY,PROBE_MODE:PROBE_AUTHORITY,CAPTURE_POLICY_MODE:CAPTURE_POLICY_AUTHORITY,CAPTURE_MODE:CAPTURE_AUTHORITY,WINDOW_POLICY_MODE:WINDOW_POLICY_AUTHORITY,WINDOW_MODE:WINDOW_AUTHORITY}.get(r.get('mode'))
+    if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=(WINDOW_SCOPE if r.get('mode') in (WINDOW_POLICY_MODE,WINDOW_MODE) else SCOPE) or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
         from .restricted_matrix import ENTRIES,LIMITS as MX
@@ -992,6 +1057,20 @@ def validate_registration(body,sha):
             or r.get('owner_limits')!=dict(connections=list(PIPELINE_OWNER_LIMITS['connections']),commands=list(PIPELINE_OWNER_LIMITS['commands'])) or not digest_ok(r.get('control_sha256'))
             or not isinstance(audit,dict) or set(audit)!={'events_sha256','final_result_sha256'} or not all(digest_ok(v) for v in audit.values())
             or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'probe' in r):raise ValueError('BOLTON_CAPTURE_ACCEPTANCE_BINDING')
+    if r.get('mode')==WINDOW_POLICY_MODE:
+        if (r.get('predecessor')!=WINDOW_POLICY_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_POLICY_WINDOW_ALLOWANCE_INSTALLATION_ONLY'
+            or r.get('state_directory')!=WINDOW_POLICY_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=WINDOW_POLICY_STATE)
+            or r.get('owner_limits')!=dict(connections=list(WINDOW_POLICY_OWNER_LIMITS['connections']),commands=list(WINDOW_POLICY_OWNER_LIMITS['commands']))
+            or r.get('policy')!=dict(file=str(GENERATION3_WINDOW_POLICY),named_allowances=[WINDOW_AUTHORITY+'_CAPTURE',WINDOW_AUTHORITY+'_SCREEN'],baseline=GENERATION3_STOP,scope=WINDOW_SCOPE,cap='UNCHANGED_EXCEPT_FOR_THE_TWO_NAMED_ALLOWANCES')
+            or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'capture' in r or 'window' in r):raise ValueError('BOLTON_WINDOW_POLICY_BINDING')
+    if r.get('mode')==WINDOW_MODE:
+        digest_ok=lambda v:isinstance(v,str) and len(v)==64 and all(ch in '0123456789abcdef' for ch in v)
+        audit=r.get('policy_ceremony_audit')
+        if (r.get('window')!=WINDOW_BINDING or r.get('predecessor')!=WINDOW_PREDECESSOR or r.get('execution_authority')!='OWNER_GRANT_AND_EXCEPTION_FOR_THE_HOSTED_RESTRICTED_JOB' or r.get('risk_application')!='THIS_FINITE_BOLTON_WINDOW_DEMONSTRATION_ONCE'
+            or r.get('state_directory')!=WINDOW_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=WINDOW_STATE) or r.get('evidence_directory')!=WINDOW_EVIDENCE_DIRECTORY
+            or r.get('owner_limits')!=dict(connections=list(PIPELINE_OWNER_LIMITS['connections']),commands=list(PIPELINE_OWNER_LIMITS['commands'])) or not digest_ok(r.get('control_sha256'))
+            or not isinstance(audit,dict) or set(audit)!={'events_sha256','final_result_sha256'} or not all(digest_ok(v) for v in audit.values())
+            or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'probe' in r or 'capture' in r):raise ValueError('BOLTON_WINDOW_DEMONSTRATION_BINDING')
     if r.get('mode')==OBSERVER_MODE:
         if (r.get('predecessor')!=OBSERVER_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_CONTROL_OBSERVATION_ONLY'
             or r.get('state_directory')!=OBSERVER_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=OBSERVER_STATE)
@@ -1002,7 +1081,7 @@ def validate_registration(body,sha):
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
             or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(minutes=30) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE) else timedelta(minutes=75) if r.get('mode')==PROBE_MODE else timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,CAPTURE_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(minutes=30) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else timedelta(minutes=75) if r.get('mode')==PROBE_MODE else timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -1027,7 +1106,7 @@ def main():
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))      # no core file may ever hold the value
         held,precheck_seconds=observer_precheck_input()      # exits here, consuming nothing, on any invalid or unreadable input
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(CAPTURE_POLICY_STATE if r['mode']==CAPTURE_POLICY_MODE else CAPTURE_STATE if r['mode']==CAPTURE_MODE else POLICY_STATE if r['mode']==POLICY_MODE else PROBE_STATE if r['mode']==PROBE_MODE else OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(WINDOW_POLICY_STATE if r['mode']==WINDOW_POLICY_MODE else WINDOW_STATE if r['mode']==WINDOW_MODE else CAPTURE_POLICY_STATE if r['mode']==CAPTURE_POLICY_MODE else CAPTURE_STATE if r['mode']==CAPTURE_MODE else POLICY_STATE if r['mode']==POLICY_MODE else PROBE_STATE if r['mode']==PROBE_MODE else OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -1042,7 +1121,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode']==CAPTURE_MODE else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode'] in (CAPTURE_MODE,WINDOW_MODE) else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)

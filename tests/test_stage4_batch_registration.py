@@ -63,6 +63,10 @@ def test_workflow_scope():
             # Exact separately authorised Bolton capture-acceptance job (restricted secrets only; no administrative secret; write token confined to the evidence branch by code); no blanket exception.
             assert hashlib.sha256(path.read_bytes()).hexdigest()=='5ea2106486e8aecb793fbf894b190cdc0af16611fa5c86f2595df022056a312a'
             continue
+        if path.name=='stage4-window-demonstration-once.yml':
+            # Exact separately authorised Bolton window-demonstration job (restricted secrets only; no administrative secret; write token confined to the evidence branch by code); no blanket exception.
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='101a5fb89c8164a90e9f3ab50e17bbee29f9ba81a5210f2b37708169a017fc2d'
+            continue
         if path.name=='stage4-ingestion-storage-catalogue-once.yml':
             # Exact separately authorised catalogue-only access; no blanket exception.
             assert hashlib.sha256(path.read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'
