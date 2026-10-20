@@ -68,36 +68,6 @@ class Budget:
         if response_size > self.response_bytes or self.used_bytes > self.total_bytes:
             self.reject('PARTIAL_RETRIEVAL', 'response byte ceiling', True)
 
-MEDIA_TYPES = ('text/html', 'application/xhtml+xml', 'text/plain', 'application/json', 'application/xml', 'text/xml')
-
-
-def response_shape(response, url, base_url):
-    """Bounded, non-sensitive facts about one response: the integer status, the media type only if it is on a fixed allow-list, and whether (not where) it redirects. Never a header value, URL, cookie or
-    body. Failure to observe any of it yields None for that field; it never raises."""
-    out = dict(http_status=None, media_type=None, redirect=None)
-    try:
-        status = response.status_code
-        if type(status) is int and 100 <= status <= 599: out['http_status'] = status
-    except Exception: pass
-    try:
-        media = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
-        out['media_type'] = media if media in MEDIA_TYPES else ('OTHER' if media else None)
-    except Exception: pass
-    try:
-        status = out['http_status']
-        if status is not None:
-            if 300 <= status < 400:
-                from urllib.parse import urljoin
-                location = response.headers.get('Location', '')
-                if not location: out['redirect'] = 'MISSING_LOCATION'
-                else:
-                    a, b = urlsplit(urljoin(url, location)), urlsplit(base_url)
-                    out['redirect'] = 'SAME_ORIGIN' if (a.scheme, a.hostname, a.port or 443) == (b.scheme, b.hostname, b.port or 443) else 'OTHER_ORIGIN'
-            else: out['redirect'] = 'NONE'
-    except Exception: pass
-    return out
-
-
 class Boundary:
     def __init__(self, policy, budget, dispatch, *, max_retries=1):
         if type(max_retries) is not int or max_retries not in (0,1):
@@ -110,7 +80,6 @@ class Boundary:
         self.detail_url = None
         self.redirects = self.retries = self.requests = self.received_bytes = 0
         self.closed = False
-        self.last_response = None
 
     def unique(self, matches, *, complete=False):
         matches = sorted(set(matches))
@@ -177,7 +146,6 @@ class Boundary:
         self.budget.reject('PARTIAL_RETRIEVAL', 'unapproved route class')
 
     def request(self, method, url, *, body=None, headers=None, redirected=False):
-        self.last_response = None      # a pre-dispatch rejection must not report an earlier request's response
         self.validate(method, url, body)
         if redirected:
             self.redirects += 1
@@ -185,14 +153,12 @@ class Boundary:
         while True:
             self.budget.charge_request(self.policy)
             self.requests += 1
-            self.last_response = None      # facts of THIS request only: a dispatch that raises must not report an earlier response
             response = None
             charged = 0
             try:
                 response = self.dispatch(method, url, data=body, headers=headers or {}, stream=True,
                     allow_redirects=False, timeout=min(15, self.budget.seconds-(time.monotonic()-self.budget.started)),
                     deadline=self.budget.started+self.budget.seconds)
-                self.last_response = response_shape(response, url, self.policy.base_url)
                 payload = bytearray()
                 charged = 0
                 content_type = response.headers.get("Content-Type", "").lower()

@@ -17,7 +17,7 @@ from verification.ingestion_storage import stable_pipeline as sp
 from verification.ingestion_storage.connection_diagnostics import fixed_stop_reason
 from verification.ingestion_storage.operational_journal import Journal
 from verification.ingestion_storage.operational_publication import GitHub
-from verification.stage26b_l1.request_boundary import response_shape
+from verification.discovery.source_diagnostics import response_shape
 
 
 # --------------------------------------------------------------------------- the publication reserve (requests and seconds)
@@ -226,5 +226,5 @@ def test_transport_facts_are_those_of_the_failing_request_only():
     b.request('GET',b.config.form_url);assert b.last_response['http_status']==200
     with pytest.raises(Exception):b.request('GET',b.config.form_url)      # the dispatch itself raises on the next request
     assert b.last_response is None
-    with pytest.raises(Exception):b.request('POST','https://elsewhere.example/x',body=b'a=b')      # rejected before any dispatch
+    with pytest.raises(Exception):b.retrieve('POST','https://elsewhere.example/x',b'a=b')      # rejected before any dispatch
     assert b.last_response is None

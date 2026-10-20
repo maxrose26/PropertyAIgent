@@ -24,6 +24,33 @@ REDIRECTS=frozenset({'NONE','SAME_ORIGIN','OTHER_ORIGIN','MISSING_LOCATION'})
 TRANSPORT_KEYS=frozenset({'http_status','media_type','redirect','rejection_outcome','rejection_reason'})
 
 
+def response_shape(response,url,base_url):
+    """Bounded, non-sensitive facts about one response: the integer status, the media type only if it is on a fixed allow-list, and whether (not where) it redirects. Never a header value, URL, cookie or
+    body. Failure to observe any of it yields None for that field; it never raises."""
+    from urllib.parse import urljoin,urlsplit
+    out=dict(http_status=None,media_type=None,redirect=None)
+    try:
+        status=response.status_code
+        if type(status) is int and 100<=status<=599:out['http_status']=status
+    except Exception:pass
+    try:
+        media=response.headers.get('Content-Type','').split(';')[0].strip().lower()
+        out['media_type']=media if media in MEDIA else ('OTHER' if media else None)
+    except Exception:pass
+    try:
+        status=out['http_status']
+        if status is not None:
+            if 300<=status<400:
+                location=response.headers.get('Location','')
+                if not location:out['redirect']='MISSING_LOCATION'
+                else:
+                    a,b=urlsplit(urljoin(url,location)),urlsplit(base_url)
+                    out['redirect']='SAME_ORIGIN' if (a.scheme,a.hostname,a.port or 443)==(b.scheme,b.hostname,b.port or 443) else 'OTHER_ORIGIN'
+            else:out['redirect']='NONE'
+    except Exception:pass
+    return out
+
+
 def transport_facts(response,exc):
     """The bounded transport object for a failed fetch: the boundary's recorded response shape plus the rejection's own fixed literals when (and only when) they are on the allow-lists. Everything else
     is dropped; nothing is derived from exception text."""

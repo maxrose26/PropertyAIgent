@@ -65,6 +65,15 @@ class WindowBoundary(Boundary):
         self.next_url=None
         self.phase='FORM'
         self.response_provenance=[]
+        self.last_response=None
+        physical=self.dispatch
+        def recording(method,url,**kwargs):      # the shape of THIS request's response only (status, allow-listed media type, redirect disposition); nothing else is kept
+            self.last_response=None
+            response=physical(method,url,**kwargs)
+            from .source_diagnostics import response_shape
+            self.last_response=response_shape(response,url,self.config.base)
+            return response
+        self.dispatch=recording
 
     def validate(self,method,url,body=None):
         self.budget.check()
@@ -76,6 +85,7 @@ class WindowBoundary(Boundary):
         if not allowed: self.budget.reject('PARTIAL_RETRIEVAL','window request not admitted')
 
     def retrieve(self,method,url,body=None):
+        self.last_response=None      # one logical request: a rejection before dispatch must not report an earlier request's response (a redirect's own response is kept for its target validation)
         status,headers,data=self.request(method,url,body=body,headers={'Content-Type':'application/x-www-form-urlencoded'} if body else {})
         if status!=200 or headers.get('Content-Type','').split(';')[0].lower() not in {'text/html','application/xhtml+xml'}:
             self.budget.reject('PARTIAL_RETRIEVAL','response shape')
