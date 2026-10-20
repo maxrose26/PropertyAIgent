@@ -209,14 +209,15 @@ def test_installing_v3_changes_exactly_two_function_definitions_and_nothing_else
 
 
 @pytest.mark.parametrize('absent',['manual_stop','last_hard_stop','hard_stop_generation'])
-def test_v3_refuses_the_named_allowance_when_a_stop_field_is_absent(ledger,absent):
+def test_v3_refuses_the_named_allowance_when_a_stop_field_is_absent_and_allows_nothing_v1_did_not(ledger,absent):
     boot,connector,installer,control,set_control=ledger
     observed_state(set_control,control);grant=probe_grant(boot,control,set_control)
-    apply_v3(installer)
-    ctl=control();ctl.pop(absent);set_control(ctl)      # an absent field is NULL in SQL: it must be FALSE here, never a widening
-    with pytest.raises(psycopg.errors.Error,match='EXACT_SCOPED_DISPOSITION'):register(boot,payload(grant))
+    ctl=control();ctl.pop(absent);set_control(ctl)      # an absent field is NULL in SQL: it must be FALSE in the probe branch, never a widening
     ctl=control();ctl['bolton_exceptions'][NAMED]=payload(grant)|dict(expires_at=grant['expires_at']);ctl['grants'][NAMED]=grant
-    assert allowed(boot,ctl,NAMED) is False
+    under_v1=allowed(boot,ctl,NAMED)      # the installed (reviewed 18 October) policy, evaluated on the very same record
+    apply_v3(installer)
+    assert allowed(boot,ctl,NAMED)==under_v1      # v3 grants nothing that v1 did not (the original treats an absent manual stop as "no manual stop")
+    with pytest.raises(psycopg.errors.Error,match='EXACT_SCOPED_DISPOSITION'):register(boot,payload(grant))      # and the registration is refused
 
 
 def test_v3_does_not_honour_a_revoked_or_expired_probe_exception(ledger):

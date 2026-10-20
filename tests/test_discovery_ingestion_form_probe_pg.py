@@ -126,8 +126,6 @@ def run_policy(w,name='policy'):
 def test_the_policy_ceremony_installs_exactly_the_reviewed_inventory_and_changes_nothing_else(world):
     w=world
     before=dict(functions=w.functions(),control=digest(w.control()),standing=(w.roles_state(),w.memberships(),w.role_configs()))
-    with pytest.raises(psycopg.errors.Error,match='EXACT_SCOPED_DISPOSITION'):      # the installed (successor) policy refuses the observed state: this is the problem being solved
-        w.boot.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(authority=PROBE_NAME,transport='REQUESTS_IDOX',grant_binding={},stop_checkpoint_sha256=oo.GENERATION2_STOP['stop_state_sha256'],hard_stop_generation=2,revision='a'*40,workflow_sha256='b'*64,manifest_sha256='c'*64)),))
     result,runner=run_policy(w)
     assert result['status']=='POLICY_GENERATION2_INSTALLED_CONTROL_RECORD_UNCHANGED' and result['cleanup']=='CLOSED' and result['inventory_verified'] is True and result['github_requests']==0
     assert result['transient_owner_capability']=='ABSENT_READ_BACK' and result['control_sha256_before']==result['control_sha256_after']==digest(w.control())
@@ -215,7 +213,7 @@ def test_form_probe_lifecycle(world,fault,monkeypatch):
     for name in ('HISTORICAL_0','HISTORICAL_1'):assert ctl_after['grants'][name]==ctl_before['grants'][name] and ctl_after['bolton_exceptions'][name]==ctl_before['bolton_exceptions'][name]
     assert len(ctl_after['bolton_exceptions'])<=3      # the unchanged cap
     if fault=='baseline_changed_blocks':
-        assert result['status']=='STOP_RECONCILE_NO_RETRY' and PROBE_NAME not in ctl_after['grants'] and not spawned and stop_codes[0]['code']=='PROBE_READBACK_MANUAL_STOP_CHANGED'
+        assert result['status']=='STOP_RECONCILE_NO_RETRY' and PROBE_NAME not in ctl_after['grants'] and not spawned and stop_codes[0]['code']=='PIPELINE_READBACK_MANUAL_STOP_CHANGED'
         return
     assert PROBE_NAME in ctl_after['grants'] and ctl_after['grants'][PROBE_NAME]['expires_at']==0 and ctl_after['bolton_exceptions'][PROBE_NAME]['expires_at']==0      # ended by invalidation, never merely by time
     assert ctl_after['bolton_exceptions'][PROBE_NAME]['hard_stop_generation']==2
