@@ -28,3 +28,7 @@ grants or exceptions; local audit only.
 
 ## Not authorised by this package
 Installing any policy, clearing or replacing a stop, a source request, a probe registration, a dispatch, any credential change.
+
+## Successor (after the consumed first attempt)
+The first attempt stopped before the runner at stage `ROUTE_VALIDATION` with the fixed reason `ROUTE_MALFORMED_INPUT` (zero connections, zero statements; the value could not be parsed as a URL; **its precise cause is unobserved**). Its namespace `operational-control-observation-once-20261021`, authority and registration are consumed and preserved with their complete audit (bound by hash in the successor's registration and checked by the owner script).
+The successor uses fresh names (`AUTHORISE_INGESTION_CONTROL_OBSERVATION_SUCCESSOR_2_ONCE_20261021`, `operational-control-observation-successor-2-once-20261021`) and adds **one** change in front of the unchanged execution: the single bounded hidden prompt is validated against the complete exact route (the existing validator) and for password presence **before** the registration is consumed. An invalid or unreadable value exits with a fixed code (`INPUT_REJECTED_NOT_CONSUMED:ROUTE_<code>`, `PASSWORD_ABSENT` or `INPUT_NOT_READ_NOT_CONSUMED`), creates no journal or state directory, and leaves the registration usable. The value stays in memory only and is handed once to the existing path. The observation's SQL, rollback and both readbacks, privileges and numerical limits are unchanged.

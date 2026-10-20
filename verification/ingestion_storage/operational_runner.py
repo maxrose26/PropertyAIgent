@@ -91,8 +91,8 @@ PIPELINE_BACKSTOP_SECONDS=4600
 # Control observation (read the control record, commit nothing, issue no authority, make no source request). Finite: one connection, 12 statements (the observation uses 6), 20 database-active
 # seconds, 30 supervised-active seconds after the hidden input. Ordering invariants as for every mode: job + window <= work alarm; work alarm + window <= diagnostic_total <= active - reporting.
 OBSERVER_MODE='CONTROL_OBSERVATION'
-OBSERVER_AUTHORITY='AUTHORISE_INGESTION_CONTROL_OBSERVATION_ONCE_20261021'
-OBSERVER_STATE='operational-control-observation-once-20261021'
+OBSERVER_AUTHORITY='AUTHORISE_INGESTION_CONTROL_OBSERVATION_SUCCESSOR_2_ONCE_20261021'
+OBSERVER_STATE='operational-control-observation-successor-2-once-20261021'
 OBSERVER_OWNER_LIMITS=dict(connections=(1,1),commands=(12,12,12))
 OBSERVER_TIMING=dict(input_seconds=120,active_seconds=30,work_seconds=24,diagnostic_seconds=3,report_seconds=2,outer_seconds=180)
 OBSERVER_DEADLINES=dict(job=20,diagnostic_total=27,diagnostic_window=3,admin_diagnostic=25,admin_pre=8,admin_total=18,runtime_total=1)
@@ -102,7 +102,14 @@ OBSERVER_STATEMENT_SECONDS=4
 OBSERVER_BACKSTOP_SECONDS=240
 OBSERVER_PREDECESSOR=dict(consumed_run=dict(run_id=39388007668,artifact_id=12248515861,artifact_zip_sha256='934a798296e7beba6bd5bb0860a820a5ef3104c7b0c18b111c81c616b3c0ee22'),
                           owner_events_sha256='35dedf6a87c3b10d4e23af54590c49bb5af4393358dd79ee9f95675be5035449',owner_final_result_sha256='8c26067b366efc208fec0bbb7affdaed80ab355b0e50c867a6d538dad7a26381',
-                          pipeline_registration_sha256='8ae69f3ce95c4285ba2138ddb815953c3b68f85e790101d07a323cdabb4de5c0',integrated_corrective_revision='895fcbe8ea412213ebc795c7800ea635c8260585')
+                          pipeline_registration_sha256='8ae69f3ce95c4285ba2138ddb815953c3b68f85e790101d07a323cdabb4de5c0',integrated_corrective_revision='895fcbe8ea412213ebc795c7800ea635c8260585',
+                          # The first observation attempt stopped before the runner at ROUTE_VALIDATION (fixed reason ROUTE_MALFORMED_INPUT); the cause of that rejection is UNOBSERVED. Its namespace and
+                          # authority are consumed and preserved; this successor uses fresh names and never reuses them.
+                          consumed_observation_attempt=dict(authority='AUTHORISE_INGESTION_CONTROL_OBSERVATION_ONCE_20261021',state_directory='operational-control-observation-once-20261021',
+                                                            registration_sha256='da5dce7f31b389c4661a2918464c83dd65d8c2829a138f51dfa42089a266d99f',
+                                                            events_sha256='842139208adb04e180e2776790f8111216510277d9c433cbea7a1ebf3c0107a4',
+                                                            final_result_sha256='7505156e6c459d6fc3903e4d8a80960c6ee2282f3aa467f12603b65c0924fb27',
+                                                            outcome='STOPPED_BEFORE_RUNNER_AT_ROUTE_VALIDATION_ROUTE_MALFORMED_INPUT_CAUSE_UNOBSERVED'))
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -124,6 +131,29 @@ def restricted_url(role,password):
     """Same in-memory value goes to protected mapping and native URL parser."""
     if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
     return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
+
+def observer_precheck_input(reader=None,seconds=120):
+    """ONE bounded visible hidden prompt whose value is validated against the COMPLETE exact route (the existing validator: driver, host, port, database, username, no query) and for password presence
+    BEFORE anything is consumed: an invalid or unreadable value exits with a FIXED code, creates no journal or state directory and consumes nothing. The value stays in memory only (never an argument,
+    environment variable, file, log or output) and is handed straight to the existing execution path. Returns (value, seconds taken)."""
+    from .credential_mapping import secure_migration_input
+    from .operational_cleanup import arm_deadline
+    from verification.discovery.route_validation import validate_route,RouteRejection
+    reader=reader or secure_migration_input
+    began=time.monotonic()
+    try:
+        arm_deadline(seconds,'SECURE_INPUT_DEADLINE')
+        raw=reader()
+    except BaseException:
+        raise SystemExit('INPUT_NOT_READ_NOT_CONSUMED') from None
+    finally:
+        signal.setitimer(signal.ITIMER_REAL,0)
+    try:parsed=validate_route(raw)
+    except RouteRejection as rejection:raise SystemExit('INPUT_REJECTED_NOT_CONSUMED:ROUTE_'+rejection.code) from None
+    except BaseException:raise SystemExit('INPUT_REJECTED_NOT_CONSUMED:ROUTE_MALFORMED_INPUT') from None
+    if not isinstance(parsed.password,str) or not parsed.password:raise SystemExit('INPUT_REJECTED_NOT_CONSUMED:PASSWORD_ABSENT')
+    return raw,round(time.monotonic()-began,3)
+
 
 def hosted_finished(hosted_summary,incomplete):
     """Whether the restricted job's PUBLISHED result is a completed run. The job publishes while its memory scope is still enforcing, so a success is published as `PENDING_MEMORY_SCOPE_CLOSURE`
@@ -785,16 +815,27 @@ def main():
     r=validate_registration(a.registration.read_bytes(),a.registration_sha256)
     from .operational_memory import OperationalMemory
     memory=OperationalMemory() # Positive kernel enforcement BEFORE credentials.
+    held=None;precheck_seconds=None
+    if r['mode']==OBSERVER_MODE:
+        resource.setrlimit(resource.RLIMIT_CORE,(0,0))      # no core file may ever hold the value
+        held,precheck_seconds=observer_precheck_input()      # exits here, consuming nothing, on any invalid or unreadable input
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
     journal=Journal(state/(OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
+    reader=secure_migration_input
+    if held is not None:
+        journal.emit('hidden_input_prechecked',dict(route_validated=True,password_present=True,seconds=precheck_seconds,value_exported=False))
+        box=[held];held=None
+        def reader():      # hands the already-validated value to the existing execution path exactly once, then forgets it
+            value,box[0]=box[0],None
+            return value
     from .operational_outcome import session
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],secure_migration_input,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)

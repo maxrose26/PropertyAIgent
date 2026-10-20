@@ -8,9 +8,10 @@ set -euo pipefail
 umask 077
 [[ $# = 3 && "$1" =~ ^[a-f0-9]{40}$ && "$2" =~ ^[a-f0-9]{40}$ && "$3" =~ ^[a-f0-9]{64}$ ]] || { echo 'USAGE: owner-run.sh <commit40> <tree40> <registration-sha256>'; exit 2; }
 COMMIT=$1; TREE=$2; REGISTRATION_SHA256=$3
-REGISTRATION="$HOME/stage4-owner/operational-control-observation-registration-20261021.json"
+REGISTRATION="$HOME/stage4-owner/operational-control-observation-successor-2-registration-20261021.json"
 STATE_ROOT="$HOME/.local/state/propertyaigent"
-STATE_DIRECTORY=operational-control-observation-once-20261021
+STATE_DIRECTORY=operational-control-observation-successor-2-once-20261021
+CONSUMED_DIRECTORY=operational-control-observation-once-20261021
 PIPELINE_DIRECTORY=operational-stable-pipeline-once-20261020
 PY="$HOME/stage4-owner/storage-controller-venv/bin/python"
 
@@ -28,6 +29,10 @@ printf 'observation_namespace_absent=%s\n' "$STATE_DIRECTORY"
 printf '%s  %s\n%s  %s\n' \
   35dedf6a87c3b10d4e23af54590c49bb5af4393358dd79ee9f95675be5035449 "$STATE_ROOT/$PIPELINE_DIRECTORY/events.jsonl" \
   8c26067b366efc208fec0bbb7affdaed80ab355b0e50c867a6d538dad7a26381 "$STATE_ROOT/$PIPELINE_DIRECTORY/final-result.json" | sha256sum --check
+# The first (consumed) observation attempt must be exactly as reconciled; it is preserved and never reused.
+printf '%s  %s\n%s  %s\n' \
+  842139208adb04e180e2776790f8111216510277d9c433cbea7a1ebf3c0107a4 "$STATE_ROOT/$CONSUMED_DIRECTORY/events.jsonl" \
+  7505156e6c459d6fc3903e4d8a80960c6ee2282f3aa467f12603b65c0924fb27 "$STATE_ROOT/$CONSUMED_DIRECTORY/final-result.json" | sha256sum --check
 scope_state="$(timeout 10s systemctl --user show propertyaigent-operational-once.scope -p LoadState --value)" || { echo 'SCOPE_STATE_UNKNOWN: refusing to launch'; exit 3; }
 [[ "$scope_state" = not-found ]] || { echo "SCOPE_PRESENT_OR_UNKNOWN ($scope_state): refusing to launch"; exit 3; }
 "$PY" -I -B -c \
@@ -36,11 +41,12 @@ scope_state="$(timeout 10s systemctl --user show propertyaigent-operational-once
 
 printf '%s\n' \
   'CONTROL OBSERVATION. Effects:' \
+  '  0. ONE bounded hidden prompt (120 seconds). The value is validated against the COMPLETE exact route BEFORE anything is consumed: an invalid value exits with a fixed code and consumes nothing, so you may then start again with the same registration (until it expires). It is never written anywhere.' \
   '  1. ONE database connection, at most 12 statements (6 used), at most 20 database-active seconds and 30 supervised-active seconds after the hidden input.' \
   '  2. Reads the stop state and the identities and expiry states of grants and Bolton exceptions. COMMITS NOTHING (a rolled-back transaction-local owner capability is the only way the record is readable; its absence is read back).' \
   '  3. Issues no authority, makes no source request, changes no credential, membership, role setting or secret, and makes no GitHub request.' \
   'Keep this terminal open until controller_exit_status is printed.'
-printf '%s\n' 'The 120-second hidden-input timer starts at the prompt below. Enter the existing migration credential only there (typing is not echoed). Never paste it into chat.'
+printf '%s\n' 'The 120-second hidden-input timer starts at the prompt below (you are asked once). Enter the existing migration credential only there (typing is not echoed). Never paste it into chat.'
 set +e
 systemd-run --user --scope \
   --unit=propertyaigent-operational-once \
