@@ -84,6 +84,7 @@ PIPELINE_OWNER_LIMITS=dict(connections=(8,10),commands=(56,80,96))
 # GitHub requests (owner): the worst case is itemised and asserted in tests/test_ingestion_stable_pipeline.py::owner_worst_case_github_requests (polls of the two bounded waits at 30 s, each distinct head
 # examined up to three times, the freshness and anchor probes, both publications with their readbacks, the account check and the failure-path read); the bound keeps a reserve above it.
 PIPELINE_GITHUB_BOUND=180
+OWNER_PUBLICATION_RESERVE=dict(requests=14,seconds=90)      # the owner's final two-file publication is 10 requests (6 + 2x2) and at most 4 head reads; the hosted job's reserve (stable_pipeline.PUBLICATION_RESERVE_*) is the same
 # Ordering invariants (tested, as for the other modes): job + diagnostic_window <= work alarm; work alarm + diagnostic_window <= diagnostic_total <= active window - reporting; admin_pre < admin_total <
 # admin_diagnostic. Waiting for the restricted job counts as the administrative phase, so the administrative allowances are sized from the two bounded waits plus the fixed phases.
 PIPELINE_TIMING=dict(input_seconds=120,active_seconds=4380,work_seconds=4260,diagnostic_seconds=40,report_seconds=20,outer_seconds=4500)
@@ -528,7 +529,7 @@ class Runner:
                     active_seconds=now-self.started,
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
-    def closure(self,access,*,memory_close=True):
+    def closure(self,access,*,memory_close=True,github_mutations=True):
         """Same positive checks on success/failure; no automatic process kill.
 
         This is controller/owned-resource closure, not evidence that the outer
@@ -554,7 +555,7 @@ class Runner:
         connection_closed=(failed_admin_closed and a['connections_opened']==a['connections_closed'] and self.closed and (getattr(self,"matrix",None) is None or self.matrix.closed_ok()) and
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
-        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
+        safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not (github_mutations and self.github.mutation_uncertain)      # the sealed final closure judges processes, sockets and connections only; an uncertain publication is reported separately
         overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else ('PENDING_MEMORY_SCOPE_CLOSURE' if safe and connection_closed and process['status']=='PENDING_MEMORY_SCOPE_CLOSURE' else 'UNCERTAIN')
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
@@ -771,18 +772,44 @@ class Runner:
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
         invalidation=self.owner.invalidate_authorities()
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
-        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
-        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
+        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',memory_close=False)      # the scope keeps enforcing while the result is published; the final closure follows publication
+        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall'] not in ('CLOSED','PENDING_MEMORY_SCOPE_CLOSURE'):raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
         finished=hosted_finished(hosted_summary,incomplete)
         result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',
                     source_observations_attempted=1,application_writes=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
-        self.emit('pipeline_owner_result',result);self.journal.save('final-result.json',result)
-        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/owner',expected_head=self.evidence_head)
-        result.update(evidence_commit=self.evidence_head,audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)
-        self.journal.save('final-result.json',result)
-        return result
+        self.emit('pipeline_owner_result',result)
+        return self.seal_owner_result(result,lambda pending:self.publish_owner(pending))
+
+    def publish_owner(self,pending):
+        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(pending)},directory=self.r['evidence_directory']+'/owner',expected_head=self.evidence_head)
+
+    def seal_owner_result(self,result,publish):
+        """The owner's definitive result: PUBLICATION FIRST, inside the enforced memory scope and a bounded GitHub reserve, THEN the final closure (which removes the scope, after which the closed-envelope guard admits no GitHub call),
+        THEN the sealed local record. The 23 October window demonstration published after closing the scope, the guard denied it, and the failure path overwrote a correct result with UNCERTAIN; that ordering is gone.
+        Confirmed authority invalidation is never undone by a later failure: it stays in `authority_invalidation`; a publication failure is reported as `publication` / `publication_reason` and a closure failure as `cleanup`."""
+        publication='PUBLISHED';reason=None
+        pending=dict(result,closure_stage='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE')
+        try:
+            with self.github.reserve_scope(OWNER_PUBLICATION_RESERVE['requests'],OWNER_PUBLICATION_RESERVE['seconds']):
+                self.journal.save('final-result.json',pending)
+                publish(pending)
+        except BaseException as exc:      # deliberately broad: a work-alarm or hard-deadline exception during publication must be REPORTED, never allowed to discard a confirmed invalidation or skip the final closure
+            publication='UNCERTAIN_'+type(exc).__name__;reason=fixed_stop_reason(exc) or 'UNCLASSIFIED_PUBLICATION_FAILURE'      # a fixed literal, never exception text
+        try:final=self.closure(result['access'],memory_close=True,github_mutations=False)
+        except BaseException:final=dict(overall='UNCERTAIN',access=result.get('access'))
+        sealed=dict(result,closure_stage='FINAL_AFTER_PUBLICATION',cleanup=final['overall'],closure_components=final,publication=publication,publication_reason=reason,published_status=result['status'],published_cleanup=result.get('cleanup'),
+                    publication_mutation_uncertain=bool(self.github.mutation_uncertain))
+        if publication=='PUBLISHED':sealed['evidence_commit']=self.evidence_head
+        if final['overall']!='CLOSED':sealed['status']='STOP_RECONCILE_NO_RETRY'      # closure is uncertain: reconcile; the invalidation field above is unchanged
+        elif publication!='PUBLISHED':sealed['status']=result['status']+'_PUBLICATION_UNCERTAIN'
+        try:
+            self.journal.emit('owner_final_closure',dict(cleanup=final['overall'],publication=publication,publication_reason=reason,authority_invalidation=result.get('authority_invalidation')))
+            sealed.update(audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)      # the saved record binds the audit it closes
+            self.journal.save('final-result.json',sealed)
+        except BaseException:sealed['audit_stop_record']='UNCERTAIN'
+        return sealed
 
     def require_observed_baseline(self,record):
         """The control record must be EXACTLY the one observed (the stop fields, both digests, the global stop and no unexpired grant). Nothing is inferred from the live state."""
@@ -920,8 +947,8 @@ class Runner:
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
         invalidation=self.owner.invalidate_authorities()
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
-        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
-        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PROBE_INVALIDATION_OR_CLOSURE')
+        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',memory_close=False)
+        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall'] not in ('CLOSED','PENDING_MEMORY_SCOPE_CLOSURE'):raise Uncertain('PROBE_INVALIDATION_OR_CLOSURE')
         finished=hosted_finished(hosted_summary,[])
         result=dict(status='BOLTON_FORM_PROBE_OBSERVED_AUTHORITY_INVALIDATED' if finished else 'BOLTON_FORM_PROBE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,hosted=hosted_summary,cleanup=components['overall'],
                     access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,probe=dict(outcome=checkpoint['observation']['outcome'],stage=checkpoint['observation']['stage'],transport=checkpoint['observation']['transport'],
@@ -929,11 +956,8 @@ class Runner:
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',source_observations_attempted=1,application_writes=0,
                     pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
-        self.emit('probe_owner_result',result);self.journal.save('final-result.json',result)
-        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)},directory=self.r['evidence_directory']+'/owner',expected_head=self.evidence_head)
-        result.update(evidence_commit=self.evidence_head,audit_sha256=hashlib.sha256(self.journal.file.read_bytes()).hexdigest(),audit_chain_head=self.journal.head)
-        self.journal.save('final-result.json',result)
-        return result
+        self.emit('probe_owner_result',result)
+        return self.seal_owner_result(result,lambda pending:self.publish_owner(pending))
 
     def observe(self):
         """One fixed control observation and a closure. No grant, exception, stop, credential, membership, role setting, secret or source request exists on this path, and no GitHub request is admitted."""
@@ -1091,6 +1115,11 @@ def validate_registration(body,sha):
     if r['controller_sha256']!=controller or r['ca_sha256']!=PEM_SHA256 or not r['evidence_directory'].startswith('docs/design/ingestion-operational-execution-'):raise ValueError('CONTROLLER_CA_EVIDENCE_BINDING')
     return r
 
+def exit_status(result):
+    """0 only for a cleanly closed, non-stopped result whose owner publication (where one was attempted) succeeded. A cleanly closed failure, or an unpublished result, is never a quiet success."""
+    return 0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' and result.get('publication','PUBLISHED')=='PUBLISHED' else 1
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--registration',type=Path,required=True);p.add_argument('--registration-sha256',required=True);a=p.parse_args()
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_LINUX_SECURE_TTY_REQUIRED')
@@ -1124,6 +1153,6 @@ def main():
     result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode'] in (CAPTURE_MODE,WINDOW_MODE) else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
-    raise SystemExit(0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1)
+    raise SystemExit(exit_status(result))
 
 if __name__=='__main__':main()
