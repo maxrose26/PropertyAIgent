@@ -51,6 +51,7 @@
   "tests/test_ingestion_direct_route.py",
   "tests/test_ingestion_evidence_probe_fixture.py",
   "tests/test_ingestion_hard_deadline.py",
+  "tests/test_ingestion_observation_input_precheck.py",
   "tests/test_ingestion_operational_settling.py",
   "tests/test_ingestion_owner_teardown_policy.py",
   "tests/test_ingestion_pipeline_failure_path.py",
