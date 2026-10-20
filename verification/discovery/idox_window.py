@@ -54,11 +54,11 @@ class WindowConfig:
 
 
 class WindowBoundary(Boundary):
-    def __init__(self, dispatch, config=WindowConfig()):
+    def __init__(self, dispatch, config=WindowConfig(), *, probe=False):
         self.config=config
         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
             config.base,config.form_url),
-            Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch,
+            (Budget(requests=1,per_reference=1,total_bytes=262_144,response_bytes=262_144,seconds=15) if probe else Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45)),dispatch,
             max_retries=config.max_transport_retries)
         self.admitted_post=None
         self.admitted_body=None
@@ -205,6 +205,46 @@ def run(dispatch, config=WindowConfig()):
         out['resource']=b.audit(out['completeness']);out['cleanup']='BOUNDARY_CLOSED'
         out['response_provenance']=b.response_provenance
     return out
+
+
+def run_form_probe(dispatch, config=WindowConfig()):
+    """The Bolton FORM PROBE: exactly the first request that failed in run 39388007668 (the advanced-search form GET) and nothing else - no search POST, no listing, no detail page, no retry, redirects not
+    followed, at most 262144 bytes and 15 seconds. A council answer of any kind is an OBSERVATION, never an exception. The body is never returned or retained: only its size, sha256 and structural
+    counts, and the bounded transport facts. Form tokens parsed to establish that the form is recognised are discarded unseen."""
+    from .source_diagnostics import shape,transport_facts
+    b=WindowBoundary(dispatch,config,probe=True)
+    out={'council':config.council,'probe':'FORM_ONLY','requested_interval':[config.start.isoformat(),config.end.isoformat()],'date_semantics':config.semantics,'persistence':False,'pages':[],'records':[],
+         'cleanup':'UNKNOWN'}
+    stage='FORM_REQUEST';body=b'';failure=None;code=None;caught=None;outcome='FORM_RECOGNISED'
+    try:
+        body=b.retrieve('GET',config.form_url)
+        stage='FORM_PARSE'
+        _,payload=config.payload(body);payload.clear()
+    except (ListingError,BoundaryFailure,Failure) as e:
+        caught=e;failure=type(e).__name__+':SOURCE_CONTRACT_REJECTED';code='SOURCE_CONTRACT_REJECTED'
+        outcome='REQUEST_REJECTED' if stage=='FORM_REQUEST' else 'FORM_NOT_RECOGNISED'
+    except Exception:
+        failure='UNCLASSIFIED_FAILURE';code='UNCLASSIFIED_FAILURE';outcome='REQUEST_REJECTED' if stage=='FORM_REQUEST' else 'FORM_NOT_RECOGNISED'
+    finally:
+        b.admitted_body=None;b.close()
+    facts=shape(body,stage,code or 'UNKNOWN')
+    out['observation']={'outcome':outcome,'stage':stage,'failure':failure,'transport':transport_facts(b.last_response,caught),
+                        'body':{k:facts[k] for k in ('body_bytes','body_sha256','shape_available','counts') if k in facts}}
+    out['resource']=b.audit(outcome);out['cleanup']='BOUNDARY_CLOSED'
+    return out
+
+
+def form_probe(config=WindowConfig()):
+    with requests.Session() as s:
+        s.trust_env=False
+        s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
+        def dispatch(method,url,**kwargs):
+            kwargs.pop('deadline',None)
+            kwargs['timeout']=(3,8)
+            return s.request(method,url,**kwargs)
+        result=run_form_probe(dispatch,config)
+    result['cleanup']='SESSION_BOUNDARY_CLOSED'
+    return result
 
 
 def live(config=WindowConfig()):

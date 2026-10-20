@@ -38,13 +38,13 @@ FORBIDDEN_ENV=('DATABASE_URL','INGESTION_STORAGE_DATABASE_URL','GITHUB_TOKEN','P
 SECRET_NAMES=tuple(sq.SECRET_ENV.values())
 
 
-def admitted(env):
+def admitted(env,authority=None):
     """Single-use protected-environment admission. The restricted URLs and the evidence publisher's job token arrive on STDIN (see read_secrets), so none of them - nor any administrative credential - may be present in the environment, where a same-user child (the credential-free source worker parses untrusted pages) could read them from /proc."""
     sha=env.get('PIPELINE_REVIEWED_SHA','');head=env.get('PIPELINE_EVIDENCE_HEAD','')
     hexed=lambda v:len(v)==40 and all(ch in '0123456789abcdef' for ch in v)
     return (hexed(sha) and hexed(head) and env.get('GITHUB_SHA')==sha and env.get('GITHUB_WORKFLOW_SHA')==sha and env.get('GITHUB_REF')=='refs/heads/master'
             and env.get('GITHUB_RUN_NUMBER')=='1' and env.get('GITHUB_RUN_ATTEMPT')=='1' and env.get('GITHUB_ACTIONS')=='true' and env.get('RUNNER_ENVIRONMENT')=='github-hosted'
-            and env.get('PIPELINE_AUTHORITY')==HOSTED_AUTHORITY and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
+            and env.get('PIPELINE_AUTHORITY')==(authority or HOSTED_AUTHORITY) and not any(env.get(k) for k in FORBIDDEN_ENV) and not any(k.startswith('PG') and env.get(k) for k in env))
 
 
 # The execution binding the OWNER registered with the capture grant (revision, workflow_sha256 = the controller's hash, manifest_sha256), read by the worker. It is the registration's own binding,
@@ -102,6 +102,7 @@ class HostedOwner:
 
 
 class HostedRunner(Runner):
+    GRANT_SUFFIX='_CAPTURE'      # the ledger authority this job reads and spends (the form probe reads its own named allowance)
     """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
     def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision,checkout_probe=None):
         self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
@@ -170,7 +171,7 @@ class HostedRunner(Runner):
             with engine.connect() as connection:
                 from sqlalchemy import text
                 count=connection.execute(text(sq.CONTROL_SQL)).fetchone()
-                granted=connection.execute(text(GRANT_BINDING_SQL),{'a':self.authority+'_CAPTURE'}).fetchone()
+                granted=connection.execute(text(GRANT_BINDING_SQL),{'a':self.authority+self.GRANT_SUFFIX}).fetchone()
         finally:closed=budget.close([engine])
         if closed.get('cleanup')!='CLOSED' or count is None or int(count[3])<1 or granted is None or granted[0] is None or granted[1] is not True:raise Denied('CAPTURE_AUTHORITY_NOT_REGISTERED')
         self.checkout_binding=verify_checkout_binding(self.checkout_probe(),granted[0],self.execution['revision'],self.execution['manifest_sha256'])      # a mismatch stops here: zero source requests

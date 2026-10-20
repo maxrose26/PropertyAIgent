@@ -169,6 +169,28 @@ class Coordinator:
             self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
             raise
 
+    def idox_form_probe(self,claim,supervised_reader):
+        """The form-probe analogue of idox_source: one DB-gated source intent, one form-only read, the observation recorded, the item finished UNSUPPORTED_CONTRACT (never reusable as a capture). A council
+        answer of any kind is an observation. Only an unsafe or unaccountable outcome raises the accepted fail-safe stop."""
+        from .idox_adapter import IdoxListingContract
+        from .form_probe import project
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
+        c=contract.config
+        if row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics} or row['task']!='DISCOVERY':raise Denied('IDOX_TASK_SCOPE')
+        if row['checkpoint'] is not None:raise Denied('RESUME_CHECKPOINT_NO_SOURCE_REPLAY')
+        self.ledger.intent(claim,'source_calls')
+        try:
+            source,outer=supervised_reader(row)
+            receipt=project(source,outer,row['limits'])
+            bounded(receipt)
+            self.ledger.resolve_source(claim,receipt)
+            self.ledger.finish(claim,{'outcome':'FORM_PROBE_OBSERVED'},state='UNSUPPORTED_CONTRACT',reason='DIAGNOSTIC_FORM_PROBE_NO_CAPTURE')
+        except Exception:
+            self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
+            raise
+        return receipt
+
     def metadata_from_scope(self,claim):
         row=self.ledger.get(claim.key)
         if row['task']!='LISTING_METADATA' or row['subject']['kind']!='APPLICATION' or len(row['dependencies'])!=1:raise Denied('METADATA_TASK')

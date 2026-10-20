@@ -11,7 +11,7 @@ from verification.ingestion_storage.operational_supervisor import supervise
 
 
 def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None):
- if kind not in {'listing','detail'}:raise ValueError('SOURCE_KIND')
+ if kind not in {'listing','detail','form_probe'}:raise ValueError('SOURCE_KIND')
  root=Path(root)
  # Configuration contains only literal source identity/date scope, never secrets.
  raw=json.dumps(configuration,sort_keys=True,allow_nan=False).encode()
@@ -31,15 +31,15 @@ def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None
 
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--worker',choices=['listing','detail'],required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--worker',choices=['listing','detail','form_probe'],required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
  if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith('_KEY') or k.endswith('_TOKEN') or k.endswith('_PASSWORD') for k in os.environ) or a.output.exists():raise ValueError('PRIVATE_CREDENTIAL_FREE_SOURCE')
  cfg=json.loads(a.plan.read_bytes())
  import resource
  resource.setrlimit(resource.RLIMIT_AS,(1024**3,1024**3));resource.setrlimit(resource.RLIMIT_CPU,(45,45));resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
- if a.worker=='listing':
-  from verification.discovery.idox_window import WindowConfig,live
+ if a.worker in ('listing','form_probe'):
+  from verification.discovery.idox_window import WindowConfig,live,form_probe
   contract=WindowConfig(cfg['council'],cfg['semantics'],date.fromisoformat(cfg['start']),date.fromisoformat(cfg['end']),0)
-  audit=live(contract)
+  audit=form_probe(contract) if a.worker=='form_probe' else live(contract)
  else:
   from verification.discovery.material_qualification import idox_worker
   audit=idox_worker(cfg)
