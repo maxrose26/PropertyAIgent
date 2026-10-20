@@ -158,6 +158,20 @@ def test_stable_pipeline_lifecycle(tmp_path,record_property,real_gh_store,fault,
             hosted_final=json.loads((hosted_dir/'final-result.json').read_bytes()) if (hosted_dir/'final-result.json').exists() else None
             source_calls=int((hosted_dir/'rehearsal-source-calls').read_text()) if (hosted_dir/'rehearsal-source-calls').exists() else 0
             ctl_after=control()
+            if hosted_final is not None and (hosted_dir/'rehearsal-done').exists():
+                # The hosted half ran over a stateful memory scope that drives the REAL controller guard and the real publication path: the result was published INSIDE the enforced scope and the
+                # bounded reserve, the scope was closed only afterwards, and no GitHub request was made once it was closed. The sealed local record carries the complete closure.
+                closed_after=int((hosted_dir/'rehearsal-memory-closed-after-gh-calls').read_text());total=int((hosted_dir/'rehearsal-gh-calls-total').read_text())
+                assert closed_after==total,(closed_after,total)
+                assert hosted_final.get('closure_stage')=='FINAL_AFTER_PUBLICATION' and hosted_final.get('publication')=='PUBLISHED' and hosted_final.get('publication_reason') is None,json.dumps({k:hosted_final.get(k) for k in ('closure_stage','publication','publication_reason','cleanup')})
+                assert hosted_final.get('cleanup')=='CLOSED' and hosted_final.get('published_cleanup')=='PENDING_MEMORY_SCOPE_CLOSURE'
+                import base64
+                head_now=json.loads(metadata.cli(['gh','api','--method','GET',sp.REPO+'/git/ref/heads/'+sp.BRANCH]).stdout)['object']['sha']
+                blob_now=json.loads(metadata.cli(['gh','api','--method','GET',sp.REPO+'/contents/'+sp.EVIDENCE_DIRECTORY+'/completed/final-result.json?ref='+head_now]).stdout)
+                published=json.loads(base64.b64decode(blob_now['content']))      # the owner-visible file on the evidence branch, exactly as published (before the scope was closed)
+                assert published['closure_stage']=='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE' and published['cleanup']=='PENDING_MEMORY_SCOPE_CLOSURE' and published['execution']==hosted_final['execution']
+                if fault in ('source_raises','wrong_revision','wrong_executable'):      # a hosted stop is observed by the owner on its next poll, not at the end of its bounded wait
+                    assert stop_codes and stop_codes[0]['code']=='HOSTED_ENDED_BEFORE_RETENTION',stop_codes
             if fault in ('success','idle_pooled_session') and hosted_final and hosted_final['status']=='STOP_RECONCILE_NO_RETRY':
                 events_=[json.loads(l) for l in (hosted_dir/'events.jsonl').read_text().splitlines()] if (hosted_dir/'events.jsonl').exists() else []
                 pytest.fail(json.dumps(dict(owner_stop_codes=stop_codes,hosted_stop_code=(hosted_dir/'rehearsal-stop-code').read_text() if (hosted_dir/'rehearsal-stop-code').exists() else None,hosted=dict(operation_phase=hosted_final.get('operation_phase'),failure=hosted_final.get('failure')),qualification=hosted_final.get('qualification'),

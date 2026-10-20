@@ -8,6 +8,10 @@ on:
       - 'verification/ingestion_storage/hosted_memory_scope.sh'
       - 'verification/ingestion_storage/operational_memory.py'
       - 'verification/ingestion_storage/memory_enforcement.py'
+      - 'verification/ingestion_storage/stable_pipeline.py'
+      - 'verification/ingestion_storage/operational_runner.py'
+      - 'verification/ingestion_storage/operational_publication.py'
+      - 'tests/hosted_scope_publication_proof.py'
       - '.github/workflows/stage4-hosted-memory-proof.yml'
   workflow_dispatch:
 permissions:
@@ -15,7 +19,7 @@ permissions:
 jobs:
   proof:
     runs-on: ubuntu-24.04
-    timeout-minutes: 6
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,3 +71,10 @@ jobs:
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" /usr/bin/touch "$RUNNER_TEMP/must-not-exist" && ran=1
           sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope
           [[ $ran -eq 0 && ! -e "$RUNNER_TEMP/must-not-exist" ]]
+      - name: The final result is published inside the enforced scope and its bounded reserve, then the scope is closed, then the guard denies further calls (real cgroup-v2 scope)
+        run: |
+          set -euo pipefail
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/proof-venv"
+          export PROOF_DIR="$RUNNER_TEMP/publication-proof"
+          env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" PROOF_DIR="$PROOF_DIR" sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" "$RUNNER_TEMP/proof-venv/bin/python" -I -B tests/hosted_scope_publication_proof.py
+          sudo rmdir /sys/fs/cgroup/propertyaigent-operational-once.scope 2>/dev/null || true

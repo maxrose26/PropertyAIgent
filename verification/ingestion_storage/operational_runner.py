@@ -381,15 +381,18 @@ class Runner:
                     active_seconds=now-self.started,
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
-    def closure(self,access):
+    def closure(self,access,*,memory_close=True):
         """Same positive checks on success/failure; no automatic process kill.
 
         This is controller/owned-resource closure, not evidence that the outer
         systemd scope has disappeared after this process exits.
         """
-        process=dict(status='UNCERTAIN',native_memory_proof=self.memory is not None)
+        process=dict(status='UNCERTAIN',native_memory_proof=self.memory is not None);memory_pending=False
         try:
-            if self.memory is not None:
+            if self.memory is not None and not memory_close and not hasattr(self,'memory_closure'):
+                # Deferred: the scope keeps enforcing while the final result is published inside its bounded reserve; it is removed by the final closure, after which no further GitHub call is admitted.
+                memory_pending=True;process['memory']='ENFORCED_PENDING_CLOSURE';group_closed=True
+            elif self.memory is not None:
                 if not hasattr(self,'memory_closure'):self.memory_closure=self.memory.close()
                 proof=self.memory_closure
                 process['memory']=proof
@@ -397,7 +400,7 @@ class Runner:
             else:group_closed=True # disposable-only; production requires native memory at entry
             after=owned_resources()
             process.update(new_socket_count=len(after['socket_fds']-self.baseline['socket_fds']),live_child_count=len(after['children']))
-            if group_closed and process['new_socket_count']==0 and process['live_child_count']==0:process['status']='CLOSED'
+            if group_closed and process['new_socket_count']==0 and process['live_child_count']==0:process['status']='PENDING_MEMORY_SCOPE_CLOSURE' if memory_pending else 'CLOSED'
         except BaseException:pass
         a=self.owner.accounting()
         failed_admin_closed=(a.get('failed_native_connections',0)==a.get('failed_native_finished',0) or process.get('new_socket_count')==0)
@@ -405,7 +408,7 @@ class Runner:
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
         safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
-        overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
+        overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else ('PENDING_MEMORY_SCOPE_CLOSURE' if safe and connection_closed and process['status']=='PENDING_MEMORY_SCOPE_CLOSURE' else 'UNCERTAIN')
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
     def failed(self,exc):

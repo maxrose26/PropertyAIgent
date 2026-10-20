@@ -177,18 +177,18 @@ def run(dispatch, config=WindowConfig()):
             'publication_semantics':'UNKNOWN'}
         if out['capped']:out['enumeration_evidence']='PAGE_CAP'
     except (ListingError,BoundaryFailure,Failure) as e:
-        from .source_diagnostics import shape
+        from .source_diagnostics import shape,transport_facts
         # Only these fixed known messages retain their legacy spelling. Other
         # exceptions never export arbitrary str(e), URLs, tokens or source text.
         known={'sort selector':('sort selector','SORT_SELECTOR_COUNT'),
                'ambiguous reference across pages':('ambiguous reference across pages','DUPLICATE_REFERENCE')}
         label,code=known.get(str(e),('SOURCE_CONTRACT_REJECTED','SOURCE_CONTRACT_REJECTED'))
         out['failure']=type(e).__name__+':'+label
-        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code)
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code,transport_facts(b.last_response,e))
         out['completeness']='INCOMPLETE' if out['pages'] else 'FAILED'
     except Exception:
-        from .source_diagnostics import shape
-        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE')
+        from .source_diagnostics import shape,transport_facts
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE',transport_facts(b.last_response,None))
         out['failure']='UNCLASSIFIED_FAILURE';out['completeness']='FAILED'
     finally:
         b.admitted_body=None; b.close()

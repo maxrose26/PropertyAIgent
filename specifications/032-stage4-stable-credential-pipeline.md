@@ -64,3 +64,31 @@ Durable retention before screening requires a write to the evidence branch from 
 
 ## 8. Not authorised by this specification
 Any production registration, dispatch, grant, exception, source call, application write, unit-fact work, stop release, password rotation, scheduling, deployment, purchase, or Stage advancement.
+
+## 9. Corrective addendum after run 39388007668 (final publication within the enforced envelope; safe source diagnostics)
+
+Status: specification for an offline corrective candidate. It authorises no live request, replacement execution, merge or registration.
+
+### 9.1 What the first hosted run established (artifact 12248515861, sha256 `934a7982…c0ee22`)
+* The restricted job connected, qualified both logins, verified its checkout binding, made exactly one Bolton request (`requests_attempted = 1`, `retries = 0`, `redirects = 0`, 183 bytes received, 0.385 s) and stopped with `BoundaryFailure:SOURCE_CONTRACT_REJECTED` at stage `FORM_REQUEST` (the first form `GET`). No capture was retained and no screening ran.
+* The failure **cause is undetermined**. The retained record names no HTTP status, media type or specific rejection: `idox_window.run` collapses every `BoundaryFailure`/`Failure` into one code, and the diagnostic body is empty because the first retrieval did not return. Nothing in the record establishes an address block, and it must never be described as one.
+* The restricted job's final-result publication ended `UNCERTAIN_Denied`. The cause is reproduced offline: `closure()` removes the memory scope and sets `memory_closure`; every later GitHub call runs `check()`, which raises `Denied('RESOURCE_ENVELOPE_CLOSED_NO_MORE_OPERATIONS')`. The rehearsal ran with no memory scope, so the path was never exercised, and the same ordering would deny the final publication on a successful run. The owner, which waits for `completed/final-result.json` or the retained marker, therefore received no early signal and waited out its bounded timeout.
+
+### 9.2 Final publication inside an enforced budget, then final closure
+The closed-envelope guard is **not** relaxed. The ordering changes instead:
+1. **Pre-publication closure** (local only): connections, owned processes and sockets are closed and checked exactly as before, but the memory scope is **not** removed. The result is labelled `closure_stage = PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE`; its `cleanup` is `PENDING_MEMORY_SCOPE_CLOSURE` when every other component is closed (never `CLOSED`).
+2. **Publication under an enforced reserve**, with the memory scope still enforcing: a dedicated budget of at most 14 GitHub requests (the two-file publication is 10 requests, with at most 4 for head reads), 90 seconds and the publisher's existing 2 MiB bound. It is additional to nothing: it is a ceiling on the final publication, counted inside the hosted bound of 140. Every call still passes `check()` (memory snapshot included).
+3. **Final closure**: the memory scope is closed and the complete closure is computed. **No GitHub call is made after memory closure.** The sealed local record (`final-result.json`, `events.jsonl`, the workflow artifact) carries the complete closure and `cleanup = CLOSED` or `UNCERTAIN`.
+4. **Publication failure** is recorded with a fixed non-secret reason (`publication_reason`, the controller's own code or `UNKNOWN`); the artifact remains authoritative and the owner's bounded wait remains the fallback.
+The published result never claims `CLOSED` for the memory scope. The owner (unchanged) observes `completed/final-result.json` at the next 30-second poll and ends the ceremony through its existing failure handling.
+
+### 9.3 Safe source diagnostics
+`failure_diagnostic` keeps its version-1 keys and values unchanged and gains an **optional** `transport` object, recorded from the first response the boundary receives:
+* `http_status`: integer 100–599 or `null` when no response was received;
+* `media_type`: one of a fixed allow-list (`text/html`, `application/xhtml+xml`, `text/plain`, `application/json`, `application/xml`, `text/xml`) or `OTHER`, or `null`;
+* `redirect`: `NONE`, `SAME_ORIGIN` or `OTHER_ORIGIN` (the `Location` value is never exported), or `null`;
+* `rejection_outcome` and `rejection_reason`: the boundary's own fixed literals when they are in a closed allow-list, otherwise `OTHER`.
+Never exported: credentials, cookies, request or response headers other than the allow-listed media type, URLs, bodies, exception text. Existing audit classifications (`failure`, `code`, `stage`, `body_*`) are preserved.
+
+### 9.4 Required validation
+Unit tests for the two-stage closure, the reserve, the guard (calls after memory closure still denied), and the transport object (including exclusion of sensitive values). A complete success rehearsal and a complete source-failure rehearsal over the real controller guard and publication path with a stateful memory scope, in which the owner observes the failure on its next poll, ends both authorities and confirms the readback; and a hosted proof on a real cgroup-v2 scope that the publication occurs while the scope is enforcing and that closure follows it.

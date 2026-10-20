@@ -25,12 +25,27 @@ def canonical(value):
 
 class GitHub:
     def __init__(self,emit,check,*,runner=subprocess.run,bound=40):
-        self.emit=emit;self.check=check;self.runner=runner;self.requests=0;self.mutation_uncertain=False;self.bound=bound
+        self.emit=emit;self.check=check;self.runner=runner;self.requests=0;self.mutation_uncertain=False;self.bound=bound;self.reserve=None
+
+    def reserve_scope(self,requests,seconds):
+        """A ceiling on a final publication: at most `requests` more requests and `seconds` of wall time, enforced on every call and probe. It narrows the overall bound, never widens it."""
+        from contextlib import contextmanager
+        @contextmanager
+        def scope():
+            if self.reserve is not None:raise ValueError('GITHUB_PUBLICATION_RESERVE_EXHAUSTED')
+            self.reserve=dict(limit=min(self.bound,self.requests+requests),deadline=time.monotonic()+seconds)
+            try:yield self.reserve
+            finally:self.reserve=None
+        return scope()
+
+    def _admit(self):
+        if self.reserve is not None and (self.requests>=self.reserve['limit'] or time.monotonic()>=self.reserve['deadline']):raise ValueError('GITHUB_PUBLICATION_RESERVE_EXHAUSTED')
 
     def call(self,method,path,body=None):
         self.check()
         if method!='GET' and self.mutation_uncertain:raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
         if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
+        self._admit()
         self.requests+=1
         self.emit('github_intent',dict(method=method,path=path,ordinal=self.requests))
         command=['gh','api','--method',method,path]
@@ -59,6 +74,7 @@ class GitHub:
         empty successful answer, an unreadable or oversized one - is Uncertain, exactly as for call(). The audit records what was answered (PRESENT / ABSENT_HTTP_404)."""
         self.check()
         if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
+        self._admit()
         self.requests+=1
         self.emit('github_intent',dict(method='GET',path=path,ordinal=self.requests))
         try:
