@@ -190,3 +190,21 @@ def test_the_application_side_transport_schema_equals_the_verification_side_defi
     for bad in (dict(good,http_status=99),dict(good,http_status='403'),dict(good,media_type='text/evil'),dict(good,redirect='https://x'),dict(good,rejection_reason='free text'),dict(good,extra=1),{},None):
         with pytest.raises(ValueError):fp.validate_transport(bad)
         with pytest.raises(ValueError):sd.validate_transport(bad)
+
+
+def test_the_credential_free_child_runs_the_form_probe_worker_and_writes_one_bounded_audit(tmp_path,monkeypatch):
+    import json as _json,os,resource,sys
+    from verification.ingestion_storage import operational_source as src
+    from verification.discovery import idox_window
+    monkeypatch.setattr(idox_window,'form_probe',lambda config:dict(run_form_probe(lambda method,url,**kw:Resp(),config),cleanup='SESSION_BOUNDARY_CLOSED'))
+    monkeypatch.setenv('INGESTION_SOURCE_PRIVATE','ONCE')
+    for key in [k for k in list(os.environ) if 'DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD'))]:monkeypatch.delenv(key,raising=False)
+    plan=tmp_path/'plan.json';plan.write_text(_json.dumps(dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16')))
+    output=tmp_path/'worker-result.json'
+    monkeypatch.setattr(sys,'argv',['x','--worker','form_probe','--plan',str(plan),'--output',str(output)])
+    monkeypatch.setattr(resource,'setrlimit',lambda *a,**k:None)      # the child sets its own limits; not applied inside the test process
+    src.main()
+    audit=_json.loads(output.read_bytes())
+    assert audit['probe']=='FORM_ONLY' and audit['observation']['outcome']=='FORM_RECOGNISED' and audit['cleanup']=='SESSION_BOUNDARY_CLOSED' and output.stat().st_size<512*1024
+    with pytest.raises(ValueError):src.read('detail_probe',{},root=tmp_path)      # only the reviewed worker kinds exist
+
