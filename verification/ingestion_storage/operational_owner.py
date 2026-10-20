@@ -92,7 +92,7 @@ class Owner:
     # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
     DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
     limits=DEFAULT_LIMITS      # class default for any Owner not built through __init__
-    statement_hard_seconds=ADMIN_STATEMENT_HARD_SECONDS      # the observation mode lowers this on its own Owner; every other mode keeps 12 s
+    statement_hard_seconds=None      # None = the module constant ADMIN_STATEMENT_HARD_SECONDS at call time (every other mode keeps 12 s, and tests may patch it); the observation mode sets its own
 
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
@@ -135,7 +135,7 @@ class Owner:
         started=time.monotonic()
         try:
             try:
-                with hard_deadline(self.statement_hard_seconds,'ADMIN_STATEMENT_HARD_DEADLINE'):
+                with hard_deadline(self.statement_hard_seconds or ADMIN_STATEMENT_HARD_SECONDS,'ADMIN_STATEMENT_HARD_DEADLINE'):
                     cur=c.execute(statement,params)
                     rows=cur.fetchall() if cur.description else []
             except DeadlineExceeded:

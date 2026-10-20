@@ -192,7 +192,7 @@ def test_a_failure_after_the_grant_never_commits_and_the_connection_is_closed():
 
 def test_the_statement_deadline_is_the_observer_s_own_and_other_modes_keep_twelve_seconds(tmp_path):
     r=runner_for(tmp_path,FakeAdmin(control()))
-    assert r.owner.statement_hard_seconds==orr.OBSERVER_STATEMENT_SECONDS==4 and oo.Owner.statement_hard_seconds==oo.ADMIN_STATEMENT_HARD_SECONDS==12
+    assert r.owner.statement_hard_seconds==orr.OBSERVER_STATEMENT_SECONDS==4 and oo.Owner.statement_hard_seconds is None and oo.ADMIN_STATEMENT_HARD_SECONDS==12
     result=r.execute()
     assert result['status']=='CONTROL_OBSERVED_NO_COMMITTED_MUTATION'
 
