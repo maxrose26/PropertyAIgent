@@ -92,6 +92,7 @@ class Owner:
     # (normal, diagnostic) administrative connections; (normal, teardown, diagnostic) administrative commands. The restricted-connection matrix passes much tighter finite values.
     DEFAULT_LIMITS=dict(connections=(11,13),commands=(200,232,240))
     limits=DEFAULT_LIMITS      # class default for any Owner not built through __init__
+    statement_hard_seconds=None      # None = the module constant ADMIN_STATEMENT_HARD_SECONDS at call time (every other mode keeps 12 s, and tests may patch it); the observation mode sets its own
 
     def __init__(self,connector,emit,check,*,identity='postgres',expiry,bindings,limits=None):
         self.limits=dict(limits or self.DEFAULT_LIMITS);self.timeline={}
@@ -134,7 +135,7 @@ class Owner:
         started=time.monotonic()
         try:
             try:
-                with hard_deadline(ADMIN_STATEMENT_HARD_SECONDS,'ADMIN_STATEMENT_HARD_DEADLINE'):
+                with hard_deadline(self.statement_hard_seconds or ADMIN_STATEMENT_HARD_SECONDS,'ADMIN_STATEMENT_HARD_DEADLINE'):
                     cur=c.execute(statement,params)
                     rows=cur.fetchall() if cur.description else []
             except DeadlineExceeded:
@@ -540,6 +541,60 @@ class Owner:
         self.emit('pipeline_readback',record)      # persisted (chained, synced) before the result can be acted on
         if findings:raise Uncertain('PIPELINE_READBACK_'+findings[0])
         if record['statements']>self.PIPELINE_MAX_STATEMENTS:raise Uncertain('PIPELINE_READBACK_STATEMENT_BOUND')
+        return record
+
+    OBSERVER_MAX_STATEMENTS=12      # bound named in the registration; the observation itself uses 6
+    OBSERVER_MAX_DB_ACTIVE_SECONDS=20
+
+    @staticmethod
+    def project_control(ctl,now):
+        """A bounded projection of the control record: the stop state, and the identity and expiry state of every grant and Bolton exception (names, expiry numbers and states only - never the bindings or
+        any key list). `now` is the SERVER's clock. Two digests: of the whole record, and of the stop fields alone (the exact stop binding a policy could pin)."""
+        if not isinstance(ctl,dict):raise ValueError('CONTROL_SHAPE')
+        def state(expires):
+            if not isinstance(expires,(int,float)) or isinstance(expires,bool) or not math.isfinite(expires):return 'UNREADABLE'
+            return 'REVOKED_ZERO' if expires==0 else 'EXPIRED' if expires<=now else 'UNEXPIRED'
+        import math
+        def text(value,limit=100):
+            return value[:limit] if isinstance(value,str) else None
+        def small(value):
+            try:return value if len(json.dumps(value,sort_keys=True))<=512 else 'OVERSIZE_NOT_EXPORTED'
+            except (TypeError,ValueError):return 'UNREADABLE'
+        def integer(value):
+            return value if type(value) is int and -10**9<=value<=10**9 else None
+        grants=ctl.get('grants',{});exceptions=ctl.get('bolton_exceptions',{})
+        if not isinstance(grants,dict) or not isinstance(exceptions,dict):raise ValueError('CONTROL_SHAPE')
+        stop=dict(global_stop=small(ctl.get('global_stop')),manual_stop=text(ctl.get('manual_stop'),512),last_hard_stop=text(ctl.get('last_hard_stop'),512),hard_stop_generation=integer(ctl.get('hard_stop_generation')))
+        out=dict(**stop,council_deferred_until=small(ctl.get('council_deferred_until')),control_keys=sorted(str(k) for k in ctl),
+                 grants=[dict(authority=text(a),expires_at=g.get('expires_at') if state(g.get('expires_at'))!='UNREADABLE' else None,state=state(g.get('expires_at')),source_calls=integer(g.get('source_calls')),writes=integer(g.get('writes')),login=text(g.get('login')),key_count=len(g.get('keys') or []) if isinstance(g.get('keys'),list) else None,
+                              execution_binding_revision=(lambda r:r if isinstance(r,str) and re.fullmatch(r'[0-9a-f]{40}',r) else None)((g.get('execution_binding') or {}).get('revision') if isinstance(g.get('execution_binding'),dict) else None)) for a,g in sorted(grants.items()) if isinstance(g,dict)],
+                 bolton_exceptions=[dict(authority=text(a),expires_at=e.get('expires_at') if state(e.get('expires_at'))!='UNREADABLE' else None,state=state(e.get('expires_at')),transport=text(e.get('transport')),hard_stop_generation=integer(e.get('hard_stop_generation')),
+                                         grant_binding_matches=bool(isinstance(grants.get(a),dict) and e.get('grant_binding')=={k:v for k,v in grants[a].items() if k not in ('source_calls','writes')})) for a,e in sorted(exceptions.items()) if isinstance(e,dict)])
+        out['counts']=dict(grants=len(out['grants']),grants_unexpired=sum(g['state']=='UNEXPIRED' for g in out['grants']),exceptions=len(out['bolton_exceptions']),exceptions_unexpired=sum(e['state']=='UNEXPIRED' for e in out['bolton_exceptions']))
+        out['stop_state_sha256']=digest(stop);out['control_sha256']=digest(ctl)
+        return out
+
+    def control_observation(self):
+        """The FIXED single-connection observation of the control record. NO COMMITTED MUTATION (it is NOT strictly read-only: see the GRANT below). The administrative identity has no table privilege, so (exactly as the accepted preflight and the accepted
+        invalidation readback do) the temporary owner capability exists only inside a transaction that is ROLLED BACK, and its absence is read back. That GRANT is a statement that would write the role
+        catalog if it were committed; it is the only way the record can be read, and it is reported as such. No other write, no termination, no secret, no source request. The projection is persisted to
+        the audit journal before anything else can happen."""
+        started=time.monotonic();before=self.commands;active_before=self.connection_active
+        with self.connection() as c:
+            flags=tuple(self.q(c,"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_catalog.pg_roles WHERE rolname=current_user")[0])
+            if flags!=(self.identity,self.identity,False,True,True,True):raise ValueError('MIGRATION_IDENTITY')
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            row=self.q(c,"SELECT outcome::jsonb,extract(epoch FROM statement_timestamp()) FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0]
+            self.q(c,'ROLLBACK',effect=True)
+            capability=tuple(self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0])
+        if capability!=(False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        ctl=row[0] if isinstance(row[0],dict) else json.loads(row[0])
+        record=dict(statements=self.commands-before,elapsed_seconds=round(time.monotonic()-started,3),database_active_seconds=round(self.connection_active-active_before,3),server_epoch=float(row[1]),
+                    projection=self.project_control(ctl,float(row[1])),transient_owner_capability='ROLLED_BACK_AND_READ_BACK_ABSENT',committed_writes=0,query_text_read=False,password_values_read=False)
+        self.emit('control_observation',record)      # persisted (chained, synced) before the result can be acted on
+        if record['statements']>self.OBSERVER_MAX_STATEMENTS:raise Uncertain('OBSERVER_STATEMENT_BOUND')
+        if record['database_active_seconds']>self.OBSERVER_MAX_DB_ACTIVE_SECONDS:raise Uncertain('OBSERVER_DB_ACTIVE_BOUND')
         return record
 
     def read_items(self,keys):
