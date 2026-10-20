@@ -199,7 +199,7 @@ def test_the_statement_deadline_is_the_observer_s_own_and_other_modes_keep_twelv
 
 def test_the_failure_result_says_the_capability_could_not_be_read_back_after_a_failure(tmp_path):
     result=runner_for(tmp_path,FakeAdmin(control(),capability=(True,True))).execute()
-    assert 'NOT_READ_BACK' in result['transient_owner_capability']
+    assert 'UNVERIFIED' in result['transient_owner_capability'] and 'NOT_READ_BACK' in result['transient_owner_capability']
 
 
 def test_pathological_values_are_bounded_or_withheld():

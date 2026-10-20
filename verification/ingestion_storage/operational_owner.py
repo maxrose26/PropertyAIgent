@@ -575,7 +575,7 @@ class Owner:
         return out
 
     def control_observation(self):
-        """The FIXED single-connection observation of the control record. NOTHING IS COMMITTED. The administrative identity has no table privilege, so (exactly as the accepted preflight and the accepted
+        """The FIXED single-connection observation of the control record. NO COMMITTED MUTATION (it is NOT strictly read-only: see the GRANT below). The administrative identity has no table privilege, so (exactly as the accepted preflight and the accepted
         invalidation readback do) the temporary owner capability exists only inside a transaction that is ROLLED BACK, and its absence is read back. That GRANT is a statement that would write the role
         catalog if it were committed; it is the only way the record can be read, and it is reported as such. No other write, no termination, no secret, no source request. The projection is persisted to
         the audit journal before anything else can happen."""

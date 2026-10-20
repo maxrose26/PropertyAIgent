@@ -43,6 +43,7 @@
   "tests/hosted_scope_publication_proof.py",
   "tests/stable_pipeline_rehearsal.py",
   "tests/storage_gh_fixture.py",
+  "tests/test_discovery_ingestion_control_observation_pg.py",
   "tests/test_discovery_ingestion_operational_wrapper_pg.py",
   "tests/test_discovery_ingestion_stable_pipeline_pg.py",
   "tests/test_ingestion_control_observation.py",

@@ -679,7 +679,7 @@ class Runner:
         except BaseException:components=dict(overall='UNCERTAIN',process=dict(status='UNCERTAIN'))
         return dict(status='STOP_RECONCILE_NO_RETRY',cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),operation_phase=self.operation_phase,
                     accounting=self.accounting(),access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',authority_invalidation='NOT_REQUIRED_NO_AUTHORITY',source_observations_attempted=0,execution_grants_created=0,application_writes=0,committed_writes=0,
-                    transient_owner_capability='ABORTED_BY_DISCONNECT_NOT_READ_BACK_IF_THE_FAILURE_FOLLOWED_THE_GRANT',pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
+                    transient_owner_capability='UNVERIFIED_TRANSACTION_ABORTED_BY_DISCONNECT_ABSENCE_NOT_READ_BACK',pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
 
     def execute(self):
         try:
