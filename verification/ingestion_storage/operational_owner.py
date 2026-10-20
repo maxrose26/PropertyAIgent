@@ -29,6 +29,7 @@ ROLE_SETTING_VALUE=re.compile(r'[0-9]{1,9}(?:ms|s|min|h|d)?')
 PKG=Path('docs/design/ingestion-operational-required-20261018')
 WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
 GENERATION2_POLICY=Path('docs/design/ingestion-form-probe-20261021/policy-generation2.sql')
+GENERATION2_CAPTURE_POLICY=Path('docs/design/ingestion-capture-acceptance-20261022/policy-capture-allowance.sql')
 GENERATION2_STOP=dict(manual_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',last_hard_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',hard_stop_generation=2,
                       stop_state_sha256='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21',control_sha256='d2abd06f56e0c86d4b7c9e4f73f1df2f7fb91c4f32c98e09004bb278113886a9')
 STOP={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'}
@@ -229,11 +230,19 @@ class Owner:
         if set(v3)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'} or not set(v3)<=set(upgraded):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
         return {**upgraded,**v3}
 
+    @classmethod
+    def capture_inventory(cls):
+        """The GENERATION2_CAPTURE_POLICY_APPLIED inventory: the successor-policy inventory with exactly the two functions redefined by policy v4."""
+        _,upgraded,_=cls.reviewed_inventories(True)
+        v4={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(GENERATION2_CAPTURE_POLICY.read_text())}
+        if set(v4)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'} or not set(v4)<=set(upgraded):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
+        return {**upgraded,**v4}
+
     def verify_installed(self,c):
         """Accept exactly one coherent reviewed inventory, bound to the execution mode, with the reviewed owner and search path on every function. Reports a fixed reason code and the
         recognised policy state (never exception text). Preflight fails closed before any change."""
         states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
-        every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory()}
+        every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory(),'GENERATION2_CAPTURE_POLICY_APPLIED':self.capture_inventory()}
         if self.permitted_policy_states is not None:      # a mode may name exactly the retained state it is bound to (it then neither applies the policy nor accepts any other state)
             permitted={k:v for k,v in every.items() if k in self.permitted_policy_states}
         names=list(upgraded)
@@ -250,7 +259,7 @@ class Owner:
         else:reason=None
         self.preflight_report=dict(reason_code=reason or 'POLICY_STATE_RECOGNISED',policy_state=recognised or 'UNRECOGNISED',permitted_states=sorted(permitted))
         if reason:raise ValueError(reason)
-        self.expected_generation=2 if recognised=='GENERATION2_POLICY_APPLIED' else 1      # the generation the reviewed inventory is bound to
+        self.expected_generation=2 if recognised in ('GENERATION2_POLICY_APPLIED','GENERATION2_CAPTURE_POLICY_APPLIED') else 1      # the generation the reviewed inventory is bound to
 
     def install(self):
         if self.reuse_installed:

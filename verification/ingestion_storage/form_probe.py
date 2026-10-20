@@ -21,6 +21,7 @@ PROBE_GITHUB_BOUND=60      # the anchor probe, the head reads and the 10-request
 
 class ProbeHostedRunner(sp.HostedRunner):
     GRANT_SUFFIX='_PROBE'
+    MANIFEST=PROBE_MANIFEST_PATH
 
     def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision,checkout_probe=None):
         super().__init__(urls,journal,github,source_reader,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision,checkout_probe=checkout_probe)

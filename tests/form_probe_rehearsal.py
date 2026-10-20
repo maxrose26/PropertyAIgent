@@ -77,15 +77,9 @@ class Scope:
         return dict(owned_groups_removed=True,owned_survivors=0,memory=dict(aggregate=dict(events=dict(oom_kill=0))))
 
 
-def checkout_probe():
-    actual=dict(revision=plan['revision'],tree='d'*40,tracked_files_modified=False,controller_sha256=plan['controller_sha256'],manifest_sha256=plan['manifest_sha256'])
-    if fault=='wrong_revision':actual['revision']='e'*40
-    return actual
-
-
 journal=Journal(plan['output'])
 result,code=fprobe.run_probe_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=Scope(),
-                                    evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'],checkout_probe=checkout_probe)
+                                    evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'])      # checkout_probe omitted: the production default reader runs against this very checkout and the mode's own manifest
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
 Path(plan['output']).joinpath('rehearsal-gh-calls-total').write_text(str(_gh_calls[0]))
 Path(plan['output']).joinpath('rehearsal-done').write_text(str(code))

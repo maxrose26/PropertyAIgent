@@ -18,6 +18,8 @@ from psycopg import sql
 from app.ingestion.ledger import digest
 from verification.ingestion_storage import operational_owner as oo
 from verification.ingestion_storage import operational_runner as orr
+from verification.ingestion_storage import stable_pipeline as sp
+from verification.ingestion_storage import form_probe as fprobe
 from verification.ingestion_storage import restricted_route as rr
 from verification.ingestion_storage.operational_journal import Journal
 from verification.ingestion_storage.operational_outcome import session
@@ -43,7 +45,7 @@ def world(tmp_path,real_gh_store,monkeypatch):
     password=secrets.token_urlsafe(48);role='provisioning_migrator'
     metadata,secret,ciphertexts,requests=real_gh_store
     def connector():return psycopg.connect(**{**info,'user':role,'password':password},autocommit=True,prepare_threshold=None,connect_timeout=3)
-    registration=dict(expires_at=(datetime.now(timezone.utc)+timedelta(minutes=60)).isoformat(),revision='a'*40,controller_sha256='b'*64,manifest_sha256='c'*64,evidence_head='1'*40,evidence_directory=orr.PROBE_EVIDENCE_DIRECTORY)
+    real=real_bindings();registration=dict(expires_at=(datetime.now(timezone.utc)+timedelta(minutes=60)).isoformat(),**real,evidence_head='1'*40,evidence_directory=orr.PROBE_EVIDENCE_DIRECTORY)
     extra=['ingestion_effect_login','ingestion_effect_broker','ingestion_recovery_operator']
     mapped_values={}
     def cli(command,**kwargs):
@@ -156,7 +158,16 @@ def test_the_policy_ceremony_refuses_an_unreviewed_installed_inventory(world):
 
 
 # ================================================================================ the probe
-FAULTS=['observed_form','refused_403','worker_audit_malformed','wrong_revision','owner_wait_expires','baseline_changed_blocks']
+def real_bindings(pipeline_manifest=False):
+    """The bindings the owner registers, taken from THIS checkout exactly as the production registration renderer does: HEAD, the controller module's hash, the probe mode's own manifest."""
+    import hashlib,subprocess
+    root=Path(__file__).resolve().parents[1]
+    manifest=sp.MANIFEST_PATH if pipeline_manifest else fprobe.PROBE_MANIFEST_PATH
+    head=subprocess.run(['git','rev-parse','HEAD'],cwd=root,stdout=subprocess.PIPE,check=True).stdout.decode().strip()
+    return dict(revision=head,controller_sha256=hashlib.sha256((root/'verification/ingestion_storage/operational_runner.py').read_bytes()).hexdigest(),manifest_sha256=hashlib.sha256((root/manifest).read_bytes()).hexdigest())
+
+
+FAULTS=['observed_form','refused_403','worker_audit_malformed','wrong_revision','wrong_manifest','wrong_controller','owner_wait_expires','baseline_changed_blocks']
 
 
 @pytest.mark.parametrize('fault',FAULTS)
@@ -164,6 +175,9 @@ def test_form_probe_lifecycle(world,fault,monkeypatch):
     w=world;tmp_path=w.tmp_path
     policy,_=run_policy(w)
     assert policy['status']=='POLICY_GENERATION2_INSTALLED_CONTROL_RECORD_UNCHANGED'      # the probe runs only after the real policy ceremony
+    if fault=='wrong_manifest':w.registration['manifest_sha256']=real_bindings(pipeline_manifest=True)['manifest_sha256']      # the OTHER mode's manifest was registered (the 20 October defect, inverted)
+    if fault=='wrong_controller':w.registration['controller_sha256']='b'*64
+    if fault=='wrong_revision':w.registration['revision']='e'*40      # the owner registered (and the job is pinned to) a commit that is not the one actually checked out
     if fault=='baseline_changed_blocks':
         ctl=w.control();ctl['manual_stop']='SOMETHING_ELSE';w.set_control(ctl)
     ctl_before=w.control()
@@ -181,7 +195,7 @@ def test_form_probe_lifecycle(world,fault,monkeypatch):
     orunner.failed=failed_with_code
     hosted_dir=tmp_path/'hosted-out';spawned=[]
     plan=dict(disposable='LOOPBACK_ONLY',fault=fault,dbname=w.info['dbname'],gh=w.metadata.gh,gh_env=w.metadata.fixture_env(),evidence_head=w.registration['evidence_head'],manifest_sha256=w.registration['manifest_sha256'],
-              controller_sha256=w.registration['controller_sha256'],revision=w.registration['revision'],output=str(hosted_dir))
+              controller_sha256=w.registration['controller_sha256'],revision=w.registration['revision'],output=str(hosted_dir))      # the job and the owner share one execution identity; the REAL reader then compares it with the actual checkout
     plan_path=tmp_path/'plan.json';plan_path.write_text(json.dumps(plan))
     def start_hosted():
         env=dict(os.environ,INGESTION_ACCEPTANCE_DISPOSABLE='PG17_ONLY',REHEARSAL_URLS=json.dumps(w.urls),PYTHONPATH=str(Path.cwd()),PYTHONDONTWRITEBYTECODE='1')
@@ -224,7 +238,7 @@ def test_form_probe_lifecycle(world,fault,monkeypatch):
     closed_after=int((hosted_dir/'rehearsal-memory-closed-after-gh-calls').read_text());total=int((hosted_dir/'rehearsal-gh-calls-total').read_text())
     assert closed_after==total      # no GitHub request after the memory scope was closed; the result was published inside it
     assert hosted_final['closure_stage']=='FINAL_AFTER_PUBLICATION' and hosted_final['publication']=='PUBLISHED' and hosted_final['cleanup']=='CLOSED'
-    if fault=='wrong_revision':
+    if fault in ('wrong_revision','wrong_manifest','wrong_controller'):
         assert source_calls==0 and result['status']=='STOP_RECONCILE_NO_RETRY' and stop_codes[0]['code']=='HOSTED_ENDED_BEFORE_PROBE_OBSERVATION' and hosted_final['stop_reason']=='CHECKOUT_BINDING_MISMATCH'
         assert ctl_after['hard_stop_generation']==2 and ctl_after['manual_stop']==IDOX      # a refused checkout raises no stop
         return

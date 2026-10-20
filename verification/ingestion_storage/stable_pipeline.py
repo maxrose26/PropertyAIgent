@@ -60,14 +60,14 @@ def _git(root,*args):
     return done.stdout.decode('utf-8','strict').strip()
 
 
-def actual_checkout(root=None):
+def actual_checkout(root=None,manifest_path=None):
     """What this job is ACTUALLY running: the checked-out commit and tree, whether any tracked file differs from it, and the hashes of the controller module that is loaded and of the package manifest."""
     root=Path(root or Path.cwd()).resolve()
     from . import operational_runner as controller
     loaded=Path(controller.__file__).resolve()
     if root not in loaded.parents:raise Denied('CHECKOUT_BINDING_MISMATCH')      # the loaded controller is not the one in this checkout
     return dict(revision=_git(root,'rev-parse','HEAD'),tree=_git(root,'rev-parse','HEAD^{tree}'),tracked_files_modified=bool(_git(root,'status','--porcelain','--untracked-files=no')),
-                controller_sha256=hashlib.sha256(loaded.read_bytes()).hexdigest(),manifest_sha256=hashlib.sha256((root/MANIFEST_PATH).read_bytes()).hexdigest())
+                controller_sha256=hashlib.sha256(loaded.read_bytes()).hexdigest(),manifest_sha256=hashlib.sha256((root/(manifest_path or MANIFEST_PATH)).read_bytes()).hexdigest())      # each mode names its OWN registered manifest; the comparison stays exact
 
 
 def verify_checkout_binding(actual,binding,reviewed_sha,manifest_sha256):
@@ -103,22 +103,26 @@ class HostedOwner:
 
 class HostedRunner(Runner):
     """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
+    EVIDENCE=EVIDENCE_DIRECTORY      # where THIS mode publishes
+    AUTHORITY=PIPELINE_AUTHORITY      # the ledger authority name THIS mode spends (<name>_CAPTURE, <name>_SCREEN)
+    MODE_NAME='STABLE_PIPELINE_HOSTED'
+    MANIFEST='docs/design/ingestion-stable-pipeline-20261020/MANIFEST.json'      # the manifest THIS mode registered; the checkout reader hashes exactly this file (never another mode's)
     GRANT_SUFFIX='_CAPTURE'      # the ledger authority this job reads and spends (the form probe reads its own named allowance)
     def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision,checkout_probe=None):
-        self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
+        self.r=dict(evidence_directory=self.EVIDENCE,manifest_sha256=manifest_sha256,mode=self.MODE_NAME)
         self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.ssl=ssl;self.memory=memory;self.hostaddr=hostaddr
         self.operation_phase='INITIALISATION';self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0
         self.expiry=datetime.now(timezone.utc)+timedelta(seconds=HOSTED_DEADLINES['job']+60)
         self.settle_seconds=0;self.settle_sleep=time.sleep;self.route_name='POOLER';self.restricted_hostaddr=None;self.matrix_mode=False;self.matrix=None;self.pipeline_mode=False
-        self.deadlines=dict(HOSTED_DEADLINES);self.authority=PIPELINE_AUTHORITY
+        self.deadlines=dict(HOSTED_DEADLINES);self.authority=self.AUTHORITY
         self.owner=HostedOwner(self,urls)
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None
         self.batch_bindings={};self.evidence_head=evidence_head;self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
         identity=dict(subject=SCOPE,task='DISCOVERY',contract=CONTRACT,revision=manifest_sha256)
         root=item(identity,max_attempts=1,limits=dict(DEFAULT_LIMITS,requests=10,bytes=3000000,rows=60,pages=6))
         self.capture_key=root['key'];self.capture_bindings=bindings_for([root])
-        self.initial_evidence_head=evidence_head;self.checkout_probe=checkout_probe or actual_checkout;self.checkout_binding=None
-        self.execution=dict(revision=revision,manifest_sha256=manifest_sha256,capture_key=self.capture_key,initial_evidence_head=evidence_head,authority=PIPELINE_AUTHORITY)      # identical to the owner's pipeline_execution()
+        self.initial_evidence_head=evidence_head;self.checkout_probe=checkout_probe or (lambda:actual_checkout(manifest_path=self.MANIFEST));self.checkout_binding=None
+        self.execution=dict(revision=revision,manifest_sha256=manifest_sha256,capture_key=self.capture_key,initial_evidence_head=evidence_head,authority=self.AUTHORITY)      # identical to the owner's pipeline_execution()
         self.pipeline_sleep=time.sleep;self.authority_check=None;self.retained_published=False
 
     def check(self):
@@ -139,7 +143,7 @@ class HostedRunner(Runner):
         if self.retained_published or self.capture is None:return
         archive=self.capture.get('durable_archive') or {}
         marker=dict(execution=self.execution,capture_sha256=digest(self.capture),kind=self.capture.get('kind'),archive_sha256=archive.get('sha256'))
-        self.evidence_head=self.github.publish({'retained.json':json.dumps(marker,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/capture-retained',expected_head=self.evidence_head)
+        self.evidence_head=self.github.publish({'retained.json':json.dumps(marker,sort_keys=True,separators=(',',':')).encode()},directory=self.EVIDENCE+'/capture-retained',expected_head=self.evidence_head)
         self.retained_published=True;self.emit('capture_retained_marker_published',dict(head=self.evidence_head))
 
     def await_marker(self,bindings):
@@ -152,7 +156,7 @@ class HostedRunner(Runner):
             head=self.head()
             if probes.get(head,0)<REPROBES:
                 probes[head]=probes.get(head,0)+1
-                blob=self.github.probe(REPO+'/contents/'+EVIDENCE_DIRECTORY+'/screening-authority/registered.json?ref='+head)
+                blob=self.github.probe(REPO+'/contents/'+self.EVIDENCE+'/screening-authority/registered.json?ref='+head)
                 if blob is not None:
                     try:marker=json.loads(blob_bytes(blob))
                     except ValueError:raise Uncertain('OWNER_MARKER_UNREADABLE') from None
@@ -229,7 +233,7 @@ class HostedRunner(Runner):
         """The sealed execution chain and the result, on the evidence branch (the owner's signal that the restricted job is finished). Best effort on a failure path: the owner's own deadline and
         the grant lifetime bound the authority regardless."""
         self.journal.save('final-result.json',result)
-        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':json.dumps(result,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/completed',expected_head=self.head())
+        self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':json.dumps(result,sort_keys=True,separators=(',',':')).encode()},directory=self.EVIDENCE+'/completed',expected_head=self.head())
         return self.evidence_head
 
 
@@ -257,12 +261,12 @@ def stop_early(journal,reason,detail=None):
     print(json.dumps({'status':result['status'],'stop_reason':reason}));return result
 
 
-def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256,revision,checkout_probe=None):
+def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memory,evidence_head,manifest_sha256,revision,checkout_probe=None,runner_class=None,github_bound=140):
     """The hosted pipeline over INJECTED effects (the GitHub CLI runner, the source reader, the memory scope). Production passes the reviewed implementations from main(); the disposable rehearsal
     passes loopback fixtures. Returns (result, exit_code). Nothing else differs between the two."""
     holder={}
-    github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=gh_runner,bound=140)
-    runner=HostedRunner(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision,checkout_probe=checkout_probe);holder['runner']=runner
+    github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=gh_runner,bound=github_bound)
+    runner=(runner_class or HostedRunner)(urls,journal,github,None,ssl,hostaddr,memory,evidence_head=evidence_head,manifest_sha256=manifest_sha256,revision=revision,checkout_probe=checkout_probe);holder['runner']=runner
     runner.source_reader=source_reader_factory(runner)
     if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
     if github.probe(REPO+'/contents/'+EVIDENCE_ANCHOR+'?ref='+evidence_head) is None:return stop_early(journal,'EVIDENCE_BRANCH_ANCHOR_MISSING'),1      # a 404 below means something only if the branch itself is readable
@@ -280,12 +284,12 @@ def read_secrets(stream):
     return lines[0],{'ingestion_worker_login':lines[1],'ingestion_effect_login':lines[2]}
 
 
-def main(argv=None):
+def main(argv=None,*,authority=None,runner_class=None,manifest_path=None,github_bound=140):
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path,required=True);args=parser.parse_args(argv)
-    if not admitted(os.environ):raise SystemExit('PIPELINE_NOT_ADMITTED')
+    if not admitted(os.environ,authority):raise SystemExit('PIPELINE_NOT_ADMITTED')
     token,urls=read_secrets(sys.stdin.buffer)      # stdin only: the secrets are never in this process's environment
-    journal=Journal(args.output);journal.emit('consumed',dict(authority=HOSTED_AUTHORITY,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD']))
+    journal=Journal(args.output);journal.emit('consumed',dict(authority=authority or HOSTED_AUTHORITY,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD']))
     sq.install_cancellation()
     from .operational_memory import OperationalMemory
     try:memory=OperationalMemory()      # kernel-enforced ACTUAL memory (cgroup v2), established BEFORE any database connection; unavailable = stop here
@@ -302,7 +306,7 @@ def main(argv=None):
     def source_reader_factory(runner):
         return lambda _row:read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=runner.observe_source)
     result,code=run_hosted(urls=urls,journal=journal,gh_runner=lambda command,**kw:subprocess.run(command,env=github_env,**kw),source_reader_factory=source_reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},
-                           hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(MANIFEST_PATH).read_bytes()).hexdigest(),revision=os.environ['PIPELINE_REVIEWED_SHA'])
+                           hostaddr=hostaddr,memory=memory,evidence_head=os.environ['PIPELINE_EVIDENCE_HEAD'],manifest_sha256=hashlib.sha256(Path(manifest_path or MANIFEST_PATH).read_bytes()).hexdigest(),revision=os.environ['PIPELINE_REVIEWED_SHA'],runner_class=runner_class,github_bound=github_bound)
     raise SystemExit(code)
 
 
