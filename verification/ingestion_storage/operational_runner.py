@@ -110,6 +110,14 @@ def restricted_url(role,password):
     if role not in ROLES:raise ValueError('EXACT_OPERATIONAL_MAPPING_ROLE')
     return 'postgresql://'+quote(role+'.zcikcfgpblzuzpanpdqd',safe='')+':'+quote(password,safe='')+'@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
 
+def hosted_finished(hosted_summary,incomplete):
+    """Whether the restricted job's PUBLISHED result is a completed run. The job publishes while its memory scope is still enforcing, so a success is published as `PENDING_MEMORY_SCOPE_CLOSURE`
+    (accepted only together with `closure_stage == PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE`); the complete closure is in the sealed workflow artifact, which is the authority for it. A stop is never completed."""
+    cleanup=hosted_summary.get('cleanup')
+    closed=cleanup in ('CLOSED',None) or (cleanup=='PENDING_MEMORY_SCOPE_CLOSURE' and hosted_summary.get('closure_stage')=='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE')
+    return not incomplete and closed and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+
+
 class Runner:
     """Injected IO enables the actual wrapper to be rehearsed without sources."""
     deadlines=DEFAULT_DEADLINES;matrix_mode=False;matrix=None;pipeline_mode=False      # class defaults: unchanged capture/diagnostic behaviour for any Runner not built in matrix mode
@@ -381,15 +389,18 @@ class Runner:
                     active_seconds=now-self.started,
                     historical_accounting_gaps='PRESERVED_NOT_RECONSTRUCTED')
 
-    def closure(self,access):
+    def closure(self,access,*,memory_close=True):
         """Same positive checks on success/failure; no automatic process kill.
 
         This is controller/owned-resource closure, not evidence that the outer
         systemd scope has disappeared after this process exits.
         """
-        process=dict(status='UNCERTAIN',native_memory_proof=self.memory is not None)
+        process=dict(status='UNCERTAIN',native_memory_proof=self.memory is not None);memory_pending=False
         try:
-            if self.memory is not None:
+            if self.memory is not None and not memory_close and not hasattr(self,'memory_closure'):
+                # Deferred: the scope keeps enforcing while the final result is published inside its bounded reserve; it is removed by the final closure, after which no further GitHub call is admitted.
+                memory_pending=True;process['memory']='ENFORCED_PENDING_CLOSURE';group_closed=True
+            elif self.memory is not None:
                 if not hasattr(self,'memory_closure'):self.memory_closure=self.memory.close()
                 proof=self.memory_closure
                 process['memory']=proof
@@ -397,7 +408,7 @@ class Runner:
             else:group_closed=True # disposable-only; production requires native memory at entry
             after=owned_resources()
             process.update(new_socket_count=len(after['socket_fds']-self.baseline['socket_fds']),live_child_count=len(after['children']))
-            if group_closed and process['new_socket_count']==0 and process['live_child_count']==0:process['status']='CLOSED'
+            if group_closed and process['new_socket_count']==0 and process['live_child_count']==0:process['status']='PENDING_MEMORY_SCOPE_CLOSURE' if memory_pending else 'CLOSED'
         except BaseException:pass
         a=self.owner.accounting()
         failed_admin_closed=(a.get('failed_native_connections',0)==a.get('failed_native_finished',0) or process.get('new_socket_count')==0)
@@ -405,7 +416,7 @@ class Runner:
             all(x['database'].get('cleanup')=='CLOSED' and x['database'].get('connections_closed') is True for x in self.receipts.values()))
         connection=dict(status='CLOSED' if connection_closed else 'UNCERTAIN',administrative_opened=a['connections_opened'],administrative_closed=a['connections_closed'],failed_administrative_attempts=a.get('failed_native_connections',0),failed_administrative_closed=failed_admin_closed,runtime_slots=len(self.receipts))
         safe=access in ('DISABLED_VERIFIED','AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED','NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED','RESTRICTED_RUNTIME_NO_ACCESS_CHANGE') and not a['uncertain_effect'] and not self.github.mutation_uncertain
-        overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else 'UNCERTAIN'
+        overall='CLOSED' if safe and connection_closed and process['status']=='CLOSED' else ('PENDING_MEMORY_SCOPE_CLOSURE' if safe and connection_closed and process['status']=='PENDING_MEMORY_SCOPE_CLOSURE' else 'UNCERTAIN')
         return dict(access=access,connections=connection,process=process,overall=overall,outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
     def failed(self,exc):
@@ -605,7 +616,7 @@ class Runner:
             head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
             raw,hosted=self.verify_hosted_result(blob)
-            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'))
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),closure_stage=hosted.get('closure_stage'),rows=hosted.get('rows'),batches=hosted.get('batches'))
             done=self.owner.read_items([p['key'] for p in self.plans])
             incomplete=sorted(k for k in (p['key'] for p in self.plans) if done.get(k,(None,))[0]!='COMPLETE')
             self.emit('pipeline_screening_state',dict(batches=len(self.plans),complete=len(self.plans)-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
@@ -614,7 +625,7 @@ class Runner:
             head,blob=self.await_file('completed/final-result.json',pb['screening_wait_seconds'])
             self.evidence_head=head
             raw,hosted=self.verify_hosted_result(blob)
-            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
+            hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),closure_stage=hosted.get('closure_stage'),rows=hosted.get('rows'),batches=hosted.get('batches'));incomplete=[]
             self.emit('pipeline_screening_state',dict(batches=0,complete=0,incomplete=[],reason='EXPLICIT_ZERO_ROWS',hosted=hosted_summary))
         self.operation_phase='PIPELINE_INVALIDATION'
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
@@ -622,7 +633,7 @@ class Runner:
         after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
         components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')
         if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall']!='CLOSED':raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
-        finished=not incomplete and hosted_summary.get('cleanup') in ('CLOSED',None) and hosted_summary.get('status') not in ('STOP_RECONCILE_NO_RETRY',)
+        finished=hosted_finished(hosted_summary,incomplete)
         result=dict(status='STABLE_PIPELINE_AUTHORITY_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'STABLE_PIPELINE_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,
                     readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),
                     capture_sha256=digest(self.capture),batches=len(self.plans),accounting=self.accounting(),owned_cleanup=components['process'],credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',

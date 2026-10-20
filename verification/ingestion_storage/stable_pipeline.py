@@ -23,6 +23,8 @@ from .operational_publication import GitHub,Uncertain,BRANCH,REPO,blob_bytes
 from .operational_runner import Runner,CONTRACT,PIPELINE_AUTHORITY
 from .tls_trust import verified_trust,owned_resources
 
+PUBLICATION_RESERVE_REQUESTS=14      # the two-file publication is 10 requests (6 + 2x2); head reads take at most 4 more
+PUBLICATION_RESERVE_SECONDS=90
 HOSTED_AUTHORITY='AUTHORISE_INGESTION_STABLE_PIPELINE_HOSTED_ONCE_20261020'
 EVIDENCE_DIRECTORY='docs/design/ingestion-operational-execution-stable-pipeline-20261020'
 MANIFEST_PATH='docs/design/ingestion-stable-pipeline-20261020/MANIFEST.json'
@@ -178,14 +180,14 @@ class HostedRunner(Runner):
     def hosted_result(self,qualification):
         from collections import Counter
         from app.ingestion.listing_screening import screen_row
-        components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
+        components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE',memory_close=False)      # the memory scope keeps enforcing until the final result is published (finalise)
         screens=[screen_row(row) for row in self.capture.get('records',[])] if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1' else []
         usable=sum(x['proposal_usable'] for x in screens)
         outcome='CAPTURED_PROCESSING_BLOCKED' if self.capture and self.capture.get('kind')!='LISTING_RECEIPT_V1' else 'STABLE_PIPELINE_CAPTURE_SCREENING_COMPLETED_RESTRICTED_RUNTIME_ONLY'
         if self.capture and self.capture.get('kind')=='LISTING_RECEIPT_V1':
             if not screens:outcome='DISCOVERY_EXPLICIT_ZERO_SCREENING_NOT_EXERCISED'
             elif usable<len(screens):outcome='PARTIAL_PROPOSAL_COVERAGE'
-        return dict(status=outcome if components['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',execution=self.execution,checkout_binding=self.checkout_binding,cleanup=components['overall'],closure_components=components,qualification=qualification,
+        return dict(status=outcome if components['overall'] in ('CLOSED','PENDING_MEMORY_SCOPE_CLOSURE') else 'STOP_RECONCILE_NO_RETRY',closure_stage='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE',execution=self.execution,checkout_binding=self.checkout_binding,cleanup=components['overall'],closure_components=components,qualification=qualification,
                     rows=len((self.capture or {}).get('records',[])),batches=len(self.plans),capture_sha256=digest(self.capture) if self.capture else None,slot_receipts=self.receipts,
                     accounting=self.accounting(),authority_check_receipt=self.authority_check,usable_proposals=usable,screening_dispositions=dict(Counter(x['disposition'] for x in screens)),citation_leads=sum(len(x['citations']['occurrences']) for x in screens),
                     source_resources=(self.capture or {}).get('resources'),source_observations_attempted=self.source_attempts,application_writes=0,credential_changes=0,grants_issued=0,
@@ -213,9 +215,9 @@ class HostedRunner(Runner):
 
     def hosted_failure(self,exc,qualification):
         self.diagnosing=True;self.diagnostic_started=time.monotonic()
-        try:components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE')
+        try:components=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE',memory_close=False)
         except BaseException:components=dict(overall='UNCERTAIN')
-        result=dict(status='STOP_RECONCILE_NO_RETRY',execution=self.execution,capture_sha256=digest(self.capture) if self.capture else None,cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),checkout_binding=self.checkout_binding,operation_phase=self.operation_phase,qualification=qualification,
+        result=dict(status='STOP_RECONCILE_NO_RETRY',closure_stage='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE',execution=self.execution,capture_sha256=digest(self.capture) if self.capture else None,cleanup=components['overall'],closure_components=components,failure=safe_failure(exc,'EXECUTION'),stop_reason=fixed_stop_reason(exc),checkout_binding=self.checkout_binding,operation_phase=self.operation_phase,qualification=qualification,
                     accounting=self.accounting(),source_observations_attempted=self.source_attempts,source_capture_retained=self.capture is not None,source_resources=self.source_resources,
                     application_writes=0,credential_changes=0,grants_issued=0,pipeline_retry='HELD',stage4='OPEN',historical_uncertainty_preserved=True)
         try:self.emit('stopped',result)
@@ -228,6 +230,24 @@ class HostedRunner(Runner):
         self.journal.save('final-result.json',result)
         self.evidence_head=self.github.publish({'events.jsonl':self.journal.file.read_bytes(),'final-result.json':json.dumps(result,sort_keys=True,separators=(',',':')).encode()},directory=EVIDENCE_DIRECTORY+'/completed',expected_head=self.head())
         return self.evidence_head
+
+
+    def finalise(self,result):
+        """Publish the result for the owner INSIDE the enforced scope and a bounded reserve, THEN close the memory scope and seal the complete local record. The closed-envelope guard is untouched: after the
+        scope is removed no GitHub call is admitted. A publication failure carries a fixed non-secret reason; the sealed local record (and the workflow artifact) remain authoritative."""
+        publication='PUBLISHED';reason=None
+        try:
+            with self.github.reserve_scope(PUBLICATION_RESERVE_REQUESTS,PUBLICATION_RESERVE_SECONDS):self.publish_completed(result)
+        except BaseException as exc:
+            publication='UNCERTAIN_'+type(exc).__name__;reason=fixed_stop_reason(exc)
+        try:final=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE',memory_close=True)
+        except BaseException:final=dict(overall='UNCERTAIN')
+        sealed=dict(result,closure_stage='FINAL_AFTER_PUBLICATION',cleanup=final['overall'],closure_components=final,publication=publication,publication_reason=reason,
+                    status=result['status'] if final['overall']=='CLOSED' else 'STOP_RECONCILE_NO_RETRY',published_status=result['status'],published_cleanup=result.get('cleanup'))
+        try:
+            self.journal.emit('final_closure',dict(cleanup=final['overall'],publication=publication,publication_reason=reason));self.journal.save('final-result.json',sealed)
+        except BaseException:sealed['audit_stop_record']='UNCERTAIN'
+        return sealed
 
 
 def stop_early(journal,reason,detail=None):
@@ -245,13 +265,8 @@ def run_hosted(*,urls,journal,gh_runner,source_reader_factory,ssl,hostaddr,memor
     runner.source_reader=source_reader_factory(runner)
     if runner.head()!=evidence_head:return stop_early(journal,'EVIDENCE_HEAD_MOVED'),1
     if github.probe(REPO+'/contents/'+EVIDENCE_ANCHOR+'?ref='+evidence_head) is None:return stop_early(journal,'EVIDENCE_BRANCH_ANCHOR_MISSING'),1      # a 404 below means something only if the branch itself is readable
-    result=runner.run()
-    try:runner.publish_completed(result)
-    except BaseException as exc:
-        result=dict(result,publication='UNCERTAIN_'+type(exc).__name__)
-        try:journal.save('final-result.json',result)
-        except BaseException:pass
-    print(json.dumps({k:result.get(k) for k in ('status','cleanup','rows','batches','publication')},sort_keys=True))
+    result=runner.finalise(runner.run())      # publication first (scope still enforcing, bounded reserve), then the final closure
+    print(json.dumps({k:result.get(k) for k in ('status','cleanup','rows','batches','publication','publication_reason')},sort_keys=True))
     return result,0 if result.get('cleanup')=='CLOSED' and result.get('status')!='STOP_RECONCILE_NO_RETRY' else 1
 
 

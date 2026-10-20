@@ -85,13 +85,34 @@ if _original_step is not None:
         except BaseException as exc:
             _steps.append((op,type(exc).__name__));Path(plan['output']).joinpath('rehearsal-steps').write_text(json.dumps(_steps));raise
     _sql_ledger.SQLLedger._step=_recording_step
+_gh_calls=[0]
+_inner_gh_runner=gh_runner
+def gh_runner(command,**kw):      # counts every GitHub request the hosted half makes, so the order against the memory-scope closure can be asserted
+    _gh_calls[0]+=1
+    return _inner_gh_runner(command,**kw)
+
+
+class Scope:
+    """A stateful stand-in for OperationalMemory with the production contract (snapshot() only while enforcing; close() once), driving the REAL controller guard and the real publication path. The real cgroup-v2
+    scope is proved separately on a hosted runner (stage4-hosted-memory-proof)."""
+    source=None
+    def __init__(self):self.closed=False
+    def snapshot(self):
+        if self.closed:raise AssertionError('snapshot after close')
+    def close(self):
+        self.closed=True
+        Path(plan['output']).joinpath('rehearsal-memory-closed-after-gh-calls').write_text(str(_gh_calls[0]))
+        return dict(owned_groups_removed=True,owned_survivors=0,memory=dict(aggregate=dict(events=dict(oom_kill=0))))
+
+
 def probe():      # rehearsal only: what the hosted checkout would report; the faults model a job running the wrong revision or a changed controller
     actual=dict(revision=plan['revision'],tree='d'*40,tracked_files_modified=False,controller_sha256=plan['controller_sha256'],manifest_sha256=plan['manifest_sha256'])
     if plan['fault']=='wrong_revision':actual['revision']='e'*40
     if plan['fault']=='wrong_executable':actual['controller_sha256']='f'*64
     return actual
-result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=None,
+result,code=sp.run_hosted(urls=urls,journal=journal,gh_runner=gh_runner,source_reader_factory=reader_factory,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr='192.0.2.1',memory=Scope(),
                           evidence_head=plan['evidence_head'],manifest_sha256=plan['manifest_sha256'],revision=plan['revision'],checkout_probe=probe)
 Path(plan['output']).joinpath('rehearsal-source-calls').write_text(str(len(calls)))
+Path(plan['output']).joinpath('rehearsal-gh-calls-total').write_text(str(_gh_calls[0]))
 Path(plan['output']).joinpath('rehearsal-done').write_text(str(code))
 raise SystemExit(code)
