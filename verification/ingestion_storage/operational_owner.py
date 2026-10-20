@@ -28,6 +28,9 @@ ROLE_SETTING_VALUE=re.compile(r'[0-9]{1,9}(?:ms|s|min|h|d)?')
 
 PKG=Path('docs/design/ingestion-operational-required-20261018')
 WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
+GENERATION2_POLICY=Path('docs/design/ingestion-form-probe-20261021/policy-generation2.sql')
+GENERATION2_STOP=dict(manual_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',last_hard_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',hard_stop_generation=2,
+                      stop_state_sha256='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21',control_sha256='d2abd06f56e0c86d4b7c9e4f73f1df2f7fb91c4f32c98e09004bb278113886a9')
 STOP={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'}
 STOP_SHA='a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e'
 SCOPE=dict(kind='DISCOVERY_SCOPE',council='bolton',start='2026-10-16',end='2026-10-16',semantics='RECEIVED')
@@ -55,7 +58,7 @@ def evaluate_pipeline_readback(obs,expected):
     if not isinstance(ctl,dict):findings.append('CONTROL_STATE_UNAVAILABLE')
     else:
         if ctl.get('global_stop')!=STOP:findings.append('GLOBAL_STOP_CHANGED')
-        if ctl.get('manual_stop')!='STORAGE_TEST_STOP':findings.append('MANUAL_STOP_CHANGED')
+        if ctl.get('manual_stop')!=expected.get('manual_stop','STORAGE_TEST_STOP'):findings.append('MANUAL_STOP_CHANGED')
         if ctl.get('hard_stop_generation')!=expected['hard_stop_generation']:findings.append('HARD_STOP_GENERATION_CHANGED')
         if ctl.get('unexpired_grants')!=0:findings.append('UNEXPIRED_GRANT_PRESENT')
     roles={r[0]:r for r in obs.get('roles') or []}
@@ -218,27 +221,36 @@ class Owner:
         upgraded={**original,**policy}
         return states,upgraded,(dict(states,SUCCESSOR_POLICY_APPLIED=upgraded) if permit_successor_policy else states)
 
+    @classmethod
+    def generation2_inventory(cls):
+        """The GENERATION2_POLICY_APPLIED inventory: the successor-policy inventory with exactly the two functions redefined by policy v3."""
+        _,upgraded,_=cls.reviewed_inventories(True)
+        v3={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(GENERATION2_POLICY.read_text())}
+        if set(v3)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'} or not set(v3)<=set(upgraded):raise ValueError('REVIEWED_FUNCTION_INVENTORY')
+        return {**upgraded,**v3}
+
     def verify_installed(self,c):
         """Accept exactly one coherent reviewed inventory, bound to the execution mode, with the reviewed owner and search path on every function. Reports a fixed reason code and the
         recognised policy state (never exception text). Preflight fails closed before any change."""
         states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
+        every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory()}
         if self.permitted_policy_states is not None:      # a mode may name exactly the retained state it is bound to (it then neither applies the policy nor accepts any other state)
-            permitted={k:v for k,v in {'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded}.items() if k in self.permitted_policy_states}
+            permitted={k:v for k,v in every.items() if k in self.permitted_policy_states}
         names=list(upgraded)
         rows=self.q(c,"SELECT p.proname,p.prosrc,r.rolname,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname",(names,))
         observed={n:body for n,body,_,_ in rows}
-        recognised=next((s for s,b in {'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded}.items() if observed==b),None)
+        recognised=next((s for s,b in every.items() if observed==b),None)
         self.emit('installed_function_inventory',dict(hashes={n:hashlib.sha256(body.encode()).hexdigest() for n,body in observed.items()},policy_state=recognised or 'UNRECOGNISED'))
         if set(observed)!=set(names) or len(rows)!=len(names):reason='INSTALLED_FUNCTION_CONTENT_CHANGED'      # missing, extra or duplicated (overloaded) functions
         elif any(owner!='ingestion_storage_owner' or config!=['search_path=pg_catalog'] for _,_,owner,config in rows):reason='INSTALLED_FUNCTION_OWNER_OR_CONFIG_CHANGED'
         elif recognised is None:
-            mixed=all(observed[n] in (states['ORIGINAL'][n],upgraded[n]) for n in names)
+            mixed=all(observed[n] in {v[n] for v in every.values()} for n in names)
             reason='INSTALLED_POLICY_STATE_MIXED' if mixed else 'INSTALLED_FUNCTION_CONTENT_CHANGED'
         elif recognised not in permitted:reason='INSTALLED_POLICY_STATE_NOT_PERMITTED_FOR_MODE'
         else:reason=None
         self.preflight_report=dict(reason_code=reason or 'POLICY_STATE_RECOGNISED',policy_state=recognised or 'UNRECOGNISED',permitted_states=sorted(permitted))
         if reason:raise ValueError(reason)
-        self.expected_generation=1
+        self.expected_generation=2 if recognised=='GENERATION2_POLICY_APPLIED' else 1      # the generation the reviewed inventory is bound to
 
     def install(self):
         if self.reuse_installed:
@@ -354,9 +366,12 @@ class Owner:
         if not ok:raise Uncertain('STABLE_STATE_NOT_VERIFIED')
         return dict(valid_until=min(r[3] for r in roles).isoformat(),memberships=members)
 
-    def register(self,items,authority,*,capture_key,source_calls,prepared=()):
+    stop_manual='STORAGE_TEST_STOP'      # the manual stop this registration is bound to (a mode bound to the observed generation-2 baseline sets its exact value)
+    stop_sha=None      # None = the accepted generation-1 checkpoint digest
+
+    def register(self,items,authority,*,capture_key,source_calls,prepared=(),capture_only=True):
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}
-        grant=dict(keys=sorted(bindings),contracts=sorted({x['contract'] for x in [*items,*prepared]}),expires_at=(self.grant_expiry or self.expiry).timestamp(),source_calls=source_calls,writes=0,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=['required_once'],bindings=bindings,detail_source_keys=[],capture_key=capture_key,capture_only=True,execution_binding=self.bindings,
+        grant=dict(keys=sorted(bindings),contracts=sorted({x['contract'] for x in [*items,*prepared]}),expires_at=(self.grant_expiry or self.expiry).timestamp(),source_calls=source_calls,writes=0,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=['required_once'],bindings=bindings,detail_source_keys=[],capture_key=capture_key,capture_only=capture_only,execution_binding=self.bindings,
                    completion_outcomes={'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'LISTING_METADATA':['BATCH_SCREENED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE']})
         # Owner-only fixed insertion/issuance. No runtime principal receives the
         # owner, issuer, barrier or recovery memberships used here.
@@ -364,7 +379,7 @@ class Owner:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             ctl=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-            if ctl['global_stop']!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=self.expected_generation or authority in ctl['grants']:raise Uncertain('OWNER_REGISTRATION_STATE_CHANGED')
+            if ctl['global_stop']!=STOP or ctl.get('manual_stop')!=self.stop_manual or ctl.get('hard_stop_generation',0)!=self.expected_generation or authority in ctl['grants']:raise Uncertain('OWNER_REGISTRATION_STATE_CHANGED')
             if self.require_control_sha256 is not None and digest(ctl)!=self.require_control_sha256:raise Uncertain('OWNER_REGISTRATION_CONTROL_BINDING')      # first registration: the control row is exactly the accepted baseline
             self.authorities.append(authority);self.invalidation='REQUIRED'
             for item in items:
@@ -373,7 +388,7 @@ class Owner:
             self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
             self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            exception=dict(authority=authority,transport='REQUESTS_IDOX',grant_binding={k:v for k,v in grant.items() if k not in {'source_calls','writes'}},stop_checkpoint_sha256=STOP_SHA,hard_stop_generation=self.expected_generation,**self.bindings)
+            exception=dict(authority=authority,transport='REQUESTS_IDOX',grant_binding={k:v for k,v in grant.items() if k not in {'source_calls','writes'}},stop_checkpoint_sha256=self.stop_sha or STOP_SHA,hard_stop_generation=self.expected_generation,**self.bindings)
             self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(exception),),effect=True)
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)

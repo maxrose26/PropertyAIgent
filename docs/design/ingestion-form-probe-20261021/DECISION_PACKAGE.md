@@ -1,0 +1,70 @@
+# Bolton form probe — combined policy-and-diagnostic candidate and grouped production decision (offline; nothing here is authorised or run)
+
+Stage 4 remains OPEN. No policy installation, source request, probe registration, dispatch, stop change, credential change, deployment or Stage advancement has been made. Generation 2 and `IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE` are untouched. The historical Bolton cause is **UNDETERMINED**: an IP block is neither established nor excluded. **Diagnostic evidence is kept distinct from capture-and-screening acceptance: a probe is never a capture and never counts toward acceptance.**
+
+## 1. Observation and reconciliation with the consumed run
+Successor observation (ran once; audit `events.jsonl` `bc2187fb…8f41`, `final-result.json` `ac00382c…46be`, chain head `5ce83469…17e8`): 6 statements on one connection, the approved transaction-local `GRANT` rolled back and both capability-absence checks false, committed writes 0, 0 GitHub or source requests, closure `CLOSED`, process gone.
+Observed control record (server time 2026-10-20T12:14:50Z): global stop = Salford (run 38884069913), manual stop = `last_hard_stop` = `IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE`, generation **2**; two grants and two Bolton exceptions, all revoked to zero (0 unexpired): the 18 October capture (binding revision `ad8d5211…`) and the stable-pipeline capture (revision `038e9b13…`, `source_calls` now 0 — consistent with the one request having consumed it, an inference). Digests: stop state `675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21`, whole record `d2abd06f56e0c86d4b7c9e4f73f1df2f7fb91c4f32c98e09004bb278113886a9`.
+**Reconciled with the consumed run:** matches the owner audit (the failed source request raised generation 2; the capture authority and exception ended; nothing unexpired; no screening authority ever existed). The exception count is **2**: the installed cap (refuse at 3) leaves **exactly one** more slot.
+
+## 2. Why nothing can run under this state
+The installed `ingestion_bolton_allowed` honours, and `ingestion_register_bolton_exception` registers, only with an empty or `STORAGE_TEST_STOP` manual stop and generation 0/1 (for 1: the pinned 18 October `last_hard_stop` and digest). Under generation 2 neither can happen; the owner readback, registration and cleanup code also hard-coded generation 1.
+
+## 3. The smallest justified combined proposal
+1. **Policy v3** (`docs/design/ingestion-form-probe-20261021/policy-generation2.sql`): derived mechanically from the reviewed 18 October successor policy; every predicate outside two marked stop-state clauses is byte-identical. It adds one branch, for **one exact named single-use allowance** `AUTHORISE_INGESTION_BOLTON_FORM_PROBE_ONCE_20261021_PROBE`, only in the exact observed state (global stop, generation 2, manual stop and `last_hard_stop` as observed, registration bound to stop-state digest `675b69ad…06b21`). The probe branch is NULL-safe (an absent stop field is false). **Not done:** no generation reset, no historical grant or exception removed or edited, no cap change, no other name admitted under generation 2.
+   **Consequences, stated plainly:** the probe's exception is the **third and last** key under the unchanged cap — after it, no further Bolton exception can register without another reviewed policy decision; v3 stays installed afterwards (it can honour nothing once the allowance is revoked); a later hard stop (generation 3) is not recognised by v3 and blocks everything until reconciled; reverting v3 would be a separate ceremony, not provided here.
+2. **Exact stop binding in code:** the owner inventory check gains a third reviewed inventory (`GENERATION2_POLICY_APPLIED`); a probe registration names its baseline (generation 2, the exact strings, the stop-state digest and the whole-record digest) and anything else is refused. The generation-1 behaviour of every existing mode is unchanged.
+3. **Policy ceremony** (owner mode, own namespace, 30-minute registration, no GitHub): observe the record (must equal the observed baseline exactly), verify the installed inventory is exactly the reviewed successor state, install exactly the two function definitions, verify the new inventory, read the transient capability back absent, observe again — the control record must be **byte-for-byte unchanged**.
+4. **Form probe** (owner mode + one new restricted hosted workflow): one DB-gated source intent, **one form-only `GET`** (the exact request that failed), the bounded transport object, the body **not** retained, the item finished `UNSUPPORTED_CONTRACT` (never reusable as a capture), result published inside the enforced memory scope then closure, then the owner ends the allowance by revocation-only invalidation with readback. A council answer of any kind is an observation and raises **no** stop; only an unsafe or unaccountable outcome raises the accepted fail-safe stop (generation 3).
+
+## 4. Is a one-GET diagnostic the smallest useful test? (and owner-local capture)
+* **Yes for the unresolved transport question.** The first failure was at the first form `GET`; the probe reproduces exactly that request with the new transport facts, in the same hosted environment where it failed, for one request instead of a capture ceremony.
+* **Limit:** one hosted answer shows what the council returns to that environment; it cannot attribute a bad answer to the address. Discriminating needs the same probe from the owner-local environment (where earlier captures succeeded) as a paired control — a second request and a separate decision.
+* **Owner-local capture** would give a more direct acceptance path (and would likely succeed) but answers nothing about the hosted route and would not distinguish the cause; it also needs the same policy change and the last exception slot. **Recommendation: probe first.** A capture of any kind needs its own decision and, under the unchanged cap, another reviewed policy change.
+
+## 5. Exact limits
+| Area | Limit |
+|---|---|
+| Source | 1 request (form `GET`), 0 retries, redirects not followed, no `POST`/listing/detail; ≤ 262,144 bytes; ≤ 15 s |
+| Retained | transport object (status, allow-listed media type, redirect disposition, fixed rejection literals), size, sha256, shape counts; **no body** (block pages can echo the requester's address) |
+| Authority | one allowance, `source_calls = 1`, `writes = 0`, ≤ 20 minutes, not capture-only (see §9), no screening authority |
+| Policy ceremony | 3/4 connections, 34/40/48 commands, 60 s active window, ≤ 30-minute registration; zero GitHub/source requests |
+| Probe owner | measured 25 commands (normal), 46 through the end, 5 connections; allowances 28/52/66 commands, 6/8 connections; GitHub ≤ 90 (modelled ≈ 67); active window 1,500 s; ≤ 75-minute registration |
+| Hosted job | 20-minute workflow limit, hard kill 900 s, kernel memory 1.5 GiB / 256 MiB / 1 GiB; GitHub ≤ 60; publication reserve 14 requests / 90 s |
+| Reporting | published record provisional; acceptance needs the sealed artifact (`FINAL_AFTER_PUBLICATION`, `CLOSED`) and the owner's committed invalidation readback; missing/uncertain closure blocks acceptance |
+
+## 6. Fresh bindings (nothing consumed is reused)
+Policy ceremony: mode `BOLTON_POLICY_GENERATION2`, authority `AUTHORISE_INGESTION_POLICY_GENERATION2_ONCE_20261021`, namespace `operational-policy-generation2-once-20261021`. Probe: mode `BOLTON_FORM_PROBE`, authority `AUTHORISE_INGESTION_BOLTON_FORM_PROBE_ONCE_20261021` (ledger grant and named exception `…_PROBE`), namespace `operational-bolton-form-probe-once-20261021`, evidence directory `docs/design/ingestion-operational-execution-bolton-form-probe-20261021`, hosted authority `…_HOSTED_ONCE_20261021`, **new workflow `stage4-form-probe-once.yml`** (so its run number is 1; sha pinned in the two exclusivity guards), new root item (distinct revision). The probe registration also binds the policy ceremony's own audit hashes, the consumed pipeline run, both observation attempts and the successor observation; the owner scripts re-check every predecessor hash. All fresh registrations: explicit UTC and BST expiries; the hidden input for both ceremonies is validated against the complete route **before** the registration is consumed.
+
+## 7. How a valid response informs the capture decision
+| Result | Meaning | Next |
+|---|---|---|
+| form recognised (200, HTML, form parsed) | the hosted path reaches the form now; the first failure may have been transient or request-specific; cause stays undetermined | propose one full capture ceremony (needs a new reviewed policy decision for the exception slot) |
+| 4xx / 5xx / redirect to another origin / non-HTML | the council did not return the form to that environment; status or size alone does not establish an address block | no hosted capture; options: owner-local paired control, owner-local capture, deferral |
+| timeout / transport failure | no inference | no automatic retry |
+
+## 8. Evidence
+| Item | Value |
+|---|---|
+| PR | #157 (draft) → `master` `5ff252f6ad11a800e9cac46e1bd454274ec2b6e5` |
+| Tested code | commit `c5fec3f00c5e8842d26b5352e4974a114965212e`, tree `b59e3d4dde593ad7ab5110b37509a8f3d3dd3077` (this package is a later documentation-only commit) |
+| Disposable PostgreSQL 17 (real ledger, real standing-credential provisioning, reviewed successor policy, the observed generation-2 state, real owner modes, hosted half as a separate process, real `gh`, the real policy SQL, stateful memory stand-in driving the real guard): policy v3 SQL tests incl. absent-field, revoked/expired and generation-1 pinning; policy ceremony (installs exactly two definitions, control record unchanged, capability read back absent; refuses a changed baseline and an unreviewed inventory); **probe lifecycle, six scenarios** | all pass: **observed form** (200, FORM_RECOGNISED), **council refusal** (403, REQUEST_REJECTED, no stop raised, generation stays 2), **malformed worker audit** (accepted fail-safe stop, generation 3, owner ends the allowance, `HOSTED_ENDED_BEFORE_PROBE_OBSERVATION`), **wrong revision** (zero source calls), **owner wait expires**, **changed baseline blocks** (nothing issued). Observed owner cost: 46 commands / 5 connections (normal through end), 38 / 4 on a hosted stop, 15 / 2 when the readback blocks |
+| Offline contract suite | all pass: 41 source-probe tests (incl. the credential-free child entry), 21 owner/static tests, plus the earlier observation, pre-check and publication suites; PostgreSQL step **47 passed** on the final code |
+| Disclosed CI events | the existing step "Operational controller and all descendants killed above256MiB" failed on its post-kill systemd checks on commits `6d3d64fa` and `c5fec3f0` (and a sibling "killed above 256 MiB" step on two earlier commits of this work); **on each of those two commits only the failed job was re-run once, on the same commit, and passed** (final code `c5fec3f0`: attempt 2 green). The cause remains unresolved (the steps print neither checked value); the maintenance fix (print then poll the state before asserting) is a separate proposal, not part of this candidate |
+| Independent review | read-only agent: one MEDIUM (a NULL in the probe branch of the registration predicate could widen the policy when a stop field is absent) — fixed and tested; one MEDIUM test defect — fixed; LOWs addressed (not capture-only consequence documented; docstring order); a CI architecture guard also caught application code importing `verification` — fixed with a parity-tested restatement |
+Limits of the evidence: the stand-in memory scope (the real cgroup scope is proven separately); the supervised subprocess is exercised for its entry point and the form-only logic, not end to end against the network; no run has contacted the council.
+
+## 9. Residuals
+* Policy v3 is permanent until another reviewed policy decision; it names one allowance and honours nothing once that allowance is revoked, but it also consumes the last exception slot.
+* The probe grant is not capture-only (a diagnostic receipt is deliberately not a listing receipt); bounded to one root item, one source call, revoked by the owner, item finished `UNSUPPORTED_CONTRACT`.
+* One request from a GitHub-hosted address cannot by itself explain the earlier failure.
+* If a hosted outcome is unaccountable the accepted fail-safe raises generation 3, which v3 does not recognise: everything then waits for another reconciliation.
+* The new workflow's token has `contents: write` as the previous one did (confined by code to the evidence branch).
+
+## 10. Grouped production decision (nothing starts without it)
+**Approve as one decision:** (a) the policy change in §3.1 including its consequences (a database function replacement, not a credential or stop change); (b) the exact named allowance and its Bolton exception (the last cap slot); (c) guarded, head-locked `[skip render]` integration of PR #157 at its final head; (d) the sequence below.
+1. Integrate; verify tree, executable hashes and post-merge checks. No deployment.
+2. Render **one** policy registration (≤ 30 min, UTC and BST); you run `owner-run-policy.sh` once in your visible terminal (no GitHub sign-in; hidden input validated before consumption). I reconcile the audit (inventory, capability absence, control record unchanged) before anything else.
+3. Render **one** probe registration bound to the policy ceremony's audit (≤ 75 min); you run `owner-run-probe.sh` in the private GitHub session; after the owner audit records the allowance I dispatch the new restricted workflow **once** and name the protected-environment approval you need to click.
+4. I collect and reconcile the sealed artifact, the evidence-branch publications, the owner invalidation readback, process and connection closure; then a recommendation on the capture question.
+**Not authorised by this package:** any source request beyond the one probe, any capture or screening, stop release or reset, credential change, deployment, scheduling, Stage advancement.

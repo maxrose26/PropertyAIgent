@@ -214,4 +214,4 @@ def test_pathological_values_are_bounded_or_withheld():
 
 def test_the_prepared_runner_gives_the_observer_a_zero_github_bound():
     source=Path(orr.__file__).read_text()
-    assert "dict(bound=0) if r.get('mode')==OBSERVER_MODE" in source
+    assert "dict(bound=0) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE)" in source
