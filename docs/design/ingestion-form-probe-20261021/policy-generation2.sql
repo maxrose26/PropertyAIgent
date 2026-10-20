@@ -46,9 +46,9 @@ BEGIN
  OR (coalesce((p->>'hard_stop_generation')::integer,0)=1 AND ctl->>'last_hard_stop' IS DISTINCT FROM 'OPERATIONAL_FIRST_CONNECTION_FAILURE_CLEANUP_20261018')
  OR (ctl->>'manual_stop' IS NOT NULL AND ctl->>'manual_stop'<>'STORAGE_TEST_STOP')
  OR p->>'stop_checkpoint_sha256'<>'a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e'))
-  OR (a='AUTHORISE_INGESTION_BOLTON_FORM_PROBE_ONCE_20261021_PROBE' AND (ctl->>'hard_stop_generation')::integer=2 AND (p->>'hard_stop_generation')::integer=2
+  OR coalesce(a='AUTHORISE_INGESTION_BOLTON_FORM_PROBE_ONCE_20261021_PROBE' AND (ctl->>'hard_stop_generation')::integer=2 AND (p->>'hard_stop_generation')::integer=2
    AND ctl->>'manual_stop'='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE' AND ctl->>'last_hard_stop'='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE'
-   AND p->>'stop_checkpoint_sha256'='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21'))
+   AND p->>'stop_checkpoint_sha256'='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21',false))      -- NULL (an absent stop field) is FALSE here, never a widening
  OR p->>'transport'<>'REQUESTS_IDOX' OR g IS NULL OR p->'grant_binding' IS DISTINCT FROM g-ARRAY['source_calls','writes']
  OR (g->>'expires_at')::double precision<=t OR (g->>'expires_at')::double precision>t+86400
  OR ctl->'bolton_exceptions' ? a OR (SELECT count(*) FROM jsonb_object_keys(coalesce(ctl->'bolton_exceptions','{}'::jsonb)))>=3

@@ -180,3 +180,13 @@ def test_the_coordinator_refuses_a_wrong_scope_or_a_replay_before_any_intent():
         ledger=FakeLedger(row)
         with pytest.raises(Denied):coordinator(ledger).idox_form_probe(CLAIM,lambda r:(worker(),OUTER))
         assert ledger.calls==[]      # no source intent, no stop: nothing was attempted
+
+
+def test_the_application_side_transport_schema_equals_the_verification_side_definition():
+    from verification.discovery import source_diagnostics as sd
+    assert fp.TRANSPORT_KEYS==sd.TRANSPORT_KEYS and fp.TRANSPORT_OUTCOMES==sd.OUTCOMES and fp.TRANSPORT_REASONS==sd.REASONS and fp.TRANSPORT_MEDIA==sd.MEDIA and fp.TRANSPORT_REDIRECTS==sd.REDIRECTS
+    good=dict(http_status=403,media_type='text/html',redirect='NONE',rejection_outcome='SOURCE_UNAVAILABLE',rejection_reason='HTTP failure')
+    assert fp.validate_transport(good)==sd.validate_transport(good)
+    for bad in (dict(good,http_status=99),dict(good,http_status='403'),dict(good,media_type='text/evil'),dict(good,redirect='https://x'),dict(good,rejection_reason='free text'),dict(good,extra=1),{},None):
+        with pytest.raises(ValueError):fp.validate_transport(bad)
+        with pytest.raises(ValueError):sd.validate_transport(bad)

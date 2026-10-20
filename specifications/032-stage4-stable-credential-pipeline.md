@@ -135,3 +135,7 @@ The hosted job uses the corrected publication order (result published inside the
 
 ### 12.6 Order (each step separately registered, none started by this specification)
 (1) Policy v3 ceremony. (2) Fresh probe registration and one restricted dispatch (new workflow file, so its run number is 1). (3) Reconciliation. A valid response informs — but does not decide — the later capture decision: a recognised form means the hosted path works now (cause still undetermined); any other answer means no hosted capture, and the options are an owner-local paired control or deferral.
+
+### 12.7 Notes from review
+* The probe grant is **not** capture-only (`capture_only = false`): the capture-only check exists to force a DISCOVERY checkpoint to be a listing receipt, which a diagnostic receipt deliberately is not. The consequence is bounded: the grant binds exactly one root item, allows `source_calls = 1` and `writes = 0`, is revoked by the owner's invalidation, and the item is finished `UNSUPPORTED_CONTRACT` so it cannot be claimed again.
+* In the registration predicate the probe branch is wrapped so that an absent stop field is false, never NULL (a NULL would otherwise let the named allowance register in a state the policy does not describe); this is tested for each stop field.

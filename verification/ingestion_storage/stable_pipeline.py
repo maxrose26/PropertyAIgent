@@ -102,8 +102,8 @@ class HostedOwner:
 
 
 class HostedRunner(Runner):
-    GRANT_SUFFIX='_CAPTURE'      # the ledger authority this job reads and spends (the form probe reads its own named allowance)
     """The accepted Runner methods, over a hosted shell. __init__ deliberately does not call Runner.__init__ (no registration, no administrative connector, no Owner)."""
+    GRANT_SUFFIX='_CAPTURE'      # the ledger authority this job reads and spends (the form probe reads its own named allowance)
     def __init__(self,urls,journal,github,source_reader,ssl,hostaddr,memory,*,evidence_head,manifest_sha256,revision,checkout_probe=None):
         self.r=dict(evidence_directory=EVIDENCE_DIRECTORY,manifest_sha256=manifest_sha256,mode='STABLE_PIPELINE_HOSTED')
         self.journal=journal;self.emit=journal.emit;self.source_reader=source_reader;self.github=github;self.ssl=ssl;self.memory=memory;self.hostaddr=hostaddr

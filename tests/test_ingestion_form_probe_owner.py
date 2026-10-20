@@ -216,7 +216,7 @@ def test_the_renderer_builds_registrations_that_pass_every_binding_but_the_check
     spec=importlib.util.spec_from_file_location('render_probe',PACKAGE/'render_registration.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
     for mode,error in (('policy',None),('probe',None)):
         r=m.render(mode,minutes=20,evidence_head='1'*40,policy_audit=dict(events_sha256='1'*64,final_result_sha256='2'*64) if mode=='probe' else None)
-        with pytest.raises(ValueError,match='CLEAN_REVIEWED_CHECKOUT|REVIEWED_CONTENT_BINDING|CONTROLLER_CA_EVIDENCE_BINDING'):validate(r)      # the bindings are exact: only the checkout identity of THIS test checkout differs
+        with pytest.raises(ValueError,match='CLEAN_REVIEWED_CHECKOUT'):validate(dict(r,revision='f'*40))      # every other binding passes; only the (deliberately wrong) checkout identity stops it - deterministic in any checkout
     with pytest.raises(ValueError,match='POLICY_CEREMONY_AUDIT_REQUIRED'):m.render('probe',evidence_head='1'*40)
     with pytest.raises(ValueError):m.render('other',evidence_head='1'*40)
 

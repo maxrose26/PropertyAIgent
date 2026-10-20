@@ -94,6 +94,7 @@ def world(tmp_path,real_gh_store,monkeypatch):
             standing=(roles_state(),memberships(),role_configs());valid_until=min(r[3] for r in standing[0]).astimezone(timezone.utc).isoformat()
             # ---------------------------------------------------------------- the OBSERVED generation-2 state, reproduced: stops as observed, two revoked historical grants and exceptions (the cap leaves one slot)
             ctl=control();ctl['manual_stop']=IDOX;ctl['last_hard_stop']=IDOX;ctl['hard_stop_generation']=2
+            ctl.setdefault('bolton_exceptions',{});ctl.setdefault('grants',{})
             for i in range(2):
                 name='HISTORICAL_%d'%i
                 ctl['grants'][name]=dict(keys=['k'],expires_at=0,source_calls=0,writes=0,login='ingestion_worker_login',bindings={'k':{}})

@@ -206,3 +206,33 @@ def test_installing_v3_changes_exactly_two_function_definitions_and_nothing_else
     assert before['memberships']==after['memberships'] and before['roles']==after['roles']      # no membership, option, password, validity or setting change; the temporary capability is gone
     apply_v3(installer)
     assert function_fingerprints(boot)==after['functions']      # idempotent
+
+
+@pytest.mark.parametrize('absent',['manual_stop','last_hard_stop','hard_stop_generation'])
+def test_v3_refuses_the_named_allowance_when_a_stop_field_is_absent(ledger,absent):
+    boot,connector,installer,control,set_control=ledger
+    observed_state(set_control,control);grant=probe_grant(boot,control,set_control)
+    apply_v3(installer)
+    ctl=control();ctl.pop(absent);set_control(ctl)      # an absent field is NULL in SQL: it must be FALSE here, never a widening
+    with pytest.raises(psycopg.errors.Error,match='EXACT_SCOPED_DISPOSITION'):register(boot,payload(grant))
+    ctl=control();ctl['bolton_exceptions'][NAMED]=payload(grant)|dict(expires_at=grant['expires_at']);ctl['grants'][NAMED]=grant
+    assert allowed(boot,ctl,NAMED) is False
+
+
+def test_v3_does_not_honour_a_revoked_or_expired_probe_exception(ledger):
+    boot,connector,installer,control,set_control=ledger
+    observed_state(set_control,control);grant=probe_grant(boot,control,set_control)
+    apply_v3(installer);register(boot,payload(grant))
+    ctl=control();assert allowed(boot,ctl,NAMED) is True
+    ctl['bolton_exceptions'][NAMED]['expires_at']=0
+    assert allowed(boot,ctl,NAMED) is False      # revoked to zero (the invalidation): no longer honoured
+    ctl=control();ctl['grants'][NAMED]['expires_at']=0
+    assert allowed(boot,ctl,NAMED) is False      # the grant itself revoked: the binding no longer matches
+
+
+def test_v3_still_pins_the_generation_1_last_hard_stop(ledger):
+    boot,connector,installer,control,set_control=ledger
+    apply_v3(installer)
+    ctl=control();ctl['last_hard_stop']='SOMETHING_ELSE';set_control(ctl)      # generation 1 with a different last_hard_stop
+    grant=probe_grant(boot,control,set_control,name='ANY_OTHER_AUTHORITY_GEN1',revision='6'*64)
+    with pytest.raises(psycopg.errors.Error,match='EXACT_SCOPED_DISPOSITION'):register(boot,payload(grant,name='ANY_OTHER_AUTHORITY_GEN1',generation=1,sha=STOP1_SHA))
