@@ -62,8 +62,8 @@ def test_idox_adapter_fail_closed(engine,field):
 def setup_new(engine,*,supported=True):
  install(engine);l=Ledger(engine);target,raw,packet=projected(summary('01780/26',status='Decided',decision='Approve',date='Mon 28 Sep 2026') if supported else summary('01780/26',status='Awaiting decision',omit=('Decision','Decision Issued Date')))
  e=replace(envelope(),reference=target['reference'],displayed_references=(target['reference'],),source_url=target['source_url'],source_record_id=target['source_identifier'])
- parent=l.enqueue(dict(kind='APPLICATION',council='bolton',reference=e.reference),'SCREENING',contract='fixture-screen')
- l.grant('INGESTION_TEST_screen',[parent],contracts=['fixture-screen'],expires_at=l.clock()+600)
+ parent=l.enqueue(dict(kind='APPLICATION',council='bolton',reference=e.reference),'SCREENING',contract='listing-screen-v1')
+ l.grant('INGESTION_TEST_screen',[parent],contracts=['listing-screen-v1'],expires_at=l.clock()+600)
  claim=l.claim(parent,'screen','INGESTION_TEST_screen')
  l.checkpoint(claim,dict(disposition='SUPPORTED_PROCESSING_PRIORITY',source_url=e.source_url,source_record_id=e.source_record_id));l.finish(claim,{'outcome':'SCREENED'})
  contract=accepted_idox_new_identity('bolton-existing-coupled-new',target)

@@ -589,7 +589,8 @@ def test_a_v3_item_with_its_version_and_authority_fields_removed_is_ineligible_b
     assert not ls.identity_admission_eligible(legacy, item)      # v3 contract + legacy shape
     assert not ls.identity_admission_eligible(legacy, dict(item, contract='listing-screen-v9'))
     assert ls.identity_admission_eligible(legacy, dict(item, contract=V1))      # a valid v1 item
-    assert ls.identity_admission_eligible(legacy, dict(item, contract='fixture-screen'))      # the historical fixture contract the existing tests use
+    for unknown in ('fixture-screen', 'retained-fixture-v1', 'listing-screen-v1 ', 'LISTING-SCREEN-V1', 'screen', '', None, 7):
+        assert not ls.identity_admission_eligible(legacy, dict(item, contract=unknown)), unknown      # arbitrary or unknown contracts, inside or outside the listing-screen family, are refused
     assert ls.identity_admission_eligible(legacy)      # no item supplied: unchanged helper behaviour
 
 
