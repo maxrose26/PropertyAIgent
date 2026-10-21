@@ -390,9 +390,9 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             fake_subject = dict(kind='APPLICATION', council='bolton', reference='HIST/1')
             fake_record = sha('hist-record')
             for i in range(130):
-                base = item(dict(subject=fake_subject, task='SCREENING', contract='listing-screen-v1' if i == 0 else 'listing-screen-v3', revision=fake_record if i == 0 else sha('rev%d' % i)), dependencies=[CAPTURE_KEY])
+                base = item(dict(subject=fake_subject, task='SCREENING', contract='listing-screen-v1' if i == 0 else 'listing-screen-v3', revision=fake_record if i == 0 else sha('rev%d' % i)), dependencies=[sha('hist-parent')])
                 many.append(completed(base, checkpoint=None if i == 0 else {'rule_version': ls.RULE_V3, 'record_sha256': fake_record, 'config_sha256': sha('cfg%d' % i)}, outcome=dict(outcome='X', retained=True)))
-            many.append(completed(item(dict(subject=fake_subject, task='SCREENING', contract='listing-screen-v3', revision=sha('queued')), dependencies=[CAPTURE_KEY]), checkpoint=None))      # unscreened: not listed
+            many.append(completed(item(dict(subject=fake_subject, task='SCREENING', contract='listing-screen-v3', revision=sha('queued')), dependencies=[sha('hist-parent')]), checkpoint=None))      # unscreened: not listed
             insert_rows(many)
             seen, cursor, pages = [], None, 0
             started = time.perf_counter()
