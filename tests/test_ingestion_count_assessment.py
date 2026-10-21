@@ -159,13 +159,15 @@ def test_routing_fails_closed_on_anything_ambiguous_or_tampered():
         with pytest.raises(ValueError,match='ROUTING_(?:AUTHORITY_UNRESOLVED|OUTCOME_NOT_IN_VOCABULARY)'):ls.routing_of(r)
 
 
-def test_nothing_in_the_repository_selects_v3_or_imports_the_new_modules_and_nothing_re_screens():
-    offenders=[]
+def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
+    """Phase A: nothing selected v3. Slice 1 (PR #171) adds exactly one explicit consumer set; this test pins it, and the held production paths are pinned in tests/test_ingestion_screening_v3_slice1.py."""
+    allowed={'app/ingestion/coordinator.py','app/ingestion/screening_projection.py'}
+    offenders=set()
     for path in list((ROOT/'app').rglob('*.py'))+list((ROOT/'verification').rglob('*.py')):
         if path.name in ('listing_screening.py','count_assessment.py','count_evidence.py'):continue
         text=path.read_text(encoding='utf-8',errors='ignore')
-        if re.search(r'RULE_V3|screening-assessment-v3|routing_of|ingestion\.count_(?:assessment|evidence)|from\s+\.count_(?:assessment|evidence)|from\s+\.\s+import\s+[^\n]*count_(?:assessment|evidence)',text):offenders.append(str(path.relative_to(ROOT)))
-    assert offenders==[]      # opt-in only: no caller selects v3, no consumer reads it, no existing path changes
+        if re.search(r'RULE_V3|screening-assessment-v3|routing_of|ingestion\.count_(?:assessment|evidence)|from\s+\.count_(?:assessment|evidence)|from\s+\.\s+import\s+[^\n]*count_(?:assessment|evidence)',text):offenders.add(path.relative_to(ROOT).as_posix())
+    assert offenders<=allowed,offenders      # explicit opt-in only: the disposable coordinator and the read-only projections; no production path
     assert not [n for n in dir(ls) if 'rescreen' in n.lower() or 're_screen' in n.lower()]
 
 

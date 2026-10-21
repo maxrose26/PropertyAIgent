@@ -26,6 +26,7 @@ class NewIdentityContract:
 
 
 def execute(coordinator,claim,*,envelope,council,source):
+    from .listing_screening import identity_admission_eligible
     from app.pipeline.discovery_admission import admit_identity,PROTECTED_FIELDS
     from app.pipeline.discovery_contract import Completeness
     ledger=coordinator.ledger;row=ledger.get(claim.key);contract=coordinator.contracts.get(row['contract'])
@@ -35,7 +36,7 @@ def execute(coordinator,claim,*,envelope,council,source):
         or (target['council'],target['reference'],target['source_url'])!=(envelope.council,envelope.reference,envelope.source_url)
         or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE):raise Denied('NEW_IDENTITY_BINDING')
     parent=ledger.get(row['dependencies'][0]);screen=parent['checkpoint']
-    if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not screen or screen.get('disposition') not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}:
+    if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not screen or not identity_admission_eligible(screen,parent):
         raise Denied('SELECTIVE_SCREENING_REQUIRED')
     def lookup():
         with Session(ledger.engine) as s:
