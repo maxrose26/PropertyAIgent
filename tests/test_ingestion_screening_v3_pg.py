@@ -401,7 +401,7 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             plans3 = batching.batch_plans(CAPTURE_KEY, receipt, V3)
             batches3 = [item({k: p[k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=p['dependencies'], checkpoint=p['checkpoint']) for p in plans3]
             children3 = [item(dict(subject=dict(kind='APPLICATION', council='bolton', reference=r['reference']), task='SCREENING', contract='listing-screen-v3', revision=ls.assessment_identity(r, V3)[3]), dependencies=[CAPTURE_KEY]) for r in receipt['records']]
-            read_only = [root0, *v1_children, *v1_batches]      # bound for exact retained READS (the capture and the earlier assessments); all COMPLETE, so nothing can claim or change them
+            read_only = [root0, *v1_children, *v1_batches]      # named among the bindings so they can be READ (the capture and the earlier assessments); a binding is not a new permission: all are COMPLETE, so the existing claim/fence checks refuse any change
             set_expiry(900)      # the proposed authority lifetime
             bindings3, grant3 = owner.build_grant(batches3, [*read_only, *children3], capture_key=CAPTURE_KEY, source_calls=0, screening=V3)
             assert len(bindings3) == 59 and len(grant3['keys']) <= 74 and grant3['source_calls'] == 0 and grant3['writes'] == 0 and grant3['screening_configs'] == [digest(V3.config())]

@@ -416,7 +416,7 @@ def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserve
     l=coordinator.ledger;rule=coordinator.screening_rule
     if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
     if rule.rule_version==RULE_V1:raise Denied('V3_RULE_REQUIRED')
-    if not preserved_keys or len(set(preserved_keys))!=len(preserved_keys):raise Denied('PRESERVED_KEYS_REQUIRED')      # the earlier assessments and batches the run must prove unchanged; they must be bound (read-only) in the registration
+    if not preserved_keys or len(set(preserved_keys))!=len(preserved_keys):raise Denied('PRESERVED_KEYS_REQUIRED')      # the earlier assessments and batches the run must prove unchanged; they must be named among the registered bindings so they can be read (a binding is not a new permission: they are COMPLETE, so the existing claim/fence checks already refuse any change)
     check();root=l.get(capture_key);receipt=root['checkpoint']
     if (root['state']!='COMPLETE' or root['task']!='DISCOVERY' or not isinstance(receipt,dict) or receipt.get('kind')!='LISTING_RECEIPT_V1'
         or digest(receipt)!=capture_sha256 or not receipt.get('durable_archive')):raise Denied('RETAINED_CAPTURE_BINDING')
