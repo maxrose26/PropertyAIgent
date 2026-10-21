@@ -1,6 +1,6 @@
 {
  "specification": "035-residential-count-and-categorisation.md",
- "spec_version": "residential-count-v1",
+ "spec_version": "residential-count-v2",
  "admission_threshold": 10,
  "baseline_source": "app.scrapers.unit_filter.qualify + app.ingestion.listing_screening.screen_row (rule v1) at master 82988cb",
  "examples": [
@@ -12,9 +12,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -39,9 +41,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 6,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_BELOW_THRESHOLD",
     "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
@@ -67,9 +71,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 9,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_BELOW_THRESHOLD",
     "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
@@ -94,9 +100,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 10,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -122,9 +130,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 49,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -150,9 +160,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 10,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -178,9 +190,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 11,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -205,9 +219,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 11,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -232,9 +248,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 24,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -259,9 +277,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -287,9 +307,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 25,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -315,9 +337,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -342,9 +366,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -369,9 +395,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": 14,
     "existing": 14,
     "net": -2,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -397,9 +425,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": 2,
     "existing": 2,
     "net": 10,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -424,9 +454,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -452,9 +484,11 @@
     "category": "non_target_admin_or_minor",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": 12,
     "existing": 12,
     "net": -12,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NO_RESIDENTIAL_CREATED"
@@ -480,9 +514,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -507,9 +543,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 24,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": 12,
     "existing": 12,
     "net": 12,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -535,9 +573,11 @@
     "category": "outline_application",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "UP_TO:50",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_FOR_ASSESSMENT",
     "reason": "QUALIFIED_MAXIMUM_AT_OR_ABOVE_THRESHOLD"
@@ -563,9 +603,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "BEDS_NOT_DWELLINGS"
@@ -591,9 +633,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NOT_HOUSING_SUPPLY"
@@ -618,9 +662,13 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {
+     "retail": 3
+    },
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NO_RESIDENTIAL_CREATED"
@@ -645,9 +693,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NO_RESIDENTIAL_CREATED"
@@ -672,9 +722,11 @@
     "category": "variation_or_amendment",
     "scheme_role": "AMENDMENT_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": {
      "reference": "00284/26",
      "context_count": 30,
@@ -704,9 +756,11 @@
     "category": "variation_or_amendment",
     "scheme_role": "AMENDMENT_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": {
      "reference": "00284/26",
      "context_count": 8,
@@ -735,9 +789,11 @@
     "category": "condition_discharge_or_details",
     "scheme_role": "DISCHARGE_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": {
      "reference": "12345/20",
      "context_count": 20,
@@ -766,9 +822,11 @@
     "category": "reserved_matters",
     "scheme_role": "PHASE_OF_PARENT",
     "proposed_total": 120,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": {
      "reference": "91352/14",
      "context_count": "UP_TO:1700",
@@ -798,9 +856,11 @@
     "category": "screening_or_scoping_opinion",
     "scheme_role": "PRE_APPLICATION_SIGNAL",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_WATCHLIST",
     "reason": "SCREENING_OR_SCOPING_OPINION"
@@ -825,9 +885,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ROUTE_COUNT_UNCONFIRMED",
     "reason": "RESIDENTIAL_WITHOUT_STATED_COUNT"
@@ -853,9 +915,11 @@
     "category": "unknown",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_UNUSABLE_PROPOSAL",
     "reason": "PROPOSAL_NOT_USABLE"
@@ -880,9 +944,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -907,9 +973,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
@@ -935,9 +1003,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 9,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": 14,
     "existing": 14,
     "net": -5,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_BELOW_THRESHOLD",
     "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
@@ -962,9 +1032,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 8,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": {
      "reference": null,
      "context_count": 200,
@@ -994,9 +1066,11 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NONE",
     "existing": 12,
     "net": 0,
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NO_RESIDENTIAL_CREATED"
@@ -1021,21 +1095,67 @@
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 102,
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_SCHEME",
-    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 102
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 102"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
    },
-   "evidence": [
+   "records": [
     {
+     "id": "f1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 102,
      "source_kind": "APPLICATION_FORM_STRUCTURED",
-     "quote": "Total proposed residential units 102",
-     "rank": 1
+     "document_date": "2026-05-01",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
     }
    ],
-   "note": "Provenance example: the structured form outranks the proposal text; the baseline (proposal text only) cannot see it.",
+   "scope_relations": [],
+   "note": "Provenance: the structured form total outranks the proposal text; the baseline (proposal text only) cannot see it.",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -1044,8 +1164,9 @@
     "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
    },
    "baseline_conformance": {
-    "admission_matches": true,
-    "count_matches": false
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
    }
   },
   {
@@ -1055,22 +1176,99 @@
    "expected": {
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
-    "proposed_total": "NOT_ESTABLISHED",
+    "proposed_total": "CONFLICT_UNRESOLVED",
+    "approved_total": "NOT_ESTABLISHED",
     "demolished": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
     "parent_context": null,
     "admission": "ADMIT_FOR_ASSESSMENT",
-    "reason": "COUNT_CONFLICT"
+    "reason": "COUNT_CONFLICT",
+    "bases": {
+     "proposed": {
+      "state": "CONFLICT_UNRESOLVED",
+      "competing": [
+       [
+        "p1",
+        49
+       ],
+       [
+        "f1",
+        52
+       ]
+      ]
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "UNDER_REVIEW",
+     "label": "Unit count under review",
+     "competing": [
+      {
+       "record": "p1",
+       "value": 49
+      },
+      {
+       "record": "f1",
+       "value": 52
+      }
+     ],
+     "basis": "PROPOSED"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
    },
-   "evidence": [
+   "records": [
     {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "f1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 52,
      "source_kind": "APPLICATION_FORM_STRUCTURED",
-     "quote": "Total proposed residential units 52",
-     "rank": 1
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
     }
    ],
-   "note": "Two supported sources disagree (49 vs 52): the conflict is recorded, neither silently wins; both are at or above the threshold so the application is admitted for assessment with COUNT_CONFLICT.",
+   "scope_relations": [],
+   "note": "Unknown chronology: no dates, revisions or supersession statement. Two figures in the same basis and scope stay unresolved; neither silently wins. Both are at or above 10, so size is established while the quantity is under review.",
    "baseline_current": {
     "qualify_unit_count": 49,
     "qualify_category": "primary_residential",
@@ -1079,8 +1277,1285 @@
     "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
    },
    "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38b",
+   "proposal": "ERECTION OF 52 DWELLINGS (REVISION B)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 52,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 52,
+      "historical": [
+       "p1"
+      ]
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 52"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": "2026-03-01",
+     "revision": "A",
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 52,
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "document_date": "2026-06-10",
+     "revision": "B",
+     "qualifier": null,
+     "relations": {
+      "supersedes": "p1"
+     }
+    }
+   ],
+   "scope_relations": [],
+   "note": "Explicit supersession: revision B states it supersedes revision A. Revision A is preserved as history, not deleted.",
+   "baseline_current": {
+    "qualify_unit_count": 52,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38c",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "PER_SCOPE",
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "PER_SCOPE",
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED_BY_PHASE",
+     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "note": "Different phases are different scopes, not a conflict. They are not added together unless non-overlap is evidenced (E38d).",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38d",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 101,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 101
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 101 (Phase 1: 49, Phase 2: 52)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "NON_OVERLAPPING_PARTS"
+    }
+   ],
+   "note": "A combined total exists only because explicit non-overlap evidence relates the two phases.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38e",
+   "proposal": "SECTION 73 VARIATION: ERECTION OF 52 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 52,
+    "approved_total": 49,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 52
+     },
+     "approved": {
+      "state": "RESOLVED",
+      "quantity": 49
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved: 49",
+     "alongside": "Proposed revision: 52"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED",
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "threshold": 50,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 50,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 50,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": "permission 1",
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 52,
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "document_date": "2026-06-10",
+     "revision": "variation",
+     "qualifier": null,
+     "relations": {
+      "revises": "a1"
+     }
+    }
+   ],
+   "scope_relations": [],
+   "note": "Approved 49 with a later proposed revision of 52. At a threshold of 50 only the proposed basis matches, and the result says so.",
+   "baseline_current": {
+    "qualify_unit_count": 52,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38f",
+   "proposal": "SECTION 73 PERMISSION: 52 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": 52,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "APPROVED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "RESOLVED",
+      "quantity": 52,
+      "historical": [
+       "a1"
+      ]
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved: 52"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": "permission 1",
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "a2",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 52,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2026-07-01",
+     "revision": "permission 2 (s73)",
+     "qualifier": null,
+     "relations": {
+      "supersedes": "a1"
+     }
+    }
+   ],
+   "scope_relations": [],
+   "note": "Revised approval: permission 2 states it supersedes permission 1; the 49 is preserved as historical evidence.",
+   "baseline_current": {
+    "qualify_unit_count": 52,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38g",
+   "proposal": "OUTLINE PERMISSION FOR UP TO 50 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "outline_application",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "UP_TO:50",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "QUALIFIED_MAXIMUM_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "QUALIFIED_MAXIMUM",
+      "maximum": 50
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved (outline): up to 50"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "POSSIBLE",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "POSSIBLE",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": "UP_TO:50",
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": null,
+     "qualifier": "outline",
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "note": "A qualified approved maximum keeps its qualifier everywhere, is a possible (never confirmed) match, and routes to assessment.",
+   "baseline_current": {
+    "qualify_unit_count": 50,
+    "qualify_category": "outline_application",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38h",
+   "proposal": "ERECTION OF DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "CONFLICT_UNRESOLVED",
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "COUNT_CONFLICT",
+    "bases": {
+     "proposed": {
+      "state": "CONFLICT_UNRESOLVED",
+      "competing": [
+       [
+        "p1",
+        9
+       ],
+       [
+        "f1",
+        12
+       ]
+      ]
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "UNDER_REVIEW",
+     "label": "Unit count under review",
+     "competing": [
+      {
+       "record": "p1",
+       "value": 9
+      },
+      {
+       "record": "f1",
+       "value": 12
+      }
+     ],
+     "basis": "PROPOSED"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "POSSIBLE",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "POSSIBLE",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 9,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "f1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 12,
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "note": "9 versus 12 crosses the 10+ threshold: a possible match, listed separately from confirmed matches, routed to assessment.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38i",
+   "proposal": "ERECTION OF 49 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 49,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 49
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED",
+      "unsupported_as_approved": [
+       "a1"
+      ]
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 49"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "document_date": "2026-01-10",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "document_date": "2026-01-10",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "note": "A form or proposal alone cannot establish an approved count: the claimed approval is recorded as unsupported and the supported proposed quantity is shown.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38j",
+   "proposal": "ERECTION OF DWELLINGS (TWO PERMISSIONS)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "COUNT_CONFLICT",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "ALTERNATIVE_PERMISSIONS",
+      "competing": [
+       [
+        "a1",
+        49
+       ],
+       [
+        "a2",
+        60
+       ]
+      ]
+     }
+    },
+    "headline": {
+     "kind": "UNDER_REVIEW",
+     "label": "Unit count under review",
+     "competing": [
+      {
+       "record": "a1",
+       "value": 49
+      },
+      {
+       "record": "a2",
+       "value": 60
+      }
+     ],
+     "basis": "APPROVED"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2024-02-01",
+     "revision": "permission 1",
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "a2",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 60,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-02-01",
+     "revision": "permission 2",
+     "qualifier": null,
+     "relations": {
+      "alternative_to": "a1"
+     }
+    }
+   ],
+   "scope_relations": [],
+   "note": "Alternative permissions are preserved side by side; the larger or the later does not replace the other.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38k",
+   "proposal": "ERECTION OF DWELLINGS (TWO UPLOADED DECISIONS)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "COUNT_CONFLICT",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "CONFLICT_UNRESOLVED",
+      "competing": [
+       [
+        "a1",
+        49
+       ],
+       [
+        "a2",
+        52
+       ]
+      ]
+     }
+    },
+    "headline": {
+     "kind": "UNDER_REVIEW",
+     "label": "Unit count under review",
+     "competing": [
+      {
+       "record": "a1",
+       "value": 49
+      },
+      {
+       "record": "a2",
+       "value": 52
+      }
+     ],
+     "basis": "APPROVED"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2024-02-01",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "a2",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 52,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2026-02-01",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "note": "The later document does not supersede the earlier one: without an explicit relationship the conflict stays unresolved.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38l",
+   "proposal": "ERECTION OF 49 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": 49,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "APPROVED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "RESOLVED",
+      "quantity": 49
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved: 49"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "planning": {
+    "planning_status": "GRANTED",
+    "construction_progress": "STARTED"
+   },
+   "note": "Dwelling count, planning status and construction progress are three separate facts; none changes another.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38m",
+   "proposal": "ERECTION OF 49 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 49,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "RESOLVED",
+      "quantity": 49
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 49"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "threshold": 10,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "threshold": 10,
+      "match": "CONFIRMED",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "planning": {
+    "planning_status": "REFUSED",
+    "construction_progress": "NONE"
+   },
+   "note": "Size eligibility is only the size gate: a refused application still has a supported proposed quantity of 49; the status gate is separate and not decided here.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E41",
+   "proposal": "ERECTION OF 9 FLATS AND 1 SHOP",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "mixed_use",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 9,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {
+     "retail": 1
+    },
+    "parent_context": null,
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "note": "9 flats plus 1 shop is 9 residential dwellings, not 10 units.",
+   "baseline_current": {
+    "qualify_unit_count": 9,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
     "admission_matches": true,
-    "count_matches": false
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E42",
+   "proposal": "ERECTION OF 10 FLATS AND 2 SHOPS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "mixed_use",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 10,
+    "approved_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {
+     "retail": 2
+    },
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "The two shops are recorded separately and do not contribute to the 10.",
+   "baseline_current": {
+    "qualify_unit_count": 10,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
    }
   }
  ]
