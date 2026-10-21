@@ -1,6 +1,7 @@
 """Residential count evidence model (specification 035, sections 3A-3F): count bases, evidence status, scope relations and bounds, owner relationship assessments, headline, search certainty over a size range,
 size admission and the read model. PURE: plain dicts in, plain dicts out; no database, network, model call, clock or configuration. Nothing in app/ imports this yet (Phase A is opt-in and offline), and it
 touches no stored value: the legacy scalar columns are not read or written here. tests/spec035_reference.py is the independent oracle for it; tests/test_ingestion_count_assessment.py proves they agree."""
+import re
 PROPOSED='PROPOSED';APPROVED='APPROVED';EITHER='EITHER'
 PERMISSION_SOURCES={'DECISION_NOTICE','APPROVED_PLANS_SCHEDULE'}      # only these can establish an APPROVED count: a form, proposal, statement or officer recommendation cannot (and no assessment can)
 RESOLVED='RESOLVED';COMBINED='COMBINED_SCOPES';QUALIFIED='QUALIFIED_MAXIMUM';CONFLICT='CONFLICT_UNRESOLVED';ALTERNATIVES='ALTERNATIVE_PERMISSIONS';NOT_ESTABLISHED='NOT_ESTABLISHED';PER_SCOPE='PER_SCOPE'
@@ -15,39 +16,59 @@ INF=float('inf')
 
 def parse(value):
     """('EXACT', n) or ('UP_TO', n)."""
-    if isinstance(value,int) and not isinstance(value,bool):return 'EXACT',value
-    if isinstance(value,str) and value.startswith('UP_TO:'):return 'UP_TO',int(value.split(':')[1])
+    if isinstance(value,int) and not isinstance(value,bool) and value>=1:return 'EXACT',value
+    if isinstance(value,str) and re.fullmatch(r'UP_TO:[1-9][0-9]{0,6}',value):return 'UP_TO',int(value.split(':')[1])
     raise ValueError('BAD_COUNT_VALUE')
+
+
+def clean_records(records):
+    """(valid records, rejected ids). A malformed record is NEVER counted and NEVER raises: it is reported. Valid means a dict with a unique non-empty string id, a basis, a non-empty string source kind and scope,
+    a parseable positive count, and relations that are a dict of string values. Relations are normalised to a dict."""
+    out=[];rejected=[];seen=set()
+    for i,r in enumerate(records if isinstance(records,(list,tuple)) else ()):
+        try:
+            ok=(isinstance(r,dict) and isinstance(r.get('id'),str) and r['id'] and r['id'] not in seen and r.get('basis') in (PROPOSED,APPROVED) and isinstance(r.get('source_kind'),str) and r['source_kind'].strip()
+                and isinstance(r.get('scope','whole'),str) and r.get('scope','whole').strip() and (r.get('relations') is None or (isinstance(r['relations'],dict) and all(isinstance(v,str) for v in r['relations'].values()))))
+            if ok:parse(r.get('value'))
+        except (ValueError,TypeError):ok=False
+        if ok:seen.add(r['id']);out.append(dict(r,relations=dict(r.get('relations') or {}),scope=r.get('scope','whole')))
+        else:rejected.append(r.get('id') if isinstance(r,dict) and isinstance(r.get('id'),str) else 'index:%d'%i)
+    return out,rejected
 
 
 def supported_minimum(record):
     """"Up to N" has NO evidenced positive lower bound unless one is separately supported: a positive value, a source kind and the literal words. Otherwise the lower bound is 0."""
     m=record.get('minimum')
-    if isinstance(m,dict) and isinstance(m.get('value'),int) and not isinstance(m.get('value'),bool) and m['value']>=1 and m.get('source_kind') and (m.get('quote') or '').strip():return m['value']
+    if (isinstance(m,dict) and isinstance(m.get('value'),int) and not isinstance(m.get('value'),bool) and m['value']>=1 and isinstance(m.get('source_kind'),str) and m['source_kind'].strip()
+            and isinstance(m.get('quote'),str) and m['quote'].strip()):return m['value']
     return None
 
 
 def valid_assessment(a,records):
     """An owner relationship assessment (D10) is evidence of a relationship, labelled reviewer-assessed. It counts only if made by an authenticated owner with actor, timestamp, rationale, citations and an exact scope,
     and its subject and target exist. It never creates permission evidence (it cannot touch a record's source kind), never changes planning status, and never establishes legal supersession."""
-    ids={r['id']:r for r in records}
-    ok=(a.get('kind') in ASSESSMENT_KINDS and a.get('authenticated') is True and bool(str(a.get('actor') or '').strip()) and bool(str(a.get('timestamp') or '').strip())
-        and bool(str(a.get('rationale') or '').strip()) and isinstance(a.get('citations'),list) and bool(a['citations']) and all(str(c).strip() for c in a['citations']))
-    if not ok:return False
-    if a['kind']!='SUPERSEDES':return isinstance(a.get('scopes'),list) and len(a['scopes'])>=2 and all(str(x).strip() for x in a['scopes'])      # a scope relation names the exact scopes it covers
-    if a['kind']=='SUPERSEDES':
-        s,t=ids.get(a.get('subject')),ids.get(a.get('target'))
+    try:
+        ids={r['id']:r for r in records}
+        text=lambda v:isinstance(v,str) and bool(v.strip())
+        ok=(isinstance(a,dict) and isinstance(a.get('kind'),str) and a['kind'] in ASSESSMENT_KINDS and a.get('authenticated') is True and text(a.get('actor')) and text(a.get('timestamp')) and text(a.get('rationale'))
+            and isinstance(a.get('citations'),list) and bool(a['citations']) and all(text(c) for c in a['citations']))
+        if not ok:return False
+        if a['kind']!='SUPERSEDES':return isinstance(a.get('scopes'),list) and len(a['scopes'])>=2 and all(text(x) for x in a['scopes'])      # a scope relation names the exact scopes it covers
+        t_,s_=a.get('target'),a.get('subject')
+        if not (text(t_) and text(s_) and t_!=s_ and text(a.get('scope'))):return False
+        s,t=ids.get(s_),ids.get(t_)
         return bool(s and t and s['basis']==t['basis'] and s.get('scope','whole')==t.get('scope','whole')==a['scope'])      # exact scope: the assessment names the one scope both records are in
-    return True
+    except (TypeError,KeyError,AttributeError,ValueError):return False
 
 
 def supported_relation(relation,kind):
     """A document-stated scope relation: a source kind and the literal words. A phase LABEL alone proves nothing."""
-    return relation.get('relation')==kind and bool(relation.get('source_kind')) and bool((relation.get('quote') or '').strip())
+    return (isinstance(relation,dict) and relation.get('relation')==kind and isinstance(relation.get('source_kind'),str) and bool(relation['source_kind'].strip())
+            and isinstance(relation.get('quote'),str) and bool(relation['quote'].strip()) and isinstance(relation.get('scopes'),(list,tuple)) and all(isinstance(x,str) for x in relation['scopes']))
 
 
 def _assessed_relation(a,kind):
-    return a.get('kind')==kind
+    return isinstance(a,dict) and a.get('kind')==kind and isinstance(a.get('scopes'),(list,tuple)) and all(isinstance(x,str) for x in a['scopes'])
 
 
 def _scope_state(active,historical,assessed_supersession):
@@ -59,7 +80,7 @@ def _scope_state(active,historical,assessed_supersession):
         kind,n=next(iter(values))
         out=dict(state=RESOLVED if kind=='EXACT' else QUALIFIED,quantity=n if kind=='EXACT' else None,maximum=n if kind=='UP_TO' else None,qualifier=active[0].get('qualifier'),competing=competing,historical=historical)
         if kind=='UP_TO':
-            mins=[supported_minimum(r) for r in active if supported_minimum(r)];out['minimum']=max(mins) if mins else None
+            mins=[supported_minimum(r) for r in active if supported_minimum(r) and supported_minimum(r)<=n];out['minimum']=max(mins) if mins else None      # a minimum above the maximum is impossible and ignored
         if assessed_supersession:out.update(relationship_basis=REVIEWER_ASSESSED,legal_supersession_established=False)
         return out
     # distinct figures that nothing relates: never resolved by date, upload order, size or source rank
@@ -78,25 +99,32 @@ def _covers(relations,assessments,kind,names):
 
 
 def resolve_basis(records,basis,scope_relations=(),assessments=()):
+    records,rejected_records=clean_records(records)
+    scope_relations=[x for x in (scope_relations if isinstance(scope_relations,(list,tuple)) else ()) if isinstance(x,dict)]
+    assessments=list(assessments) if isinstance(assessments,(list,tuple)) else []
     recs=[r for r in records if r['basis']==basis]
     unsupported=[]
     if basis==APPROVED:
         unsupported=[r['id'] for r in recs if r['source_kind'] not in PERMISSION_SOURCES]      # an assessment can never move a record out of this list
         recs=[r for r in recs if r['source_kind'] in PERMISSION_SOURCES]
     valid=[a for a in assessments if valid_assessment(a,records)]
-    rejected=[a.get('id') for a in assessments if not valid_assessment(a,records)]
+    rejected=[(a.get('id') if isinstance(a,dict) else None) for a in assessments if not valid_assessment(a,records)]
     scopes={}
     for r in recs:scopes.setdefault(r.get('scope','whole'),[]).append(r)
     per={}
     for scope,group in scopes.items():
         ids={r['id'] for r in group}
-        stated={r['relations']['supersedes'] for r in group if r.get('relations',{}).get('supersedes') in ids}      # only an EXPLICIT supersedes between two supported records of the same scope
-        assessed={a['target'] for a in valid if a['kind']=='SUPERSEDES' and a['subject'] in ids and a['target'] in ids}-stated
+        stated_edges={(r['id'],r['relations']['supersedes']) for r in group if r['relations'].get('supersedes') in ids and r['relations']['supersedes']!=r['id']}      # only an EXPLICIT supersedes between two supported records of the same scope; never of itself
+        assessed_edges={(a['subject'],a['target']) for a in valid if a['kind']=='SUPERSEDES' and a['subject'] in ids and a['target'] in ids and a['subject']!=a['target']}-stated_edges
+        edges=stated_edges|assessed_edges
+        edges={(x,y) for x,y in edges if (y,x) not in edges}      # mutual supersession cancels itself: neither record wins
+        stated={y for x,y in edges if (x,y) in stated_edges};assessed={y for x,y in edges if (x,y) in assessed_edges}-stated
+        if all(r['id'] in stated|assessed for r in group):stated=assessed=set()      # a cycle would erase every record; evidence is never erased, so the relationships are ignored
         active=[r for r in group if r['id'] not in stated|assessed]
         per[scope]=_scope_state(active,sorted(stated|assessed),bool(assessed))
-    if not per:return dict(state=NOT_ESTABLISHED,scopes={},unsupported_as_approved=unsupported,rejected_assessments=rejected)
+    if not per:return dict(state=NOT_ESTABLISHED,scopes={},unsupported_as_approved=unsupported,rejected_assessments=rejected,rejected_records=rejected_records)
     if len(per)==1:
-        out=dict(next(iter(per.values())));out['scopes']=per;out['unsupported_as_approved']=unsupported;out['rejected_assessments']=rejected;return out
+        out=dict(next(iter(per.values())));out['scopes']=per;out['unsupported_as_approved']=unsupported;out['rejected_assessments']=rejected;out['rejected_records']=rejected_records;return out
     names=set(per)
     metrics={r.get('metric',DEFAULT_METRIC) for r in recs if r.get('scope','whole') in names}
     non_overlap=_covers(scope_relations,valid,'NON_OVERLAPPING_PARTS',names)
@@ -232,7 +260,7 @@ def headline(records,scope_relations=(),assessments=()):
         if ap.get('combined'):label=combined_label(ap,'Approved')
         out=dict(kind='APPROVED',label=tag(ap,label))
         if pr['state'] in (RESOLVED,QUALIFIED,COMBINED) and _qty(pr)!=_qty(ap):
-            revises=any(r['basis']==PROPOSED and r.get('relations',{}).get('revises') for r in records)
+            revises=any(r['basis']==PROPOSED and r.get('relations',{}).get('revises') for r in clean_records(records)[0])
             out['alongside']='Proposed revision: %s'%_qty(pr) if revises else 'Proposed (relationship to the approval not established): %s'%_qty(pr)
         return out
     if ap['state'] in (CONFLICT,ALTERNATIVES):return dict(kind='UNDER_REVIEW',label='Unit count under review',competing=competing(ap),basis=APPROVED)

@@ -53,7 +53,7 @@ def test_the_production_evidence_model_reproduces_every_evidence_example_and_agr
     recs=e['records'];rel=e['scope_relations'];asm=e.get('assessments',[]);x=e['expected']
     for basis,name in ((ce.PROPOSED,'proposed'),(ce.APPROVED,'approved')):
         assert project(ce.resolve_basis(recs,basis,rel,asm))==x['bases'][name],(e['id'],name)
-        assert ce.resolve_basis(recs,basis,rel,asm)==ref.resolve_basis(recs,basis,rel,asm)
+        assert {k:v for k,v in ce.resolve_basis(recs,basis,rel,asm).items() if k!='rejected_records'}==ref.resolve_basis(recs,basis,rel,asm)      # production adds only the list of rejected malformed records
     assert ce.headline(recs,rel,asm)==x['headline']==ref.headline(recs,rel,asm)
     for s in x['search']:
         got=ce.search_match(recs,s['basis'],s['size_min'],s['size_max'],rel,asm)
@@ -202,3 +202,101 @@ def test_the_wording_analysis_is_linear_on_long_adversarial_text():
     for t in texts:
         start=time.monotonic();ca._mentions(t[:8192]);ca._nonres(t[:8192]);assert time.monotonic()-start<2,t[:30]
         start=time.monotonic();ca.assess_proposal(t[:8192]);assert time.monotonic()-start<5,t[:30]
+
+
+# ------------------------------------------------------------------ review round: the assessor is conservative on wordings beyond the 41 examples
+def _a(text):return ca.assess_proposal(text)
+
+
+@pytest.mark.parametrize('text',['Amendment to planning permission 21/00012/FUL for erection of 50 dwellings','Removal of condition 5 of 21/00012/FUL (erection of 30 dwellings)',
+    'Substitution of house types on plots 1-30 of 30 dwellings approved under 21/00012/FUL','Application to vary approved plans for 21/00012/FUL (erection of 50 dwellings)',
+    'Amendment to 20 dwellings approved under 21/00012/FUL to 24 dwellings','Amendments to approved scheme for 40 dwellings (ref 20/0001/FUL) to include 4 additional dwellings'])
+def test_an_amendment_of_a_named_permission_never_gets_a_scheme_total_of_its_own(text):
+    got=_a(text)
+    assert got['scheme_role']=='AMENDMENT_OF_PARENT' and got['admission']=='RETAIN_RELATED_TO_PARENT' and got['proposed_total']=='NOT_ESTABLISHED'
+    assert got['parent_context']['reference'] in ('21/00012/FUL','20/0001/FUL') and got['approved_total']=='NOT_ESTABLISHED'
+
+
+def test_a_stated_resulting_total_without_the_words_the_number_of_is_still_a_revised_total():
+    got=_a('Amendment to 21/00012/FUL to increase number of dwellings from 50 to 54')
+    assert got['admission']=='RETAIN_RELATED_TO_PARENT' and got['parent_context']['context_count']==50 and got['parent_context']['revised_total']==54
+
+
+@pytest.mark.parametrize('text,total,admission',[('Erection of 3 terraces of 4 houses each',12,'ADMIT_SCHEME'),('Erection of 3 buildings comprising 4 flats each',12,'ADMIT_SCHEME'),('Erection of 6 dwellings in each of 2 blocks',12,'ADMIT_SCHEME'),
+    ('Erection of 2 blocks of 6 flats','NOT_ESTABLISHED','ROUTE_COUNT_UNCONFIRMED'),('ERECTION OF 3 BLOCKS COMPRISING 24 APARTMENTS',24,'ADMIT_SCHEME')])
+def test_per_group_counts_are_multiplied_only_when_each_is_explicit_and_never_guessed(text,total,admission):
+    got=_a(text);assert (got['proposed_total'],got['admission'])==(total,admission)
+
+
+@pytest.mark.parametrize('text,total',[('Erection of twenty-four dwellings',24),('Erection of twenty four dwellings',24),('Erection of thirty-one dwellings',31),('Erection of nineteen dwellings',19),('Erection of twenty dwellings',20)])
+def test_compound_number_words_are_one_number(text,total):
+    assert _a(text)['proposed_total']==total
+
+
+def test_wording_the_assessor_cannot_parse_is_routed_not_guessed():
+    for t in ('Erection of one hundred and twenty dwellings','Erection of two thousand dwellings'):
+        got=_a(t);assert (got['proposed_total'],got['admission'],got['reason'])==('NOT_ESTABLISHED','ROUTE_COUNT_UNCONFIRMED','COUNT_WORDING_NOT_PARSED')
+
+
+@pytest.mark.parametrize('text,reason',[('Erection of 36 dwellings, 18 houses and 18 flats','POSSIBLE_BREAKDOWN_OF_A_TOTAL'),('Erection of 5 dwellings and 5 dwellings','REPEATED_COUNT')])
+def test_a_total_and_its_breakdown_or_a_repeated_figure_is_never_added(text,reason):
+    got=_a(text);assert (got['proposed_total'],got['admission'],got['reason'])==('NOT_ESTABLISHED','ROUTE_COUNT_UNCONFIRMED',reason)
+
+
+@pytest.mark.parametrize('text,total,existing',[('Erection of 12 dwellings; 3 dwellings retained',12,3),('Erection of 11 dwellings, 5 dwellings are existing',11,5)])
+def test_a_count_followed_by_retained_or_existing_wording_is_existing_stock_not_proposed(text,total,existing):
+    got=_a(text);assert (got['proposed_total'],got['existing'])==(total,existing)
+
+
+@pytest.mark.parametrize('text',['Erection of 10 student cluster flats','Erection of 150 bed student accommodation comprising 20 cluster flats','3 dwellings and 12 flats for students'])
+def test_student_accommodation_is_not_dwelling_supply_decision_d4(text):
+    got=_a(text);assert (got['proposed_total'],got['admission'],got['reason'])==('NOT_ESTABLISHED','RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')
+
+
+# ------------------------------------------------------------------ review round: the evidence model never raises on malformed input and never lets evidence vanish
+def _rec(i='r',**kw):
+    base=dict(id=i,basis='PROPOSED',value=49,source_kind='LISTING_PROPOSAL_TEXT',relations={});base.update(kw);return base
+
+
+@pytest.mark.parametrize('bad',[dict(value=None),dict(value=True),dict(value='UP_TO:x'),dict(value='UP_TO:-5'),dict(value=-3),dict(value=0),dict(value=1.5),dict(source_kind=None),dict(source_kind=''),dict(basis='OTHER'),dict(scope=None),dict(scope=5),
+                                dict(relations=['x']),dict(relations={'supersedes':['a']}),dict(id=None),dict(id=7)])
+def test_a_malformed_record_is_rejected_and_reported_never_counted_and_never_raises(bad):
+    good=_rec('g',value=12)
+    recs=[good,_rec('b',**bad)]
+    st=ce.resolve_basis(recs,'PROPOSED')
+    assert st['state']=='RESOLVED' and st['quantity']==12 and st['rejected_records']
+    for call in (lambda:ce.headline(recs),lambda:ce.size_outcome(recs),lambda:ce.read_model(recs),lambda:ce.search_match(recs,'EITHER',10,None)):call()      # nothing raises
+
+
+def test_an_approved_record_without_a_source_kind_is_rejected_not_a_crash():
+    st=ce.resolve_basis([dict(id='a',basis='APPROVED',value=49,relations={})],'APPROVED')
+    assert st['state']=='NOT_ESTABLISHED' and st['rejected_records']==['a']
+
+
+def test_malformed_relations_assessments_and_minimums_never_raise_and_have_no_effect():
+    recs=[_rec('a',scope='Phase 1'),_rec('b',scope='Phase 2',value=52)]
+    for rel in ([None],['x'],[dict(relation='NON_OVERLAPPING_PARTS')],[dict(relation='NON_OVERLAPPING_PARTS',source_kind='P',quote=5,scopes=['Phase 1','Phase 2'])],[dict(relation='NON_OVERLAPPING_PARTS',source_kind='P',quote='q',scopes=None)],[dict(relation='NON_OVERLAPPING_PARTS',source_kind='P',quote='q',scopes=[['x']])],5,None):
+        assert ce.resolve_basis(recs,'PROPOSED',rel)['state']=='PER_SCOPE'
+    for asm in ([None],['x'],[5],[dict(kind=['SUPERSEDES'])],[dict(kind='SUPERSEDES')],[dict(kind='COMMON_DEVELOPMENT',scopes=[['x'],'y'],authenticated=True,actor='a',timestamp='t',rationale='r',citations=['c'])],[dict(kind='SUPERSEDES',authenticated=True,actor='a',timestamp='t',rationale='r',citations=['c'],subject='a',target='b')],5):
+        assert ce.resolve_basis(recs,'PROPOSED',(),asm)['state']=='PER_SCOPE'
+    up=[dict(id='a',basis='APPROVED',value='UP_TO:20',source_kind='DECISION_NOTICE',relations={},minimum=m) for m in (dict(value=40,source_kind='DECISION_NOTICE',quote='q'),dict(value=10,source_kind='DECISION_NOTICE',quote=5),dict(value=10,source_kind=7,quote='q'),'x')]
+    for r in up:assert ce.scenarios(ce.resolve_basis([r],'APPROVED'))==[(0,20)]      # a minimum above the maximum, or a malformed one, is ignored
+
+
+def test_supersession_of_itself_mutual_or_cyclic_never_erases_evidence():
+    ids=('a','b','c')
+    for rels in ({'a':'a'},{'a':'b','b':'a'},{'a':'b','b':'c','c':'a'}):
+        recs=[_rec(i,value=49+n,relations={'supersedes':rels[i]} if i in rels else {}) for n,i in enumerate(ids[:max(2,len(rels))])]
+        st=ce.resolve_basis(recs,'PROPOSED')
+        assert st['state']=='CONFLICT_UNRESOLVED' and sorted(i for i,_ in st['competing'])==sorted(r['id'] for r in recs) and not st['historical']      # every record is still there, none "wins"
+    one=[_rec('a',relations={'supersedes':'a'})]
+    assert ce.resolve_basis(one,'PROPOSED')['state']=='RESOLVED'      # a record cannot supersede itself out of existence
+
+
+def test_owner_assessments_need_authentication_and_every_field_in_production_too():
+    recs=[dict(_rec('a1',basis='APPROVED',source_kind='DECISION_NOTICE')),dict(_rec('a2',basis='APPROVED',value=52,source_kind='DECISION_NOTICE'))]
+    good=dict(id='as1',kind='SUPERSEDES',subject='a2',target='a1',scope='whole',actor='owner:x',authenticated=True,timestamp='2026-10-20T09:30:00+00:00',rationale='s73',citations=['notice 2'])
+    ok=ce.resolve_basis(recs,'APPROVED',(),[good]);assert ok['quantity']==52 and ok['relationship_basis']=='REVIEWER_ASSESSED' and ok['legal_supersession_established'] is False
+    for field,bad in (('authenticated',False),('authenticated',None),('authenticated','yes'),('actor',''),('timestamp',''),('rationale','  '),('citations',[]),('citations',['']),('scope',''),('scope','Phase 2'),('subject','a1'),('target','zz'),('kind','LEGALLY_SUPERSEDES')):
+        st=ce.resolve_basis(recs,'APPROVED',(),[dict(good,**{field:bad})]);assert st['state']=='CONFLICT_UNRESOLVED' and st['rejected_assessments']==['as1'],(field,bad)
+    st=ce.resolve_basis(recs,'APPROVED',(),[{k:v for k,v in good.items() if k!='scope'}]);assert st['state']=='CONFLICT_UNRESOLVED'

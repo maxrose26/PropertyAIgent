@@ -15,13 +15,21 @@ MAX_TEXT=8192      # the screening bound: anything longer is not analysed
 
 NUMBER_WORDS={'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12,'thirteen':13,'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,'nineteen':19,
               'twenty':20,'thirty':30,'forty':40,'fifty':50,'sixty':60,'seventy':70,'eighty':80,'ninety':90}
-_NUM=r'(\d{1,4}|'+'|'.join(NUMBER_WORDS)+r')'
+_TENS='twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety'
+_UNITS='one|two|three|four|five|six|seven|eight|nine'
+_NUM=r'(\d{1,4}|(?:'+_TENS+r')[- ](?:'+_UNITS+r')|'+'|'.join(NUMBER_WORDS)+r')'      # "twenty-four" / "twenty four" are one number, never "twenty" 
 DWELLING_NOUN=r'(?:dwellings?|dwellinghouses?|houses?|flats?|apartments?|maisonettes?|bungalows?|townhouses?|homes?|(?:residential|self[- ]contained|affordable|retirement|extra[- ]care|living)\s+(?:units?|accommodation))'
 _STOP=r'(?:comprising|comprises|containing|including|with|for|to|of|and|within|providing|creating|into|from|on|at)'
 _NOT_COUNT=r'(?:bed|beds|bedroom|bedrooms|bedded|room|rooms|storey|storeys|story|stories|car|cars|parking|space|spaces|person|persons|bay|bays|m|metres?)'
 ATTACHED=re.compile(r'(?<![\w/.,-])'+_NUM+r'\b[\s-]*(?:no\.?\s+)?(?!'+_NOT_COUNT+r'\b)(?:(?!'+_STOP+r'\b)[\w-]+\.?\s+){0,3}?'+DWELLING_NOUN+r'\b(?!\s+(?:blocks?|buildings?)\b)',re.I)
 UP_TO=re.compile(r'\b(?:up\s+to|not\s+exceeding|no\s+more\s+than|maximum\s+of)\s+'+_NUM+r'\b[\s-]*(?:no\.?\s+)?(?:(?!'+_STOP+r'\b)[\w-]+\.?\s+){0,4}?'+DWELLING_NOUN+r'\b',re.I)
-PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+blocks?\s+of\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+each\b',re.I)
+_GROUP=r'(?:apartment\s+)?(?:blocks?|buildings?|terraces?|towers?|wings?)'
+PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+(?:of|comprising|containing)\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+each\b',re.I)
+PRODUCT_IN_EACH=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+in\s+each\s+of\s+'+_NUM+r'\s+'+_GROUP+r'\b',re.I)
+GROUP_OF_UNCLEAR=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+of\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b(?!\s+each\b)',re.I)      # "2 blocks of 6 flats": per block or in total? not decided by guessing
+STUDENT=re.compile(r'\bstudents?\b|\bcluster\s+(?:flats?|units?|apartments?)\b',re.I)      # decision D4: student accommodation is not dwelling supply
+AFTER_RETAINED=re.compile(r'\A\W{0,3}(?:\w+\s+){0,2}?(?:retained|retention|existing|remaining|to\s+remain)\b',re.I)
+AFTER_REMOVED=re.compile(r'\A\W{0,3}(?:\w+\s+){0,2}?(?:demolished|removed|to\s+be\s+demolished)\b',re.I)
 BARE_UNITS=re.compile(r'(?<![\w/.,-])(\d{1,4})\s+(?:no\.?\s+)?units?\b',re.I)
 RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?|bungalows?|maisonettes?)\b',re.I)
 NON_RES_UNIT_WORDS=re.compile(r'\b(?:retail|commercial|office|offices|storage|industrial|warehouse|shops?|workshops?|air\s+handling|extract|plant|parking|student|hotel|bed|beds)\b',re.I)
@@ -43,19 +51,25 @@ CLAUSE_BREAK=re.compile(r'[.;:,()\n]')
 PARENT_MARKER=re.compile(r'\bpursuant\s+to\b',re.I)
 WIDER_MARKER=re.compile(r',?\s*\bpart\s+of\s+(?:a\s+|the\s+)?wider\s+(?:scheme|development|site|allocation)\b(?:\s+of)?',re.I)
 JOIN=re.compile(r'\s*(?:,\s*and\b|,|;|&|\band\b|\bplus\b|\btogether\s+with\b)\s*(?:(?:the\s+)?(?:erection|construction|conversion|change\s+of\s+use|provision|formation)\s+of\s+(?:an?\s+|the\s+)?[\w\s-]{0,40}?\s+(?:to|into|as)\s+)?\Z',re.I)
-REVISED=re.compile(r'\b(?:increase|reduce|decrease|amend|change|vary)\s+the\s+number\s+of\s+(?:dwellings|homes|houses|flats|apartments|units)\s+from\s+'+_NUM+r'\s+to\s+'+_NUM+r'\b',re.I)
-SECTION_73=re.compile(r'\b(?:section\s*73|s\.?\s*73|variation\s+(?:of|to)|non-?material)\b',re.I)
+REVISED=re.compile(r'\b(?:increase|reduce|decrease|amend|change|vary)\s+(?:the\s+)?(?:number\s+of\s+)?(?:dwellings|homes|houses|flats|apartments|units)?\s*from\s+'+_NUM+r'(?:\s+(?:dwellings|homes|houses|flats|apartments|units))?\s+to\s+'+_NUM+r'\b',re.I)
+SECTION_73=re.compile(r'\b(?:section\s*73|s\.?\s*73|variation\s+(?:of|to)|non-?material|amendments?|amend|vary|substitution|substitute|removal\s+of\s+(?:conditions?|condition\s+\d+)|(?:plans?|scheme|dwellings?|permission|development)\s+approved|approved\s+(?:plans?|scheme|under|pursuant|permission))\b',re.I)
 
 RELATED_ROLES={'variation_or_amendment':'AMENDMENT_OF_PARENT','condition_discharge_or_details':'DISCHARGE_OF_PARENT','external_consultation':'AMENDMENT_OF_PARENT','screening_or_scoping_opinion':'PRE_APPLICATION_SIGNAL'}
 
 
 def _value(token):
-    t=token.lower();return NUMBER_WORDS[t] if t in NUMBER_WORDS else int(t)
+    t=token.lower()
+    if t in NUMBER_WORDS:return NUMBER_WORDS[t]
+    if t.isdigit():return int(t)
+    tens,units=re.split(r'[- ]',t);return NUMBER_WORDS[tens]+NUMBER_WORDS[units]
 
 
 def _classify_mention(text,m):
     """('NEW'|'LOST'|'RETAINED'|'CONTEXT'|'ADJACENT'|'NOT_HOUSING', reason) for one attached dwelling count (R-EXISTING, R-CONTEXT, R-HOUSING)."""
-    if NOT_HOUSING_SUPPLY.search(m.group(0)):return 'NOT_HOUSING',None
+    if NOT_HOUSING_SUPPLY.search(m.group(0)) or STUDENT.search(m.group(0)):return 'NOT_HOUSING',None
+    after=CLAUSE_BREAK.split(text[m.end():m.end()+40],1)[0]      # only the words up to the end of this clause say what this count is
+    if AFTER_REMOVED.search(after):return 'LOST','DEMOLITION'      # "3 dwellings to be demolished": the words AFTER the count say what it is
+    if AFTER_RETAINED.search(after):return 'RETAINED',None
     cuts=[c.end() for c in CLAUSE_BREAK.finditer(text,0,m.start())]
     window=text[max(cuts[-1] if cuts else 0,m.start()-120):m.start()]
     if ADJACENT_WORDS.search(window):return 'ADJACENT',None
@@ -79,6 +93,8 @@ def _mentions(text):
     """Attached dwelling counts in order, after consuming blocks-of-N products and qualified maxima, with R-UNITS as the only fallback."""
     spans=[];work=text
     for m in PRODUCT.finditer(text):
+        spans.append(('PRODUCT',m.start(),m.end(),_value(m.group(1))*_value(m.group(2)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
+    for m in PRODUCT_IN_EACH.finditer(work):
         spans.append(('PRODUCT',m.start(),m.end(),_value(m.group(1))*_value(m.group(2)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
     for m in UP_TO.finditer(work):
         spans.append(('UP_TO',m.start(),m.end(),_value(m.group(1)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
@@ -147,6 +163,10 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
         m=WIDER_MARKER.search(text)
         if m:own=text[:m.start()];parent=dict(reference=ref,context_count=_first_attached(text[m.end():]),relation='PART_OF_WIDER_SCHEME')
     nonres=_nonres(own)
+    ambiguous=None
+    if STUDENT.search(own):ambiguous=('RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')      # D4: student cluster beds and flats are not dwelling supply; a mixed scheme is for review, not guessed
+    elif GROUP_OF_UNCLEAR.search(own):ambiguous=('ROUTE_COUNT_UNCONFIRMED','AMBIGUOUS_PER_GROUP_COUNT')
+    elif re.search(r'\b(?:hundred|thousand)\b',own,re.I):ambiguous=('ROUTE_COUNT_UNCONFIRMED','COUNT_WORDING_NOT_PARSED')
     # ---- classify every attached count in the application's own words
     new=[];lost=[];retained=[];not_housing=False
     for kind,a,b,value,m in _mentions(own):
@@ -161,18 +181,23 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     works_only=bool(retained) and not lost
     # ---- the proposed quantity (R-SUM, R-PRODUCT, qualified maxima)
     proposed=NE;reason=None;value=None
+    if ambiguous:new=[]
     if new:
         up=[n for n in new if n[0]=='UP_TO']
         if up and len(new)==1:proposed='UP_TO:%d'%up[0][3];value=proposed
         elif up:proposed=NE;reason='MULTIPLE_PROPOSED_DWELLING_COUNTS'
         else:
             ok=all(JOIN.match(own[new[i][2]:new[i+1][1]]) for i in range(len(new)-1))
+            vals=[n[3] for n in new]
+            if len(vals)>=3 and any(v==sum(vals)-v for v in vals):ok=False;reason='POSSIBLE_BREAKDOWN_OF_A_TOTAL'      # "36 dwellings, 18 houses and 18 flats": a total plus its breakdown is never added
+            if len(vals)>=2 and len({(n[0],n[3],own[n[1]:n[2]].lower()) for n in new})<len(new):ok=False;reason='REPEATED_COUNT'      # the same figure twice is a repeat or a breakdown, not two schemes
             if ok:proposed=sum(n[3] for n in new);value=proposed
-            else:proposed=NE;reason='MULTIPLE_PROPOSED_DWELLING_COUNTS'
+            else:proposed=NE;reason=reason or 'MULTIPLE_PROPOSED_DWELLING_COUNTS'
     # ---- outcomes without a proposed quantity
     admission=None
     if value is None:
-        if reason:admission,reason='ROUTE_COUNT_UNCONFIRMED',reason
+        if ambiguous:admission,reason=ambiguous
+        elif reason:admission,reason='ROUTE_COUNT_UNCONFIRMED',reason
         elif not_housing:proposed,admission,reason=NONE,'RETAIN_NOT_RESIDENTIAL_SUPPLY','NOT_HOUSING_SUPPLY'
         elif BEDSPACES.search(own) and CARE_USE.search(own):admission,reason='RETAIN_NOT_RESIDENTIAL_SUPPLY','BEDS_NOT_DWELLINGS'
         elif lost or retained or nonres or not RESIDENTIAL_WORDING.search(own) or NONRES_DEST.search(own):proposed,admission,reason=NONE,'RETAIN_NOT_RESIDENTIAL_SUPPLY','NO_RESIDENTIAL_CREATED'
