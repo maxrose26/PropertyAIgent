@@ -138,6 +138,23 @@ def _category(text,application_type):
     return c
 
 
+LINE_BREAK=re.compile('[\n\r\x0b\x0c\x85\u2028\u2029]')
+_PREV_NOUN=re.compile(r'(?:dwellings?|dwellinghouses?|houses?|flats?|apartments?|maisonettes?|bungalows?|townhouses?|homes?|units?)\W{0,3}\Z',re.I)
+_NEXT_COUNT=re.compile(r'\W{0,3}(?:\d|(?:'+'|'.join(NUMBER_WORDS)+r')\b|(?:erection|construction|provision|demolition|retention|conversion|new|proposed)\b)',re.I)
+
+
+def _normalise_whitespace(text):
+    """A run of whitespace or hyphens means the same as one, so runs are collapsed (this bounds the patterns that scan them). A run containing a line break collapses to ONE line break only where the break
+    plainly separates two counts: the line before ends with a dwelling noun and the line after starts a new count or clause ("Demolition of 12 flats<newline>18 new flats" keeps the 18 outside the demolition
+    clause). Any other line break is a wrapped line inside a sentence or keyword phrase ("Variation of<newline>condition 2", "Erection of 12<newline>dwellings") and becomes a space, so wrapping can never change
+    a classification."""
+    def run(m):
+        if not LINE_BREAK.search(m.group()):return ' '
+        before=m.string[max(0,m.start()-40):m.start()];after=m.string[m.end():m.end()+40]
+        return '\n' if _PREV_NOUN.search(before) and _NEXT_COUNT.match(after) else ' '
+    return re.sub(r'-{2,}','-',re.sub(r'\s+',run,text))
+
+
 def _blank(category,role,admission,reason,proposed=NE,**over):
     out=dict(rule_version=RULE_VERSION,category=category,scheme_role=role,proposed_total=proposed,approved_total=NE,lost=NE,existing=NE,net=NE,non_residential_units={},parent_context=None,admission=admission,reason=reason,
              records=[],source_kind=SOURCE_KIND)
@@ -158,9 +175,7 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     record the text supports, and the labelled headline."""
     text=text if isinstance(text,str) else ''
     if proposal_state!='PRESENT_VALUE' or not text.strip() or len(text)>MAX_TEXT:return _blank('unknown','NEW_SCHEME','RETAIN_UNUSABLE_PROPOSAL','PROPOSAL_NOT_USABLE')
-    # A run of whitespace or hyphens means the same as one, so runs are collapsed (this bounds the patterns that scan them). A run that CONTAINS a line break collapses to ONE line break, never to a space: a
-    # newline is a clause boundary (CLAUSE_BREAK), so "Demolition of 12 flats<newline>18 new flats" keeps the 18 outside the demolition clause.
-    text=re.sub(r'-{2,}','-',re.sub(r'\s+',lambda m:'\n' if re.search('[\n\r\x0b\x0c\x85\u2028\u2029]',m.group()) else ' ',text))
+    text=_normalise_whitespace(text)
     category=_category(text,application_type);role='PHASE_OF_PARENT' if category=='reserved_matters' else RELATED_ROLES.get(category,'NEW_SCHEME')
     ref=_parent_reference(text)
     if role in ('AMENDMENT_OF_PARENT','DISCHARGE_OF_PARENT','PRE_APPLICATION_SIGNAL'):

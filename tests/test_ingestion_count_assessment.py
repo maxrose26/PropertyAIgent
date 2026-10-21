@@ -464,3 +464,38 @@ def test_normalisation_collapses_runs_but_keeps_one_line_break_and_stays_bounded
     for t in ('12 flats'+'\n'*8000+'18 dwellings','12 flats'+' \n'*4000+'18 dwellings','Demolition of 12 flats'+'\n'*4000+'18 new flats','12'+'-'*8190,'flats'+' '*8187,'flats'+'\u3000'*8187,'\r\n'*4096+'12 flats'):
         start=time.monotonic();got=ca.assess_proposal(t[:8192]);assert time.monotonic()-start<1.5,t[:30];assert got['admission']
     got=_a('Demolition of 12 flats'+'\n'*4000+'18 new flats');assert (got['proposed_total'],got['lost'])==(18,12)
+
+
+# ------------------------------------------------------------------ review of the newline rule: wrapping can never change a classification
+WRAP_SENTENCES=['Variation of condition 2 to increase from 49 to 52 dwellings','Discharge of condition 5 relating to 40 dwellings approved under 19/00123/OUT','Details pursuant to condition 4 of 19/00123/OUT 40 dwellings',
+    'Non material amendment to approved scheme for 40 dwellings ref 20/0001/FUL','Reserved matters pursuant to outline 91352/14 for 120 dwellings','Approval of reserved matters pursuant to 91352/14',
+    'Demolition of existing bungalow and erection of 12 dwellings','Demolition of 2 houses and erection of 20 flats','Conversion of 12 flats to 18 flats','Erection of 12 dwellings. Existing 4 flats will be demolished',
+    'Erection of 2 blocks of 6 flats each','Erection of 5 houses and 5 flats','Extension to existing 12 flats to provide 6 additional flats','Change of use of 8 flats to a hotel','Erection of 25 dwellings and demolition of 3 houses',
+    'Mixed use development comprising residential flats and ground floor retail','Erection of 9 flats and 1 shop','Outline application for up to 50 dwellings','Section 73 variation to increase the number of dwellings from 49 to 52 on permission 00284/26']
+
+
+def test_a_line_break_at_any_word_position_gives_the_single_line_result_except_between_two_counts():
+    checked=0
+    for sentence in WRAP_SENTENCES:
+        words=sentence.split(' ');want=_a(sentence)
+        for i in range(1,len(words)):
+            for sep in ('\n','\r\n',' \n','\n  '):
+                wrapped=' '.join(words[:i])+sep+' '.join(words[i:])
+                got=_a(wrapped)
+                before=' '.join(words[:i]);after=' '.join(words[i:])
+                between_counts=bool(ca._PREV_NOUN.search(before)) and bool(ca._NEXT_COUNT.match(after))
+                if between_counts:continue      # a real boundary between two counts: covered by the dedicated tests above
+                assert {k:got[k] for k in KEYS}=={k:want[k] for k in KEYS},(repr(wrapped),got['admission'],want['admission'])
+                checked+=1
+    assert checked>500
+
+
+@pytest.mark.parametrize('text',['Variation of\ncondition 2 to increase from 49 to 52 dwellings','Variation\nof condition 2 to increase from 49 to 52 dwellings','Discharge of\ncondition 5 relating to 40 dwellings approved under 19/00123/OUT',
+    'Details pursuant\nto condition 4 of 19/00123/OUT 40 dwellings','Non\nmaterial amendment to approved scheme for 40 dwellings','Reserved\nmatters pursuant to outline 91352/14 for 120 dwellings'])
+def test_a_wrapped_keyword_phrase_still_classifies_an_amendment_discharge_or_reserved_matters(text):
+    got=_a(text);assert got['admission'] in ('RETAIN_RELATED_TO_PARENT','ROUTE_COUNT_UNCONFIRMED','ADMIT_SCHEME') and not (got['scheme_role']=='NEW_SCHEME' and got['admission']=='ADMIT_SCHEME'),text
+
+
+def test_each_unicode_line_break_character_is_a_boundary_between_two_counts():
+    for brk in ('\n','\r','\x0b','\x0c','\x85','\u2028','\u2029','\r\n'):
+        got=_a('Demolition of 12 flats'+brk+'18 new flats');assert (got['proposed_total'],got['lost']) == (18,12),repr(brk)
