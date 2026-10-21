@@ -13,7 +13,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -42,7 +42,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 6,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -72,7 +72,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 9,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -101,7 +101,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 10,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -131,7 +131,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 49,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -161,7 +161,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 10,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -191,7 +191,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 11,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -220,7 +220,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 11,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -249,7 +249,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 24,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -278,7 +278,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -308,7 +308,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 25,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -338,7 +338,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -367,7 +367,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -396,7 +396,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": 14,
+    "lost": 14,
     "existing": 14,
     "net": -2,
     "non_residential_units": {},
@@ -426,7 +426,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": 2,
+    "lost": 2,
     "existing": 2,
     "net": 10,
     "non_residential_units": {},
@@ -455,7 +455,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -485,7 +485,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": 12,
+    "lost": 12,
     "existing": 12,
     "net": -12,
     "non_residential_units": {},
@@ -515,7 +515,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -544,7 +544,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 24,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": 12,
+    "lost": 12,
     "existing": 12,
     "net": 12,
     "non_residential_units": {},
@@ -574,7 +574,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "UP_TO:50",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -604,7 +604,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -634,7 +634,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -663,7 +663,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {
@@ -694,7 +694,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -723,7 +723,7 @@
     "scheme_role": "AMENDMENT_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -757,7 +757,7 @@
     "scheme_role": "AMENDMENT_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -790,7 +790,7 @@
     "scheme_role": "DISCHARGE_OF_PARENT",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -823,7 +823,7 @@
     "scheme_role": "PHASE_OF_PARENT",
     "proposed_total": 120,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -857,7 +857,7 @@
     "scheme_role": "PRE_APPLICATION_SIGNAL",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -886,7 +886,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -916,7 +916,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -945,7 +945,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -974,7 +974,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 12,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1004,7 +1004,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 9,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": 14,
+    "lost": 14,
     "existing": 14,
     "net": -5,
     "non_residential_units": {},
@@ -1033,7 +1033,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 8,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1067,7 +1067,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NONE",
+    "lost": "NONE",
     "existing": 12,
     "net": 0,
     "non_residential_units": {},
@@ -1096,7 +1096,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 102,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1119,22 +1119,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -1155,7 +1158,7 @@
     }
    ],
    "scope_relations": [],
-   "note": "Provenance: the structured form total outranks the proposal text; the baseline (proposal text only) cannot see it.",
+   "note": "Provenance: a single supported structured-form record; the baseline (proposal text only) cannot see it. Source ranking never resolves a disagreement (E38).",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -1178,7 +1181,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "CONFLICT_UNRESOLVED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1221,25 +1224,53 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": 50,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 60,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
      }
     ]
    },
@@ -1291,7 +1322,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 52,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1317,22 +1348,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -1389,7 +1423,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "PER_SCOPE",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1399,6 +1433,7 @@
     "bases": {
      "proposed": {
       "state": "PER_SCOPE",
+      "overlap": "UNRESOLVED",
       "scopes": {
        "Phase 1": {
         "state": "RESOLVED",
@@ -1416,27 +1451,30 @@
     },
     "headline": {
      "kind": "PROPOSED_BY_PHASE",
-     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52)"
+     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52; overlap not established)"
     },
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -1468,7 +1506,7 @@
     }
    ],
    "scope_relations": [],
-   "note": "Different phases are different scopes, not a conflict. They are not added together unless non-overlap is evidenced (E38d).",
+   "note": "Different phase labels are different scopes, not a conflict, but a label alone does not prove the scopes are disjoint: the overlap stays unresolved, no total is formed, and the scheme size is anywhere from the larger phase to both added (52 to 101). A total needs supported non-overlap (E38d).",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -1491,7 +1529,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 101,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1514,22 +1552,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -1566,10 +1607,12 @@
       "Phase 1",
       "Phase 2"
      ],
-     "relation": "NON_OVERLAPPING_PARTS"
+     "relation": "NON_OVERLAPPING_PARTS",
+     "source_kind": "PHASING_PLAN",
+     "quote": "Phase 1 (plots 1-49) and Phase 2 (plots 50-101) are separate and do not overlap"
     }
    ],
-   "note": "A combined total exists only because explicit non-overlap evidence relates the two phases.",
+   "note": "A combined total exists only because a supported source (a phasing plan, with its literal words) states that the two phases do not overlap.",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -1592,7 +1635,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 52,
     "approved_total": 49,
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1617,24 +1660,27 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED",
        "PROPOSED"
@@ -1642,24 +1688,52 @@
      },
      {
       "basis": "APPROVED",
-      "threshold": 50,
+      "size_min": 50,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 50,
-      "match": "CONFIRMED",
+      "size_min": 50,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 50,
-      "match": "CONFIRMED",
+      "size_min": 50,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": 50,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 50,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": 50,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
       ]
      }
     ]
@@ -1691,7 +1765,7 @@
     }
    ],
    "scope_relations": [],
-   "note": "Approved 49 with a later proposed revision of 52. At a threshold of 50 only the proposed basis matches, and the result says so.",
+   "note": "Approved 49 with a later proposed revision of 52. At a minimum of 50 only the proposed basis meets the filter; with a range of 10 to 50 only the approved basis does; the result names the basis either way. Meeting a size filter is not a confirmed quantity, a planning approval or a buyer fit.",
    "baseline_current": {
     "qualify_unit_count": 52,
     "qualify_category": "primary_residential",
@@ -1714,7 +1788,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": 52,
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1740,22 +1814,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
@@ -1812,7 +1889,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "UP_TO:50",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1835,25 +1912,53 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "POSSIBLE",
+      "size_min": 10,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "POSSIBLE",
+      "size_min": 10,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
       "matched_by": [
        "APPROVED"
       ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 1,
+      "size_max": 100,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 60,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
      }
     ]
    },
@@ -1871,7 +1976,7 @@
     }
    ],
    "scope_relations": [],
-   "note": "A qualified approved maximum keeps its qualifier everywhere, is a possible (never confirmed) match, and routes to assessment.",
+   "note": "A qualified approved maximum keeps its qualifier everywhere and routes to assessment. \"Up to 50\" can be anything from 1 to 50, so against 10-100 it is only a possible size match, but against 1-100 every possible count lies inside the range and it meets the filter - still with a qualified, not a confirmed, quantity.",
    "baseline_current": {
     "qualify_unit_count": 50,
     "qualify_category": "outline_application",
@@ -1894,7 +1999,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "CONFLICT_UNRESOLVED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -1937,25 +2042,44 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "POSSIBLE",
+      "size_min": 10,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "POSSIBLE",
+      "size_min": 10,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
       "matched_by": [
        "PROPOSED"
       ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 5,
+      "size_max": 20,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 13,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
      }
     ]
    },
@@ -1984,7 +2108,7 @@
     }
    ],
    "scope_relations": [],
-   "note": "9 versus 12 crosses the 10+ threshold: a possible match, listed separately from confirmed matches, routed to assessment.",
+   "note": "9 versus 12 crosses the 10+ threshold: a possible size match, listed separately from matches that meet the filter, routed to assessment. Against 5-20 both figures lie inside, so it meets that filter (the quantity is still under review).",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -2007,7 +2131,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 49,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -2033,22 +2157,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -2103,7 +2230,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -2146,22 +2273,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
@@ -2218,7 +2348,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -2261,22 +2391,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
@@ -2331,7 +2464,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NOT_ESTABLISHED",
     "approved_total": 49,
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -2354,22 +2487,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "APPROVED"
       ]
@@ -2417,7 +2553,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 49,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {},
@@ -2440,22 +2576,25 @@
     "search": [
      {
       "basis": "APPROVED",
-      "threshold": 10,
+      "size_min": 10,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      },
      {
       "basis": "PROPOSED",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
      },
      {
       "basis": "EITHER",
-      "threshold": 10,
-      "match": "CONFIRMED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
       ]
@@ -2495,6 +2634,247 @@
    }
   },
   {
+   "id": "E38n",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "PER_SCOPE",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "PER_SCOPE",
+      "overlap": "UNRESOLVED",
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED_BY_PHASE",
+     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52; overlap not established)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 200,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 51,
+      "match": "NONE",
+      "matched_by": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "NON_OVERLAPPING_PARTS",
+     "source_kind": null,
+     "quote": ""
+    }
+   ],
+   "note": "A claimed non-overlap with no supporting source or words is ignored: the overlap stays unresolved. The scheme is between 52 (the larger phase) and 101 (both), so 10-100 is only a possible size match.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E44",
+   "proposal": "SECTION 73 VARIATION TO INCREASE THE NUMBER OF DWELLINGS FROM 49 TO 52 ON PERMISSION 00284/26",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "variation_or_amendment",
+    "scheme_role": "AMENDMENT_OF_PARENT",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": {
+     "reference": "00284/26",
+     "context_count": 49,
+     "relation": "VARIATION_OF",
+     "revised_total": 52
+    },
+    "admission": "RETAIN_RELATED_TO_PARENT",
+    "reason": "AMENDMENT_OF_PARENT"
+   },
+   "note": "R-AMEND: a clause that states the resulting total is a PROPOSED-basis record in the parent's scope (relation revises), shown as a proposed revision beside the parent's approval. It does not admit alone, does not make the amendment a scheme, and does not become approved without a new decision notice.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E45",
+   "proposal": "VARIATION OF CONDITION 2 OF PERMISSION 00284/26 TO REDUCE THE NUMBER OF DWELLINGS FROM 52 TO 49",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "variation_or_amendment",
+    "scheme_role": "AMENDMENT_OF_PARENT",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": {
+     "reference": "00284/26",
+     "context_count": 52,
+     "relation": "VARIATION_OF",
+     "revised_total": 49
+    },
+    "admission": "RETAIN_RELATED_TO_PARENT",
+    "reason": "AMENDMENT_OF_PARENT"
+   },
+   "note": "A reduction is handled the same way: the stated resulting total (49) is the proposed revision; the 52 is the parent's figure and is context.",
+   "baseline_current": {
+    "qualify_unit_count": 52,
+    "qualify_category": "variation_or_amendment",
+    "qualify_classification": "Excluded - secondary/admin",
+    "legacy_admits": false,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E47",
+   "proposal": "CONVERSION OF 12 FLATS TO 6 FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 6,
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": 12,
+    "existing": 12,
+    "net": -6,
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "note": "Loss definition: the 12 existing flats cease to exist as those dwellings (reconfigured away); the 6 are the output. Net is 6 - 12 = -6.",
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
    "id": "E41",
    "proposal": "ERECTION OF 9 FLATS AND 1 SHOP",
    "proposal_state": "PRESENT_VALUE",
@@ -2503,7 +2883,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 9,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {
@@ -2535,7 +2915,7 @@
     "scheme_role": "NEW_SCHEME",
     "proposed_total": 10,
     "approved_total": "NOT_ESTABLISHED",
-    "demolished": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
     "net": "NOT_ESTABLISHED",
     "non_residential_units": {
