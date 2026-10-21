@@ -161,7 +161,7 @@ def test_routing_fails_closed_on_anything_ambiguous_or_tampered():
 
 def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     """Phase A: nothing selected v3. Slice 1 (PR #171) adds exactly one explicit consumer set; this test pins it, and the held production paths are pinned in tests/test_ingestion_screening_v3_slice1.py."""
-    allowed={'app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py'}
+    allowed={'app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py'}
     offenders=set()
     for path in list((ROOT/'app').rglob('*.py'))+list((ROOT/'verification').rglob('*.py')):
         if path.name in ('listing_screening.py','count_assessment.py','count_evidence.py'):continue

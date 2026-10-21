@@ -1,0 +1,52 @@
+{
+ "authority": {
+  "items_new": 29,
+  "keys_bound": 59,
+  "name": "AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_WINDOW_ONCE_20261030_SCREEN",
+  "source_calls": 0,
+  "writes": 0
+ },
+ "bound_paths": [
+  ".gitattributes",
+  ".github/workflows/stage4-screening-v3-retained-once.yml",
+  "app/ingestion/batching.py",
+  "app/ingestion/coordinator.py",
+  "app/ingestion/count_assessment.py",
+  "app/ingestion/count_evidence.py",
+  "app/ingestion/ledger.py",
+  "app/ingestion/listing_screening.py",
+  "app/ingestion/new_identity.py",
+  "app/ingestion/schema.py",
+  "app/ingestion/sql_ledger.py",
+  "app/scrapers/unit_filter.py",
+  "docs/design/ingestion-operational-20261016/worker.sql",
+  "docs/design/ingestion-screening-v3-activation-20261030/policy-screening-v3-allowance.sql",
+  "docs/design/ingestion-screening-v3-activation-20261030/worker-step-original.sql",
+  "docs/design/ingestion-screening-v3-activation-20261030/worker-step-v3.sql",
+  "docs/design/ingestion-window-demonstration-20261023/policy-window-allowance.sql",
+  "tests/fixtures/retained_bolton_window/capture-retained/retained.json",
+  "tests/fixtures/retained_bolton_window/capture/source.json",
+  "tests/fixtures/retained_bolton_window/completed/events.jsonl",
+  "tests/fixtures/retained_bolton_window/completed/final-result.json",
+  "tests/fixtures/retained_bolton_window/reconciliation.json",
+  "tests/fixtures/retained_bolton_window/screening-authority/registered.json",
+  "verification/ingestion_storage/operational_controller.py",
+  "verification/ingestion_storage/operational_owner.py",
+  "verification/ingestion_storage/operational_runner.py",
+  "verification/ingestion_storage/policy_screening_v3.py",
+  "verification/ingestion_storage/retained_world.py",
+  "verification/ingestion_storage/screening_v3_grant.py",
+  "verification/ingestion_storage/screening_v3_hosted.py",
+  "verification/ingestion_storage/screening_v3_worker_sql.py",
+  "verification/ingestion_storage/stable_pipeline.py"
+ ],
+ "clocks_seconds": {
+  "cleanup_reserve": 300,
+  "execution_deadline": 600,
+  "grant_lifetime": 900,
+  "ready_wait": 1800,
+  "status": "PROVISIONAL"
+ },
+ "purpose": "Screening-v3 retained-window assessment (PR #175): the paths bound by this mode. The manifest hash is registered with the execution binding; the hosted job hashes this exact file from its checkout.",
+ "retained_evidence_pins": "the five sha256 pins in verification/ingestion_storage/retained_world.py (PINS)"
+}

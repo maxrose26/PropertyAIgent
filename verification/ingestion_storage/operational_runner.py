@@ -20,7 +20,8 @@ from .operational_owner import Owner,item,SCOPE,ROLES,SECRETS
 from .tls_trust import verified_trust,owned_resources,PEM_SHA256
 from .connection_diagnostics import PreparationFailure,fixed_stop_reason
 from .operational_preparation import Progress,prepare_connection
-from .operational_owner import GENERATION2_STOP,GENERATION2_POLICY,GENERATION2_CAPTURE_POLICY,GENERATION3_STOP,GENERATION3_WINDOW_POLICY,WINDOW_SCOPE,STOP
+from .operational_owner import GENERATION2_STOP,GENERATION2_POLICY,GENERATION2_CAPTURE_POLICY,GENERATION3_STOP,GENERATION3_WINDOW_POLICY,GENERATION3_SCREENING_V3_POLICY,WINDOW_SCOPE,STOP
+from .policy_screening_v3 import NAME as SV3_NAME,CAPTURE_KEY as SV3_CAPTURE_KEY,WINDOW_CAPTURE as SV3_WINDOW_CAPTURE_NAME,WINDOW_SCREEN as SV3_WINDOW_SCREEN_NAME
 
 AUTHORITY='AUTHORISE_BOLTON_CAPTURE_QUEUE_SUCCESSOR_ONCE_20261018'
 DIAGNOSTIC_AUTHORITY='AUTHORISE_INGESTION_ACTIONABLE_CONNECTION_DIAGNOSTIC_ONCE_20261018'
@@ -188,7 +189,35 @@ WINDOW_POLICY_PREDECESSOR=dict(capture_acceptance=CAPTURE_ACCEPTANCE_OUTCOME,der
 WINDOW_BINDING=dict(CAPTURE_BINDING,hard_stop_generation=GENERATION3_STOP['hard_stop_generation'],manual_stop=GENERATION3_STOP['manual_stop'],last_hard_stop=GENERATION3_STOP['last_hard_stop'],stop_state_sha256=GENERATION3_STOP['stop_state_sha256'],
                     hosted_workflow=WINDOW_WORKFLOW,hosted_authority=WINDOW_HOSTED_AUTHORITY,scope=dict(WINDOW_SCOPE))
 WINDOW_PREDECESSOR=dict(capture_acceptance=CAPTURE_ACCEPTANCE_OUTCOME,derived_stop=dict(GENERATION3_STOP),policy_window_allowance=dict(authority=WINDOW_POLICY_AUTHORITY,state_directory=WINDOW_POLICY_STATE,policy_file=str(GENERATION3_WINDOW_POLICY)))
-INPUT_PRECHECKED_MODES=(OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE)      # every mode that needs the migration credential on this path validates the hidden input BEFORE the registration is consumed
+# ====================================================================================== screening-v3 RETAINED-WINDOW ASSESSMENT (PR #175; one source-free screening of the 24 retained Bolton applications)
+# Two owner-local ceremonies reuse the accepted machinery: (1) policy v6 + the derived v3 worker function (installation, exact inventory verified after each step), (2) the screening-only pipeline: owner verifies the 30
+# retained rows, awaits the hosted restricted job's READY marker (queueing and protected-environment approval happen BEFORE and OUTSIDE the grant lifetime), registers the ONE named allowance, the hosted job runs
+# `assess_retained`'s stages with the standing restricted credentials alone, and the owner invalidates, reads back, publishes inside the enforced envelope, then closes and seals. Nothing here is authorised by being here.
+SV3_POLICY_MODE='BOLTON_POLICY_SCREENING_V3'
+SV3_POLICY_AUTHORITY='AUTHORISE_INGESTION_POLICY_SCREENING_V3_ONCE_20261030'
+SV3_POLICY_STATE='operational-policy-screening-v3-once-20261030'
+SV3_MODE='BOLTON_SCREENING_V3_RETAINED'
+SV3_AUTHORITY=SV3_NAME[:-len('_SCREEN')]      # the ledger grant and the named exception are SV3_AUTHORITY + '_SCREEN' (the exact name policy v6 recognises); there is no _CAPTURE name
+SV3_STATE='operational-bolton-screening-v3-retained-once-20261030'
+SV3_EVIDENCE_DIRECTORY='docs/design/ingestion-operational-execution-bolton-screening-v3-retained-20261030'
+SV3_HOSTED_AUTHORITY='AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_HOSTED_ONCE_20261030'
+SV3_WORKFLOW='.github/workflows/stage4-screening-v3-retained-once.yml'
+SV3_WORKER_INSTALL=Path('docs/design/ingestion-screening-v3-activation-20261030/worker-step-v3.sql')
+SV3_WORKER_ROLLBACK=Path('docs/design/ingestion-screening-v3-activation-20261030/worker-step-original.sql')
+SV3_MANIFEST_PATH='docs/design/ingestion-screening-v3-activation-20261030/MANIFEST.json'
+# Clocks (provisional; carried forward from the proposal). EXECUTION DEADLINE 600 s starts when the allowance is registered (the commit of the registration, before the marker is published) and bounds the owner's wait for the hosted
+# result; CLEANUP RESERVE 300 s follows (invalidation, readbacks, publication, closure, sealing); GRANT LIFETIME 900 s = 600 + 300 is fixed in the grant itself at registration and is never extended. The hosted job's queueing,
+# protected-environment approval, start-up and connection qualification happen BEFORE registration and are bounded separately by READY WAIT (1800 s), which is outside the grant lifetime.
+SV3_BINDING=dict(valid_until=PIPELINE_BINDING['valid_until'],hard_stop_generation=GENERATION3_STOP['hard_stop_generation'],manual_stop=GENERATION3_STOP['manual_stop'],last_hard_stop=GENERATION3_STOP['last_hard_stop'],
+                 stop_state_sha256=GENERATION3_STOP['stop_state_sha256'],grant_minutes=15,poll_seconds=30,ready_wait_seconds=1800,screening_wait_seconds=600,execution_deadline_seconds=600,cleanup_reserve_seconds=300,
+                 grant_lifetime_seconds=900,hosted_workflow=SV3_WORKFLOW,hosted_authority=SV3_HOSTED_AUTHORITY,scope=dict(WINDOW_SCOPE),capture_key=SV3_CAPTURE_KEY,
+                 source=dict(requests=0,redirects=0,retries=0,source_client='NONE'),screening=dict(batches=5,children=24,retained_rows=30,new_items=29,bound_keys=59))
+SV3_POLICY_OWNER_LIMITS=dict(connections=(4,5),commands=(44,52,60))      # provisional: two inventory-verified installations between two observations; measured and fixed by the disposable rehearsal
+SV3_OWNER_LIMITS=dict(connections=(10,12),commands=(96,116,132))      # provisional: readback 9 + retained read 5 + registration 11 + ledger read 5 + invalidation 12 + readback 9 + failure reserve; measured and fixed by the rehearsal
+SV3_POLICY_PREDECESSOR=dict(derived_stop=dict(GENERATION3_STOP),policy_window_allowance=dict(authority=WINDOW_POLICY_AUTHORITY,state_directory=WINDOW_POLICY_STATE,policy_file=str(GENERATION3_WINDOW_POLICY)),
+                            consumed_window_names=[SV3_WINDOW_CAPTURE_NAME,SV3_WINDOW_SCREEN_NAME])
+SV3_PREDECESSOR=dict(SV3_POLICY_PREDECESSOR,policy_screening_v3=dict(authority=SV3_POLICY_AUTHORITY,state_directory=SV3_POLICY_STATE,policy_file=str(GENERATION3_SCREENING_V3_POLICY),worker_function=str(SV3_WORKER_INSTALL)))
+INPUT_PRECHECKED_MODES=(OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE,SV3_POLICY_MODE,SV3_MODE)      # every mode that needs the migration credential on this path validates the hidden input BEFORE the registration is consumed
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
 MATRIX_OWNER_LIMITS=dict(connections=(4,5),commands=(44,58,64))
@@ -257,19 +286,21 @@ class Runner:
         settled=registration.get('mode') in SETTLED_MODES
         self.probe_mode=registration.get('mode')==PROBE_MODE;self.capture_mode=registration.get('mode') in (CAPTURE_MODE,WINDOW_MODE);self.capture_policy_mode=registration.get('mode')==CAPTURE_POLICY_MODE
         self.window_mode=registration.get('mode')==WINDOW_MODE;self.window_policy_mode=registration.get('mode')==WINDOW_POLICY_MODE
-        self.policy_mode=registration.get('mode') in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE)
-        self.pipeline_mode=registration.get('mode') in (PIPELINE_MODE,PROBE_MODE,CAPTURE_MODE,WINDOW_MODE)      # the probe is a pipeline variant: same revocation-only failure path, same owner waits
+        self.sv3_mode=registration.get('mode')==SV3_MODE;self.sv3_policy_mode=registration.get('mode')==SV3_POLICY_MODE      # screening-v3: owner-local screening-only pipeline and its policy/function installation
+        self.policy_mode=registration.get('mode') in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE,SV3_POLICY_MODE)
+        self.pipeline_mode=registration.get('mode') in (PIPELINE_MODE,PROBE_MODE,CAPTURE_MODE,WINDOW_MODE,SV3_MODE)      # the probe is a pipeline variant: same revocation-only failure path, same owner waits
         self.observer_mode=registration.get('mode')==OBSERVER_MODE
         self.authority=SETTLED_MODES[registration['mode']][0] if settled else (PROBE_AUTHORITY if self.probe_mode else CAPTURE_AUTHORITY if self.capture_mode else PIPELINE_AUTHORITY) if self.pipeline_mode else AUTHORITY
         if self.window_mode:self.authority=WINDOW_AUTHORITY
-        self.scope=WINDOW_SCOPE if self.window_mode else SCOPE
+        if self.sv3_mode:self.authority=SV3_AUTHORITY
+        self.scope=WINDOW_SCOPE if (self.window_mode or self.sv3_mode) else SCOPE
         if self.window_mode:self.window_config=WindowConfig('bolton','RECEIVED',date.fromisoformat(WINDOW_SCOPE['start']),date.fromisoformat(WINDOW_SCOPE['end']),0)
         self.settle_seconds=SETTLE_SECONDS if settled else 0;self.settle_sleep=time.sleep
         direct=registration.get('mode')==DIRECT_MODE
         stable=registration.get('mode') in STABLE_MODES
         self.route_name='DIRECT' if direct else 'POOLER';self.restricted_hostaddr=None
         self.deadlines=dict(OBSERVER_DEADLINES if self.observer_mode else POLICY_DEADLINES if self.policy_mode else PROBE_DEADLINES if self.probe_mode else PIPELINE_DEADLINES if self.pipeline_mode else MATRIX_DEADLINES if (self.matrix_mode or direct or stable) else DEFAULT_DEADLINES)
-        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=OBSERVER_OWNER_LIMITS if self.observer_mode else POLICY_OWNER_LIMITS if self.policy_mode else PROBE_OWNER_LIMITS if self.probe_mode else MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
+        self.owner=Owner(connector,self.emit,self.check,identity=identity,expiry=self.expiry,bindings=self.bindings,limits=SV3_OWNER_LIMITS if self.sv3_mode else SV3_POLICY_OWNER_LIMITS if self.sv3_policy_mode else OBSERVER_OWNER_LIMITS if self.observer_mode else POLICY_OWNER_LIMITS if self.policy_mode else PROBE_OWNER_LIMITS if self.probe_mode else MATRIX_OWNER_LIMITS if self.matrix_mode else PIPELINE_OWNER_LIMITS if self.pipeline_mode else STABLE_OWNER_LIMITS if stable else DIRECT_OWNER_LIMITS if direct else None)
         if direct or stable or self.pipeline_mode or self.observer_mode or self.policy_mode:self.owner.permitted_policy_states=('SUCCESSOR_POLICY_APPLIED',)
         if self.probe_mode:      # bound to exactly the reviewed policy-v3 inventory and the exact observed generation-2 baseline
             self.owner.permitted_policy_states=('GENERATION2_POLICY_APPLIED',);self.owner.stop_manual=PROBE_BINDING['manual_stop'];self.owner.stop_sha=PROBE_BINDING['stop_state_sha256']
@@ -277,11 +308,13 @@ class Runner:
             self.owner.permitted_policy_states=('GENERATION2_CAPTURE_POLICY_APPLIED',);self.owner.stop_manual=CAPTURE_BINDING['manual_stop'];self.owner.stop_sha=CAPTURE_BINDING['stop_state_sha256']
         if self.window_mode:      # bound to exactly the reviewed policy-v5 inventory and the exact generation-3 stop state
             self.owner.permitted_policy_states=('GENERATION3_WINDOW_POLICY_APPLIED',);self.owner.stop_manual=WINDOW_BINDING['manual_stop'];self.owner.stop_sha=WINDOW_BINDING['stop_state_sha256']
+        if self.sv3_mode:      # bound to exactly the reviewed policy-v6 + v3-worker-function inventory and the exact generation-3 stop state
+            self.owner.permitted_policy_states=('GENERATION3_SCREENING_V3_APPLIED',);self.owner.stop_manual=SV3_BINDING['manual_stop'];self.owner.stop_sha=SV3_BINDING['stop_state_sha256']
         if self.observer_mode:self.owner.statement_hard_seconds=OBSERVER_STATEMENT_SECONDS
-        if self.pipeline_mode:self.owner.expected_generation=(PROBE_BINDING if self.probe_mode else WINDOW_BINDING if self.window_mode else CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING)['hard_stop_generation']
+        if self.pipeline_mode:self.owner.expected_generation=(PROBE_BINDING if self.probe_mode else SV3_BINDING if self.sv3_mode else WINDOW_BINDING if self.window_mode else CAPTURE_BINDING if self.capture_mode else PIPELINE_BINDING)['hard_stop_generation']
         if registration.get('mode')==STABLE_REVOKE_MODE:self.owner.stable_state=True
         self.owner.reuse_installed=registration.get('reuse_accepted_operational_installation',False)
-        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE,*STABLE_MODES)
+        self.owner.apply_policy=registration.get('mode') not in (*DIAGNOSTIC_MODES,MATRIX_MODE,PIPELINE_MODE,OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE,SV3_POLICY_MODE,SV3_MODE,*STABLE_MODES)
         self.matrix=None
         self.source_attempts=0;self.source_resources={'status':'NOT_STARTED','attempted_requests':0,'received_body_bytes':0};self.receipts={};self.plans=[];self.capture=None;self.capture_key=None;self.batch_bindings={};self.evidence_head=registration['evidence_head'];self.closed=True;self.diagnosing=False;self.baseline=owned_resources()
 
@@ -337,7 +370,7 @@ class Runner:
         try:
             engines=[budget.engine(self.owner.urls[r],ssl=self.ssl,hostaddr=self.restricted_address(),route=self.route_name) for r in ROLES]
             ledger=ControllerLedger(engines[0],budget=budget,owner='required_once',authority=authority,bindings=bindings,broker_engine=engines[1])
-            yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,self.window_config,QUALIFICATION)}),budget
+            yield Coordinator(ledger,{CONTRACT:IdoxListingContract(CONTRACT,self.window_config,QUALIFICATION)},screening_rules=getattr(self,'screening_rules',None)),budget      # v1 unless a v3 mode registered its rule
             success=True
         finally:
             account=budget.close(engines);elapsed=time.monotonic()-started
@@ -913,6 +946,120 @@ class Runner:
                     stop_state_sha256=baseline['stop_state_sha256'],source_observations_attempted=0,execution_grants_created=0,application_writes=0,github_requests=self.github.requests,pipeline_retry='HELD',stage4='OPEN',
                     historical_uncertainty_preserved=True)
 
+    def require_post_window_baseline(self,record):
+        """The control record must be EXACTLY the derived generation-3 stop state, nothing unexpired, every consumed name (the probe, the 22 October capture and BOTH window names) present and REVOKED, and the screening-v3 name never
+        registered. Nothing is inferred from the live state; this is the observation that verifies the baseline before anything is installed or issued."""
+        p=record['projection'];g=GENERATION3_STOP
+        grants={x['authority']:x['state'] for x in p['grants']};exceptions={x['authority']:x['state'] for x in p['bolton_exceptions']}
+        consumed=(PROBE_AUTHORITY+'_PROBE',CAPTURE_AUTHORITY+'_CAPTURE',SV3_WINDOW_CAPTURE_NAME,SV3_WINDOW_SCREEN_NAME)
+        if (p['global_stop']!=STOP or p['manual_stop']!=g['manual_stop'] or p['last_hard_stop']!=g['last_hard_stop'] or p['hard_stop_generation']!=g['hard_stop_generation'] or p['stop_state_sha256']!=g['stop_state_sha256']
+            or p['counts']['grants_unexpired']!=0 or p['counts']['exceptions_unexpired']!=0 or any(x.get(a)!='REVOKED_ZERO' for x in (grants,exceptions) for a in consumed) or SV3_NAME in (set(grants)|set(exceptions))):raise Uncertain('OBSERVED_BASELINE_CHANGED')
+        return p
+
+    def install_policy_screening_v3(self):
+        """The ONE installation ceremony of the screening-v3 activation: observe the record and require the exact generation-3 baseline, verify the installed policy-v5 inventory, install policy v6 (the two reviewed policy
+        functions), verify the exact policy-v6 inventory, install the derived v3 worker function (one reviewed statement), verify the exact final inventory, read the transient capability back absent, and verify the control record
+        is byte-for-byte unchanged. Issues no authority; no GitHub or source request."""
+        self.operation_phase='POLICY_PRECHECK'
+        before=self.owner.control_observation()
+        baseline=self.require_post_window_baseline(before)
+        self.operation_phase='POLICY_INSTALL'
+        self.owner.permitted_policy_states=('GENERATION3_WINDOW_POLICY_APPLIED',)
+        with self.owner.connection() as c:
+            self.owner.verify_installed(c)      # exactly the reviewed v5 inventory, reviewed owner and search path, or nothing is installed
+            self.owner.script(c,GENERATION3_SCREENING_V3_POLICY)
+            self.owner.permitted_policy_states=('GENERATION3_SCREENING_V3_POLICY_APPLIED',)
+            self.owner.verify_installed(c)      # exactly the reviewed v6 inventory now (the original worker function still installed)
+            self.operation_phase='WORKER_FUNCTION_INSTALL'
+            self.owner.script(c,SV3_WORKER_INSTALL)
+            self.owner.permitted_policy_states=('GENERATION3_SCREENING_V3_APPLIED',)
+            self.owner.verify_installed(c)      # exactly the final inventory: policy v6 + the derived v3 worker function
+            capability=tuple(self.owner.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET'),pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0])
+        if capability!=(False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
+        self.operation_phase='POLICY_POSTCHECK'
+        after=self.owner.control_observation()
+        if after['projection']['control_sha256']!=baseline['control_sha256'] or after['projection']['stop_state_sha256']!=baseline['stop_state_sha256']:raise Uncertain('CONTROL_RECORD_CHANGED_BY_POLICY_INSTALLATION')
+        components=self.closure('NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED')
+        if components['overall']!='CLOSED':raise Uncertain('OWNED_PROCESS_OR_SOCKET_CLOSURE')
+        return dict(status='POLICY_SCREENING_V3_INSTALLED_CONTROL_RECORD_UNCHANGED',cleanup='CLOSED',closure_components=components,accounting=self.accounting(),access='NO_AUTHORITY_ISSUED_STANDING_CREDENTIALS_UNCHANGED',
+                    installed_policy='GENERATION3_SCREENING_V3_APPLIED',inventory_verified=True,transient_owner_capability='ABSENT_READ_BACK',control_sha256_before=baseline['control_sha256'],control_sha256_after=after['projection']['control_sha256'],
+                    stop_state_sha256=baseline['stop_state_sha256'],source_observations_attempted=0,execution_grants_created=0,application_writes=0,github_requests=self.github.requests,pipeline_retry='HELD',stage4='OPEN',
+                    historical_uncertainty_preserved=True)
+
+    def screening_v3(self):
+        """Owner side of the screening-only v3 pipeline. It never touches a credential, membership, role setting or secret, never reads or runs a source, and never runs screening: the restricted hosted job does, with the standing
+        restricted credentials alone. Order: readback (the installed inventory must be the final one) -> verify the 30 retained rows and the absence of every new row against the pinned evidence -> await the hosted READY marker (outside the
+        grant lifetime) -> verify it -> register the ONE allowance (the grant lifetime starts here) -> publish the screening-authority marker -> await the hosted result (execution deadline) -> verify -> invalidate with committed readbacks ->
+        publish inside the enforced envelope -> close -> seal."""
+        from .retained_world import retained,verify_world,verify_no_v3_rows,v3_items,identities,WorldMismatch,CAPTURE_CHECKPOINT
+        from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+        pb=SV3_BINDING
+        account=self.github.call('GET','user')
+        if account.get('login')!='maxrose26':raise ValueError('EXACT_OWNER_GITHUB_ACCESS')
+        rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)      # the configuration is frozen here, once
+        expected=dict(identity=self.owner.identity,hard_stop_generation=pb['hard_stop_generation'],valid_until=pb['valid_until'],manual_stop=pb['manual_stop'])
+        self.operation_phase='SV3_READBACK_BEFORE_GRANT'
+        before=self.owner.pipeline_readback(expected,label='BEFORE_ANY_GRANT')      # includes the exact final inventory (policy v6 + v3 worker function), no unexpired grant, the standing credentials unchanged
+        self.operation_phase='SV3_VERIFY_RETAINED_WORLD'
+        try:
+            _,receipt=retained()      # the pinned evidence, byte for byte, regenerated with the repository's own code; the checkpoint digest must reproduce
+            root,children,_,batches1,_=identities(receipt)
+            plans,batches3,children3=v3_items(receipt,rule)
+            keys=[root['key'],*[c['key'] for c in children],*[b['key'] for b in batches1],*[x['key'] for x in (*batches3,*children3)]]
+            rows=self.owner.read_items(keys)      # one bounded administrative read of exactly the 59 rows
+            verify_world(rows,receipt);verify_no_v3_rows(rows,receipt,rule)
+        except WorldMismatch as exc:raise Uncertain(str(exc)) from None
+        self.capture=receipt;self.capture_key=root['key'];self.plans=plans
+        self.emit('sv3_retained_world_verified',dict(retained_rows=30,new_items=29,capture_sha256=CAPTURE_CHECKPOINT))
+        head=self.evidence_head_now()
+        if head!=self.evidence_head:raise Uncertain('EVIDENCE_HEAD_MOVED')
+        self.require_evidence_anchor(head)
+        for relative in ('hosted-ready/ready.json','screening-authority/registered.json','completed/final-result.json'):
+            if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
+        self.operation_phase='SV3_AWAIT_HOSTED_READY'      # the restricted job's queueing, protected-environment approval, start-up and qualification: bounded here, OUTSIDE the grant lifetime
+        head,_,blob=self.await_any(('hosted-ready/ready.json',),pb['ready_wait_seconds'])
+        self.evidence_head=head
+        try:ready=json.loads(blob_bytes(blob))
+        except ValueError:raise Uncertain('HOSTED_READY_UNREADABLE') from None
+        binding=ready.get('checkout_binding') if isinstance(ready,dict) else None
+        if (not isinstance(ready,dict) or ready.get('execution')!=self.pipeline_execution() or ready.get('capture_sha256')!=CAPTURE_CHECKPOINT or ready.get('config_sha256')!=digest(rule.config())
+            or ready.get('new_items_sha256')!=digest(sorted(x['key'] for x in (*batches3,*children3))) or not isinstance(binding,dict) or binding.get('tracked_files_modified') is not False
+            or (binding.get('revision'),binding.get('controller_sha256'),binding.get('manifest_sha256'))!=(self.r['revision'],self.r['controller_sha256'],self.r['manifest_sha256'])
+            or ready.get('qualification')!='STABLE_CREDENTIALS_QUALIFIED'):raise Uncertain('HOSTED_READY_BINDING')      # the hosted job names this exact revision, controller, manifest, configuration, capture and item set
+        self.operation_phase='SV3_SCREENING_AUTHORITY'
+        self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(seconds=pb['grant_lifetime_seconds']))      # fixed here; never extended
+        self.owner.require_control_sha256=self.r['control_sha256']      # exactly the record the installation ceremony left
+        read_only=[root,*children,*batches1]
+        self.batch_bindings=self.owner.register(batches3,self.authority+'_SCREEN',capture_key=self.capture_key,source_calls=0,prepared=[*read_only,*children3],screening=rule)
+        self.owner.require_control_sha256=None
+        registered_at=time.monotonic()      # the execution deadline starts at the commit of the registration
+        self.emit('sv3_screening_authority_registered',dict(batches=len(batches3),children_prepared=len(children3),bound_keys=len(self.batch_bindings),grant_expires_at=self.owner.grant_expiry.isoformat()))
+        marker=dict(execution=self.pipeline_execution(),authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
+        self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
+        self.operation_phase='SV3_AWAIT_SCREENING'
+        remaining=max(1,int(pb['execution_deadline_seconds']-(time.monotonic()-registered_at)))
+        head,blob=self.await_file('completed/final-result.json',remaining)
+        self.evidence_head=head
+        raw,hosted=self.verify_hosted_result(blob)
+        hosted_summary=dict(sha256=hashlib.sha256(raw).hexdigest(),status=hosted.get('status'),cleanup=hosted.get('cleanup'),closure_stage=hosted.get('closure_stage'),rows=hosted.get('rows'),batches=hosted.get('batches'))
+        done=self.owner.read_items([x['key'] for x in (*batches3,*children3)])
+        incomplete=sorted(k for k in (x['key'] for x in (*batches3,*children3)) if done.get(k,(None,))[0]!='COMPLETE')
+        self.emit('sv3_screening_state',dict(items=29,complete=29-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
+        self.operation_phase='SV3_INVALIDATION'
+        self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
+        invalidation=self.owner.invalidate_authorities()
+        after=self.owner.pipeline_readback(expected,label='AFTER_INVALIDATION')
+        components=self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',memory_close=False)      # the scope keeps enforcing while the result is published; the final closure follows publication
+        if invalidation not in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') or components['overall'] not in ('CLOSED','PENDING_MEMORY_SCOPE_CLOSURE'):raise Uncertain('PIPELINE_INVALIDATION_OR_CLOSURE')
+        finished=hosted_finished(hosted_summary,incomplete) and hosted.get('assessments')==24
+        result=dict(status='SCREENING_V3_RETAINED_COMPLETED_AUTHORITY_INVALIDATED' if finished else 'SCREENING_V3_RETAINED_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED',authority_invalidation=invalidation,screening='COMPLETE' if not incomplete else 'INCOMPLETE',hosted=hosted_summary,
+                    cleanup=components['overall'],access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',closure_components=components,readback_before=dict(statements=before['statements'],findings=before['findings'],notes=before['notes']),
+                    readback_after=dict(statements=after['statements'],findings=after['findings'],notes=after['notes']),capture_sha256=digest(self.capture),batches=len(plans),accounting=self.accounting(),owned_cleanup=components['process'],
+                    credentials='UNCHANGED_RETAINED_UNTIL_THE_OWNER_REVOKES_OR_THEY_EXPIRE',retained_rows_verified=30,new_items=29,source_observations_attempted=0,application_writes=0,identities_created=0,pipeline_retry='HELD',stage4='OPEN',
+                    historical_uncertainty_preserved=True)
+        self.emit('sv3_owner_result',result)
+        return self.seal_owner_result(result,lambda pending:self.publish_owner(pending))
+
     def form_probe(self):
         """Owner side of the Bolton form probe (specification section 12): fixed readback (bound to the reviewed v3 inventory and the observed generation-2 baseline), ONE grant plus its named exception,
         a bounded wait for the restricted job's result, the database's own record of the probe, then revocation-only invalidation and the final readback. Never touches a credential, membership, role setting or secret."""
@@ -981,6 +1128,8 @@ class Runner:
     def execute(self):
         try:
             if self.observer_mode:return self.observe()
+            if self.sv3_policy_mode:return self.install_policy_screening_v3()
+            if self.sv3_mode:return self.screening_v3()
             if self.window_policy_mode:return self.install_policy_window_allowance()
             if self.capture_policy_mode:return self.install_policy_capture_allowance()
             if self.policy_mode:return self.install_policy_generation2()
@@ -1020,7 +1169,7 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
         holder={}
         try:from .operational_source import read
         except ImportError:raise PreparationFailure('RUNNER_COMPONENTS','COMPONENT_IMPORT_FAILED') from None
-        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode') in (PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE) else dict(bound=PROBE_GITHUB_BOUND) if r.get('mode')==PROBE_MODE else dict(bound=0) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else {}))
+        github=GitHub(journal.emit,lambda:holder['runner'].check(),**(dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode') in (PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE,SV3_MODE) else dict(bound=PROBE_GITHUB_BOUND) if r.get('mode')==PROBE_MODE else dict(bound=0) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE,SV3_POLICY_MODE) else {}))
         def reader(_):return read('listing',dict(council='bolton',semantics='RECEIVED',start='2026-10-16',end='2026-10-16'),root=journal.root/'source',stop_file=journal.root/'STOP',memory_group=memory.source,observe=holder['runner'].observe_source)
     with progress.stage('RUNNER_CONSTRUCTION'):
         try:runner=Runner(r,journal,connect,source_reader=reader,github=github,url_factory=(lambda role,password:rr.url('DIRECT',role,password)) if direct else restricted_url,ssl={'sslmode':'verify-full','sslrootcert':str(ca)},memory=memory,hostaddr=selected,started=started)
@@ -1033,8 +1182,8 @@ def prepare_runner(r,raw,started,*,journal,memory,progress,dns_run=subprocess.ru
 def validate_registration(body,sha):
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
-    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY,OBSERVER_MODE:OBSERVER_AUTHORITY,POLICY_MODE:POLICY_AUTHORITY,PROBE_MODE:PROBE_AUTHORITY,CAPTURE_POLICY_MODE:CAPTURE_POLICY_AUTHORITY,CAPTURE_MODE:CAPTURE_AUTHORITY,WINDOW_POLICY_MODE:WINDOW_POLICY_AUTHORITY,WINDOW_MODE:WINDOW_AUTHORITY}.get(r.get('mode'))
-    if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=(WINDOW_SCOPE if r.get('mode') in (WINDOW_POLICY_MODE,WINDOW_MODE) else SCOPE) or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
+    expected_authority={'REQUIRED_CAPTURE_SCREENING':AUTHORITY,'CONNECTION_DIAGNOSTIC_ONLY':DIAGNOSTIC_AUTHORITY,MATRIX_MODE:MATRIX_AUTHORITY,**{m:v[0] for m,v in SETTLED_MODES.items()},DIRECT_MODE:DIRECT_AUTHORITY,**{m:v[0] for m,v in STABLE_MODES.items()},PIPELINE_MODE:PIPELINE_AUTHORITY,OBSERVER_MODE:OBSERVER_AUTHORITY,POLICY_MODE:POLICY_AUTHORITY,PROBE_MODE:PROBE_AUTHORITY,CAPTURE_POLICY_MODE:CAPTURE_POLICY_AUTHORITY,CAPTURE_MODE:CAPTURE_AUTHORITY,WINDOW_POLICY_MODE:WINDOW_POLICY_AUTHORITY,WINDOW_MODE:WINDOW_AUTHORITY,SV3_POLICY_MODE:SV3_POLICY_AUTHORITY,SV3_MODE:SV3_AUTHORITY}.get(r.get('mode'))
+    if expected_authority is None or r.get('authority')!=expected_authority or r.get('status')!='OWNER_APPROVED_REQUIRED_ONCE' or r.get('scope')!=(WINDOW_SCOPE if r.get('mode') in (WINDOW_POLICY_MODE,WINDOW_MODE,SV3_POLICY_MODE,SV3_MODE) else SCOPE) or r.get('roles')!=list(ROLES) or r.get('risk_acceptance')!='ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_WORKER_EFFECT_ONCE':raise ValueError('EXACT_OPERATIONAL_APPROVAL_REQUIRED')
     if r.get('reuse_accepted_operational_installation') is not True or r.get('baseline_control_sha256')!='0d829597f1422fef0af13920d5749c5751adf6d896588f379c400db7b3fa27cf' or r.get('accepted_cleanup_evidence')!='8dc4a36bc5565318e138d192bf2f7e96906f048f':raise ValueError('ACCEPTED_INSTALLED_STATE_REQUIRED')
     if r.get('mode')==MATRIX_MODE:
         from .restricted_matrix import ENTRIES,LIMITS as MX
@@ -1095,6 +1244,20 @@ def validate_registration(body,sha):
             or r.get('owner_limits')!=dict(connections=list(PIPELINE_OWNER_LIMITS['connections']),commands=list(PIPELINE_OWNER_LIMITS['commands'])) or not digest_ok(r.get('control_sha256'))
             or not isinstance(audit,dict) or set(audit)!={'events_sha256','final_result_sha256'} or not all(digest_ok(v) for v in audit.values())
             or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'probe' in r or 'capture' in r):raise ValueError('BOLTON_WINDOW_DEMONSTRATION_BINDING')
+    if r.get('mode')==SV3_POLICY_MODE:
+        if (r.get('predecessor')!=SV3_POLICY_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_SCREENING_V3_POLICY_AND_FUNCTION_INSTALLATION_ONLY'
+            or r.get('state_directory')!=SV3_POLICY_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=SV3_POLICY_STATE)
+            or r.get('owner_limits')!=dict(connections=list(SV3_POLICY_OWNER_LIMITS['connections']),commands=list(SV3_POLICY_OWNER_LIMITS['commands']))
+            or r.get('policy')!=dict(file=str(GENERATION3_SCREENING_V3_POLICY),worker_function=str(SV3_WORKER_INSTALL),rollback_function=str(SV3_WORKER_ROLLBACK),rollback_policy=str(GENERATION3_WINDOW_POLICY),named_allowance=SV3_NAME,baseline=GENERATION3_STOP,scope=WINDOW_SCOPE,cap='UNCHANGED_EXCEPT_FOR_THE_ONE_NAMED_ALLOWANCE')
+            or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'capture' in r or 'window' in r or 'screening_v3' in r):raise ValueError('BOLTON_SCREENING_V3_POLICY_BINDING')
+    if r.get('mode')==SV3_MODE:
+        digest_ok=lambda v:isinstance(v,str) and len(v)==64 and all(ch in '0123456789abcdef' for ch in v)
+        audit=r.get('policy_ceremony_audit')
+        if (r.get('screening_v3')!=SV3_BINDING or r.get('predecessor')!=SV3_PREDECESSOR or r.get('execution_authority')!='OWNER_GRANT_AND_EXCEPTION_FOR_THE_HOSTED_RESTRICTED_JOB' or r.get('risk_application')!='THIS_FINITE_SCREENING_V3_RETAINED_ASSESSMENT_ONCE'
+            or r.get('state_directory')!=SV3_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=SV3_STATE) or r.get('evidence_directory')!=SV3_EVIDENCE_DIRECTORY
+            or r.get('owner_limits')!=dict(connections=list(SV3_OWNER_LIMITS['connections']),commands=list(SV3_OWNER_LIMITS['commands'])) or not digest_ok(r.get('control_sha256'))
+            or not isinstance(audit,dict) or set(audit)!={'events_sha256','final_result_sha256'} or not all(digest_ok(v) for v in audit.values())
+            or 'restricted_route' in r or 'settling_seconds' in r or 'validity_days' in r or 'pipeline' in r or 'probe' in r or 'capture' in r or 'window' in r):raise ValueError('BOLTON_SCREENING_V3_BINDING')
     if r.get('mode')==OBSERVER_MODE:
         if (r.get('predecessor')!=OBSERVER_PREDECESSOR or r.get('execution_authority')!='NONE' or r.get('risk_application')!='THIS_FINITE_CONTROL_OBSERVATION_ONLY'
             or r.get('state_directory')!=OBSERVER_STATE or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=OBSERVER_STATE)
@@ -1105,7 +1268,7 @@ def validate_registration(body,sha):
         if (r.get('settling_seconds')!=SETTLE_SECONDS or r.get('predecessor')!=settled_predecessor or r.get('execution')!=dict(attempt=1,kind='OWNER_LOCAL',maximum_attempts=1,retry=False,state_directory=settled_state)
             or r.get('state_directory')!=settled_state):raise ValueError('SETTLED_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
-    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(minutes=30) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else timedelta(minutes=75) if r.get('mode')==PROBE_MODE else timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
+    if expiry.tzinfo is None or not now<expiry<=now+(timedelta(minutes=30) if r.get('mode') in (OBSERVER_MODE,POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE,SV3_POLICY_MODE) else timedelta(minutes=75) if r.get('mode')==PROBE_MODE else timedelta(hours=2) if r.get('mode') in (MATRIX_MODE,DIRECT_MODE,PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE,SV3_MODE,*SETTLED_MODES,*STABLE_MODES) else timedelta(hours=24)):raise ValueError('ORIGINAL_OPERATIONAL_EXPIRY')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
     for path,digest_ in r['hashes'].items():
@@ -1135,7 +1298,7 @@ def main():
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))      # no core file may ever hold the value
         held,precheck_seconds=observer_precheck_input()      # exits here, consuming nothing, on any invalid or unreadable input
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/(WINDOW_POLICY_STATE if r['mode']==WINDOW_POLICY_MODE else WINDOW_STATE if r['mode']==WINDOW_MODE else CAPTURE_POLICY_STATE if r['mode']==CAPTURE_POLICY_MODE else CAPTURE_STATE if r['mode']==CAPTURE_MODE else POLICY_STATE if r['mode']==POLICY_MODE else PROBE_STATE if r['mode']==PROBE_MODE else OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
+    journal=Journal(state/(SV3_POLICY_STATE if r['mode']==SV3_POLICY_MODE else SV3_STATE if r['mode']==SV3_MODE else WINDOW_POLICY_STATE if r['mode']==WINDOW_POLICY_MODE else WINDOW_STATE if r['mode']==WINDOW_MODE else CAPTURE_POLICY_STATE if r['mode']==CAPTURE_POLICY_MODE else CAPTURE_STATE if r['mode']==CAPTURE_MODE else POLICY_STATE if r['mode']==POLICY_MODE else PROBE_STATE if r['mode']==PROBE_MODE else OBSERVER_STATE if r['mode']==OBSERVER_MODE else PIPELINE_STATE if r['mode']==PIPELINE_MODE else STABLE_MODES[r['mode']][1] if r['mode'] in STABLE_MODES else DIRECT_STATE if r['mode']==DIRECT_MODE else SETTLED_MODES[r['mode']][1] if r['mode'] in SETTLED_MODES else MATRIX_STATE if r['mode']==MATRIX_MODE else DIAGNOSTIC_STATE if r['mode']=='CONNECTION_DIAGNOSTIC_ONLY' else 'operational-capture-queue-successor-once-20261018'))
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     from .credential_mapping import secure_migration_input
@@ -1150,7 +1313,7 @@ def main():
     progress=Progress()
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
-    result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode'] in (CAPTURE_MODE,WINDOW_MODE) else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE,SV3_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode'] in (CAPTURE_MODE,WINDOW_MODE,SV3_MODE) else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(exit_status(result))

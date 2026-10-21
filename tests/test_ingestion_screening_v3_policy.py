@@ -75,9 +75,11 @@ def test_the_two_new_inventory_states_differ_from_their_predecessors_in_exactly_
     assert all(mixed != inv for inv in (window, policy, full, original))
 
 
-def test_the_new_states_are_known_to_verification_and_bound_to_generation_3_but_no_mode_selects_them_yet():
+def test_the_new_states_are_known_to_verification_and_bound_to_generation_3_and_only_the_screening_v3_modes_select_them():
     source = text_of('verification/ingestion_storage/operational_owner.py')
     assert "'GENERATION3_SCREENING_V3_POLICY_APPLIED':self.screening_v3_policy_inventory()" in source and "'GENERATION3_SCREENING_V3_APPLIED':self.screening_v3_inventory()" in source
     assert "'GENERATION3_SCREENING_V3_POLICY_APPLIED','GENERATION3_SCREENING_V3_APPLIED')" in source      # generation 3
     runner = text_of('verification/ingestion_storage/operational_runner.py')
-    assert 'SCREENING_V3' not in runner      # the runner has no mode for them: nothing can select the states until the execution mode is built and approved
+    assert runner.count("permitted_policy_states=('GENERATION3_SCREENING_V3_APPLIED',)") == 2      # the execution mode's construction and the installation mode's final verification: nothing else selects the final state
+    assert runner.count("permitted_policy_states=('GENERATION3_SCREENING_V3_POLICY_APPLIED',)") == 1      # the installation mode's intermediate verification
+    assert 'if self.sv3_mode:' in runner and 'if self.sv3_policy_mode:' in runner
