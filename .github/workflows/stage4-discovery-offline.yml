@@ -15,6 +15,8 @@ on:
       - 'app/scrapers/unit_filter.py'
       - 'tests/test_unit_filter_digit_runs.py'
       - 'tests/test_ingestion_screening_v3_*.py'
+      - 'tests/test_discovery_ingestion_screening_v3_policy_pg.py'
+      - 'docs/design/ingestion-screening-v3-activation-20261030/**'
       - 'tests/test_ingestion_screening_history.py'
       - 'tests/test_ingestion_retained_capture_reconciliation.py'
       - 'tests/fixtures/retained_bolton_window/**'
@@ -100,7 +102,7 @@ jobs:
           timeout --kill-after=2s 180s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_unit_filter_digit_runs.py tests/test_ingestion_count_assessment.py -q -x -p no:cacheprovider
       - name: Screening rule v3, explicit selection, bound identity, code binding, retained-capture reconciliation, history, derived worker function, wiring and controller (offline, disposable database only)
         run: |
-          timeout --kill-after=2s 240s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_slice1.py tests/test_ingestion_retained_capture_reconciliation.py tests/test_ingestion_screening_v3_code_binding.py tests/test_ingestion_screening_history.py tests/test_ingestion_screening_v3_worker_sql.py tests/test_ingestion_screening_v3_wiring.py tests/test_ingestion_screening_v3_controller.py -q -p no:cacheprovider
+          timeout --kill-after=2s 240s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_slice1.py tests/test_ingestion_retained_capture_reconciliation.py tests/test_ingestion_screening_v3_code_binding.py tests/test_ingestion_screening_history.py tests/test_ingestion_screening_v3_worker_sql.py tests/test_ingestion_screening_v3_wiring.py tests/test_ingestion_screening_v3_controller.py tests/test_ingestion_screening_v3_policy.py -q -p no:cacheprovider
       - name: Stable qualification module imports, builds its engine, negotiates TLS with a local server and is memory-limited under the workflow's enforced resource limits, no external network
         run: |
           set -euo pipefail
@@ -198,7 +200,7 @@ jobs:
 
   screening-v3-pg:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20      # the disposable PostgreSQL rehearsal of the screening-v3 production connection (PR #173 section 5.3); fixed loopback service, no secrets, no council
+    timeout-minutes: 30      # the disposable PostgreSQL rehearsal and policy-v6 tests of the screening-v3 production connection (PR #173 section 5.3); fixed loopback service, no secrets, no council
     services:
       postgres:
         image: postgres:17
@@ -218,7 +220,7 @@ jobs:
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/provisioning-venv"
       - name: Screening v3 rehearsal, original function then derived replacement then rollback, disposable PostgreSQL only
         run: |
-          timeout --kill-after=2s 600s env -i HOME="$HOME" PATH=/usr/bin:/bin V3_REHEARSAL_TIMINGS="$RUNNER_TEMP/v3-rehearsal-timings.json" INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_pg.py -q -s -p no:cacheprovider --basetemp="$RUNNER_TEMP/v3-rehearsal"
+          timeout --kill-after=2s 600s env -i HOME="$HOME" PATH=/usr/bin:/bin V3_REHEARSAL_TIMINGS="$RUNNER_TEMP/v3-rehearsal-timings.json" INGESTION_REQUIRE_LOCAL_PG=1 INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_pg.py tests/test_discovery_ingestion_screening_v3_policy_pg.py -q -s -p no:cacheprovider --basetemp="$RUNNER_TEMP/v3-rehearsal"
       - name: Measured costs of the rehearsal
         if: always()
         run: cat "$RUNNER_TEMP/v3-rehearsal-timings.json" || true
