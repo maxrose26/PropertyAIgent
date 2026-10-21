@@ -226,6 +226,11 @@ def identity_admission_eligible(result,item=None):
     build) is read as v1. Anything unresolvable, unknown or not in the named version's vocabulary is NOT eligible (fail closed)."""
     if not isinstance(result,dict) or not result:return False
     if 'rule_version' not in result and 'routing_authority' not in result:
+        # Historical v1 shape. When the item is supplied its contract is established FIRST: only a valid v1 item (the v1 contract, or a historical fixture contract outside the listing-screen family) may
+        # carry it; a v3 item, or any other listing-screen contract, with its version/authority fields missing is ineligible even though its informational v1 disposition may look eligible.
+        if item is not None:
+            c=item.get('contract')
+            if not isinstance(c,str) or (c!=V1_CONTRACT and c.startswith('listing-screen-')):return False
         d=result.get('disposition')
         return isinstance(d,str) and d in IDENTITY_ELIGIBLE[RULE_V1]
     try:authority,outcome=routing_of(result)

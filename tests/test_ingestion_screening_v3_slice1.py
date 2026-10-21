@@ -571,3 +571,40 @@ def test_related_assessments_are_capped_and_report_the_true_total(ledger, monkey
         co, kids, res = run(ledger, [rec], v3_rule(t), n=n)
     (cp,) = res.values()
     assert len(cp['related_assessments']) == 2 and cp['related_assessments_total'] == 3
+
+
+# ------------------------------------------------------------------ legacy fallback cannot be used to launder a v3 item
+def stripped(cp, *fields):
+    return {k: v for k, v in cp.items() if k not in fields}
+
+
+def test_a_v3_item_with_its_version_and_authority_fields_removed_is_ineligible_but_historical_v1_still_works(ledger):
+    co, (child,), (cp,) = (lambda r: (r[0], r[1], list(r[2].values())))(run(ledger, [record('01768/26', 'Erection of 49 dwellings')], v3_rule()))
+    item = ledger.get(child)
+    assert cp['disposition'] == 'SUPPORTED_PROCESSING_PRIORITY'      # the informational v1 disposition looks eligible
+    for fields in (('rule_version', 'routing_authority'), ('rule_version',), ('routing_authority', 'count_assessment')):
+        forged = stripped(cp, *fields)
+        assert not ls.identity_admission_eligible(forged, item), fields
+    legacy = stripped(cp, 'rule_version', 'routing_authority', 'count_assessment')
+    assert not ls.identity_admission_eligible(legacy, item)      # v3 contract + legacy shape
+    assert not ls.identity_admission_eligible(legacy, dict(item, contract='listing-screen-v9'))
+    assert ls.identity_admission_eligible(legacy, dict(item, contract=V1))      # a valid v1 item
+    assert ls.identity_admission_eligible(legacy, dict(item, contract='fixture-screen'))      # the historical fixture contract the existing tests use
+    assert ls.identity_admission_eligible(legacy)      # no item supplied: unchanged helper behaviour
+
+
+@pytest.mark.parametrize('fields', [('rule_version', 'routing_authority'), ('rule_version',), ('routing_authority', 'count_assessment')])
+def test_both_identity_gates_refuse_a_v3_item_whose_version_fields_were_removed(engine, fields):
+    l, co, k, e, raw, parent, screen = gate_setup(engine, 'Erection of 49 dwellings', rule=v3_rule())
+    assert screen['disposition'] == 'SUPPORTED_PROCESSING_PRIORITY'
+    claim = l.claim(k, 'worker', 'INGESTION_TEST_new')
+    with l.engine.begin() as c:
+        c.execute(W.update().where(W.c.key == parent).values(checkpoint=stripped(screen, *fields)))
+    calls = []
+    with pytest.raises(Denied, match='SELECTIVE_SCREENING_REQUIRED'):
+        co.new_identity_source(claim, envelope=e, council=get_council('bolton'), supervised_reader=lambda row: calls.append(row))
+    assert calls == []
+    with pytest.raises(Denied, match='SELECTIVE_SCREENING_REQUIRED'):
+        co.new_identity(claim, envelope=e, council=get_council('bolton'), source=raw)
+    with Session(engine) as s:
+        assert s.scalar(select(func.count()).select_from(Application)) == 0
