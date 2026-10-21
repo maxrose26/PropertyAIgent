@@ -160,9 +160,16 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
                     previous = key
                 return plans
 
-            def scenario(name, n, rule, *, kind='LISTING_RECEIPT_V1', screening_grant=True, expiry=900, authority=None, source_calls=0):
+            def synthetic(tag, i):
+                """A record with its own reference, so a scenario never collides with the retained world's children (the SQL refuses a conflicting duplicate, correctly)."""
+                r = copy.deepcopy(receipt['records'][i])
+                r['reference'] = 'SYN/%s/%d' % (tag, i)
+                r['source_record_id'] = 'SYN-%s-%d' % (tag, i)
+                return r
+
+            def scenario(name, n, rule, *, kind='LISTING_RECEIPT_V1', screening_grant=True, expiry=900, authority=None, source_calls=0, tag=None):
                 """A synthetic capture of the first n retained records (COMPLETE, own root), its batch items inserted as the owner's registration does, and a grant."""
-                capture = dict(receipt, records=receipt['records'][:n], kind=kind)
+                capture = dict(receipt, records=[synthetic(tag or name, i) for i in range(n)], kind=kind)
                 root = item(dict(subject=dict(SCOPE, semantics='RECEIVED', start='2026-09-28', end='2026-10-04'), task='DISCOVERY', contract=CON, revision='scenario-' + name), max_attempts=1, limits=dict(DEFAULT_LIMITS, requests=10, bytes=3000000, rows=60, pages=6))
                 insert_rows([completed(root, checkpoint=capture, outcome=dict(outcome='ENUMERATED_METADATA_RETAINED', children=[], source_sha256=capture['source_sha256']))])
                 plans = plan_for(root['key'], capture, rule)
@@ -276,7 +283,7 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             with pytest.raises(Exception) as e:      # replaying row 0 on the same claim: the batch has moved on, so the supplied record is not the next one
                 sc3['ledger'].batch_row(claim, sc3['plans'][0]['checkpoint']['plan'], sc3['capture'], sc3['capture']['records'][0])
             assert 'BATCH_ROW_IDENTITY' in message(e) and count("task='SCREENING'") == before
-            dup = scenario('dup2', 3, V3)      # the same record under the same configuration, presented from a different capture parent
+            dup = scenario('dup2', 3, V3, tag='dup')      # the same record under the same configuration, presented from a different capture parent
             dup_claim = dup['ledger'].claim(dup['batches'][0]['key'], lease_seconds=165)
             with pytest.raises(Exception) as e:
                 dup['ledger'].batch_row(dup_claim, dup['plans'][0]['checkpoint']['plan'], dup['capture'], dup['capture']['records'][0])

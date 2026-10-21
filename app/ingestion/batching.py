@@ -55,10 +55,10 @@ def _process_batch(coordinator,key,*,check=lambda:None,after_row=lambda _:None,p
     plan=row['checkpoint']['plan']
     if digest(plan)!=row['revision'] or not 0<=plan['first']<plan['last']<=60 or plan['last']-plan['first']>5:raise Denied('EXACT_BATCH_PLAN')
     from .listing_screening import RULE_V1,screening_plan_binding
-    rule=coordinator.screening_rule
+    rule=getattr(coordinator,'screening_rule',None)      # a coordinator that predates the registry (historical stubs) is v1
     if plan.get('screening') is None:
-        if rule.rule_version!=RULE_V1:raise Denied('BATCH_RULE_MISMATCH')      # a v1 plan is never screened by a v3 coordinator
-    elif rule.rule_version==RULE_V1 or screening_plan_binding(rule)[0]!=plan['screening']:raise Denied('BATCH_RULE_MISMATCH')      # a v3 plan only by the exact registered rule
+        if rule is not None and rule.rule_version!=RULE_V1:raise Denied('BATCH_RULE_MISMATCH')      # a v1 plan is never screened by a v3 coordinator
+    elif rule is None or rule.rule_version==RULE_V1 or screening_plan_binding(rule)[0]!=plan['screening']:raise Denied('BATCH_RULE_MISMATCH')      # a v3 plan only by the exact registered rule
     if row['state']=='COMPLETE':return dict(outcome='BATCH_ALREADY_COMPLETE',checkpoint=row['checkpoint'])
     budget=getattr(l,'budget',None)
     if budget is None or budget.slot_key!=key:raise Denied('LOGICAL_BATCH_BUDGET_REQUIRED')
