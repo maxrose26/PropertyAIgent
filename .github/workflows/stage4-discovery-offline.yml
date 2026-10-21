@@ -91,6 +91,9 @@ jobs:
       - name: Digit-run stall regression, end-to-end screening bounded under a hard timeout (offline, child processes)
         run: |
           timeout --kill-after=2s 180s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_unit_filter_digit_runs.py tests/test_ingestion_count_assessment.py -q -x -p no:cacheprovider
+      - name: Screening rule v3 slice 1, explicit selection, bound identity, version-aware identity gates and projections (offline, disposable database only)
+        run: |
+          timeout --kill-after=2s 180s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_slice1.py -q -p no:cacheprovider
       - name: Stable qualification module imports, builds its engine, negotiates TLS with a local server and is memory-limited under the workflow's enforced resource limits, no external network
         run: |
           set -euo pipefail

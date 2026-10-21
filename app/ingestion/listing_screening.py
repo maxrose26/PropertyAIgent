@@ -162,3 +162,60 @@ def routing_of(result):
     else:raise ValueError('ROUTING_AUTHORITY_UNRESOLVED')
     if not isinstance(outcome,str) or outcome not in ROUTING_VOCABULARY[version]:raise ValueError('ROUTING_OUTCOME_NOT_IN_VOCABULARY')      # unknown, misspelt, wrong-version or non-string outcomes fail closed
     return authority,outcome
+
+
+# ------------------------------------------------------------------ slice 1: explicit rule selection, configuration-bound identity, version-aware eligibility
+V1_CONTRACT='listing-screen-v1'
+V3_CONTRACT='listing-screen-v3'
+SCREENING_CONTRACT_RULES={V1_CONTRACT:RULE_V1,V3_CONTRACT:RULE_V3}      # a contract name fixes its rule version; there is no other way to select v3
+
+
+class ScreeningRule:
+    """One explicitly registered screening rule. v1 takes no threshold. v3 carries the council-configured threshold FROZEN at construction (read once, here, never per record)."""
+    def __init__(self,rule_version,*,unit_threshold=None,council=None):
+        if rule_version not in (RULE_V1,RULE_V3):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
+        if rule_version==RULE_V1:
+            if unit_threshold is not None or council is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')
+        else:
+            if (unit_threshold is None)==(council is None):raise ValueError('RULE_V3_REQUIRES_EXACTLY_ONE_OF_COUNCIL_OR_THRESHOLD')
+            if council is not None:unit_threshold=council_unit_threshold(council)
+            if type(unit_threshold) is not int or unit_threshold<=0:raise ValueError('INVALID_SCREENING_THRESHOLD')
+        self.rule_version=rule_version;self.unit_threshold=unit_threshold
+
+    def contract(self):
+        return V1_CONTRACT if self.rule_version==RULE_V1 else V3_CONTRACT
+
+    def config(self):
+        """Every decision-affecting setting of a v3 assessment. Changing any of them gives a different config_sha256 and so a different assessment identity."""
+        if self.rule_version==RULE_V1:return None
+        from .count_assessment import RULE_VERSION,MAX_TEXT
+        return dict(rule_version=RULE_V3,count_spec_version=RULE_VERSION,assessor='count_assessment',unit_threshold=self.unit_threshold,max_text_chars=MAX_TEXT)
+
+    def screen(self,record):
+        if self.rule_version==RULE_V1:return screen_row(record)
+        return screen_row(record,rule_version=RULE_V3,unit_threshold=self.unit_threshold)
+
+
+def assessment_identity(record,rule):
+    """(record_sha256, config, config_sha256, revision) of a v3 assessment of one source record. The revision is the ledger item revision: it binds the source record AND the configuration, so the same
+    record under the same configuration is one item (idempotent) and a changed threshold is a different item. v1 keeps its historical revision (the record digest) and is not handled here."""
+    from .ledger import digest
+    config=rule.config()
+    if config is None:raise ValueError('RULE_V1_HAS_NO_CONFIGURATION_BINDING')
+    record_sha=digest(record);config_sha=digest(config)
+    return record_sha,config,config_sha,digest(dict(record_sha256=record_sha,config_sha256=config_sha))
+
+
+IDENTITY_ELIGIBLE={RULE_V1:frozenset({'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}),RULE_V3:frozenset({'ADMIT_SCHEME','ADMIT_FOR_ASSESSMENT'})}
+
+
+def identity_admission_eligible(result):
+    """True only when a stored screening result's ONE authoritative routing outcome (`routing_of`) permits creating a pending identity. It is the first condition of the two identity gates, never the only one:
+    every existing factual-admission check still applies. Neither version's eligible outcome writes a count or confirms qualification. A legacy checkpoint with no rule version (the shape the existing tests
+    build) is read as v1. Anything unresolvable, unknown or not in the named version's vocabulary is NOT eligible (fail closed)."""
+    if not isinstance(result,dict) or not result:return False
+    if 'rule_version' not in result and 'routing_authority' not in result:
+        return result.get('disposition') in IDENTITY_ELIGIBLE[RULE_V1]
+    try:authority,outcome=routing_of(result)
+    except ValueError:return False
+    return outcome in IDENTITY_ELIGIBLE[result['rule_version']]

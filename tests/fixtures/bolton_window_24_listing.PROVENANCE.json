@@ -1,0 +1,29 @@
+{
+ "fixture": "tests/fixtures/bolton_window_24_listing.json",
+ "fixture_sha256": "9f45362584672f41d4b0a76fe01a5b081bc5120123b11108bd879f733846a268",
+ "record_count": 24,
+ "projection": "each record keeps only reference, proposal and address, copied verbatim from the captured listing record; no text was edited, added or removed",
+ "origin": {
+  "description": "first complete Bolton window capture (RECEIVED, 24 rows), owner-published Stage 4 window demonstration",
+  "capture_file": "docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023/capture/source.json",
+  "capture_file_sha256": "5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a",
+  "capture_branch": "stage4/narrow-continuation-evidence-20261016",
+  "capture_branch_head_at_verification": "3a0b52f018e25b6430f259bd25d47416e24d88b5",
+  "capture_file_last_changed_in": "3587e2778720f56a9510b33c7bbce7584f6be59d",
+  "capture_digest_cross_reference": "the same digest is recorded as the owner archive digest in the merged RECONCILIATION.md of the window demonstration",
+  "fixture_first_committed_in": "89d6e60706275473fcbc09af0f0f7868a93e2af2 (draft PR #163, branch stage4/screening-size-assessment-20261023)"
+ },
+ "verified": "the fixture equals, record for record, the projection of the 24 records of the capture file; verified read-only on 2026-10-27",
+ "recorded_v1_aggregate": {
+  "INSUFFICIENT_EVIDENCE": 20,
+  "RELATED_APPLICATION_FOLLOW_THROUGH": 3,
+  "SUPPORTED_PROCESSING_PRIORITY": 1,
+  "citation_occurrences": 3,
+  "proposal_usable": 24
+ },
+ "limits": [
+  "the fixture is a projection: source URLs, record identifiers and application-type cells of the capture are not carried, so tests derive neutral values for them and treat application type as UNKNOWN",
+  "it is real captured wording from one council and one window, not a sample of the national population of proposal wording",
+  "no result computed from it is a planning fact; it demonstrates routing and storage only"
+ ]
+}

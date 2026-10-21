@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import hashlib,json,math
 from sqlalchemy import select
 from .ledger import Denied,bounded,digest
-from .listing_screening import screen_row
+from .listing_screening import screen_row,routing_of,identity_admission_eligible,ScreeningRule,assessment_identity,SCREENING_CONTRACT_RULES,V1_CONTRACT,RULE_V1
 from .resource_accounting import combined_bytes
 
 
@@ -70,8 +70,14 @@ class FactualContract:
 
 
 class Coordinator:
-    def __init__(self,ledger,contracts,*,isolated_contracts=()):
+    def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None):
         self.ledger=ledger;self.contracts=dict(contracts);self.isolated_contracts=frozenset(isolated_contracts)
+        # Explicit rule selection: v1 unless a rule is registered under its own contract name. ONE screening contract per run; a v3 threshold is read once, at ScreeningRule construction, and frozen here.
+        rules=dict(screening_rules) if screening_rules else {V1_CONTRACT:ScreeningRule(RULE_V1)}
+        if len(rules)!=1:raise ValueError('ONE_SCREENING_CONTRACT_PER_RUN')
+        (name,rule),=rules.items()
+        if not isinstance(rule,ScreeningRule) or SCREENING_CONTRACT_RULES.get(name)!=rule.rule_version:raise ValueError('SCREENING_CONTRACT_RULE_MISMATCH')
+        self.screening_rules=rules;self.screening_contract=name;self.screening_rule=rule
 
     def _preflight_listing(self,claim):
         row=self.ledger.get(claim.key);subject=row['subject'];contract=self.contracts.get(row['contract'])
@@ -108,7 +114,8 @@ class Coordinator:
         for record in receipt['records']:
             subject=dict(kind='APPLICATION',council=receipt['council'],reference=record['reference'])
             # Stable key/version makes crash between insert and acknowledgement safe.
-            key=self.ledger.enqueue(subject,'SCREENING',contract='listing-screen-v1',revision=digest(record),dependencies=[claim.key],priority=row['priority'],max_attempts=2,parent_claim=claim)
+            revision=digest(record) if self.screening_rule.rule_version==RULE_V1 else assessment_identity(record,self.screening_rule)[3]
+            key=self.ledger.enqueue(subject,'SCREENING',contract=self.screening_contract,revision=revision,dependencies=[claim.key],priority=row['priority'],max_attempts=2,parent_claim=claim)
             children.append(key)
         self.ledger.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=children,source_sha256=receipt['source_sha256']))
         return children
@@ -206,13 +213,29 @@ class Coordinator:
 
     def screening(self,claim):
         row=self.ledger.get(claim.key)
-        if row['task']!='SCREENING' or row['contract']!='listing-screen-v1' or len(row['dependencies'])!=1:raise Denied('SCREENING_TASK')
+        if row['task']!='SCREENING' or row['contract'] not in SCREENING_CONTRACT_RULES or len(row['dependencies'])!=1:raise Denied('SCREENING_TASK')
+        if row['contract']!=self.screening_contract:raise Denied('SCREENING_CONTRACT_NOT_REGISTERED')
+        rule=self.screening_rule
         parent=self.ledger.get(row['dependencies'][0]);receipt=parent['checkpoint']
         records=[r for r in receipt['records'] if r['reference']==row['subject']['reference']]
-        if len(records)!=1 or digest(records[0])!=row['revision'] or receipt['council']!=row['subject']['council']:raise Denied('SCREENING_IDENTITY')
-        record=records[0];result=screen_row(record)
+        if len(records)!=1 or receipt['council']!=row['subject']['council']:raise Denied('SCREENING_IDENTITY')
+        record=records[0]
+        if rule.rule_version==RULE_V1:
+            if digest(record)!=row['revision']:raise Denied('SCREENING_IDENTITY')
+            binding={}
+        else:
+            # The stored identity must be exactly the one this run's frozen configuration derives from the record; a mismatch means the item was made under another record or configuration.
+            record_sha,config,config_sha,revision=assessment_identity(record,rule)
+            if revision!=row['revision']:raise Denied('SCREENING_CONFIG_BINDING')
+            binding=dict(record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision)
+        result=rule.screen(record)
         result.update(source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])
-        self.ledger.checkpoint(claim,result);self.ledger.finish(claim,dict(outcome=result['disposition'],retained=True))
+        if binding:
+            from .screening_projection import screening_items,assessment_history
+            result.update(binding,assessment_sha256=digest(result['count_assessment']),capture_key=row['dependencies'][0],capture_sha256=receipt['source_sha256'])
+            # Informational links to other stored assessments of the same record; never `supersedes`, never "current", and no earlier item is touched.
+            result['related_assessments']=[e for e in assessment_history(screening_items(self.ledger),row['subject'],record_sha) if e['item_key']!=claim.key]
+        self.ledger.checkpoint(claim,result);self.ledger.finish(claim,dict(outcome=routing_of(result)[1],retained=True))
         # No automatic factual task, parent retrieval or Application admission.
         return result
 
@@ -307,7 +330,7 @@ class Coordinator:
         if row['task']!='FACTUAL_REFRESH' or (contract.row['council'],contract.row['reference'],contract.row['source_url'])!=(envelope.council,envelope.reference,envelope.source_url) or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE:raise Denied('EXACT_DETAIL_CONTRACT_BEFORE_SOURCE')
         if len(row['dependencies'])!=1:raise Denied('SELECTIVE_SCREENING_REQUIRED')
         parent=self.ledger.get(row['dependencies'][0]);screen=parent['checkpoint'] or {}
-        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or screen.get('disposition') not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'} or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not identity_admission_eligible(screen) or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
         prior=row['checkpoint']
         if prior is not None:
             if prior.get('kind')=='DETAIL_RECEIPT_V1':return self.new_identity(claim,envelope=envelope,council=council,source=prior['source'])
