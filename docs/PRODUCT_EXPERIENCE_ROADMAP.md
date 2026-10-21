@@ -6,6 +6,14 @@ Priority follows the audit's own scale: **P0** (before any external demo) · **P
 
 ---
 
+## Stage 7 extension — Owner Scheme Review and Verified Corrections
+
+[Specification 036](../specifications/036-owner-scheme-review-and-verified-corrections.md) records the agreed, **not implemented** owner-only review workspace inside the existing application. Reuse this roadmap's bounded-list, evidence, unknown-state and accessibility conventions when Stage 6 dependencies are ready. This is a master **Stage 7** extension; the UX “Phases” below are not master stage numbers.
+
+Owner review concerns shared scheme evidence and corrections, separate from buyer-specific saved opportunities and investment decisions. Restrict review data and commands server-side to the authenticated owner before loading them; the proposed Administration navigation treatment below is presentation only and grants no authority. No internal inbox, unresolved records or controls may leak through general-user pages, exports or APIs. Opening a review must not fetch new evidence.
+
+Depend on Stage 4 durable evidence/screening, the reviewed Application/Site/scheme identity model and Stage 1 authorisation. Specification preparation can proceed in parallel with Claude's active ingestion work; the workspace is not a new Stage 4 completion requirement. Persistence/identity decisions, later implementation and release require their own approval. This addition implements no UI, database or scheduling changes.
+
 ## Commercial Polish — Specific Improvements
 
 Per the brief's Part 11, the concrete, demo-facing improvements that make the platform feel commercially ready, independent of which page they touch:
@@ -83,3 +91,4 @@ Consistent with the brief and with [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)'s ow
 ## Sequencing Rationale
 
 Phase 1 exists because a rebrand and a dead-end fix are same-day, zero-dependency wins with outsized impact on a first impression — they should not wait behind a full navigation rebuild. Phase 2 (navigation + dashboard) is sequenced next because every later phase assumes navigation exists to reach it from. Phase 3 (Site Profile) is prioritised immediately after navigation because it is explicitly the flagship page and the audit's single highest-value structural fix. Phases 4–6 are lower-dependency, higher-volume polish work, sequenced by how much of the product each phase's fix touches (design system components first, since they're reused everywhere; page-specific fixes last).
+

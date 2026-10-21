@@ -11,6 +11,25 @@ Development Economics  →  AI Decision Support  →  Workflow
 
 ---
 
+## Product Owner decision record — 21 October 2026: Stage 7 Owner Scheme Review
+
+**Agreed product scope; specification only, not implemented.** [Specification 036 — Owner Scheme Review and Verified Corrections](../specifications/036-owner-scheme-review-and-verified-corrections.md) adds an explicit **Stage 7 extension** within the existing application. It enables the authenticated owner to resolve materially uncertain scheme evidence, preserve verified corrections, qualify/link schemes and request specific bounded investigation. It is shared evidence maintenance, distinct from Stage 7's buyer-specific saved opportunities and investment decisions.
+
+| Stage / dependency | Placement and boundary |
+|---|---|
+| Stage 4 ingestion, durable evidence and screening | Supplies retained application identities, observations, provenance and screening outcomes. Stage 4 remains OPEN; completing the review workspace is **not** an additional Stage 4 gate. Claude's active sparse-day/screening work remains separate |
+| Application-to-scheme persistence and identity | Reconcile Application, Site, phase and SchemeIntelligence before implementation; specification 004's Development concept must not be mistaken for an existing canonical scheme table |
+| Stage 1 server-side access | Reuse verified identity/admission; owner-only checks before every read/command, including direct access. A general operator role or hidden navigation alone is insufficient |
+| Stage 6 interface conventions | Reuse existing application components, evidence qualifiers and accessible bounded lists; no frontend rebuild |
+| Stage 7 — Owner Scheme Review and Verified Corrections | Owner inbox, evidence panel, supported corrections, persistent/supersedable decisions, scheme linking, specific research-task requests and audit history |
+| Stage 7 — buyer decisions and saved opportunities | Separate buyer-owned strategy/interest workflow; owner evidence review does not create a buyer recommendation |
+
+Scheme admission is independent of whether a matching buyer profile exists today. A supported proposed total of **10+ residential dwellings** meets the current size criterion; it does not establish commercial suitability or availability. Retain valid below-threshold identities for reassessment without automatic promotion. The residential-count rules belong to [specification 035's separate proposal, PR #166](https://github.com/maxrose26/PropertyAIgent/pull/166), not a second policy in the review UI. [033](../specifications/033-verified-records-under-unknown-window-completeness.md) and [034's separate proposal, PR #164](https://github.com/maxrose26/PropertyAIgent/pull/164) govern sparse-observation boundaries: human verification cannot establish window completeness, absence or coverage.
+
+Specification work may proceed alongside current Stage 4 work. Later implementation must first settle the identity/persistence overlay and owner-only command boundary recorded in 036, then validate persistence, idempotency, stale edits, evidence conflicts and ordinary-user non-disclosure. Do not change active ingestion specifications or code through this documentation task.
+
+Verified corrections can supply versioned regression/evaluation examples; they do not automatically train models or change general rules. Retention remains unresolved: preserve existing evidence under the interim rule, with no pruning mechanism. Reviewer teams, bulk editing, CRM/outreach, a separate admin app and broader admission exceptions are deferred. This record authorises no implementation, schema change, merge, deployment, council request, task execution, schedule or Stage advancement. Historical status records below remain dated evidence, not newly verified production claims.
+
 ## Product Owner decision record — 9 October 2026
 
 **APPROVED STATUS AND SPECIFICATION SEQUENCING.** Stage 2.6A is complete for its qualified audit purpose. Stage 2.6B B1.1 is accepted and closed within its production application scope at `c709bd7643161daab16db86b86509aabf289048d` (Render `dep-db3va4g473hc73c38ia0`). This supersedes earlier next-task labels without rewriting historical decisions or completing unfinished original gates.
@@ -949,3 +968,4 @@ Specification 031 proposes a bounded legacy inventory/dependency manifest, risk-
 The future strategy must compare direct-reference polling, verified council decision/change signals, document deltas, related-application discovery and time-triggered checks. Received/validated lists are not complete change feeds. Timestamp-only verification must not change material evidence, fit, families or fingerprints, or trigger AI. Bootstrap completion requires explicitly accepted cohort coverage/exceptions before steady-state coverage is claimed.
 
 Stand Golf remains a separate acquisition-subject requirement: one planning scheme may contain commercially distinct opportunities. Wider 103 homes and retirement component 60 apartments are recorded; the potential 43-home remainder is not independently validated. Reuse/reconcile Stage 2.5B before later decomposition. Historical monitoring-hash mismatch remains separate, with no rebaseline or activation.
+
