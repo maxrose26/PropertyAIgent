@@ -7,13 +7,13 @@ Grounded in `master` at `92fa88d7356f4b7c51fa7257373b0fcd20055e75` (PR #172: dis
 
 ## 0. What is being asked
 
-Decisions needed before any implementation are collected in section 9. In short, this proposal recommends:
+This is the **finalised** proposal. Design directions from the Product Owner are recorded in section 9.1 (v3 first and compatible with 034 but not bundled; code binding; stops preserved; the 24 retained records only; no history scan in execution; the verified full retained capture; the owner-terminal ceremony). Decisions that remain are in section 9.3. In short, this proposal recommends:
 
 1. One `ingestion_worker_step` replacement (installation is a separate, held step) that adds a v3 branch beside the unchanged v1 branch.
 2. v3 identity extended with a **code binding** (digest of the modules that produce the saved result) so a code change can never silently share an identity.
 3. History presentation removed from the assessment step and replaced by a bounded, paginated, read-only query.
 4. A **screening-only** first production demonstration against the retained capture: `source_calls = 0`, `writes = 0`, no application-database effect, no identity write.
-5. Sequencing with the separate sparse-observation work (specification 034), which also replaces `ingestion_worker_step`.
+5. v3 first, compatible with (but not bundled with) the separate sparse-observation work (specification 034), which also replaces `ingestion_worker_step` at disjoint sites; v3 explicitly refuses observation parents.
 
 ## 1. Current-state findings
 
@@ -31,7 +31,7 @@ Decisions needed before any implementation are collected in section 9. In short,
 | F8 | The runner builds the screening batches from the retained capture (`batch_plans`), prepares 24 `listing-screen-v1` children and 5 batch items, registers them under `<authority>_SCREEN` with `source_calls=0`, and processes each batch with `process_batch`. Its coordinator is `Coordinator(ledger, {CONTRACT: IdoxListingContract(...)})`, so it takes the **default v1 rule**. | `operational_runner.py:428-456`, `:336-341`; `app/ingestion/batching.py:16-25`, `:44-82` |
 | F9 | The controller's nomination path (`execute`) gates identity creation on the **v1** dispositions, pins the screening child's contract to `listing-screen-v1`, and compares the stored receipt with `screen_row(r)` (v1). `resume_capture` recomputes the 24 expected v1 child keys. | `operational_controller.py:327`, `:331`, `:390` |
 | F10 | `ingestion_worker_step` is the **original** reviewed definition in every accepted installed inventory (`ORIGINAL`, `SUCCESSOR_POLICY_APPLIED`, `GENERATION2_*`, `GENERATION3_WINDOW_POLICY_APPLIED`); the policy files redefine only `ingestion_bolton_allowed` and `ingestion_register_bolton_exception`. The owner accepts exactly one coherent inventory per mode and refuses any mixture. | `operational_owner.py:219-256`; `docs/design/ingestion-window-demonstration-20261023/policy-window-allowance.sql` |
-| F11 | The control row was **last recorded** (23 October reconciliation, not re-read for this proposal) in a **stopped** state: generation 3, manual stop `IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE`, global stop `CONSUMED_SALFORD_GLOBAL_STOP`. While a global stop is set, `ingestion_worker_step` proceeds only if `ingestion_bolton_allowed` admits the authority, and policy v5 names **exactly two** allowances (the 23 October window demonstration, both consumed and invalidated, one exact scope). A new demonstration needs a **new** named allowance, i.e. a policy successor, or an owner decision to change the stop. | `policy-window-allowance.sql:14-29` (allowed), `:30-` (registration; it also names three generation-2 allowances, unreachable at generation 3); `docs/design/ingestion-window-demonstration-reconciliation-20261023/RECONCILIATION.md` rows 41-42 |
+| F11 | The control row was **last recorded** (owner audit timestamps of **2026-10-20**; the `20261023` in the file and authority names is a namespace identifier; not re-read for this proposal and not assumed current) in a **stopped** state: generation 3, manual stop `IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE`, global stop `CONSUMED_SALFORD_GLOBAL_STOP`. While a global stop is set, `ingestion_worker_step` proceeds only if `ingestion_bolton_allowed` admits the authority, and policy v5 names **exactly two** allowances (the window demonstration named `…20261023`, executed 2026-10-20, both consumed and invalidated, one exact scope). A new demonstration needs a **new** named allowance, i.e. a policy successor, or an owner decision to change the stop. | `policy-window-allowance.sql:14-29` (allowed), `:30-` (registration; it also names three generation-2 allowances, unreachable at generation 3); `docs/design/ingestion-window-demonstration-reconciliation-20261023/RECONCILIATION.md` rows 41-42 (reconciliation namespace identifier; the audit times in it are 2026-10-20) |
 | F12 | Ledger resource bounds are enforced in SQL: 4,096 items (`ITEM_BOUND`), 12,288 attempts, 32 MiB total, 131,072-byte payloads, `statement_timeout 10s`, `lock_timeout 3s`. The table has a primary key on `key` and **no secondary index**; `subject` is a `JSON` column. | `worker.sql:171` (items), `:125` (attempts), `:246` (storage), `:225` (checkpoint size); `app/ingestion/schema.py:9-29`; `sql_ledger.py:19-21` |
 
 ### 1.2 What slice 1 (PR #172) already provides, and what it does not
@@ -93,71 +93,123 @@ Interaction with batch identity: a batch item's identity is `(subject, 'LISTING_
 Specification 034 also **replaces `ingestion_worker_step`**, deriving it from the same `worker.sql` by two substitutions at the `batch_row`/`batch_reseal` capture-kind test (`worker.sql:145`) and the `capture_only` checkpoint test (~`:222`). Findings:
 
 * The site sets are **disjoint** (034: capture kind; v3: child contract/revision/insert and two ops' tails), but they sit in the same `batch_row` condition chain, and both define a **new installed inventory state** with a new owner mode and installation ceremony.
-* Two independent replacements cannot both be "the" reviewed function: whichever installs second must be derived from the first, or both must be derived once.
-* **Recommendation:** one derivation module with **both** substitution lists applied to the original, one new inventory state, one ceremony; each list individually default-off (034 by `observation_councils`, v3 by `screening_configs`), each individually removable, and a test that undoing either list alone reproduces the other's single-list function byte for byte. If 034 is not approved soon, v3 proceeds alone and 034 is later rebased onto the combined derivation.
+* Two independent replacements cannot both be "the" reviewed function. **Direction recorded: v3 first, not bundled with sparse-observation implementation.** Whichever of v3 and 034 installs second must be derived from the first as a further substitution list over the installed text (with its own inventory state and ceremony); the two lists are independent, each default-off, each individually removable.
+* **Compatibility, not bundling:** the v3 derivation module contains only the v3 list; a test applies the v3 and the 034 lists in both orders to `worker.sql` and requires identical output, and a test over an observation parent requires that v3 children are still refused. If 034 is approved first, v3 rebases onto its inventory state; if v3 lands first, 034 is rebased onto it.
 * No other overlap: 034 changes capture-side Python (`idox_source`, `observe`) and a `source_kind` annotation inside `Coordinator.screening`; v3 changes the registry, the identity binding and the controller. The `Coordinator.screening` edits are in different branches but the same method; implementation order must be agreed to avoid a rebase conflict.
 * **Correction to a tempting assumption:** 034's own site 1 makes an observation parent *admissible* for `batch_row` once the grant lists the council (034 section 3), so in a combined function an observation could spawn screening children. v3 must therefore **not** inherit that admission: S1 admits a v3 child only when `capture.checkpoint->>'kind' = 'LISTING_RECEIPT_V1'` (never for `LISTING_OBSERVATION_V1`), with a test over an observation parent. A v3 assessment of an observation is out of scope for both proposals.
+
 
 ## 3. Assessment identity and reproducibility (scope item 2)
 
 Reuse, do not replace: `digest`, `revision`, `rule_version`, `assessment_identity` (slice 1). Extend the **configuration** only.
 
-**Proposed binding (identity = what the result depends on):**
+**Proposed binding (identity = what the saved result depends on):**
 
 ```
 config = {
   rule_version, count_spec_version, assessor, unit_threshold, max_text_chars,   # as slice 1
-  code_binding: sha256 over the canonical list of {path, sha256(LF-normalised bytes)} for
-      app/ingestion/listing_screening.py, count_assessment.py, count_evidence.py,
-      app/scrapers/unit_filter.py,
-  qualifier_contract: 'listing-screen-v1-output-embedded'
+  code_binding: sha256 over the canonical list of {path, sha256(LF-normalised bytes)} for the bound modules,
+  digest_probe:  digest(<fixed test vector>)        # detects a change in the canonical-JSON digest function
 }
-revision = digest({record_sha256, config_sha256})            # unchanged rule
+revision = digest({record_sha256, config_sha256})   # unchanged rule
 ```
 
-Not bound by the digest: the Python interpreter and `re` behaviour (partly covered by the repository revision in the owner's `execution_binding`). Editing `listing_screening.py` or the coordinator for the proposed `link_related` option re-pins the digest. Stored beside the identity (provenance, not identity): `qualifier_output_sha256` (digest of the embedded v1 result), `assessment_sha256` (digest of `count_assessment`), repository `revision` (already bound by the owner registration's `execution_binding`).
+**Bound modules** (the assessment's runtime closure inside `app/`, measured on `master` by importing and running `ScreeningRule(RULE_V3).screen()` plus `assessment_identity()` on a retained record): `app/ingestion/listing_screening.py` (contains `_screen_v1`, the embedded v1 result), `app/ingestion/count_assessment.py`, `app/ingestion/count_evidence.py`, `app/scrapers/unit_filter.py` (the v1 qualifier). `app/ingestion/ledger.py` is also loaded (for `digest`), but binding its whole file would re-key every identity on any unrelated ledger edit; instead its `digest` behaviour is bound by `digest_probe`. `app/config` is imported lazily only when a rule is built from a council name and does not enter the result. The embedded v1 result is therefore covered twice: by the code that computes it, and by `qualifier_output_sha256` stored beside the identity.
 
-Why a byte digest of four modules rather than a hand-maintained version number: the failure to prevent is a silent change (PR #170 is the example), and a version number is exactly what gets forgotten. The cost is that a comment-only edit to those modules changes new identities; that is safe (new assessments, old ones preserved) and visible. A test pins the expected digest so a change must be a conscious one.
+Stored beside the identity (provenance, not identity): `qualifier_output_sha256` (digest of the embedded v1 result), `assessment_sha256` (digest of `count_assessment`), the repository revision (already bound by the owner registration's `execution_binding`). Not bound by the digest: the Python interpreter and `re` behaviour (recorded as provenance, and covered by the execution revision and the pinned CI environment).
 
-Properties kept: identical inputs and configuration ⇒ the same item (idempotent); a changed threshold or code ⇒ a different item; the source-record digest stays separately recoverable; the controller recomputes the identity in trusted memory and the grant's per-key binding includes the revision, so a worker running different code derives a different revision and is refused before it can write anything: by `EXACT_BATCH_PLAN` / `BATCH_ROW_IDENTITY` in SQL when it builds a child, by `EXACT_AUTHORITY_BINDING_REQUIRED` (F1) when it presents a binding the grant does not hold, or by `SCREENING_CONFIG_BINDING` (`coordinator.py:232`) in Python.
+**Why a byte digest and not a version number.** The failure to prevent is a silent change; PR #170 changed `unit_filter.UNIT_COUNT_PATTERNS` after the v3 assessor existed and a version number is exactly what gets forgotten. The cost is that a comment-only edit changes new identities; that is safe (new assessments, old ones preserved) and visible. Editing `listing_screening.py` for the proposed `link_related` option also changes the digest, so the option and the digest land together and the pinned value is set once, in the implementation PR.
 
-**No supersession.** No column, field or query marks an assessment current, latest, preferred or superseding. Older assessments, v1 results and factual evidence are never modified. A newer assessment does not retire an older one.
+**How dependency coverage and Windows/Linux consistency are tested (all offline, runnable in the existing CI job):**
+
+1. *Closure test.* In a fresh interpreter, import the modules, run the v3 screen on a probe record, and collect every loaded module whose file is under the repository. The set must be a subset of `{bound modules} ∪ {declared exclusions: ledger.py, schema.py, package __init__ files}`. A new import in the assessment path fails the test until it is bound or consciously excluded.
+2. *Pinned digest.* The expected `code_binding` is a constant in the test. Changing any bound byte fails it, forcing a conscious update (the failure message names the file).
+3. *Line-ending independence.* The digest function reads bytes (never text mode) and replaces `\r\n` with `\n` before hashing. Test: for each bound module, hash the bytes, a CRLF-transformed copy and an LF copy; all three give the same file digest; a lone `\r` or a UTF-8 BOM in a bound file fails the test.
+4. *Cross-platform.* The same test runs on the Linux CI job; its pinned value was also produced from the git blob (`git show <rev>:<path>`), not the working tree, so a Windows `autocrlf` checkout and a Linux checkout agree. Run on both before the pin is accepted; this proposal only specifies it.
+5. *Content-addressing end to end.* The v3 identity of the 24 retained records is computed twice (the worker's rule and the controller's trusted recomputation) and must agree; the grant's per-key binding includes the revision, so a worker running different bytes derives a different revision and is refused before it can write: by `EXACT_BATCH_PLAN` / `BATCH_ROW_IDENTITY` in SQL when it builds a child, by `EXACT_AUTHORITY_BINDING_REQUIRED` when it presents a binding the grant does not hold, or by `SCREENING_CONFIG_BINDING` (`coordinator.py:232`) in Python.
+
+Properties kept: identical inputs and configuration give the same item (idempotent); a changed threshold or code gives a different item; the source-record digest stays separately recoverable.
+
+**No supersession.** No column, field or query marks an assessment current, latest, preferred or superseding. Older assessments, v1 results and factual evidence are never modified.
 
 ## 4. Bounded history access (scope item 3)
 
 **Separate execution from presentation.**
 
-* *Execution* no longer reads other assessments. In the production path `Coordinator.screening` does **not** compute `related_assessments`; the stored v3 checkpoint carries only the binding fields. (`rule.link_related` is a registry option, default `True` for the disposable ledger so PR #172 behaviour is unchanged; the production registration sets it `False`.) Work per record is therefore O(1) regardless of backlog.
-* *Presentation* is a read-only query, run on request, never by a worker, never inside a claim:
+* *Execution* never reads other assessments. In the production path `Coordinator.screening` does not compute `related_assessments`; the stored v3 checkpoint carries only the binding fields. (`rule.link_related` stays `True` for the disposable ledger so PR #172 behaviour is unchanged; the production registration sets it `False`.) Work per record is O(1) regardless of backlog.
+* *Presentation* is a read-only query run on request, never by a worker and never inside a claim.
+
+**The query (one per request, one page per request):**
 
 ```
-SELECT key, contract, revision, state, outcome->>'outcome' AS outcome,
-       checkpoint->>'config_sha256' AS config_sha256, checkpoint->>'rule_version' AS rule_version
+SELECT key, contract, revision, state,
+       outcome::jsonb->>'outcome'        AS outcome,
+       checkpoint::jsonb->>'rule_version'    AS rule_version,
+       checkpoint::jsonb->>'config_sha256'   AS config_sha256,
+       checkpoint::jsonb->>'record_sha256'   AS record_sha256
 FROM ingestion_work_items
-WHERE task = 'SCREENING' AND subject::jsonb = :subject::jsonb
-  AND key > :after
+WHERE task = 'SCREENING'
+  AND subject::jsonb = :subject::jsonb
+  AND (revision = :record_sha256 OR checkpoint::jsonb->>'record_sha256' = :record_sha256)
+  AND key > :cursor
 ORDER BY key
-LIMIT :page_size
+LIMIT :page_plus_one
 ```
 
-Only scalar columns are selected (never whole checkpoints), results are keyset-paginated, and the page size is capped by the function (**proposed** default 25, hard cap 50). The record digest is not stored in a column for v1 items, so v1 membership is derived from `revision` (v1 revision = record digest) and v3 membership from `checkpoint->>'record_sha256'`; the caller supplies the digest and a page is filtered to it. Queued or not-yet-screened v3 items have no checkpoint, so they never match a per-record filter until screened; the presentation query lists them by contract and revision instead.
+* **Record-digest filter.** A v1 item's `revision` *is* the record digest (`digest(record)`, `coordinator.py` v1 branch), so v1 membership is `revision = :record_sha256`. A v3 item's `revision` is `digest({record_sha256, config_sha256})` and cannot be inverted, so v3 membership is the stored scalar `checkpoint->>'record_sha256'`. The filter is in SQL, on scalar fields; no checkpoint body is returned or parsed in Python.
+* **Unscreened v3 items** (queued, no checkpoint) have no result and therefore no assessment to present; they do not match, by definition. Their existence is visible by contract and revision to the owner's registration readback.
+* **Pagination.** Keyset on the unique primary key `key`. `page_size` default **25**, maximum **50** (enforced; larger values are clamped, not rejected). The function fetches `page_size + 1` rows: if an extra row exists the response carries `next_cursor = key of the last returned row`, otherwise `next_cursor = null`. **One page and one query per request.** There is no automatic traversal and no multi-page call; a caller who wants the next page makes a new request with the cursor. No write, no lock beyond `ACCESS SHARE`.
+* **Bounds.** *Enforced today (code constants; nothing here is measured):* 4,096 items, 12,288 attempts, 32 MiB (F12), `statement_timeout 10s`, `lock_timeout 3s`. *Proposed:* ≤ 1 query per request, ≤ 50 rows per page, a scan of at most 4,096 rows (the table bound; no secondary index exists), returned bytes ≤ 50 rows × the scalar fields (a few kilobytes). *To be measured in the disposable PostgreSQL job:* latency at the 4,096-row bound and returned bytes. **No new index is proposed**: that would be a schema change and a held decision.
+* **Tests (disposable PostgreSQL, no skipped or duplicated matches).** Seed one record with mixed v1 and v3 assessments (several configurations), plus non-matching records, with more than 50 matches in one scenario and exactly `page_size` matches in another (the boundary case: `next_cursor` must be null). Assert: the concatenation of all pages equals the complete match set; no key appears twice; no match is missing; the order is ascending by key on every page; page size never exceeds 50 and defaults to 25; a request with a valid cursor beyond the last key returns an empty page and a null cursor; rows inserted between two requests with keys above the cursor appear later, rows with keys below it are never inserted into an already-passed range (so a traversal never repeats); no row contains `supersedes`, `current` or `latest`; and the plan touches no more than the table bound.
 
-**Bounds.** *Enforced today (code constants; nothing here is measured):* the table cannot exceed 4,096 items, 12,288 attempts or 32 MiB (F12); `statement_timeout 10s`, `lock_timeout 3s`. *Proposed:* ≤ 1 query per request, ≤ 50 rows per page, ≤ 10 pages per presentation call, no write, no lock beyond `ACCESS SHARE`, a scan of at most 4,096 rows (the table bound) because there is no secondary index. *To be measured in the disposable PostgreSQL job:* the query's latency at the 4,096-row bound with realistic checkpoints, and its returned bytes. **No new index is proposed**: it would be a schema change and a held decision; the 4,096-row table bound makes it unnecessary at present. If the ledger bound is ever raised, an expression index becomes a separate decision.
-
-The query is executed by the controller/reader under the existing worker login's `SELECT` (the worker already reads rows, `sql_ledger.py:23-27`); it adds no function, grant or privilege.
+The query runs under the existing worker login's `SELECT` (the worker already reads rows, `sql_ledger.py:23-27`); it adds no function, grant or privilege.
 
 ## 5. Acceptance using retained evidence (scope item 4)
 
-### 5.1 Evidence
+### 5.1 Retained-capture reconciliation, resolved offline
 
-* The 24-record projection fixture `tests/fixtures/bolton_window_24_listing.json` (sha256 `9f453625…a268`) and its `PROVENANCE.json`, equal record-for-record to the owner capture (file sha256 `5525be5a…013a`).
-* **Open item:** the fixture is a *projection* (reference, proposal, address). The real v1 children were created from the full retained records, so their keys and `digest(record)` can only be reproduced from the full capture. The committed archive `docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023/capture/source.json` is 20,733 bytes on branch `stage4/narrow-continuation-evidence-20261016`, not on `master`. Acceptance must either (a) use fixture-derived records with neutral URLs (self-contained, as in PR #172) or (b) additionally commit the verified capture file. Whether the committed file reproduces the checkpoint digest recorded as the capture sha in the owner retention marker must be **checked, not assumed**, before choosing (b). See decision D6.
+The demonstration must use the **verified full retained capture**. This was reconciled offline on 2026-10-21 using only committed evidence and the repository's own generating code; no database, host or council was contacted. Full values are in [`retained-capture-reconciliation.json`](retained-capture-reconciliation.json). Four different objects carry four different hashes, and they are **not expected to match each other**:
 
-### 5.2 Expected routing: a recomputation, not a production result
+| Object | Representation | Generating code | Value (prefix) | Reproduced |
+|---|---|---|---|---|
+| **Archive file** `capture/source.json` (20,733 bytes) | Compact canonical JSON of the adapter's `source` object (`sort_keys`, separators `(',',':')`), exactly what the runner wrote | `batching.archive_capture` (`raw = json.dumps(source, sort_keys=True, separators=(',',':'))`), receipt `sha256 == digest(source)` | `5525be5a…013a` | **Yes.** The file's SHA-256 equals `digest(source)` and equals the archive hash recorded in `retained.json`. |
+| **Capture checkpoint** (`LISTING_RECEIPT_V1`) | The *derived* receipt stored in the ledger: projected records, segments, `outer_supervisor`, resources, `durable_archive` | `IdoxListingContract.project(source, outer, limits)` then `idox_source` adds `durable_archive` (`coordinator.py`, `batching.py`) | `d5fa9e29…45ee` | **Yes, exactly**, from the archive file, the supervisor receipt in `events.jsonl` (sequence 19) and the archive receipt (`commit 3587e277…`, path `…/capture/source.json`, size, hash). |
+| **Capture key** | `digest({subject: scope, task: DISCOVERY, contract, revision: manifest_sha256})` | `operational_owner.item` | `d1ff23c0…0545` | **Yes.** |
+| **Individual record digests** (24) | `digest(record)` of each *projected* record inside the checkpoint | `ledger.digest`; a v1 child's revision is exactly this | see JSON | **Yes.** All 24 equal the v1 children's revisions. |
+| **Screening bindings** (30 = root + 5 batches + 24 children) | `digest({key: {subject, task, contract, revision}})` | `operational_owner.register` | `ad4e5982…445f` (`registered.json`) | **Yes, exactly.** |
 
-Recomputed offline on 2026-10-28 from the fixture with the merged rule and threshold 10 (`ls.screen_row(..., RULE_V3, unit_threshold=10)`). Only the **aggregate** of the v1 column is recorded (1 / 3 / 20, `tests/fixtures/bolton_window_24_listing.PROVENANCE.json`); the per-row v1 dispositions are likewise recomputed from the fixture projection (which has no application type or URLs) and agree with that aggregate. **No v3 assessment exists in production.** This table is an expectation, to be checked against the implementation, not evidence of production behaviour.
+Why the hashes differ legitimately: the archive hash covers the raw `source`; the checkpoint hash covers a *different object derived from it* plus runtime facts (supervisor receipt, archive commit); a record digest covers one projected record; the capture key covers an identity, not content; the bindings hash covers task identities. None is a hash of another. The chain is: file bytes → `source` → (project + supervisor + archive receipt) → checkpoint → projected records → child identities → registered bindings. Every link was recomputed, and every recomputed value matches the retained value.
 
-| # | Reference | v1 disposition (recorded) | v3 admission (recomputed) | v3 reason | Identity-eligible under v3 |
+The reproduction was run with the code at `master` **and** with an export of the generating revision `b851b358…` (`idox_adapter.py` and `batching.py` differ between them only by the additive observation support from PR #162); both give `d5fa9e29…`. The reproduction script is in Appendix A; it needs only the five committed evidence files.
+
+**What this does and does not establish.** Offline evidence proves the committed archive file is exactly the capture that the retained checkpoint digest, the capture key and the registered child identities were derived from, and that the 24 v1 children's identities are reproducible. It does **not** prove, offline, that those rows are currently `COMPLETE` in the production database, nor that the control row is in any particular state; those are facts about production that were last recorded in the owner's archive (events 88 and 163 in the reconciliation) and can only be re-checked by a read-only readback during the approved run.
+
+**Remaining gaps (exact, with consequence).**
+
+1. The owner's `events.jsonl` (191 events, the reconciliation's authority) is in the owner's write-protected archive; the committed copy is the earlier 106-event "published before closure" version. *Consequence:* nothing in this reconciliation depends on the missing events (the outer supervisor and archive receipt are in the committed copy), but the cross-check "event 88 / event 163" in the reconciliation is quoted, not re-derived.
+2. The evidence directory is on a **branch**, not on `master`, and branches move. *Consequence:* the demonstration must cite immutable blobs (below), and the implementation PR must copy the five files into `master` at those exact hashes rather than referencing the branch.
+3. `registered.json` was last committed in `50bf769` (not in the branch's later head); its hash is pinned below. No alteration of any historical evidence is proposed.
+
+**Immutable evidence revision and hashes the demonstration would require** (all to be re-verified by the implementation PR and by the run):
+
+| Item | Value |
+|---|---|
+| Evidence directory | `docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023/` on branch `stage4/narrow-continuation-evidence-20261016` (head at inspection `3a0b52f018e25b6430f259bd25d47416e24d88b5`) |
+| `capture/source.json` | sha256 `5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a`, 20,733 bytes, committed in `3587e2778720f56a9510b33c7bbce7584f6be59d` |
+| `capture-retained/retained.json` | sha256 `a47122d0bf386a83f423d0f41d0fb2984a4f3eb8d2cf7cf0aeff74016d7ec2ee`, commit `b56d26b4dbc04def8777145fde8b1e3f3bbf7f8f` |
+| `screening-authority/registered.json` | sha256 `458c50efd3c55e2ef10193f4449e85ddcb84e2b7eda397eb9bb872fdeedb7c5d`, commit `50bf769` |
+| `completed/final-result.json`, `completed/events.jsonl` | sha256 `d38db9b6…ab9e`, `26d6392b…de2dd0`, commit `3a0b52f0…` |
+| Generating code revision | `b851b358b9a8665f5c661d252013149301aa8524` |
+| Capture checkpoint digest (pinned in the registration and checked against the ledger row at run time) | `d5fa9e29bdd51afbf36772e9b08880af6811a8cec771a3335bad0095801445ee` |
+| Capture key | `d1ff23c04af746a5219e7c109255db0310d2a006c732bcac4f66f126b0240545` |
+
+At run time the controller reads the capture row's checkpoint from the ledger and requires `digest(checkpoint) == d5fa9e29…` (the plan already binds `capture_sha256`, `batching.py:16-25`), so a production row that differed from the retained evidence would stop the run before any child is created. Synthetic or projected records may supplement tests but cannot substitute for this evidence.
+
+### 5.2 Expected routing: a local recomputation, not a production result
+
+Every v1 and v3 outcome below is a **local recomputation on 2026-10-21** from the retained records, with the merged rule and threshold 10. The only recorded production result is the archived v1 **aggregate** (1 `SUPPORTED_PROCESSING_PRIORITY`, 3 `RELATED_APPLICATION_FOLLOW_THROUGH`, 20 `INSUFFICIENT_EVIDENCE`, `final-result.json`). **No v3 assessment exists in production.** Routing was computed from the 24 *full retained records* and from the committed projection fixture (`tests/fixtures/bolton_window_24_listing.json`); the two agree for every record. The v1 recomputation agrees with the recorded aggregate. This table is an expectation to check the implementation against, not evidence of production behaviour.
+
+| # | Reference | v1 disposition (local recomputation) | v3 admission (local recomputation) | v3 reason | Identity-eligible under v3 |
 |---|---|---|---|---|---|
 | 1 | 01797/26 | INSUFFICIENT_EVIDENCE | RETAIN_NOT_RESIDENTIAL_SUPPLY | NO_RESIDENTIAL_CREATED | no |
 | 2 | 01790/26 | INSUFFICIENT_EVIDENCE | RETAIN_NOT_RESIDENTIAL_SUPPLY | NO_RESIDENTIAL_CREATED | no |
@@ -184,48 +236,74 @@ Recomputed offline on 2026-10-28 from the fixture with the merged rule and thres
 | 23 | 01758/26 | INSUFFICIENT_EVIDENCE | RETAIN_NOT_RESIDENTIAL_SUPPLY | NO_RESIDENTIAL_CREATED | no |
 | 24 | 01757/26 | INSUFFICIENT_EVIDENCE | RETAIN_BELOW_THRESHOLD | PROPOSED_TOTAL_BELOW_THRESHOLD | no |
 
-Summary of the recomputation: `RETAIN_NOT_RESIDENTIAL_SUPPLY` 16, `ROUTE_COUNT_UNCONFIRMED` 4, `RETAIN_RELATED_TO_PARENT` 2, `ADMIT_SCHEME` 1, `RETAIN_BELOW_THRESHOLD` 1. One record (01768/26) is identity-eligible under v3; it is also the single v1 `SUPPORTED_PROCESSING_PRIORITY`. The three v1 `RELATED_APPLICATION_FOLLOW_THROUGH` records are separated by v3: 01776/26 becomes `RETAIN_NOT_RESIDENTIAL_SUPPLY`, and 01769/26 and 01763/26 become `RETAIN_RELATED_TO_PARENT` (an amendment and a condition discharge); none is identity-eligible any more. Four records route to count confirmation because the assessor sees residential wording without a stated count (householder extensions and an HMO); that is existing assessor behaviour and outside this proposal.
+Summary of the recomputation: `RETAIN_NOT_RESIDENTIAL_SUPPLY` 16, `ROUTE_COUNT_UNCONFIRMED` 4, `RETAIN_RELATED_TO_PARENT` 2, `ADMIT_SCHEME` 1, `RETAIN_BELOW_THRESHOLD` 1. One record (01768/26) is identity-eligible under v3; it is also the single v1 `SUPPORTED_PROCESSING_PRIORITY`. The three v1 `RELATED_APPLICATION_FOLLOW_THROUGH` records are separated by v3: 01776/26 becomes `RETAIN_NOT_RESIDENTIAL_SUPPLY`, and 01769/26 and 01763/26 become `RETAIN_RELATED_TO_PARENT`; none is identity-eligible any more. Four records route to count confirmation because the assessor sees residential wording without a stated count (householder extensions and an HMO); that is existing assessor behaviour and outside this proposal. Each v3 checkpoint for these records measures 2,319–3,043 bytes locally (bound 131,072); computing and binding all 24 took about 0.02 s locally.
 
 ### 5.3 Tests (disposable PostgreSQL, real proposed SQL and controller path)
 
-Environment: the disposable PostgreSQL 17 service already used by the `restricted-provisioning` job (`stage4-discovery-offline.yml:195`), real roles and logins, the actual replacement function text installed into a disposable database only, `INGESTION_REQUIRE_LOCAL_PG`, loopback only. **No network egress, no council host.**
+Environment: the disposable PostgreSQL 17 service already used by the `restricted-provisioning` job (`stage4-discovery-offline.yml:195`), real roles and logins, the actual replacement function text installed into a disposable database only, loopback only. **No network egress, no council host.**
 
 | Area | Test |
 |---|---|
-| v1 compatibility | With the replacement installed, the existing v1 tests (`test_discovery_ingestion_operational_pg.py`, storage-controller and statistics suites) pass unchanged; a v1 grant has no `screening_configs`; v1 plans, keys and revisions byte-identical; v1 registration vocabulary unchanged. |
+| v1 compatibility | With the replacement installed, the existing v1 tests (`test_discovery_ingestion_operational_pg.py`, storage-controller and statistics suites) pass unchanged; a v1 grant has no `screening_configs`; v1 plans, keys and revisions byte-identical; the v1 registration vocabulary unchanged. |
 | Default OFF | A grant without `screening_configs` refuses a v3 child (`BATCH_ROW_TYPES`); a v3 plan with a grant listing a different `config_sha256` is refused. |
-| Configuration mismatch | Wrong `config_sha256` in plan vs grant vs checkpoint vs revision: refused by SQL (`batch_row`, `checkpoint`, `complete`). Wrong threshold or wrong `code_binding` is **not** detectable by SQL (it cannot recompute canonical JSON from `jsonb`); it is refused by the Python recomputation and the controller's trusted-memory comparison, and by the grant's per-key binding when the resulting revision differs. |
-| Duplicate execution | Replaying `batch_row` for the same record/config returns the existing child (`old_child`), never a second row; a conflicting duplicate raises `CONFLICTING_DUPLICATE`; a completed batch is read-only (`BATCH_ALREADY_COMPLETE`). |
-| Malformed / stripped version fields | v3 checkpoint with `rule_version`, `routing_authority` or `count_assessment` removed, mislabelled, or admission outside the vocabulary: refused by `checkpoint`/`complete` SQL and by the controller; a v3 item with its fields stripped is ineligible at the identity gate while a genuine historical v1 parent still passes (the PR #172 hardening, now enforced against real rows). |
+| Observation parent | A `LISTING_OBSERVATION_V1` capture can never be the parent of a v3 child, with and without the 034 substitutions applied (S1 admits v3 only over `LISTING_RECEIPT_V1`). |
+| Configuration mismatch | Wrong `config_sha256` in plan vs grant vs checkpoint vs revision: refused by SQL (`batch_row`, `checkpoint`, `complete`). Wrong threshold or wrong `code_binding` is **not** detectable by SQL (it cannot recompute canonical JSON from `jsonb`); it is refused by the Python recomputation, the controller's trusted-memory comparison, and the grant's per-key binding when the resulting revision differs. |
+| Duplicate execution | Replaying `batch_row` for the same record/config returns the existing child, never a second row; a conflicting duplicate raises `CONFLICTING_DUPLICATE`; a completed batch is read-only (`BATCH_ALREADY_COMPLETE`). |
+| Malformed / stripped version fields | v3 checkpoint with `rule_version`, `routing_authority` or `count_assessment` removed, mislabelled, or admission outside the vocabulary: refused by `checkpoint`/`complete` SQL and by the controller; a v3 item with its fields stripped is ineligible at the identity gate, while a genuine historical v1 parent (contract exactly `listing-screen-v1`) still passes. |
 | Authority expiry | Grant expiry mid-batch: further `claim`/`checkpoint`/`complete` raise `EXACT_AUTHORITY_BINDING_REQUIRED`; nothing half-written; no authority outlives its registration. |
 | Failure cleanup | A worker killed after a child checkpoint: `ingestion_recover_abandoned`; resume re-checkpoints under the recovered fence and never duplicates; a failure inside `process_batch` raises the stop (`BATCH_SECURITY_IDENTITY_ACCOUNTING_OR_PERSISTENCE_FAILURE`) and launches no next slot; storage and item bounds hold. |
-| Preservation | Before/after row comparison of every pre-existing row (capture, 5 batches, 24 v1 children, attempts): byte-identical, including checkpoints and outcomes. |
-| Zero council requests | The v3 grant has `source_calls = 0`; the test asserts no `begin_source` is ever recorded, `begin_source`/`begin_write` on a SCREENING child is refused by `TASK_EFFECT` (`worker.sql:198`) and the allowance is `source_calls = 0`, the supervised worker has no source client, and the job runs with outbound network disabled. Evidence is the grant, the attempt/phase rows and the absence of any socket. |
-| Identity gate | An eligible v3 receipt reaches the **existing** pending-identity path in the controller test, and every existing check still applies (unsupported source, known application, B2 withheld). Assertions: `estimated_unit_count IS NULL`, `unit_facts = NOT_WRITTEN`, `unit_confirmation_status` pending, no Site link, no dwelling count, no approval, no qualified scheme. Non-eligible outcomes never reach it. |
-| History | The paginated query returns bounded pages in a stable order, never a checkpoint body, never a `current`/`latest`/`supersedes` field; a ledger at the 4,096-item bound still answers within `statement_timeout`. |
-| Derivation | The replacement equals the original with exactly the listed substitutions; undoing them reproduces `worker.sql` byte for byte; (if combined with 034) each list is separately removable. |
+| Preservation | Before/after row comparison of every pre-existing row (capture, 5 batches, 24 v1 children, attempts): byte-identical, including checkpoints and outcomes; the control row changes only by the intended grant addition/invalidation. |
+| Zero council requests | The v3 grant has `source_calls = 0`; the test asserts no `begin_source` is ever recorded; `begin_source`/`begin_write` on a SCREENING child is refused by `TASK_EFFECT` (`worker.sql:198`) and the allowance is `source_calls = 0`; the supervised worker has no source client; the job runs with outbound network disabled. Evidence is the grant, the attempt/phase rows and the absence of any socket. |
+| Identity gate | An eligible v3 receipt reaches the **existing** pending-identity path in the controller test, and every existing check still applies. Assertions: `estimated_unit_count IS NULL`, `unit_facts = NOT_WRITTEN`, `unit_confirmation_status` pending, no Site link, no dwelling count, no approval, no qualified scheme. Non-eligible outcomes never reach it. (Test only; the demonstration does not use this path.) |
+| History | The pagination test of section 4. |
+| Derivation | The replacement equals the original with exactly the listed substitutions; undoing them reproduces `worker.sql` byte for byte; combined with the 034 list, each list is separately removable. |
+| Retained evidence | The five committed evidence files reproduce `d5fa9e29…`, `d1ff23c0…`, `ad4e5982…` and the 24 child identities (Appendix A as a test), on Linux CI. |
 
-Bounds: *proposed* (to be enforced by the tests above) — per-test wall-time ≤ the existing 90-180 s step timeouts; one extra CI step. *Measured later in CI and reported*, not claimed here.
+Bounds: *proposed* (enforced by the tests above) — one extra CI step within the existing 90-180 s step timeouts. *Measured later in CI and reported*, not claimed here.
 
 ## 6. Release and disable plan (scope item 5)
 
-Four **separately approvable** stages. None is authorised by this proposal.
+Four **separately approvable** stages. None is authorised by this proposal. Namespace dates in file and authority names (`…20261023`) are identifiers; execution dates in this document come from audit timestamps (the window demonstration ran on **2026-10-20**).
 
 | Stage | What happens | Production effect |
 |---|---|---|
-| **R1 Code integration** | Merge the Python, derivation module, tests and documentation. | None. The SQL function text exists only as a file; no connection is made. The production path remains v1 (F6). |
-| **R2 Function installation** | Owner ceremony installs the replacement `ingestion_worker_step` (and the policy successor of F11, if the stop is retained) into the production database, as a new, named, verified inventory state. | The function behaviour for v1 is unchanged; v3 is refused unless a grant lists `screening_configs`. No row is created. This is the first production database change and needs its own approval, ceremony readback and rollback text. |
-| **R3 Authority registration** | Owner registers one named allowance (`screen`-only, `source_calls = 0`, `writes = 0`) binding the 29 prepared items (5 inserted at registration, 24 created by the broker), the single `config_sha256` and the repository revision. | A grant exists until expiry (bounded ≤ 24 h by F1). Grant data in the control row **plus the 5 registered batch items** (inserted by the owner's registration). A v3 mode needs its own stop/generation constants and the same "authority not already in grants" rule as the existing modes. |
-| **R4 Execution** | The finite owner run screens the 24 records source-free and invalidates the authority with a committed readback. | 29 new ledger rows (5 batches, 24 v3 children) and their attempts. No application-database write, no council request. |
+| **R1 Code integration** | Merge the Python, derivation module, tests, evidence copy and documentation. | None. The SQL function text exists only as a file; no connection is made. Production stays v1 (F6). |
+| **R2 Function installation** | Owner-terminal ceremony installs the replacement `ingestion_worker_step` (and the policy successor of F11) as a new, named, verified inventory state, using the existing ceremony shape: exact inventory check before and after, rollback text, and **capability-absence readbacks** (no runtime login gains the owner, issuer, barrier or recovery memberships; the worker and broker still lack `INSERT/UPDATE/DELETE` on the tables; `EXECUTE` unchanged). | First production database change. The behaviour for v1 is unchanged; v3 is refused unless a grant lists `screening_configs`. No ledger row is created. **Separately held.** |
+| **R3 Authority registration** | Owner registers **one** narrowly named, screening-only allowance (section 6.1). | **Ledger and control-row mutations, by design:** one grant added to the control row, and **5 batch items inserted** by the registration transaction (`operational_owner.py:407-410`). Nothing else. |
+| **R4 Execution** | The finite owner run screens the 24 records source-free and then invalidates the authority with a committed readback. | **24 v3 children created** by the broker's `batch_row`; checkpoints/outcomes and attempts on the 5 batch items and 24 children; grant invalidated. |
 
-**Smallest separately approvable production demonstration (R2+R3+R4, one approval each):** re-assess the 24 retained Bolton records with one frozen configuration, screening-only. Exact effects: ≤ 29 new `ingestion_work_items` (5 + 24), ≤ 58 `ingestion_work_attempts` (`max_attempts = 2`), one grant added and then invalidated, **zero** source calls, **zero** application writes, **zero** identities, the capture and all 24 v1 children unchanged. The nomination/identity path (section 2.4) is built and tested but **not used** in this demonstration.
+**Smallest separately approvable production demonstration (R2 + R3 + R4, one approval each):** re-assess the 24 retained Bolton records with one frozen configuration, screening-only, from the verified full retained capture.
+
+*Effects, kept apart:*
+
+| | Registration (R3) | Execution (R4) |
+|---|---|---|
+| New `ingestion_work_items` | 5 (batch items) | 24 (v3 children) |
+| `ingestion_work_attempts` | 0 | at most **58** (batch items `max_attempts = 2` ⇒ ≤ 10; children `max_attempts = 2` ⇒ ≤ 48); expected 29 (one claim each) |
+| Control-row change | grant added | grant invalidated; no stop/generation change |
+| Source calls / council requests | 0 | **0** |
+| **Application-database writes** | **0** | **0** |
+| Identities created | 0 | **0** (the nomination path is built and tested but not used) |
+| Capture, 5 v1 batches, 24 v1 children | untouched | untouched (capture read `FOR SHARE` only) |
+
+"Zero application writes" refers to the application database (`applications`, sites, intelligence tables). The intentional mutations are the ledger rows and control-row grant entries listed above; they are the audit trail of the demonstration, not a side effect.
+
+### 6.1 The proposed allowance (for later review; nothing is registered or installed)
+
+* **Name (proposed):** `AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_WINDOW_ONCE_<id>_SCREEN` — one name, screening-only, never reusable (a name already in `grants` can never be registered again).
+* **Scope:** exactly Bolton `RECEIVED` 2026-09-28 to 2026-10-04 (the retained window); `source_calls = 0`, `writes = 0`; contracts `listing-batch-v1` and `listing-screen-v3`; `screening_configs = [one config_sha256]`; bindings for the 5 batch items, the 24 v3 children and the root capture binding (30 bindings, as in the reconciliation); `capture_sha256 = d5fa9e29…`.
+* **Stops are preserved.** The allowance does not clear, reset or advance any stop or generation. The policy successor admits it only when the control row is in the stop state **read and digested at ceremony time**; this proposal does not assume the last recorded state (generation 3, last read on 2026-10-20) is current. If the state differs, the ceremony stops and a new proposal is needed.
+* **Lifetime and deadline (proposed; the SQL ceiling of 24 h is not used).**
+  * *Measured (retained final result, 2026-10-20):* each of the five batch slots took 9.2–10.7 s of database time (sum ≈ 51.4 s), 56–65 driver statements, 2 connections, 70–82 KB returned. v3 computation for 24 records is ~0.02 s locally.
+  * *Enforced ceilings today:* a slot claim lease of 165 s and a per-slot supervised ceiling of 165 s (`batching.py`, `operational_runner.py`); batch claim leases 1-480 s (`worker.sql` claim).
+  * *Proposed:* **execution deadline 600 s** for the whole screening run (≈ 11× the measured 51.4 s total, and below the 5 × 165 s = 825 s slot ceilings, so the tighter bound binds first); **cleanup and invalidation reserve 300 s**; **authority lifetime 900 s (15 minutes) from registration** (= deadline + reserve). A run that has not finished by the deadline stops with the barrier set; it is not extended. These are proposals to be confirmed by a rehearsal in the disposable PostgreSQL job, not measured production figures.
 
 **Disabling v3 while preserving evidence.**
 
-1. *Stop issuing*: do not register a v3 allowance; v3 is default-off in SQL (no `screening_configs`) and in Python (default registry is v1).
-2. *Invalidate*: the existing invalidation with committed readback removes any registered allowance; the control state is read back unchanged.
-3. *Roll back the function*: restore the previous reviewed `ingestion_worker_step` text (the derivation guarantees byte-identical restoration). Existing v3 rows are inert data: v1 code never claims them (contract not in any grant), and they are not deleted.
-4. *Preserve*: no delete, no `supersedes`, no rewrite. v3 checkpoints, outcomes, attempts and the history query remain available read-only. The history query works with the v1-only function installed because it is a plain `SELECT`.
+1. *Stop issuing:* do not register a v3 allowance; v3 is default-off in SQL (no `screening_configs`) and in Python (default registry is v1).
+2. *Invalidate:* the existing invalidation with committed readback removes any registered allowance; the control state is read back unchanged.
+3. *Roll back the function:* restore the previous reviewed `ingestion_worker_step` text (the derivation guarantees byte-identical restoration), with the same capability-absence readbacks. Existing v3 rows are inert data: v1 code never claims them (their contract is in no grant) and they are not deleted.
+4. *Preserve:* no delete, no `supersedes`, no rewrite. v3 checkpoints, outcomes, attempts and the history query remain available read-only; the history query works with the v1-only function installed because it is a plain `SELECT`.
 
 ## 7. Residual risks
 
@@ -233,7 +311,7 @@ Four **separately approvable** stages. None is authorised by this proposal.
 * **Policy successor** for the stopped control state (F11) is a third database change in the chain; alternatives in D3.
 * **Code-digest sensitivity**: any edit to the four bound modules changes new identities (safe; visible).
 * **Bound modules are Windows/Linux byte-sensitive**: the digest normalises line endings; a test must prove it on both.
-* **Fixture is a projection** (5.1): record-level reproducibility of the *real* v1 children needs the full capture.
+* **Retained evidence lives on a branch and in the owner's archive**: the five evidence files must be copied into `master` at the pinned hashes; the owner's 191-event archive is not in the repository; production row state is checked read-only at run time, not proved offline (5.1).
 * **Checkpoint size**: a v3 checkpoint embeds the proposal and the v1 result; the 24 Bolton rows are small, but the 131,072-byte payload bound applies and must be tested at the largest proposal (8,192 characters).
 * **Assessor content is not a planning fact**: v3 outcomes are routing, not counts or approvals. `ROUTE_COUNT_UNCONFIRMED` records stay non-executable questions.
 * **History query** cost is bounded by the table bound, not by an index (4).
@@ -243,14 +321,86 @@ Four **separately approvable** stages. None is authorised by this proposal.
 
 Automatic document retrieval or parent resolution; the owner-review portal; general backlog processing, discovery checkpoints, overlap rules, scheduling; search or display; changes to counting rules, buyer matching or retention; a general allowance-policy redesign. Investigation requirements remain explicitly non-executable (`executable: false`, `executor: NONE`).
 
-## 9. Decisions needed before implementation
+## 9. Decisions, directions recorded, and the smallest implementation scope
 
-* **D1 (sequencing with 034).** Combine into one derivation and one inventory state, or land v3 alone first? *Recommendation:* one module, two independent default-off lists, whichever approves first lands first.
-* **D2 (identity).** Approve the `code_binding` byte-digest of the four modules in the v3 configuration (with a pinned-digest test)? *Alternative:* explicit version constants with a drift test.
-* **D3 (stop state).** The control row is stopped (generation 3). Approve a mechanical **policy v6** successor (one new named screen-only allowance; larger than "same shape as v5": v6 must also change the exception-key cap exemption, the name lists in both policy functions, the stop-digest branch and the owner's inventory set), **or** ask the owner to resolve the stop through a separately approved owner action, **or** defer production until the stop is resolved. This proposal does not choose.
-* **D4 (demonstration scope).** Approve the screening-only re-assessment of the 24 retained records as the smallest first demonstration, with the identity path built and tested but unused.
-* **D5 (history).** Approve removing `related_assessments` from production checkpoints and the paginated read-only query (page 25 default, 50 cap, 10 pages per call, no new index).
-* **D6 (evidence).** Fixture-derived records only, or commit the verified full capture file (after the digest check in 5.1)?
-* **D7 (installation).** Who runs R2, and the rollback text it must carry, to be written with the implementation PR.
+### 9.1 Design directions recorded (Product Owner, for finalising this proposal; not approval to implement)
+
+1. **v3 first.** Compatible with specification 034 but not bundled with sparse-observation implementation. The v3 slice explicitly **refuses observation parents** (S1 admits v3 only over `LISTING_RECEIPT_V1`). If both change `ingestion_worker_step`, the later one is derived from the earlier with its own substitution list; the sites are disjoint (2.6).
+2. **Code binding.** A digest of the code that produces the saved assessment, including its embedded v1 result, with the dependency-coverage and Windows/Linux tests of section 3.
+3. **Stops preserved.** One narrowly named, screening-only allowance for later review (6.1). No stop is cleared or reset, no policy is installed, and the last recorded state is not assumed current.
+4. **Demonstration scope.** The 24 retained Bolton records only; zero council requests, zero application writes, zero identities; the capture and all earlier assessments preserved.
+5. **History.** No history scan in assessment execution; bounded read-only pagination (section 4).
+6. **Evidence.** The demonstration uses the verified full retained capture (5.1); projected or synthetic records only supplement tests.
+7. **Installation.** The existing owner-terminal ceremony with exact inventory checks, rollback and capability-absence readbacks (R2). Separately held.
+
+### 9.2 Evidence reconciliation: result
+
+Every link reproduced offline (5.1): archive file hash, capture checkpoint digest, capture key, the 24 record digests (equal to the v1 children's revisions) and the registered bindings digest. **No blocker to binding the demonstration to the retained capture.** Remaining, non-blocking gaps: the owner's 191-event archive is not in the repository; the evidence lives on a branch and must be copied into `master` at the pinned hashes; production row state is not provable offline and is checked read-only at run time against `d5fa9e29…`.
+
+### 9.3 Decisions that remain before implementation
+
+* **D3 (stop-state route).** Approve a mechanical **policy v6** successor that admits exactly the allowance of 6.1 only when the stop state read at ceremony time matches the reviewed digest (v6 must also change the exception-key cap exemption, the name lists in both policy functions, the stop-digest branch and the owner's inventory set), **or** defer. This proposal does not clear or change any stop.
+* **D7 (installation).** Who runs R2, and the exact rollback text; to be written with the implementation PR.
+* **D8 (lifetime and deadline).** Confirm the proposed 600 s execution deadline, 300 s cleanup reserve and 900 s authority lifetime after a rehearsal in the disposable job.
+* **D9 (evidence copy).** Approve copying the five retained evidence files into `master` at the pinned hashes in the implementation PR (public planning data, no secrets).
+
+### 9.4 Smallest concrete implementation scope ready for approval
+
+One implementation PR (R1 only; nothing installed, registered or run), containing exactly:
+
+1. `ScreeningRule` code binding, `digest_probe`, and the closure / pinned-digest / line-ending tests (section 3).
+2. The `link_related=False` production option and the paginated read-only history function with its PostgreSQL tests (section 4).
+3. The mechanical derivation module for the replacement `ingestion_worker_step` (sites S1-S5, default OFF, observation parents refused) with its byte-reversibility tests; the SQL text is **not installed**.
+4. The `SQLLedger.batch_row`, `batch_plans(..., screening=)` and owner `register(..., screening=)` v3 options (default v1, byte-identical v1 output).
+5. The controller `assess_retained` function and the version-aware nomination gates (tested, unused in the demonstration).
+6. The five retained evidence files copied at the pinned hashes, `retained-capture-reconciliation.json`, and the Appendix A reproduction as a test.
+7. The disposable-PostgreSQL acceptance suite of 5.3 as one additional CI step.
+
+Out of that PR: the policy v6 text beyond a reviewable draft, any installation, any registration, any run. Each of R2, R3 and R4 is a separate later approval.
 
 Nothing here authorises implementation, merge, SQL installation, grants, stop changes, registration, execution, council requests, live re-screening, application writes, deployment or Stage advancement.
+
+## Appendix A. Offline reproduction of the retained-capture binding
+
+Needs only the committed evidence files and the repository checkout; it touches no database or network. `item` is copied verbatim from `operational_owner.item` because that module imports the Linux-only `resource` module. Run from a checkout in which the evidence directory exists at the path in `E`.
+
+```python
+import json, hashlib
+from datetime import date
+from app.ingestion.ledger import digest, DEFAULT_LIMITS
+from app.ingestion.batching import batch_plans
+from app.ingestion.idox_adapter import IdoxListingContract
+from verification.discovery.idox_window import WindowConfig
+
+E = 'docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023/'
+raw = open(E + 'capture/source.json', 'rb').read(); source = json.loads(raw)
+assert hashlib.sha256(raw).hexdigest() == digest(source) == '5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a'
+events = [json.loads(l) for l in open(E + 'completed/events.jsonl', encoding='utf-8') if l.strip()]
+outer = next(e for e in events if e['event'] == 'source_supervisor_observed')['payload']['actual']
+CON = 'bolton-received-idox-coordinator-v1'
+contract = IdoxListingContract(CON, WindowConfig('bolton', 'RECEIVED', date(2026, 9, 28), date(2026, 10, 4), 0),
+                               '1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2')
+receipt = contract.project(source, outer, dict(DEFAULT_LIMITS, requests=10, bytes=3000000, rows=60, pages=6), source_bytes_limit=512 * 1024)
+receipt.pop('window')
+receipt['durable_archive'] = dict(commit='3587e2778720f56a9510b33c7bbce7584f6be59d', path=E + 'capture/source.json',
+                                  sha256=digest(source), bytes=len(raw), readback_verified=True)
+assert digest(receipt) == 'd5fa9e29bdd51afbf36772e9b08880af6811a8cec771a3335bad0095801445ee'      # capture checkpoint
+
+def item(identity, *, dependencies=(), checkpoint=None, limits=None, max_attempts=2):      # == operational_owner.item
+    return dict(identity, key=digest(identity), dependencies=list(dependencies), priority=50, eligible_at=0, state='QUEUED', reason=None,
+                next_action='CLAIM_WHEN_AUTHORISED', limits=limits or DEFAULT_LIMITS, authority=None, attempt_count=0, max_attempts=max_attempts,
+                fence=0, owner=None, lease_until=None, phase='IDLE', checkpoint=checkpoint, outcome=None)
+
+scope = dict(kind='DISCOVERY_SCOPE', council='bolton', start='2026-09-28', end='2026-10-04', semantics='RECEIVED')
+manifest = '8fb79d78db499a4f5f622ae20debba6397451f242ae0028514246d3234358e0c'
+root = item(dict(subject=scope, task='DISCOVERY', contract=CON, revision=manifest), max_attempts=1, limits=dict(DEFAULT_LIMITS, requests=10, bytes=3000000, rows=60, pages=6))
+assert root['key'] == 'd1ff23c04af746a5219e7c109255db0310d2a006c732bcac4f66f126b0240545'      # capture key
+children = [item(dict(subject=dict(kind='APPLICATION', council='bolton', reference=r['reference']), task='SCREENING',
+                      contract='listing-screen-v1', revision=digest(r)), dependencies=[root['key']]) for r in receipt['records']]
+batches = [item({k: p[k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=p['dependencies'], checkpoint=p['checkpoint'])
+           for p in batch_plans(root['key'], receipt)]
+bindings = {x['key']: {k: x[k] for k in ('subject', 'task', 'contract', 'revision')}
+            for x in [*batches, item(dict(subject=scope, task='DISCOVERY', contract=CON, revision=manifest)), *children]}
+assert len(bindings) == 30 and digest(bindings) == 'ad4e598267d2104a6d2e0d2321087d84ac6313270f58a2411b3100e66762445f'
+print('reconciled: archive, checkpoint, capture key, 24 record digests, 5 batches, 30 registered bindings')
+```
