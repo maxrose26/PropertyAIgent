@@ -195,7 +195,7 @@ def test_the_counting_rules_directly():
     assert a('')['admission']=='RETAIN_UNUSABLE_PROPOSAL' and a('x'*9000)['admission']=='RETAIN_UNUSABLE_PROPOSAL'      # R-UNUSABLE and the length bound
 
 
-def test_the_wording_analysis_is_linear_on_long_adversarial_text():
+def test_the_wording_analysis_completes_quickly_on_long_adversarial_text():
     """Only the new module's own patterns: the pre-existing qualifier's cubic behaviour on very long digit runs is a separate, already-tracked task and is not exercised here."""
     texts=['ERECTION OF '+'12 FLATS, '*600,'DEMOLITION '*700+'ERECTION OF 12 DWELLINGS','CHANGE OF USE OF '+'ABC '*1500+'TO 12 FLATS','1 - '*2000+'FLATS','ERECTION OF '+'1 NO. '*1200+'DWELLINGS','ERECTION OF '+'FLATS AND '*900+'5 HOUSES',
            'ERECTION OF '+'3 BLOCKS OF '*600+'6 FLATS EACH','UP TO '*1000+'50 DWELLINGS']
@@ -414,7 +414,7 @@ def test_end_to_end_v3_screening_is_bounded_on_a_long_digit_run_and_a_regression
 
 
 def test_the_new_modules_alone_are_bounded_on_the_same_digit_run():
-    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear
+    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # measured completion of the new regexes on this shape (not a proof of linear complexity)
 
 
 # ------------------------------------------------------------------ third review: conversions of existing stock into a counted scheme
@@ -436,3 +436,31 @@ def test_blocks_each_containing_flats_multiply_and_never_undercount(text,total):
 
 def test_demolition_of_blocks_each_containing_flats_is_loss_not_proposal():
     got=_a('Demolition of 2 blocks each containing 6 flats');assert (got['proposed_total'],got['lost']) == ('NONE',12)
+
+
+# ------------------------------------------------------------------ fourth review: a line break is a clause boundary and survives normalisation
+@pytest.mark.parametrize('text,proposed,lost,existing,net',[
+    ('Demolition of 12 flats\n18 new flats',18,12,12,6),
+    ('Demolition of 12 flats\r\n18 new flats',18,12,12,6),
+    ('Demolition of 12 flats \n \n  18 new flats',18,12,12,6),
+    ('Demolition of 12 flats\u202818 new flats',18,12,12,6),
+    ('Existing 12 flats\n18 new flats',18,'NONE',12,18),
+    ('Existing 12 flats\n\n\n18 new flats',18,'NONE',12,18)])
+def test_a_line_break_keeps_the_new_count_outside_the_demolition_or_existing_clause(text,proposed,lost,existing,net):
+    got=_a(text)
+    assert (got['proposed_total'],got['lost'],got['existing'],got['net'])==(proposed,lost,existing,net),text
+    assert got['admission']=='ADMIT_SCHEME'
+
+
+def test_the_same_text_on_one_line_without_a_break_is_not_split():
+    got=_a('Demolition of 12 flats and erection of 18 new flats')
+    assert (got['proposed_total'],got['lost'])==(18,12)      # the wording, not the layout, decides here
+    got=_a('Existing 12 flats 18 new flats')
+    assert got['admission']!='ADMIT_SCHEME' and got['proposed_total']!=18      # no break and no clause marker: the existing clause is not silently ended (conservative, never a false admit)
+
+
+def test_normalisation_collapses_runs_but_keeps_one_line_break_and_stays_bounded():
+    import time
+    for t in ('12 flats'+'\n'*8000+'18 dwellings','12 flats'+' \n'*4000+'18 dwellings','Demolition of 12 flats'+'\n'*4000+'18 new flats','12'+'-'*8190,'flats'+' '*8187,'flats'+'\u3000'*8187,'\r\n'*4096+'12 flats'):
+        start=time.monotonic();got=ca.assess_proposal(t[:8192]);assert time.monotonic()-start<1.5,t[:30];assert got['admission']
+    got=_a('Demolition of 12 flats'+'\n'*4000+'18 new flats');assert (got['proposed_total'],got['lost'])==(18,12)

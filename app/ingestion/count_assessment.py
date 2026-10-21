@@ -3,7 +3,7 @@
 PURE and OFFLINE: one proposal string (and an optional application type) in, one plain dict out. No database, network, model call, clock or configuration; it writes nothing and re-screens nothing. It never
 reads or writes the legacy scalar columns. The counting rules are the specification's: R-ATTACH, R-UNITS, R-SUM, R-PRODUCT, R-EXISTING, R-HOUSING, R-CONTEXT, R-UNUSABLE, R-AMEND, R-MIXED, and the fixed
 definitions of proposed / existing / lost / net. The text yields at most ONE supported PROPOSED-basis record (source kind LISTING_PROPOSAL_TEXT); approved counts need permission evidence and can never come from
-this module. Admission is the size gate only (count_evidence.size_outcome); category and role come from the existing classifier plus the specification's roles. Wording analysis is linear in the text length."""
+this module. Admission is the size gate only (count_evidence.size_outcome); category and role come from the existing classifier plus the specification's roles. Wording analysis completes within the 8,192-character input ceiling on every adversarial shape tested (worst measured about 0.3 s); that is measured completion, not a proof of linear complexity, and the remaining quadratic patterns are disclosed in the specification (R-BOUND)."""
 import re
 
 from . import count_evidence as ce
@@ -158,7 +158,9 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     record the text supports, and the labelled headline."""
     text=text if isinstance(text,str) else ''
     if proposal_state!='PRESENT_VALUE' or not text.strip() or len(text)>MAX_TEXT:return _blank('unknown','NEW_SCHEME','RETAIN_UNUSABLE_PROPOSAL','PROPOSAL_NOT_USABLE')
-    text=re.sub(r'-{2,}','-',re.sub(r'\s+',' ',text))      # runs of whitespace or hyphens mean the same as one; collapsing them keeps every later pattern linear
+    # A run of whitespace or hyphens means the same as one, so runs are collapsed (this bounds the patterns that scan them). A run that CONTAINS a line break collapses to ONE line break, never to a space: a
+    # newline is a clause boundary (CLAUSE_BREAK), so "Demolition of 12 flats<newline>18 new flats" keeps the 18 outside the demolition clause.
+    text=re.sub(r'-{2,}','-',re.sub(r'\s+',lambda m:'\n' if re.search('[\n\r\x0b\x0c\x85\u2028\u2029]',m.group()) else ' ',text))
     category=_category(text,application_type);role='PHASE_OF_PARENT' if category=='reserved_matters' else RELATED_ROLES.get(category,'NEW_SCHEME')
     ref=_parent_reference(text)
     if role in ('AMENDMENT_OF_PARENT','DISCHARGE_OF_PARENT','PRE_APPLICATION_SIGNAL'):
