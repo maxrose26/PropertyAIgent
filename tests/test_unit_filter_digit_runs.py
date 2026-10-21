@@ -119,8 +119,7 @@ def test_digit_runs_near_valid_count_wording_do_not_change_the_valid_count():
 
 def test_old_and_new_agree_on_seeded_fuzz_with_digit_runs_and_words_up_to_forty_characters():
     rnd=random.Random(20261026)
-    atoms=['1','12','7','49','150','1'*14,'1'*30,'9'*38,'x','abc','a1b2','dwellings','flats','house','units','apartment','erection','of','and','no.','2no.','up to','(up to','  ','
-','	','(',')',',','.','-','/','self contained','residential','number of','total','proposed','adults','comprising','new homes','build to rent','btr','plots','twelve','one','pursuant to','2022-2039','per year','a'*30,'b2'*20]
+    atoms=['1','12','7','49','150','1'*14,'1'*30,'9'*38,'x','abc','a1b2','dwellings','flats','house','units','apartment','erection','of','and','no.','2no.','up to','(up to','  ','\n','\t','(',')',',','.','-','/','self contained','residential','number of','total','proposed','adults','comprising','new homes','build to rent','btr','plots','twelve','one','pursuant to','2022-2039','per year','a'*30,'b2'*20]
     compared=skipped=0
     for _ in range(3000):
         t=' '.join(rnd.choice(atoms) for _ in range(rnd.randint(1,24)))
