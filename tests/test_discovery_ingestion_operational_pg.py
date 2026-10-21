@@ -137,7 +137,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    env=replace(envelope(),reference=target['reference'],displayed_references=(target['reference'],),source_url=target['source_url'],source_record_id=target['source_identifier'])
    parent=seed('01780/26');fact=seed('01780/26','FACTUAL_REFRESH')
    with app.begin() as c:
-    c.execute(W.update().where(W.c.key==parent).values(state='COMPLETE',checkpoint={'disposition':'SUPPORTED_PROCESSING_PRIORITY','source_url':env.source_url,'source_record_id':env.source_record_id}))
+    c.execute(W.update().where(W.c.key==parent).values(state='COMPLETE',contract='listing-screen-v1',checkpoint={'disposition':'SUPPORTED_PROCESSING_PRIORITY','source_url':env.source_url,'source_record_id':env.source_record_id}))
     c.execute(W.update().where(W.c.key==fact).values(dependencies=[parent]))
    bind([parent,fact,other],writes=2)
    client=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
