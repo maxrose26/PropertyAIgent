@@ -14,13 +14,13 @@ Dependencies and controlling contracts:
 |---|---|
 | Stage 4 discovery, evidence and screening | [032](032-stage4-stable-credential-pipeline.md), existing WorkItem/WorkAttempt coordinator and durable capture references; no second queue |
 | Sparse observations | [033](033-verified-records-under-unknown-window-completeness.md); [034 proposal at PR #164](https://github.com/maxrose26/PropertyAIgent/pull/164): observed record evidence remains separate from window completeness |
-| Residential count and categorisation | [035 proposal at PR #166](https://github.com/maxrose26/PropertyAIgent/pull/166), version `residential-count-v1`; its rule definitions and acceptance corpus are the single count-policy reference, not a second extractor here |
+| Residential count, admission and presentation | [Specification 035 / PR #166](https://github.com/maxrose26/PropertyAIgent/pull/166) owns admission, headline-count presentation and **Approved / Proposed / Either** search behaviour, alongside its versioned count rules and acceptance corpus. Consume that contract; do not implement parallel rules in this workspace |
 | Count trust and qualifiers | [023 Stage 2](023-stage2-commercial-evidence.md), [024](024-stage2-5-buyer-discovery-and-opportunity-decomposition.md), [025](025-stage2-5b-acquisition-subject-decomposition.md); preserve exact/qualified/conflicting/unknown and scope distinctions |
 | Application, Site and scheme identity | [004](004-core-domain-model.md), existing application-to-Site reconciliation; no new generic Scheme entity is prescribed |
 | Stage 1 access | [020](020-stage1-access-command-boundary.md), existing server-owned identity, admission and revocable leases |
 | Stage 6 interface conventions | [Product Experience Roadmap](../docs/PRODUCT_EXPERIENCE_ROADMAP.md), [UI design system](../docs/UI_DESIGN_SYSTEM.md); reuse existing application components |
 
-At inspection on 21 October 2026, specifications 034 and 035 are on separate open PRs, not master. Links deliberately target those PRs until integration; do not copy their evolving rules or assume implementation. Their branch/date labels do not establish production state. This instruction settles the proposed-gross-total criterion and buyer-independent admission; other unresolved decisions in 035 are not silently approved here.
+At inspection on 21 October 2026, specifications 034 and 035 are on separate open PRs, not master. Links deliberately target those PRs until integration; do not copy their evolving rules or assume implementation. Their branch/date labels do not establish production state. Agreed decisions for this workspace are buyer-independent admission, the proposed-gross-total size criterion, separate proposed and approved positions, and delegation of admission, headline-count presentation and Approved / Proposed / Either search behaviour to 035. These are not open product questions in 036. The inspected PR #166 head `c0513f61fc90ea2e092ab0bdda966558986e2521` does not yet record the approved/proposed presentation and search alignment; synchronising that controlling specification is a documentation dependency, not permission to invent local fallback rules. This change does not edit Claude's separate branch or infer acceptance of unrelated proposals in 035.
 
 ## 2. Roadmap placement and domain boundaries
 
@@ -44,7 +44,8 @@ Reuse Stage 1's verified identity and server-owned policy. The intended boundary
 Enter review when resolving uncertainty could materially change treatment:
 
 - Residential development evident, proposed dwelling count unknown.
-- Supported sources conflict on counts.
+- Supported sources conflict on proposed totals for the same application/phase scope and revision.
+- Approved and proposed positions cannot be reliably attributed to their scopes or revisions; a legitimate approved-scheme/proposed-revision difference alone is not a count conflict.
 - Existing, demolished, retained and proposed dwellings are mixed.
 - Quantities may refer to blocks, bedrooms, bedspaces or a wider development.
 - Amendment/condition wording suggests a larger parent scheme.
@@ -64,11 +65,15 @@ Show:
 - Observation time and distinct relevant council dates.
 - Retained document excerpts and citations, when available.
 - Current screening result, rule version and actionable review reason.
-- Proposed, existing and demolished counts, supported net change, calculation and evidence.
+- **Proposed and approved dwelling counts shown separately**, each with its application/reference, Site/phase scope, evidence and supporting citation, relevant source/decision dates, observation time, proposal/permission revision and qualifiers. Unknown approval remains UNKNOWN; never substitute the proposed figure.
+- Existing and demolished counts, supported net change, calculation and evidence, attached to the relevant scoped position.
+- Mixed-use components recorded separately: residential dwellings and commercial units are distinct measures.
 - Related-application leads, prior observations and established scheme links with their verification state.
 - Previous owner decisions and material changes since the reviewed snapshot.
 
-Missing fields remain UNKNOWN. Distinguish listing evidence, document evidence, automated interpretation and owner verification. Preserve qualifiers and conflicts; do not convert a qualified maximum to an exact verified total. Owner verification of a proposal does not establish consent, delivery, availability or commercial relevance.
+Missing fields remain UNKNOWN. Distinguish listing evidence, document evidence, automated interpretation and owner verification. Preserve qualifiers and conflicts; do not convert a qualified maximum to an exact verified total. An application form can support a proposed quantity but **cannot establish approval**. Owner verification confirms an evidence-backed assessment; it cannot manufacture planning consent, grant an application or promote proposed quantities into approved facts. Approval requires applicable authoritative consent evidence under the controlling contract. Verification also does not establish delivery, availability or commercial relevance.
+
+Distinguish conflicting proposed totals within the same scope/revision from a legitimate difference between an approved scheme and a proposed revision. Retain both positions with their evidence and chronology; do not label the latter a conflict merely because the numbers differ, average them or overwrite approval with a later proposal. Uncertain scope, revision or supersession remains explicitly unresolved. Admission, the user-facing headline count and Approved / Proposed / Either search behaviour are defined by **035**, not by review-list state or an owner-selected preferred number.
 
 Citations retain complete literal references, supporting wording, offsets, source field and snapshot/hash provenance. An explicitly stated relation differs from an inferred one and remains an unverified lead until independently supported. Match retained evidence first using exact council/reference where supported; ambiguous/cross-council targets stay unresolved. No automatic parent crawling or new request occurs on review open or link selection.
 
@@ -85,6 +90,7 @@ Use the versioned rules and corpus in specification 035; the following are requi
 | Conversion of offices into twelve flats | 12 proposed dwellings |
 | Conversion of twelve flats into a hotel | Existing flats do not establish proposed residential supply |
 | Erection of six flats | 6 proposed dwellings; below current threshold |
+| Mixed-use development of nine flats and one commercial unit | 9 proposed residential dwellings; 1 commercial unit recorded separately, never 10 dwellings. Preserve potential commercial relevance without inventing an admission exception; admission follows 035 |
 | Residential development with no supported count | Proposed count UNKNOWN; review or specific further investigation |
 
 If evidence cannot safely establish a qualified quantity or scope, withhold the exact total and show the limitation. This workspace creates no exception to factual acceptance contracts. A human correction to a record cannot establish council-window completeness, absence, newly submitted status or coverage/watermark advancement.
@@ -104,7 +110,7 @@ Do not offer overlapping “keep”, “add to database” and “add to queue�
 
 ## 8. Persistence, concurrency and history
 
-Every saved decision must durably record application identity (council/reference and ledger identity even without an Application row), existing application/Site/scheme/phase identity where established, actor, timestamp, decision, reason, evidence snapshot/version/hash, original automated assessment and rule version, corrected fields and calculation, supporting citations, resulting link/task identity and supersession lineage.
+Every saved decision must durably record application identity (council/reference and ledger identity even without an Application row), existing application/Site/scheme/phase identity where established, actor, timestamp, decision, reason, evidence snapshot/version/hash, original automated assessment and rule version, corrected fields and calculation, supporting citations, resulting link/task identity and supersession lineage. For each corrected count retain whether it is proposed or approved, the exact application/phase scope, source/decision dates, revision and qualifiers; recording a review never changes the planning status of its source.
 
 Original sources, observations and automated outputs remain immutable. Supersede a decision with a recorded reason; never silently overwrite it. Later automation preserves verified corrections. Material new conflicting evidence flags reassessment and explains the change while retaining both assessments; no silent source preference erases conflict.
 
@@ -122,8 +128,8 @@ Require inspectable evidence that:
 
 1. Only the authenticated owner loads or acts on review data, including direct URLs/endpoints; non-owner operators, machines, readers and signed-out users are denied before data loading.
 2. Clear cases follow automatic processing; materially uncertain cases enter review with actionable reasons; QA exclusions are separately labelled.
-3. Count corrections preserve source evidence, calculation, qualifier, scope and original automated assessment.
-4. Every section 6 example produces its expected assessment under the versioned count contract.
+3. Proposed and approved counts remain separate with application/phase scope, evidence, dates, revisions, qualifiers and original automated assessment. Neither an application form nor owner verification establishes consent; missing approval remains UNKNOWN.
+4. Every section 6 example produces its expected assessment under the versioned 035 contract, including nine flats plus one commercial unit remaining nine dwellings. Same-revision proposed-count conflicts are distinguished from legitimate approved/proposed revision differences; headline and Approved / Proposed / Either search behaviour follow 035 without local overrides.
 5. Qualification creates or links the correct scheme once, with no buyer-profile prerequisite; below-threshold identities remain retained.
 6. Research tasks preserve purpose, missing evidence and existing execution controls without authority issuance.
 7. Decisions survive new sessions and support explicit supersession with audit history.
@@ -151,7 +157,8 @@ Inspection baseline: master `82988cbecfc2b76537a329dddb4eeb1819fbbbfd`. Reposito
 | `app/db/models.py`: Application.site_id links to Site; SchemeIntelligence is unique per application; specification 004 describes a Development concept but no Development model appears in the inspected schema | Decide which existing Site/phase identity the “qualify/link scheme” command commits against, and distinguish evidence grouping from a Development delivery entity. Do not invent a parallel scheme table implicitly |
 | Site.excluded/reason/timestamp are a coarse mutable exclusion; they do not implement versioned corrections or protected review history | Specify the smallest durable decision/supersession representation, stale-version guard and read/publication overlay, with disposable migration rehearsal if needed |
 | Ledger-held identities need not have an Application; count proposal 035 Phase B admission/promotion is not integrated | Review must reference council/reference plus immutable ledger evidence before Application creation. Confirm promotion transaction and shared-writer/recovery seam before implementing qualification |
-| 035 is an open proposal with unresolved qualified-count, retention and specialist-scope decisions; older scalar paths cannot express every distinction | Adopt the required version of 035 before wiring correction writes; do not turn UI review into an alternate extractor or use raw generic counts as verified totals |
+| The buyer-independent proposed-gross-total criterion and proposed/approved separation are agreed. 035 remains a separate open PR; its inspected text has not yet incorporated the agreed headline/search alignment | Cross-reference the aligned 035 version for admission, headline count and Approved / Proposed / Either search. This is a documentation synchronisation dependency, not a request to decide these principles again. Older scalar paths require an explicit implementation mapping; no alternate extractor or fallback policy here |
+| Proposed and approved scoped assessments must coexist, while current scalar fields do not by themselves supply complete revision/evidence history | Resolve the smallest durable representation and read overlay for both positions, including authoritative approval evidence, qualifiers and stale-version handling, before correction writes. No schema or consent inference is authorised |
 | 033 distinguishes record truth from completeness; 034 ledger enablement is a separate proposal | Consume accepted receipt/observation contracts explicitly; no review-driven watermark or source completeness repair |
 | Product Experience Roadmap proposes an Administration navigation treatment; visibility alone is not security | Owner-only server checks precede UI work. This extension is Stage 7 shared evidence, not buyer saved decisions or a new Stage 4 gate |
 | Existing roadmaps mix historical production claims and later gated work | Keep historical records intact; this document states planned requirements only and makes no fresh production claim |
