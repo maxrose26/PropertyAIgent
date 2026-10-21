@@ -195,7 +195,7 @@ def test_the_counting_rules_directly():
     assert a('')['admission']=='RETAIN_UNUSABLE_PROPOSAL' and a('x'*9000)['admission']=='RETAIN_UNUSABLE_PROPOSAL'      # R-UNUSABLE and the length bound
 
 
-def test_the_wording_analysis_is_linear_on_long_adversarial_text():
+def test_the_wording_analysis_completes_quickly_on_long_adversarial_text():
     """Only the new module's own patterns: the pre-existing qualifier's cubic behaviour on very long digit runs is a separate, already-tracked task and is not exercised here."""
     texts=['ERECTION OF '+'12 FLATS, '*600,'DEMOLITION '*700+'ERECTION OF 12 DWELLINGS','CHANGE OF USE OF '+'ABC '*1500+'TO 12 FLATS','1 - '*2000+'FLATS','ERECTION OF '+'1 NO. '*1200+'DWELLINGS','ERECTION OF '+'FLATS AND '*900+'5 HOUSES',
            'ERECTION OF '+'3 BLOCKS OF '*600+'6 FLATS EACH','UP TO '*1000+'50 DWELLINGS']
@@ -397,16 +397,24 @@ def test_every_assessment_outcome_is_inside_the_v3_vocabulary():
     for t in texts:assert ca.assess_proposal(t)['admission'] in vocab,t
 
 
-# ------------------------------------------------------------------ the digit-run dependency is tracked, not hidden
-@pytest.mark.xfail(strict=True,reason='v3 still calls the legacy qualifier first (through the v1 result) and app.scrapers.unit_filter.extract_unit_count is cubic on a long digit run; tracked as a separate task. '
-                   'This flips to an unexpected pass (a strict failure that forces removal of this marker) when that dependency is fixed, so end-to-end boundedness is never claimed before it is tested.')
-def test_end_to_end_v3_screening_is_not_yet_bounded_on_a_long_digit_run():
-    start=time.monotonic();ls.screen_row(row('1'*900),rule_version=ls.RULE_V3,unit_threshold=10)
-    assert time.monotonic()-start<0.5
+# ------------------------------------------------------------------ the digit-run dependency is resolved: end-to-end boundedness is tested under a hard timeout
+def test_end_to_end_v3_screening_is_bounded_on_a_long_digit_run_and_a_regression_fails_rather_than_hangs():
+    """Runs v3 screening on long digit runs in a CHILD process with a hard timeout, so a regression of the legacy qualifier's digit-run stall fails this test instead of hanging CI.
+    The wider adversarial battery (comma/dash/letter-separated runs, long words, every entry point) is in tests/test_unit_filter_digit_runs.py."""
+    import json,subprocess,sys
+    child=("import sys,time\nsys.path.insert(0,sys.argv[1])\nfrom app.ingestion import listing_screening as ls\n"
+           "r=lambda t:dict(reference='T/1',fields={'proposal':dict(state='PRESENT_VALUE',value=t,locator='x',truncated=False),'address':dict(state='PRESENT_VALUE',value='1 St',locator='x',truncated=False),'application_type':dict(state='UNKNOWN',value=None,locator='x',truncated=False)})\n"
+           "out={}\nfor n,t in (('digits900','1'*900),('digits8192','1'*8192),('commas','1,'*4096)):\n    s=time.monotonic();ls.screen_row(r(t),rule_version=ls.RULE_V3,unit_threshold=10);out[n]=round(time.monotonic()-s,3)\nprint(sorted(out.items()))\n")
+    try:
+        done=subprocess.run([sys.executable,'-I','-c',child,str(ROOT)],capture_output=True,text=True,timeout=20)
+    except subprocess.TimeoutExpired:
+        pytest.fail('HUNG: v3 screening of a long digit run did not finish within 20 s (the digit-run stall has regressed)')
+    assert done.returncode==0,done.stderr[-300:]
+    assert all(v<3.0 for _,v in eval(done.stdout.strip().splitlines()[-1])),done.stdout
 
 
 def test_the_new_modules_alone_are_bounded_on_the_same_digit_run():
-    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear; only the legacy qualifier is not
+    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # measured completion of the new regexes on this shape (not a proof of linear complexity)
 
 
 # ------------------------------------------------------------------ third review: conversions of existing stock into a counted scheme
@@ -428,3 +436,66 @@ def test_blocks_each_containing_flats_multiply_and_never_undercount(text,total):
 
 def test_demolition_of_blocks_each_containing_flats_is_loss_not_proposal():
     got=_a('Demolition of 2 blocks each containing 6 flats');assert (got['proposed_total'],got['lost']) == ('NONE',12)
+
+
+# ------------------------------------------------------------------ fourth review: a line break is a clause boundary and survives normalisation
+@pytest.mark.parametrize('text,proposed,lost,existing,net',[
+    ('Demolition of 12 flats\n18 new flats',18,12,12,6),
+    ('Demolition of 12 flats\r\n18 new flats',18,12,12,6),
+    ('Demolition of 12 flats \n \n  18 new flats',18,12,12,6),
+    ('Demolition of 12 flats\u202818 new flats',18,12,12,6),
+    ('Existing 12 flats\n18 new flats',18,'NONE',12,18),
+    ('Existing 12 flats\n\n\n18 new flats',18,'NONE',12,18)])
+def test_a_line_break_keeps_the_new_count_outside_the_demolition_or_existing_clause(text,proposed,lost,existing,net):
+    got=_a(text)
+    assert (got['proposed_total'],got['lost'],got['existing'],got['net'])==(proposed,lost,existing,net),text
+    assert got['admission']=='ADMIT_SCHEME'
+
+
+def test_the_same_text_on_one_line_without_a_break_is_not_split():
+    got=_a('Demolition of 12 flats and erection of 18 new flats')
+    assert (got['proposed_total'],got['lost'])==(18,12)      # the wording, not the layout, decides here
+    got=_a('Existing 12 flats 18 new flats')
+    assert got['admission']!='ADMIT_SCHEME' and got['proposed_total']!=18      # no break and no clause marker: the existing clause is not silently ended (conservative, never a false admit)
+
+
+def test_normalisation_collapses_runs_but_keeps_one_line_break_and_stays_bounded():
+    import time
+    for t in ('12 flats'+'\n'*8000+'18 dwellings','12 flats'+' \n'*4000+'18 dwellings','Demolition of 12 flats'+'\n'*4000+'18 new flats','12'+'-'*8190,'flats'+' '*8187,'flats'+'\u3000'*8187,'\r\n'*4096+'12 flats'):
+        start=time.monotonic();got=ca.assess_proposal(t[:8192]);assert time.monotonic()-start<1.5,t[:30];assert got['admission']
+    got=_a('Demolition of 12 flats'+'\n'*4000+'18 new flats');assert (got['proposed_total'],got['lost'])==(18,12)
+
+
+# ------------------------------------------------------------------ review of the newline rule: wrapping can never change a classification
+WRAP_SENTENCES=['Variation of condition 2 to increase from 49 to 52 dwellings','Discharge of condition 5 relating to 40 dwellings approved under 19/00123/OUT','Details pursuant to condition 4 of 19/00123/OUT 40 dwellings',
+    'Non material amendment to approved scheme for 40 dwellings ref 20/0001/FUL','Reserved matters pursuant to outline 91352/14 for 120 dwellings','Approval of reserved matters pursuant to 91352/14',
+    'Demolition of existing bungalow and erection of 12 dwellings','Demolition of 2 houses and erection of 20 flats','Conversion of 12 flats to 18 flats','Erection of 12 dwellings. Existing 4 flats will be demolished',
+    'Erection of 2 blocks of 6 flats each','Erection of 5 houses and 5 flats','Extension to existing 12 flats to provide 6 additional flats','Change of use of 8 flats to a hotel','Erection of 25 dwellings and demolition of 3 houses',
+    'Mixed use development comprising residential flats and ground floor retail','Erection of 9 flats and 1 shop','Outline application for up to 50 dwellings','Section 73 variation to increase the number of dwellings from 49 to 52 on permission 00284/26']
+
+
+def test_a_line_break_at_any_word_position_gives_the_single_line_result_except_between_two_counts():
+    checked=0
+    for sentence in WRAP_SENTENCES:
+        words=sentence.split(' ');want=_a(sentence)
+        for i in range(1,len(words)):
+            for sep in ('\n','\r\n',' \n','\n  '):
+                wrapped=' '.join(words[:i])+sep+' '.join(words[i:])
+                got=_a(wrapped)
+                before=' '.join(words[:i]);after=' '.join(words[i:])
+                between_counts=bool(ca._PREV_NOUN.search(before)) and bool(ca._NEXT_COUNT.match(after))
+                if between_counts:continue      # a real boundary between two counts: covered by the dedicated tests above
+                assert {k:got[k] for k in KEYS}=={k:want[k] for k in KEYS},(repr(wrapped),got['admission'],want['admission'])
+                checked+=1
+    assert checked>500
+
+
+@pytest.mark.parametrize('text',['Variation of\ncondition 2 to increase from 49 to 52 dwellings','Variation\nof condition 2 to increase from 49 to 52 dwellings','Discharge of\ncondition 5 relating to 40 dwellings approved under 19/00123/OUT',
+    'Details pursuant\nto condition 4 of 19/00123/OUT 40 dwellings','Non\nmaterial amendment to approved scheme for 40 dwellings','Reserved\nmatters pursuant to outline 91352/14 for 120 dwellings'])
+def test_a_wrapped_keyword_phrase_still_classifies_an_amendment_discharge_or_reserved_matters(text):
+    got=_a(text);assert got['admission'] in ('RETAIN_RELATED_TO_PARENT','ROUTE_COUNT_UNCONFIRMED','ADMIT_SCHEME') and not (got['scheme_role']=='NEW_SCHEME' and got['admission']=='ADMIT_SCHEME'),text
+
+
+def test_each_unicode_line_break_character_is_a_boundary_between_two_counts():
+    for brk in ('\n','\r','\x0b','\x0c','\x85','\u2028','\u2029','\r\n'):
+        got=_a('Demolition of 12 flats'+brk+'18 new flats');assert (got['proposed_total'],got['lost']) == (18,12),repr(brk)

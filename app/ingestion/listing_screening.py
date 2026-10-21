@@ -126,8 +126,8 @@ def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
     `RULE_V3` (specification 035, Phase A) is OPT-IN per call and ADDITIVE: the v1 result is carried unchanged and a `count_assessment` block is added (the four counts, category, scheme role, parent context,
     size-gate admission and headline), with `routing_authority = "count_assessment"`. The v1-shaped `disposition` of a v3 result is informational and must not route anything (use `routing_of`). Nothing in the
     repository selects v3, nothing re-screens an existing item, and a v3 result is a NEW result under its own rule version, never an edit of an old one.
-    BOUNDEDNESS CAVEAT: v3 calls the legacy qualifier first (through the v1 result), and that qualifier is cubic-time on a very long run of digits (tracked as a separate task). The new modules are linear, but
-    end-to-end v3 screening is NOT claimed to be bounded until that dependency is fixed and tested (tests/test_ingestion_count_assessment.py carries a strict xfail that turns green when it is)."""
+    BOUNDEDNESS: v3 calls the legacy qualifier first (through the v1 result). That qualifier's digit-run stall is fixed in app/scrapers/unit_filter.py (UNIT_COUNT_PATTERNS) and end-to-end screening is tested
+    bounded under a hard timeout (tests/test_unit_filter_digit_runs.py). Residual limits are listed in the pull request that fixed it."""
     if rule_version not in (RULE_V1,RULE_V3):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
     if rule_version==RULE_V1:
         if council is not None or unit_threshold is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')

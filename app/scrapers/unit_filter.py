@@ -59,6 +59,18 @@ UNIT_COUNT_PATTERNS = [
     r"(?:apartments?|flats?|dwellings?|dwellinghouses?|houses?|homes?|units?)\s*\(?\s*up\s*to\s*(\d+)\)?",
 ]
 
+# Performance bound (the digit-run stall). The patterns above ran in time CUBIC in the length of a digit run, QUADRATIC in a long word, and QUADRATIC in a whitespace run after a dwelling noun, because a bare
+# `(\d+)` is attempted from every digit of a run (each attempt re-scans the rest of the run), `\w+` can swallow digits that `\d+` has just given back, and two adjacent `\s*` around an optional token can split
+# a whitespace run in every possible way. Four textual substitutions, nothing else (the last two are language-EQUIVALENT rewrites, so they change no result at all):
+#   * `(\d+)` -> `(?<!\d)(\d+)`: a number is only attempted from the START of a digit run. Every match that could start inside a run also matches from the run's start (the tail is the same and `\d+` is
+#     greedy), and the leftmost start wins, so results are identical; the capture is still the whole run.
+#   * `(?:\w+[\s-]+){0,3}` -> `(?:\w{1,40}[\s-]+){0,3}`: the descriptive words between a count and its noun are at most 40 characters each. This is the ONE intended behaviour change: a "word" of more than
+#     40 word characters between a number and its noun no longer counts as a qualifying phrase (no real planning wording does this; the regression tests pin it).
+#   * `\s*(?:comprising|of|for)?\s*` -> `\s*(?:(?:comprising|of|for)\s*)?` and `\s*\(?\s*up` -> `\s*(?:\(\s*)?up`: with the optional token absent the two `\s*` were one `\s*`; with it present the text matched is
+#     the same. Same language, same captures, no adjacent-`\s*` ambiguity.
+UNIT_COUNT_PATTERNS = [p.replace(r"(\d+)", r"(?<!\d)(\d+)").replace(r"(?:\w+[\s-]+){0,3}", r"(?:\w{1,40}[\s-]+){0,3}")
+                       .replace(r"\s*(?:comprising|of|for)?\s*", r"\s*(?:(?:comprising|of|for)\s*)?").replace(r"\s*\(?\s*up", r"\s*(?:\(\s*)?up") for p in UNIT_COUNT_PATTERNS]
+
 EXCLUDE_CATEGORIES = {
     "variation_or_amendment",
     "condition_discharge_or_details",

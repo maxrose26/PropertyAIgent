@@ -270,3 +270,5 @@ failclosed. Independentreviewapproved28focusedIdoxtests; encoding addition
 brings affectedtests to30. Other unqualifiedzero shapes remainFAILED/UNKNOWN,
 never silentlyCOMPLETE. One finalWiganweek andBuryemptyshape worker prepared;
 no other council rerun, no production.
+
+CI reconciliation (digit-run stall fix): app/scrapers/unit_filter.py changed (UNIT_COUNT_PATTERNS: four textual substitutions, three of them result-preserving by construction and one intended 40-character word bound; see the pull request and the comment in that file). The immutable-byte pin in accepted-dependencies.json is moved to the reviewed bytes (6d9336dd3797...). The exact original bytes are preserved in history/unit-filter-v1.py.txt and accepted-dependencies-v1.json is retained unchanged; the historical test reads the archive for that module, as it does for the Idox parser. No live history is rewritten.
