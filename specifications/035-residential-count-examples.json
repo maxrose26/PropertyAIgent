@@ -1,0 +1,1087 @@
+{
+ "specification": "035-residential-count-and-categorisation.md",
+ "spec_version": "residential-count-v1",
+ "admission_threshold": 10,
+ "baseline_source": "app.scrapers.unit_filter.qualify + app.ingestion.listing_screening.screen_row (rule v1) at master 82988cb",
+ "examples": [
+  {
+   "id": "E01",
+   "proposal": "ERECTION OF 12 DWELLINGS WITH ACCESS AND LANDSCAPING",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E02",
+   "proposal": "ERECTION OF 6 SELF CONTAINED FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 6,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "note": "The six-flat Bolton scheme: valid, retained, not promoted.",
+   "baseline_current": {
+    "qualify_unit_count": 6,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E03",
+   "proposal": "ERECTION OF 9 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 9,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 9,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E04",
+   "proposal": "ERECTION OF 10 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 10,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "Boundary: 10 admits.",
+   "baseline_current": {
+    "qualify_unit_count": 10,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E05",
+   "proposal": "DEMOLITION OF 4 NO. BUILDINGS AND ERECTION OF 4 NO. APARTMENT BLOCKS COMPRISING OF NO. 49 SELF CONTAINED APARTMENTS (CLASS C3) TOGETHER WITH ACCESS, LANDSCAPING AND CAR PARKING",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 49,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "Bolton 01768/26. Buildings and blocks are not dwellings: demolished stays NOT_ESTABLISHED.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E06",
+   "proposal": "ERECTION OF 5 HOUSES AND 5 FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 10,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "R-SUM: explicitly joined components of one creation clause are added.",
+   "baseline_current": {
+    "qualify_unit_count": 5,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E07",
+   "proposal": "ERECTION OF 4 HOUSES, 3 BUNGALOWS AND 4 FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 11,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 4,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E08",
+   "proposal": "ERECTION OF 9 DWELLINGS AND CONVERSION OF BARN TO 2 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 11,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 9,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E09",
+   "proposal": "ERECTION OF 3 BLOCKS COMPRISING 24 APARTMENTS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 24,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 24,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E10",
+   "proposal": "ERECTION OF 2 BLOCKS OF 6 FLATS EACH",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "R-PRODUCT: an explicit per-block count multiplied by an explicit block count.",
+   "baseline_current": {
+    "qualify_unit_count": 6,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E11",
+   "proposal": "RESIDENTIAL DEVELOPMENT OF 25 UNITS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 25,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "R-UNITS: bare \"units\" count as dwellings only inside an explicitly residential clause.",
+   "baseline_current": {
+    "qualify_unit_count": 25,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E12",
+   "proposal": "ERECTION OF TWELVE DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E13",
+   "proposal": "ERECTION OF 12 NO. 2 STOREY DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E14",
+   "proposal": "DEMOLITION OF 14 EXISTING FLATS AND ERECTION OF 12 HOUSES",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": 14,
+    "existing": 14,
+    "net": -2,
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "Admission is by the proposed gross total (12); the negative net is recorded, not used to refuse admission. Buyer fit is a later question.",
+   "baseline_current": {
+    "qualify_unit_count": 14,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E15",
+   "proposal": "ERECTION OF 12 DWELLINGS FOLLOWING DEMOLITION OF 2 EXISTING HOUSES",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": 2,
+    "existing": 2,
+    "net": 10,
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E16",
+   "proposal": "DEMOLITION OF EXISTING BUNGALOW AND ERECTION OF 12 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "\"the existing bungalow\" is not a stated number: demolished, existing and net stay NOT_ESTABLISHED (nothing is inferred).",
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E17",
+   "proposal": "CHANGE OF USE OF 12 FLATS TO A HOTEL",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "non_target_admin_or_minor",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NONE",
+    "demolished": 12,
+    "existing": 12,
+    "net": -12,
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "NO_RESIDENTIAL_CREATED"
+   },
+   "note": "The 12 are the existing flats being lost.",
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E18",
+   "proposal": "CHANGE OF USE OF OFFICES TO 12 FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E19",
+   "proposal": "CONVERSION OF 12 FLATS INTO 24 FLATS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 24,
+    "demolished": 12,
+    "existing": 12,
+    "net": 12,
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "The 12 existing flats are lost by conversion (demolished_reason CONVERSION_AWAY); all 24 are the output.",
+   "baseline_current": {
+    "qualify_unit_count": 24,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E20",
+   "proposal": "OUTLINE APPLICATION FOR UP TO 50 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "outline_application",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "UP_TO:50",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "QUALIFIED_MAXIMUM_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "Decision D3: a qualified maximum admits for deeper assessment only; it is never recorded as an exact total.",
+   "baseline_current": {
+    "qualify_unit_count": 50,
+    "qualify_category": "outline_application",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E21",
+   "proposal": "ERECTION OF A 60 BEDROOM CARE HOME",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "BEDS_NOT_DWELLINGS"
+   },
+   "note": "Bedrooms are recorded as a separate non-dwelling measure (decision D4 covers specialist housing).",
+   "baseline_current": {
+    "qualify_unit_count": 60,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E22",
+   "proposal": "CONSTRUCTION OF 12 HOLIDAY HOMES",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NONE",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "NOT_HOUSING_SUPPLY"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E23",
+   "proposal": "ERECTION OF 3 RETAIL UNITS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NONE",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "NO_RESIDENTIAL_CREATED"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 3,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Excluded - non-residential",
+    "legacy_admits": false,
+    "screen_v1_disposition": "DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E24",
+   "proposal": "INSTALLATION OF 1 NO. AIR HANDLING UNIT",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NONE",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "NO_RESIDENTIAL_CREATED"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 1,
+    "qualify_category": "unknown",
+    "qualify_classification": "Ignore - under 10 units",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E25",
+   "proposal": "VARIATION OF CONDITION 2 OF PERMISSION 00284/26 FOR 30 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "variation_or_amendment",
+    "scheme_role": "AMENDMENT_OF_PARENT",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": {
+     "reference": "00284/26",
+     "context_count": 30,
+     "relation": "VARIATION_OF"
+    },
+    "admission": "RETAIN_RELATED_TO_PARENT",
+    "reason": "AMENDMENT_OF_PARENT"
+   },
+   "note": "The 30 belong to the parent permission; they are context, never this application's total.",
+   "baseline_current": {
+    "qualify_unit_count": 30,
+    "qualify_category": "variation_or_amendment",
+    "qualify_classification": "Excluded - secondary/admin",
+    "legacy_admits": false,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E26",
+   "proposal": "NON-MATERIAL AMENDMENT TO APPLICATION 00284/26 TO AMEND 8 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "variation_or_amendment",
+    "scheme_role": "AMENDMENT_OF_PARENT",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": {
+     "reference": "00284/26",
+     "context_count": 8,
+     "relation": "AMENDMENT_TO"
+    },
+    "admission": "RETAIN_RELATED_TO_PARENT",
+    "reason": "AMENDMENT_OF_PARENT"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 26,
+    "qualify_category": "variation_or_amendment",
+    "qualify_classification": "Excluded - secondary/admin",
+    "legacy_admits": false,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E27",
+   "proposal": "DISCHARGE OF CONDITIONS 3 AND 5 ON 12345/20 FOR 20 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "condition_discharge_or_details",
+    "scheme_role": "DISCHARGE_OF_PARENT",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": {
+     "reference": "12345/20",
+     "context_count": 20,
+     "relation": "DISCHARGE_OF"
+    },
+    "admission": "RETAIN_RELATED_TO_PARENT",
+    "reason": "DISCHARGE_OF_PARENT_CONDITIONS"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 20,
+    "qualify_category": "condition_discharge_or_details",
+    "qualify_classification": "Excluded - secondary/admin",
+    "legacy_admits": false,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E28",
+   "proposal": "APPLICATION FOR RESERVED MATTERS APPROVAL FOR 120 DWELLINGS PURSUANT TO OUTLINE 91352/14 FOR UP TO 1700 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "reserved_matters",
+    "scheme_role": "PHASE_OF_PARENT",
+    "proposed_total": 120,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": {
+     "reference": "91352/14",
+     "context_count": "UP_TO:1700",
+     "relation": "PURSUANT_TO"
+    },
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "The phase's own 120 is the proposed total; the parent's 1,700 is context and never becomes this application's count.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "reserved_matters",
+    "qualify_classification": "Review - possible 10+ housing",
+    "legacy_admits": true,
+    "screen_v1_disposition": "RELATED_APPLICATION_FOLLOW_THROUGH"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E29",
+   "proposal": "SCREENING OPINION FOR 40 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "screening_or_scoping_opinion",
+    "scheme_role": "PRE_APPLICATION_SIGNAL",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_WATCHLIST",
+    "reason": "SCREENING_OR_SCOPING_OPINION"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 40,
+    "qualify_category": "screening_or_scoping_opinion",
+    "qualify_classification": "Excluded - secondary/admin",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E30",
+   "proposal": "RESIDENTIAL DEVELOPMENT",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ROUTE_COUNT_UNCONFIRMED",
+    "reason": "RESIDENTIAL_WITHOUT_STATED_COUNT"
+   },
+   "note": "Routed to the existing unit-confirmation stage; not a scheme until a supported total exists.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Review - possible 10+ housing",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E31",
+   "proposal": "",
+   "proposal_state": "PRESENT_BLANK",
+   "expected": {
+    "category": "unknown",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "RETAIN_UNUSABLE_PROPOSAL",
+    "reason": "PROPOSAL_NOT_USABLE"
+   },
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "unknown",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E32",
+   "proposal": "ERECTION OF 12 DWELLINGS WITH 12 CAR PARKING SPACES",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": true
+   }
+  },
+  {
+   "id": "E33",
+   "proposal": "ERECTION OF 12 HOUSES ON LAND ADJOINING 20 EXISTING HOUSES",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 12,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "note": "Adjoining stock is not on the application site: existing stays NOT_ESTABLISHED.",
+   "baseline_current": {
+    "qualify_unit_count": 20,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E34",
+   "proposal": "ERECTION OF 9 DWELLINGS TO REPLACE 14 EXISTING DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 9,
+    "demolished": 14,
+    "existing": 14,
+    "net": -5,
+    "parent_context": null,
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 14,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E35",
+   "proposal": "ERECTION OF 8 DWELLINGS, PART OF WIDER SCHEME OF 200 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 8,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": {
+     "reference": null,
+     "context_count": 200,
+     "relation": "PART_OF_WIDER_SCHEME"
+    },
+    "admission": "RETAIN_BELOW_THRESHOLD",
+    "reason": "PROPOSED_TOTAL_BELOW_THRESHOLD"
+   },
+   "note": "Retained, not promoted: promotion needs evidence that raises THIS application's supported total, or a verified parent relationship (section 7).",
+   "baseline_current": {
+    "qualify_unit_count": 200,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E36",
+   "proposal": "ALTERATIONS TO THE EXISTING 12 FLATS INCLUDING NEW WINDOWS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NONE",
+    "demolished": "NONE",
+    "existing": 12,
+    "net": 0,
+    "parent_context": null,
+    "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
+    "reason": "NO_RESIDENTIAL_CREATED"
+   },
+   "baseline_current": {
+    "qualify_unit_count": 12,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": false,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E37",
+   "proposal": "RESIDENTIAL DEVELOPMENT",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 102,
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD"
+   },
+   "evidence": [
+    {
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "quote": "Total proposed residential units 102",
+     "rank": 1
+    }
+   ],
+   "note": "Provenance example: the structured form outranks the proposal text; the baseline (proposal text only) cannot see it.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Review - possible 10+ housing",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  },
+  {
+   "id": "E38",
+   "proposal": "ERECTION OF 49 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "demolished": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "COUNT_CONFLICT"
+   },
+   "evidence": [
+    {
+     "source_kind": "APPLICATION_FORM_STRUCTURED",
+     "quote": "Total proposed residential units 52",
+     "rank": 1
+    }
+   ],
+   "note": "Two supported sources disagree (49 vs 52): the conflict is recorded, neither silently wins; both are at or above the threshold so the application is admitted for assessment with COUNT_CONFLICT.",
+   "baseline_current": {
+    "qualify_unit_count": 49,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": true,
+    "count_matches": false
+   }
+  }
+ ]
+}
