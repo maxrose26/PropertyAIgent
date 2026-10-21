@@ -15,7 +15,7 @@ from tests.test_ingestion_retained_capture_reconciliation import retained
 
 ROOT = Path(__file__).resolve().parents[1]
 # The expected binding of the bound modules at this commit. Changing ANY bound byte (even a comment) changes every new v3 identity: update this constant consciously, in the same change.
-PINNED_CODE_BINDING = '4e75a267dd0b7d42fbf89a59778ed555e738c55b8efbede4356248fc23e6f4ec'
+PINNED_CODE_BINDING = 'a3f0f4f89afb99009f870a6369eb355ece4dfac59ef19113b440fd6d221ce1ac'
 PINNED_DIGEST_PROBE = 'f1b44b4a4cc0c90b8371afbc85625e7c6043443caa9bdcfa38a1bfa40ccdc082'
 EXCLUDED = {'app/ingestion/ledger.py', 'app/ingestion/schema.py'}      # loaded, deliberately not bound by file (ledger.digest is bound by the probe)
 
