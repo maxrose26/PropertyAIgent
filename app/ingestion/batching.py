@@ -28,6 +28,7 @@ def batch_plans(capture_key,capture):
 def capture_once(coordinator,key,reader,archive,check=lambda:None,*,prior_accounting_sha256=None):
     l=coordinator.ledger;check();row=l.get(key)
     if row['checkpoint'] is not None:
+        if row['checkpoint'].get('kind')=='LISTING_OBSERVATION_V1':raise Denied('OBSERVATION_IS_NOT_A_CAPTURE')      # specification 033 P6: a partial observation is never returned as a window capture
         if row['state']=='COMPLETE':return row['checkpoint']
         if row['checkpoint'].get('kind')!='LISTING_RECEIPT_V1':raise Denied('CAPTURE_BLOCKED_NO_REFETCH')
         budget=getattr(l,'budget',None)
