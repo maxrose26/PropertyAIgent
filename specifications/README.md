@@ -21,6 +21,14 @@ A specification is a short document that explains **what** we are building and *
 - Specifications are numbered sequentially (`001-`, `002-`, ...) in the order they were written, e.g. `001-platform-vision.md`.
 - File names are short, lowercase, and hyphenated after the number.
 
+## Owner Scheme Review extension
+
+- [036 — Owner Scheme Review and Verified Corrections](036-owner-scheme-review-and-verified-corrections.md): agreed product scope, documentation-only draft; Stage 7 shared-evidence extension, not an additional Stage 4 gate. Depends on the versioned residential-count proposal [035 / PR #166](https://github.com/maxrose26/PropertyAIgent/pull/166) and sparse-observation contracts [033](033-verified-records-under-unknown-window-completeness.md) / [034 proposal, PR #164](https://github.com/maxrose26/PropertyAIgent/pull/164). Separate proposal links do not imply integration or implementation.
+
 ## What belongs here
 
 Specifications for anything that changes what PropertyAIgent does or how it's structured - a new intelligence layer, a new data source, a change to the core data model, a new user-facing capability. Not every code change needs one (a bug fix or a small refactor doesn't), but anything that a future contributor would need context to understand the "why" of should have one.
+
+## Intelligence rules reference
+
+[The Intelligence Rules Index](../docs/INTELLIGENCE_RULES_INDEX.md) maps current domain contracts, implementation, consumers and meaningful tests. [The gap assessment](../docs/INTELLIGENCE_RULES_GAPS.md) prioritises at most three follow-on packages. This is an assessment, not a new policy or implementation authority; open specifications and production-verification limits are explicit.

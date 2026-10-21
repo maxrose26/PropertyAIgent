@@ -1,0 +1,500 @@
+{
+  "assessment_date": "2026-10-21",
+  "repository": "maxrose26/PropertyAIgent",
+  "base_revision": "9e906b0f0edc8e79b5c245c678f7f69cbe840bdf",
+  "base_tree": "9e906b0f0edc8e79b5c245c678f7f69cbe840bdf",
+  "method": "Read-only source/specification/test assertion inspection; no deployment or production verification",
+  "test_execution": "No existing suites rerun; four pure synthetic qualify probes only",
+  "inspected_master_blobs": [
+    {
+      "path": "CLAUDE.md",
+      "blob_sha": "db281f89c915457ef3f79b3bc220b62e57cc7c75"
+    },
+    {
+      "path": "app/db/models.py",
+      "blob_sha": "75737bf1f80ead22351490b44c050fcef54c8af8"
+    },
+    {
+      "path": "app/extraction/housing_mix.py",
+      "blob_sha": "cbcf09709f62c5cc81a7adadb55ac282193467d5"
+    },
+    {
+      "path": "app/extraction/ownership_control_evidence.py",
+      "blob_sha": "db3e2308fbeb27cdef96bcd271d907430972a634"
+    },
+    {
+      "path": "app/extraction/reconcile.py",
+      "blob_sha": "b27d1243321d95bad1bf39bd8a219a6ea22f1f23"
+    },
+    {
+      "path": "app/extraction/run_extraction.py",
+      "blob_sha": "790e79c1472ebde6cfd72ad666478e490051be1b"
+    },
+    {
+      "path": "app/ingestion/listing_screening.py",
+      "blob_sha": "7b3abaa4bfcd4411f4c37ca722da6c417267cd80"
+    },
+    {
+      "path": "app/ingestion/observation_history.py",
+      "blob_sha": "46303befd5424bce49c12566364c79db9fd343e7"
+    },
+    {
+      "path": "app/pipeline/discovery_admission.py",
+      "blob_sha": "e45df7b882bcf5917e59b15e14180329ca30864f"
+    },
+    {
+      "path": "app/pipeline/evidence.py",
+      "blob_sha": "052c52e8d298200420e64ba4f3c6c616bb36c8e5"
+    },
+    {
+      "path": "app/pipeline/phase_tracking.py",
+      "blob_sha": "58f97c17e0a700616a5d00834b35460ef81c12dc"
+    },
+    {
+      "path": "app/pipeline/site_linking.py",
+      "blob_sha": "4457c797e7f9592115ce5915d64f3fcf6d73779a"
+    },
+    {
+      "path": "app/pipeline/status_verification.py",
+      "blob_sha": "645b265020373963a227a83325bfedb72db6bd4c"
+    },
+    {
+      "path": "app/policy/agent_evaluation_persistence.py",
+      "blob_sha": "72debf550251fe208089027b3f35eabecf4f0e50"
+    },
+    {
+      "path": "app/policy/agent_evaluation_prompt.py",
+      "blob_sha": "247cbf7d699b12e51633019616c81e0fefedc0d8"
+    },
+    {
+      "path": "app/policy/agent_evaluation_validator.py",
+      "blob_sha": "98d6d4c15a472177094911cadfb8658fcffbec56"
+    },
+    {
+      "path": "app/policy/ah_assessment.py",
+      "blob_sha": "a1d6b01229a5ebba24797d892fb4e16fdd928b65"
+    },
+    {
+      "path": "app/policy/buyer_matching.py",
+      "blob_sha": "562a63726c63f3fea44df8cde1fa8182e85d95ad"
+    },
+    {
+      "path": "app/reporting/acquisition_subjects.py",
+      "blob_sha": "09a86d8642e19d6c0fbb439e74c78dd81092f0a9"
+    },
+    {
+      "path": "app/reporting/affordable_housing_scope.py",
+      "blob_sha": "558e238221021b1fbf9f3b178b6f6194e6c6cb54"
+    },
+    {
+      "path": "app/reporting/ah_kpi.py",
+      "blob_sha": "00fc2d24e4c9ad7e5b076188ea4277761234c732"
+    },
+    {
+      "path": "app/reporting/applicant_identity.py",
+      "blob_sha": "dd4af507af97ef2783ec338db9447c2bf0540be8"
+    },
+    {
+      "path": "app/reporting/commercial_evidence.py",
+      "blob_sha": "600517093a17391a3d65e8be2d3d7801f71e51b9"
+    },
+    {
+      "path": "app/reporting/opportunity_transaction_signals.py",
+      "blob_sha": "5750ca638875ad5b9deffee6c50858c7da945d7f"
+    },
+    {
+      "path": "app/reporting/opportunity_universe.py",
+      "blob_sha": "0635e4ffa6582081ad279ef54e5ea865caf94d5c"
+    },
+    {
+      "path": "app/reporting/ownership_control.py",
+      "blob_sha": "1c13db173e9b8b129aa81e3566b53b4f861b6c05"
+    },
+    {
+      "path": "app/reporting/planning_freshness.py",
+      "blob_sha": "c0d541ec1f8ae3424c878a5e1e5c3fc55111fcce"
+    },
+    {
+      "path": "app/reporting/residential_count.py",
+      "blob_sha": "fc1c58c1a34d4535d3126af5d1451226e3b13ecf"
+    },
+    {
+      "path": "app/reporting/residential_count_eligibility.py",
+      "blob_sha": "f00e57466226c915ced80df639414cdb370cd823"
+    },
+    {
+      "path": "app/reporting/residual_capacity.py",
+      "blob_sha": "7461c245453ff33fed7a02718c48958d1e1f6e2e"
+    },
+    {
+      "path": "app/reporting/scheme_reconciliation.py",
+      "blob_sha": "ee4dd9506260d3d1638cb240449943d68a3ce534"
+    },
+    {
+      "path": "app/reporting/site_profile.py",
+      "blob_sha": "bdc6501e59532cb2d59e616d4e43616887d2e235"
+    },
+    {
+      "path": "app/reporting/subject_relationships.py",
+      "blob_sha": "7c473da168c480190c8dbdaac419e44b244d2747"
+    },
+    {
+      "path": "app/scrapers/unit_filter.py",
+      "blob_sha": "6156519c19328ba863ed5c3b38bc40e2cda0f8cc"
+    },
+    {
+      "path": "docs/PLATFORM_ARCHITECTURE.md",
+      "blob_sha": "88821babce583018ee21926ede179078b87b3c89"
+    },
+    {
+      "path": "docs/PRODUCT_ROADMAP.md",
+      "blob_sha": "d2bb0c707d2dc5c4bbd574b196de57ae8351f6ea"
+    },
+    {
+      "path": "docs/PRODUCT_ROADMAP_ADDENDUM_AFFORDABLE_HOUSING_VERIFICATION.md",
+      "blob_sha": "1d835f89a4981ecfbbbf7216fd3326821d0945ee"
+    },
+    {
+      "path": "docs/PRODUCT_VISION.md",
+      "blob_sha": "abf06b1d43d15fbc00d852ac67178b7a04f9f002"
+    },
+    {
+      "path": "specifications/000-template.md",
+      "blob_sha": "5e6db9903682f5139a6f9ea78e6e78ea5439f0b2"
+    },
+    {
+      "path": "specifications/001-platform-vision.md",
+      "blob_sha": "b899c4194d6fd37c40c88694f4dd4c53517fb6c6"
+    },
+    {
+      "path": "specifications/002-site-profile.md",
+      "blob_sha": "a377ba9c5817e09dcc345281ea2e33b0cc975885"
+    },
+    {
+      "path": "specifications/003-policy-intelligence-v1.md",
+      "blob_sha": "966fbc41bb522c4466a1732c491324d85366a23b"
+    },
+    {
+      "path": "specifications/004-core-domain-model.md",
+      "blob_sha": "4699e29ebb29f1653fcb4cf5a8945be53a7692b6"
+    },
+    {
+      "path": "specifications/005-entity-search-allocation-refinement.md",
+      "blob_sha": "56561769f1c06b651f8009de83ef168b6f6fea77"
+    },
+    {
+      "path": "specifications/006-allocation-party-evidence.md",
+      "blob_sha": "c9b4efb38e177417711b1caecc24626d3b8dd869"
+    },
+    {
+      "path": "specifications/007-allocation-intelligence-grounding-hardening.md",
+      "blob_sha": "4bc6ad76c0c35f4b26417e764b115a91ae9c6be3"
+    },
+    {
+      "path": "specifications/008-allocation-intelligence-v7-quality-hardening.md",
+      "blob_sha": "6fe62a9d4a56bb6d9d593438b0cc55f50860c4e5"
+    },
+    {
+      "path": "specifications/009-allocation-intelligence-v8-reliability-hardening.md",
+      "blob_sha": "f0410732cb3ff65a4f540269658f975b4ef31b82"
+    },
+    {
+      "path": "specifications/010-allocation-intelligence-v9-final-pilot-reliability.md",
+      "blob_sha": "732745f8d70eb6279862f6760e7964861453f04f"
+    },
+    {
+      "path": "specifications/011-allocation-shortlist-v1-gate-1.md",
+      "blob_sha": "cf7bf28d42de10c68b5e855a782de498278127ac"
+    },
+    {
+      "path": "specifications/012-allocation-discovery-gate-1a-table.md",
+      "blob_sha": "3448baae60d1c673386a400838c8f3a9d70c7364"
+    },
+    {
+      "path": "specifications/013-allocation-discovery-gate-1a-performance-amendment.md",
+      "blob_sha": "c269dff2b1a31fc48a231c4f1c3f42849e2895a4"
+    },
+    {
+      "path": "specifications/014-allocation-reporting-v1-gate-2.md",
+      "blob_sha": "b7bd591126699e6145295a7027aa3b7634f4c254"
+    },
+    {
+      "path": "specifications/015-allocation-reporting-v1-gate-3-pdf.md",
+      "blob_sha": "4408c1c3739880d23a14fb0ba029130284685cdc"
+    },
+    {
+      "path": "specifications/016-allocation-reporting-v1-gate-4-ai-web.md",
+      "blob_sha": "97367b9da0537a10c99f73665f55dad756c655ba"
+    },
+    {
+      "path": "specifications/017-lpdi-v1-gate-1-document-discovery-closure.md",
+      "blob_sha": "8c8884c8300c09eaa35e487f9d2926d547445e3f"
+    },
+    {
+      "path": "specifications/018-lpdi-v1-gate-2-controlled-evidence-extraction.md",
+      "blob_sha": "ee01f62956932240240bb3e8c34cfe893522b76a"
+    },
+    {
+      "path": "specifications/019-ui-session-lifecycle.md",
+      "blob_sha": "aa8a377d90c3e688f0ab4dddc86d0e417bda9f34"
+    },
+    {
+      "path": "specifications/020-stage1-access-command-boundary.md",
+      "blob_sha": "a2dacbcc89d094ccde4171a6730580fca6bfe2d8"
+    },
+    {
+      "path": "specifications/021-stage1-local-implementation-status.md",
+      "blob_sha": "00ee75d57a9c1b71da858982adb06c05a15a8a5a"
+    },
+    {
+      "path": "specifications/022-stage1-workflow-coverage-clarification.md",
+      "blob_sha": "d2d32c30de603bbdc6396935660c3c40251e0e5a"
+    },
+    {
+      "path": "specifications/023-document-startup-denials.md",
+      "blob_sha": "6979322a8b7d898e0e5246176edc6fe7cc8a6003"
+    },
+    {
+      "path": "specifications/023-stage2-commercial-evidence.md",
+      "blob_sha": "edcd650e5963d805d4dab732d19a8e111e2b7055"
+    },
+    {
+      "path": "specifications/024-stage2-5-buyer-discovery-and-opportunity-decomposition.md",
+      "blob_sha": "64f1fc7ba100f3841f7f31935f7bd921e437f440"
+    },
+    {
+      "path": "specifications/025-stage2-5b-acquisition-subject-decomposition.md",
+      "blob_sha": "3b7bb36be81f79d788f85c0f19221f94a5a68593"
+    },
+    {
+      "path": "specifications/026-gate-b-production-discovery-validation.md",
+      "blob_sha": "0c529a185ebbb88e9093293a1c67a166cad0778c"
+    },
+    {
+      "path": "specifications/027-stored-mandate-correction-and-v7-transition-sequence.md",
+      "blob_sha": "8c5ed7faa5bb70ed025f04c9305881bc6f3f53e7"
+    },
+    {
+      "path": "specifications/028-explainable-mandate-fit-and-qualified-investigation.md",
+      "blob_sha": "0d458295813e2e4ec9c48663241eba529354b8bc"
+    },
+    {
+      "path": "specifications/029-stage26b-evidence-remediation.md",
+      "blob_sha": "4162b1ac4bf440904819331c4a6e385c91d75aff"
+    },
+    {
+      "path": "specifications/029-stage4-material-discovery.md",
+      "blob_sha": "f335de30d7eb328cdd2d84762b7d248aafcfc313"
+    },
+    {
+      "path": "specifications/030-stage26b-b2-planning-status-freshness.md",
+      "blob_sha": "db211e6100c8846617a48c827e54d45ebf16ed0e"
+    },
+    {
+      "path": "specifications/031-stage26b-legacy-freshness-bootstrap.md",
+      "blob_sha": "1f331363069cdede412808fb33176a8e64151506"
+    },
+    {
+      "path": "specifications/032-stage4-stable-credential-pipeline.md",
+      "blob_sha": "d56efcc89ebee6db2d74e4c575e7b8c8554d33c2"
+    },
+    {
+      "path": "specifications/033-verified-records-under-unknown-window-completeness.md",
+      "blob_sha": "579321e59ff0d13fcbbf006a2f27024ba82fbbe5"
+    },
+    {
+      "path": "specifications/036-owner-scheme-review-and-verified-corrections.md",
+      "blob_sha": "7bfaf8b28450f806bdf1a17fd2529500c8ec511b"
+    },
+    {
+      "path": "specifications/README.md",
+      "blob_sha": "c7f7897d092bea4794638249772f3b354169bd5a"
+    },
+    {
+      "path": "tests/test_affordable_housing_scope.py",
+      "blob_sha": "0f9a916263bef4315ff881db34bb89e05161e007"
+    },
+    {
+      "path": "tests/test_agent_evaluation_persistence.py",
+      "blob_sha": "3e3070d618aa04aba977885bc074500c6fbbd23e"
+    },
+    {
+      "path": "tests/test_agent_evaluation_validator.py",
+      "blob_sha": "7032f8854d65a6cb85cad2b1bceca741f2f479ae"
+    },
+    {
+      "path": "tests/test_ah_scope_consumers.py",
+      "blob_sha": "a89b4f21aa00abb1d8c503aaad65b600aa9e6eb5"
+    },
+    {
+      "path": "tests/test_applicant_intelligence.py",
+      "blob_sha": "a1c623c0b09d546baec11c4056a6c4763ea157df"
+    },
+    {
+      "path": "tests/test_buyer_matching.py",
+      "blob_sha": "9a7bde5f4d87a8087a8f791c8298c2d8ab7697ea"
+    },
+    {
+      "path": "tests/test_discovery_ingestion_unit_acceptance.py",
+      "blob_sha": "75ba2d1684e8da483223583cabf3677eac35bc5d"
+    },
+    {
+      "path": "tests/test_extraction_fidelity.py",
+      "blob_sha": "cebd398fea1376de930b76afd8735772995bc5d4"
+    },
+    {
+      "path": "tests/test_ingestion_listing_observation.py",
+      "blob_sha": "1477436cdb3588d0181d76c199aa569ad039f587"
+    },
+    {
+      "path": "tests/test_ownership_control_evidence.py",
+      "blob_sha": "1fcf3e6eef1034338de18ba47e81f8ebdc9d66ee"
+    },
+    {
+      "path": "tests/test_ownership_control_hierarchy.py",
+      "blob_sha": "d579f2fa816ca6e22c7f6b32db426c205b782202"
+    },
+    {
+      "path": "tests/test_ownership_control_reporting.py",
+      "blob_sha": "e619eab5bbec93d31d7609327e62a8ee7e02ca3a"
+    },
+    {
+      "path": "tests/test_planning_status_verification.py",
+      "blob_sha": "2ae16a1c06d571f2a9fe2a647e46636662217023"
+    },
+    {
+      "path": "tests/test_scheme_reconciliation.py",
+      "blob_sha": "35a758e03a6d2960b2af659470a9b7f073f29ae4"
+    },
+    {
+      "path": "tests/test_stage26b_b21.py",
+      "blob_sha": "d4ffad2c811ab6a2e893fc1af633cadc8bd6d364"
+    },
+    {
+      "path": "tests/test_stage2_commercial_evidence.py",
+      "blob_sha": "65c1b589f49879570afc80eb832e220c6fb17629"
+    },
+    {
+      "path": "tests/test_stage2_unit_phasing.py",
+      "blob_sha": "0eda4fb8fdc18a3a2010f7f4e33794fb0d066409"
+    },
+    {
+      "path": "tests/test_subject_relationships.py",
+      "blob_sha": "601fa6cf194d8d98f0a092d6d2e7e17c33d98797"
+    },
+    {
+      "path": "tests/test_wholly_affordable_state.py",
+      "blob_sha": "89e24186bb211b00ddd11099a753d75fb99c1f53"
+    },
+    {
+      "path": "app/enrichment/companies_house.py",
+      "blob_sha": "616aadddecd21b06d5d824047a521a188eef1937"
+    },
+    {
+      "path": "app/enrichment/control_entities.py",
+      "blob_sha": "53fbe9308cafb004bcf8b9489227a85505f0be20"
+    },
+    {
+      "path": "app/extraction/intelligence_refresh.py",
+      "blob_sha": "87c6dcfc687bfcd96dfd24fb92ff4aaeaf2c3bc5"
+    },
+    {
+      "path": "app/extraction/prompts.py",
+      "blob_sha": "3af4882e74136d25797666982eb9d45f2bfa0966"
+    },
+    {
+      "path": "app/pipeline/lapse_tracking.py",
+      "blob_sha": "d556fc91792a9a5a9042a8971cf850943b8412d3"
+    },
+    {
+      "path": "app/pipeline/material_change.py",
+      "blob_sha": "eb61607d0cdaae3b040125489ec68350bd46b231"
+    },
+    {
+      "path": "app/pipeline/run_weekly.py",
+      "blob_sha": "dab9e40f80d9956bcb468392c6e6e81a28941e6f"
+    },
+    {
+      "path": "app/reporting/applicant_intelligence.py",
+      "blob_sha": "279eda9531488950054f92b3b7b96d4442a43987"
+    },
+    {
+      "path": "app/reporting/dashboard.py",
+      "blob_sha": "db86ba180f292cc64c910c5818b99a12a6009a17"
+    },
+    {
+      "path": "app/reporting/entity_search.py",
+      "blob_sha": "d723088a98332c9785fdfe3eb5e6cfe37ea691b6"
+    },
+    {
+      "path": "app/reporting/opportunity_intelligence_packet.py",
+      "blob_sha": "1cae7695c12c831eac8f89c7f745b1073bb0bc5d"
+    },
+    {
+      "path": "app/ui/common.py",
+      "blob_sha": "595d27aa8068c353d7bd7b6274e21c89b880b320"
+    },
+    {
+      "path": "app/ui/site_headline.py",
+      "blob_sha": "3fdd920aeb799ffa455fc6e5b503525a1ee3a7f6"
+    },
+    {
+      "path": "docs/STAGE2_UNIT_PHASING_AMENDMENT.md",
+      "blob_sha": "944797d51fd934d648435f5c6804fecbe253a63a"
+    },
+    {
+      "path": "tests/test_agent_evaluation_prompt.py",
+      "blob_sha": "8e52afef35cf5cc6f9cf202247aec3b24a081bca"
+    },
+    {
+      "path": "tests/test_control_entities.py",
+      "blob_sha": "ed4493c2c906801d9a99e3c222fde1fd3b5deaca"
+    },
+    {
+      "path": "tests/test_gate2b0b_application_lifecycle_intelligence.py",
+      "blob_sha": "6384e6980733a8e9d0d7b7aff7fb18faea38e1f5"
+    },
+    {
+      "path": "tests/test_gate2b2b1_trusted_consumer_alignment.py",
+      "blob_sha": "4f41ebd90b379feadc81a02ad0dbbe8485d727ae"
+    }
+  ],
+  "open_dependencies": [
+    {
+      "pr": 166,
+      "head": "3213cf96650ceebc33a43ef89184589ff714db96",
+      "title": "Specification 035: residential count and categorisation (scheme admission independent of buyer profiles)"
+    },
+    {
+      "pr": 165,
+      "head": "1ef159970fdc318d7d05b65399c6712b083fae0e",
+      "title": "CI: print observed values and kernel evidence from the kernel memory-scope steps; tracking note"
+    },
+    {
+      "pr": 164,
+      "head": "9c8c08dfb0d13ace0c56dcf7df69b78da779ab0e",
+      "title": "Specification 034: partial listing observations Phase 2 (specification only) and retention decision record"
+    },
+    {
+      "pr": 163,
+      "head": "c4438d9c329c1407568c67d5920ceb9f0d7e11a2",
+      "title": "Screening rule v2 (Option B): opt-in additive size assessment; backward-compatibility tests"
+    }
+  ],
+  "pr166_inspected_files": [
+    {
+      "path": "specifications/035-residential-count-and-categorisation.md",
+      "blob_sha": "173485fb763f0c5ecebe53debd8bdbfb2951139e"
+    },
+    {
+      "path": "tests/test_spec035_residential_count_examples.py",
+      "blob_sha": "0c5244ce94e9273ebd7758f5845db42110bbdacd"
+    }
+  ],
+  "constraints": [
+    "No application, SQL or workflow changes",
+    "No production or council queries",
+    "No active Claude branch edits",
+    "No merge or deployment"
+  ]
+}

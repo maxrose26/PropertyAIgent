@@ -6,7 +6,7 @@ Status: **cause NOT established.** This file records facts, labels hypotheses, a
 In the `restricted-provisioning` job of `.github/workflows/stage4-discovery-offline.yml`, three steps start a command inside a `systemd-run --scope` with a hard memory ceiling, let it exceed the ceiling, and then assert three things: the command failed; `systemctl show <unit>.scope -p Result` is `oom-kill`; `ControlGroup` is empty (the scope is gone). Units: `propertyaigent-storage-memory-20261017`, `propertyaigent-operational-cleanup-timing-20261018`, `propertyaigent-operational-once`.
 
 ## Observed occurrences (facts, from the Actions history of `stage4-discovery-offline.yml`)
-Six failures of a kernel-kill step have been found. Each of the 37 failed runs of this workflow created since 19 Oct 2026 (plus the earlier attempts of the PR 162 run) was checked for the failing step, matching step names containing kill / excess / terminat / memory; the other failures were in other steps (stable pipeline lifecycle, wrapper, connection matrix, driver diagnostics) and are not part of this note.
+Seven failures of a kernel-kill step have been found. Each of the 37 failed runs of this workflow created since 19 Oct 2026 (plus the earlier attempts of the PR 162 run) was checked for the failing step, matching step names containing kill / excess / terminat / memory; the other failures were in other steps (stable pipeline lifecycle, wrapper, connection matrix, driver diagnostics) and are not part of this note.
 | When (UTC) | Run | Commit | Failing step | Outcome |
 |---|---|---|---|---|
 | 19 Oct 19:34 | [39312077249](https://github.com/maxrose26/PropertyAIgent/actions/runs/39312077249) (`stage4/stable-pipeline-20261020`) | `ba7a3ede` | "Operational controller and all descendants killed above256MiB" | failed; the commit was followed by further commits, so no same-commit rerun exists |
@@ -16,6 +16,7 @@ Six failures of a kernel-kill step have been found. Each of the 37 failed runs o
 | 20 Oct 23:45 | [39517067678](https://github.com/maxrose26/PropertyAIgent/actions/runs/39517067678) attempt 1 (PR 162) | `895976c6` | "Cleanup actual-memory excess kills entire owned scope" | failed |
 | 20 Oct 23:54 | same run, attempt 2 (rerun of the failed job, same commit) | `895976c6` | "Operational controller and all descendants killed above256MiB" | failed; log line `Killed  timeout --kill-after=2s 30s sudo systemd-run ...` |
 | 21 Oct 00:03 | same run, attempt 3 | `895976c6` | none | passed |
+| 21 Oct 13:09 | [39604379295](https://github.com/maxrose26/PropertyAIgent/actions/runs/39604379295) attempt 1 (post-merge CI of PR 169 on master `431c0471`; first attempt, never rerun) | `431c0471` | "Operational controller and all descendants killed above256MiB" | **failed; preserved as evidence.** The merge commit's tree (`c709968b`) is byte-identical to the PR head `de4115ca` whose run passed all seven checks minutes earlier. Log: `Killed` for the `timeout ... sudo systemd-run` line, then exit 1 on the first assertion block. The assertions that failed are not identified (this change adds the printing). **Cause: not established.** |
 Correction: an earlier session note said four earlier failures; that was right. Four step failures precede PR 162 (the first four rows above) and two more occurred on PR 162's own run. An earlier draft of this table listed only three before PR 162 and said four was wrong; that draft missed run 39326097707. The same job passed on other commits between these failures, and on the unchanged master commit immediately before PR 162 (23:21-23:29Z on 20 Oct). The failing code paths touch no code changed by those PRs (the steps run kernel/systemd tests only). Four different steps have failed, none consistently.
 
 ## What the steps never printed (the diagnostic gap)
@@ -36,3 +37,6 @@ The 30 s `timeout --kill-after=2s` around the scope command is itself a candidat
 
 ## Closing criteria
 The next failure's output identifies the failing assertion and the observed values. Only then decide between fixing a race in the harness, correcting the expectation, or reporting a runner problem. Do not add retries or loosen an assertion before that.
+
+## Record rule
+A later passing revision does not erase or explain an earlier failure. Run 39604379295 stays recorded as a failure of the unchanged code; no rerun was made before these diagnostics existed. The next failure's output, not this note, is what can identify the cause.
