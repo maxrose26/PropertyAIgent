@@ -28,4 +28,3 @@ A specification is a short document that explains **what** we are building and *
 ## What belongs here
 
 Specifications for anything that changes what PropertyAIgent does or how it's structured - a new intelligence layer, a new data source, a change to the core data model, a new user-facing capability. Not every code change needs one (a bug fix or a small refactor doesn't), but anything that a future contributor would need context to understand the "why" of should have one.
-

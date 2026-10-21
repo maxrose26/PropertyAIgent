@@ -91,4 +91,3 @@ Consistent with the brief and with [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)'s ow
 ## Sequencing Rationale
 
 Phase 1 exists because a rebrand and a dead-end fix are same-day, zero-dependency wins with outsized impact on a first impression — they should not wait behind a full navigation rebuild. Phase 2 (navigation + dashboard) is sequenced next because every later phase assumes navigation exists to reach it from. Phase 3 (Site Profile) is prioritised immediately after navigation because it is explicitly the flagship page and the audit's single highest-value structural fix. Phases 4–6 are lower-dependency, higher-volume polish work, sequenced by how much of the product each phase's fix touches (design system components first, since they're reused everywhere; page-specific fixes last).
-

@@ -968,4 +968,3 @@ Specification 031 proposes a bounded legacy inventory/dependency manifest, risk-
 The future strategy must compare direct-reference polling, verified council decision/change signals, document deltas, related-application discovery and time-triggered checks. Received/validated lists are not complete change feeds. Timestamp-only verification must not change material evidence, fit, families or fingerprints, or trigger AI. Bootstrap completion requires explicitly accepted cohort coverage/exceptions before steady-state coverage is claimed.
 
 Stand Golf remains a separate acquisition-subject requirement: one planning scheme may contain commercially distinct opportunities. Wider 103 homes and retirement component 60 apartments are recorded; the potential 43-home remainder is not independently validated. Reuse/reconcile Stage 2.5B before later decomposition. Historical monitoring-hash mismatch remains separate, with no rebaseline or activation.
-
