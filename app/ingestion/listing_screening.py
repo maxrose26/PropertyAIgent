@@ -89,11 +89,12 @@ RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|resi
 _NUMBER_WORDS={'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12,'thirteen':13,'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,'nineteen':19,
                'twenty':20,'thirty':30,'forty':40,'fifty':50,'sixty':60,'seventy':70,'eighty':80,'ninety':90}
 _DWELLING_NOUN=r'(?:dwellings?|dwellinghouses?|houses?|flats?|apartments?|maisonettes?|bungalows?|townhouses?|homes?|(?:residential|self[- ]contained|affordable|retirement|extra[- ]care|student|living)\s+(?:units?|accommodation))'
-ATTACHED_COUNT=re.compile(r'(?<![\w/.,-])(\d{1,4}|'+'|'.join(_NUMBER_WORDS)+r')\b[\s-]*(?:no\.?\s+)?(?!(?:bed|beds|bedroom|bedrooms|bedded|room|rooms|storey|storeys|story|stories|car|cars|parking|space|spaces|person|persons|bay|bays|m|metres?)\b)(?:[\w-]+\.?\s+){0,3}?'+_DWELLING_NOUN+r'\b',re.I)
-EXISTING_OR_REMOVED=re.compile(r'\b(?:demolition|demolish\w*|removal|loss|clearance|existing|retention|retain\w*|former)\b',re.I)
+ATTACHED_COUNT=re.compile(r'(?<![\w/.,-])(\d{1,4}|'+'|'.join(_NUMBER_WORDS)+r')\b[\s-]*(?:no\.?\s+)?(?!(?:bed|beds|bedroom|bedrooms|bedded|room|rooms|storey|storeys|story|stories|car|cars|parking|space|spaces|person|persons|bay|bays|m|metres?)\b)(?:[\w-]+\.?\s+){0,3}?'+_DWELLING_NOUN+r'\b(?!\s+(?:blocks?|buildings?)\b)',re.I)      # "4 no. apartment blocks" counts blocks, not apartments
+EXISTING_OR_REMOVED=re.compile(r'\b(?:demolition|demolish\w*|removal|loss|clearance|existing|retention|retain\w*|former|approved|previously|wider|overall|masterplan|allocation|parent|outline)\b',re.I)
+NOT_HOUSING_SUPPLY=re.compile(r'\b(?:holiday|temporary|caravans?|static|lodges?|glamping|serviced|short[- ]let|pods?)\b',re.I)
 CREATING=re.compile(r'\b(?:erection|construction|construct\w*|development|creation|provision|provid\w+|formation|comprising|proposed|new|build\w*|redevelopment|replac\w+)\b',re.I)
 # "change of use of 12 flats" / "conversion of 12 flats" / "alterations to 12 flats" name the EXISTING dwellings, until a "to / into / as / provide ..." introduces what is created: "change of use of offices to 12 flats" is new.
-TRANSFORMING=re.compile(r'\b(?:change of use|conversions?|alterations?|extensions?|refurbishment|renovation|sub-?division|amalgamation)\s+(?:of|to)\b',re.I)
+TRANSFORMING=re.compile(r'\b(?:change of use|conversions?|alterations?|extensions?|refurbishment|renovation|sub-?division|amalgamation)\s+(?:of|to|from)\b',re.I)
 INTRODUCES=re.compile(r'\b(?:to|into|as)\b|\bprovid\w+|\bcreat\w+',re.I)
 CLAUSE_BREAK=re.compile(r'[.;:,()\n]')
 
@@ -122,21 +123,29 @@ def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
 
 
 def _count_attachment(text,count):
-    """How the qualifier's count appears in the wording: ('ATTACHED_NEW'|'ATTACHED_EXISTING'|'NOT_ATTACHED'). A mention counts as about existing or removed dwellings when existing/removal wording precedes it in
-    its own clause and no creating wording (erection, construction, conversion, ...) sits between that wording and the number."""
-    seen=False
+    """What the qualifier's count (its largest candidate) is, judged against EVERY count attached to a dwelling noun in the wording. Returns one of
+    'NOT_ATTACHED' (no count is attached to a dwelling noun), 'ONLY_EXISTING' (every attached count is about existing, removed, approved or wider-scheme dwellings), 'MULTIPLE' (more than one proposed count, e.g.
+    "5 houses and 5 flats": the parts are never summed or guessed), 'DISAGREES' (the single proposed count is not the qualifier's) or 'SINGLE_NEW' (exactly one proposed count and it is the qualifier's).
+    A mention is about existing dwellings when existing, removal, approval or wider-scheme wording is inside it or precedes it in its clause with no creating wording in between, when a transformation
+    ("change of use from / of", "conversion of", "alterations to") precedes it with nothing introducing the new use, or when it is not housing supply (holiday, temporary, caravan, lodge ...)."""
+    proposed=[];attached=0
     for m in ATTACHED_COUNT.finditer(text):
         word=m.group(1).lower();value=_NUMBER_WORDS[word] if word in _NUMBER_WORDS else int(word)
-        if value!=count:continue
-        seen=True
+        if NOT_HOUSING_SUPPLY.search(m.group(0)):continue      # holiday homes and the like are not attached dwellings at all
+        attached+=1
         cuts=[c.end() for c in CLAUSE_BREAK.finditer(text,0,m.start())]
         window=text[max(cuts[-1] if cuts else 0,m.start()-120):m.start()]
         existing=[x.start() for x in EXISTING_OR_REMOVED.finditer(window)];creating=[x.start() for x in CREATING.finditer(window)]
         for t in TRANSFORMING.finditer(window):
             if not INTRODUCES.search(window,t.end()):existing.append(t.start())      # the transformation names the existing dwellings and nothing after it introduces the new ones
         existing.sort()
-        if not existing or (creating and creating[-1]>existing[-1]):return 'ATTACHED_NEW'
-    return 'ATTACHED_EXISTING' if seen else 'NOT_ATTACHED'
+        inside=bool(EXISTING_OR_REMOVED.search(m.group(0)))      # "20 existing houses"
+        if inside or (existing and not (creating and creating[-1]>existing[-1])):continue
+        proposed.append(value)
+    if not attached:return 'NOT_ATTACHED'
+    if not proposed:return 'ONLY_EXISTING'
+    if len(proposed)>1:return 'MULTIPLE'
+    return 'SINGLE_NEW' if proposed[0]==count else 'DISAGREES'
 
 
 def _screen(row,threshold,rule):
@@ -181,7 +190,9 @@ def _screen(row,threshold,rule):
         else:
             attachment=_count_attachment(text,count)
             if attachment=='NOT_ATTACHED':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_NOT_ATTACHED_TO_A_DWELLING_NOUN'
-            elif attachment=='ATTACHED_EXISTING':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'
+            elif attachment=='ONLY_EXISTING':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'
+            elif attachment=='MULTIPLE':assessment,reason=SIZE_NOT_ESTABLISHED,'MULTIPLE_PROPOSED_DWELLING_COUNTS'      # parts are never summed: "5 houses and 5 flats" is not "5"
+            elif attachment=='DISAGREES':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'
             elif count<threshold:assessment,reason=SIZE_BELOW,'DWELLING_COUNT_BELOW_THRESHOLD'
             else:assessment,reason=SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'
         out.update(size_assessment=assessment,known_unit_count=count if assessment!=SIZE_NOT_ESTABLISHED else None,screening_threshold=threshold,size_reason=reason)

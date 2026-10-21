@@ -83,7 +83,21 @@ def test_a_different_configured_threshold_changes_the_assessment_and_the_stated_
     ('DEMOLITION OF 14 EXISTING FLATS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),
     ('ALTERATIONS TO THE EXISTING 12 FLATS INCLUDING NEW WINDOWS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),
     ('CONVERSION OF 12 FLATS INTO 24 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),      # the largest count is the created one
-    ('DEMOLITION OF 14 FLATS AND ERECTION OF 12 HOUSES',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),      # the qualifier takes the largest number (14); v2 refuses to call it the scheme size
+    ('DEMOLITION OF 14 FLATS AND ERECTION OF 12 HOUSES',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),      # the qualifier takes the largest number (14); v2 refuses to call it the scheme size
+    # parts are never summed or guessed (a false BELOW would be the most damaging claim)
+    ('ERECTION OF 5 HOUSES AND 5 FLATS',ls.SIZE_NOT_ESTABLISHED,'MULTIPLE_PROPOSED_DWELLING_COUNTS'),
+    ('ERECTION OF 4 HOUSES, 3 BUNGALOWS AND 4 FLATS',ls.SIZE_NOT_ESTABLISHED,'MULTIPLE_PROPOSED_DWELLING_COUNTS'),
+    ('ERECTION OF 9 DWELLINGS AND CONVERSION OF BARN TO 2 DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'MULTIPLE_PROPOSED_DWELLING_COUNTS'),
+    ('ERECTION OF 6 DWELLINGS AND 5 FLATS',ls.SIZE_NOT_ESTABLISHED,'MULTIPLE_PROPOSED_DWELLING_COUNTS'),
+    # a count about someone else's dwellings is never the scheme size
+    ('CHANGE OF USE FROM 12 FLATS TO HOTEL',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),
+    ('ERECTION OF 12 HOUSES ON LAND ADJOINING 20 EXISTING HOUSES',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),
+    ('ERECTION OF 9 DWELLINGS TO REPLACE 14 EXISTING DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),
+    ('ERECTION OF 8 DWELLINGS, PART OF WIDER SCHEME OF 200 DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),
+    ('ERECTION OF 8 DWELLINGS ON PLOTS 1-8 OF THE APPROVED 150 DWELLING DEVELOPMENT',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),
+    ('ERECTION OF 12 DWELLINGS, PREVIOUSLY APPROVED FOR 15 DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DISAGREES_WITH_THE_PROPOSED_MENTION'),
+    ('CONSTRUCTION OF 12 HOLIDAY HOMES',ls.SIZE_NOT_ESTABLISHED,'COUNT_NOT_ATTACHED_TO_A_DWELLING_NOUN'),
+    ('ERECTION OF 12 DWELLINGS WITH 12 CAR PARKING SPACES',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
     ('ERECTION OF A 60 BEDROOM CARE HOME',ls.SIZE_NOT_ESTABLISHED,'COUNT_NOT_ATTACHED_TO_A_DWELLING_NOUN'),      # bedrooms, not dwellings
     ('CHANGE OF USE OF OFFICES TO 12 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
     ('CONVERSION OF EXISTING BUILDING TO PROVIDE 12 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
@@ -146,3 +160,10 @@ def test_version_1_output_over_the_archived_records_and_the_probe_wordings_equal
         return dict(reference="T/1",fields={"proposal":dict(state=over.get("state","PRESENT_VALUE"),value=t,locator="x",truncated=over.get("truncated",False)),"address":dict(state="PRESENT_VALUE",value="1 St",locator="x",truncated=False),
                                             "application_type":dict(state="UNKNOWN",value=None,locator="x",truncated=False)})
     assert digest([ls.screen_row(one(t,**kw)) for t in texts for kw in (dict(),dict(state="UNKNOWN"),dict(truncated=True))])==V1_GOLDEN
+
+
+def test_the_wording_analysis_is_linear_on_long_adversarial_text():
+    """The new patterns must not add a stall of their own. (The pre-existing qualifier is separately cubic on a very long digit run; that is tracked outside this change and is not exercised here.)"""
+    import time
+    for text in ('ERECTION OF '+'12 FLATS, '*500,'DEMOLITION '*700+'ERECTION OF 12 DWELLINGS','CHANGE OF USE OF '+'ABC '*1500+'TO 12 FLATS','1 - '*2000+'FLATS'):
+        start=time.monotonic();ls._count_attachment(text[:8192],12);assert time.monotonic()-start<2
