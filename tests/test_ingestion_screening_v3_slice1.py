@@ -477,7 +477,9 @@ def test_every_reason_the_assessor_gives_for_an_unconfirmed_count_has_a_requirem
 # ------------------------------------------------------------------ the verified Bolton fixture and provenance
 def test_the_bolton_fixture_is_the_verified_projection_and_reproduces_the_recorded_v1_aggregate():
     prov = json.loads(PROVENANCE.read_text(encoding='utf-8'))
-    raw = FIXTURE.read_bytes()
+    raw = FIXTURE.read_bytes().replace(b'
+', b'
+')      # the blob is LF; a Windows autocrlf checkout must hash the same
     assert hashlib.sha256(raw).hexdigest() == prov['fixture_sha256'] == '9f45362584672f41d4b0a76fe01a5b081bc5120123b11108bd879f733846a268'
     recs = json.loads(raw)
     assert len(recs) == prov['record_count'] == 24 and all(set(r) == {'reference', 'proposal', 'address'} for r in recs) and len({r['reference'] for r in recs}) == 24
