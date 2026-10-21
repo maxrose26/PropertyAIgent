@@ -83,3 +83,42 @@ def replacement_function(original=None):
     start = text.index('CREATE FUNCTION public.ingestion_worker_step(')
     end = text.index('$fn$;', text.index('AS $fn$', start)) + len('$fn$;')
     return text[start:end].replace('CREATE FUNCTION public.ingestion_worker_step(', 'CREATE OR REPLACE FUNCTION public.ingestion_worker_step(', 1)
+
+
+CEREMONY_OPEN = """BEGIN;
+SET LOCAL lock_timeout='3s';
+SET LOCAL statement_timeout='10s';
+GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE;
+GRANT CREATE ON SCHEMA public TO ingestion_storage_owner;
+SET LOCAL ROLE ingestion_storage_owner;
+"""
+CEREMONY_CLOSE = """RESET ROLE;
+REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner;
+REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER;
+COMMIT;
+"""
+# Read back after the ceremony: the function body digest, its owner and ACL, and that the temporary owner capability is gone (the same five flags the owner's registration readback requires to be all false).
+READBACK_SQL = {
+    'body_sha256': "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'::regprocedure",
+    'owner': "SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid='public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'::regprocedure",
+    'acl': "SELECT coalesce(array_agg(p.rolname||':'||a.privilege_type ORDER BY p.rolname,a.privilege_type),'{}') FROM pg_proc f CROSS JOIN LATERAL aclexplode(f.proacl) a JOIN pg_roles p ON p.oid=a.grantee WHERE f.oid='public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'::regprocedure",
+    'capability_absent': "SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET'),pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')",
+}
+
+
+def original_function(original=None):
+    """The installed (original) function statement, as CREATE OR REPLACE: the rollback text."""
+    text = original if original is not None else original_text()
+    start = text.index('CREATE FUNCTION public.ingestion_worker_step(')
+    end = text.index('$fn$;', text.index('AS $fn$', start)) + len('$fn$;')
+    return text[start:end].replace('CREATE FUNCTION public.ingestion_worker_step(', 'CREATE OR REPLACE FUNCTION public.ingestion_worker_step(', 1)
+
+
+def installation_script(original=None):
+    """The owner-terminal ceremony that replaces the function (the existing policy-ceremony shape): temporary, explicit, self-revoking ownership; ONE statement; no other object touched. For REVIEW ONLY: nothing runs it."""
+    return CEREMONY_OPEN + replacement_function(original) + '\n' + CEREMONY_CLOSE
+
+
+def rollback_script(original=None):
+    """Byte-for-byte restoration of the previously installed reviewed function, by the same ceremony."""
+    return CEREMONY_OPEN + original_function(original) + '\n' + CEREMONY_CLOSE
