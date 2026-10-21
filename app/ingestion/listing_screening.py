@@ -78,11 +78,42 @@ def citations(text):
     return dict(occurrences=records,overflow=len(matches)>32,complete=len(matches)<=32)
 
 
-def screen_row(row):
+RULE_V1='manchester-listing-screen-assessment-v1'
+RULE_V2='manchester-listing-screen-assessment-v2'
+SIZE_BELOW='KNOWN_BELOW_SCREENING_THRESHOLD'
+SIZE_AT_OR_ABOVE='KNOWN_AT_OR_ABOVE_SCREENING_THRESHOLD'
+SIZE_NOT_ESTABLISHED='SIZE_NOT_ESTABLISHED'
+RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?)\b',re.I)
+
+
+def council_unit_threshold(council):
+    """The council's CONFIGURED screening threshold (config/councils.yaml `unit_threshold`, the value the weekly pipeline already passes to `qualify`)."""
+    from app.config import get_council
+    return get_council(council).unit_threshold
+
+
+def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
+    """Record-level screening.
+
+    `rule_version=RULE_V1` (the default) is the original behaviour, byte for byte: every existing caller, stored result and stored-versus-recomputed comparison is unchanged. `RULE_V2` is opt-in per call and ADDITIVE:
+    the disposition logic is the same, but it uses the council's configured threshold and adds `size_assessment`, `known_unit_count`, `screening_threshold` and `size_reason`, so that "size established and
+    below the screening threshold" is no longer indistinguishable from "insufficient evidence". Nothing re-screens an existing item: a v2 result is a new result under its own rule version."""
+    if rule_version not in (RULE_V1,RULE_V2):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
+    if rule_version==RULE_V1:
+        if council is not None or unit_threshold is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')
+        return _screen(row,None,RULE_V1)
+    if (council is None)==(unit_threshold is None):raise ValueError('RULE_V2_REQUIRES_EXACTLY_ONE_OF_COUNCIL_OR_THRESHOLD')
+    threshold=council_unit_threshold(council) if council is not None else unit_threshold
+    if type(threshold) is not int or threshold<=0:raise ValueError('INVALID_SCREENING_THRESHOLD')
+    out=_screen(row,threshold,RULE_V2)
+    return out
+
+
+def _screen(row,threshold,rule):
     from app.scrapers.unit_filter import qualify
     f=row['fields']['proposal'];text=f.get('value') or ''
     usable=f['state']=='PRESENT_VALUE' and bool(text.strip()) and not f.get('truncated')
-    q=qualify(text) if usable else None
+    q=(qualify(text) if threshold is None else qualify(text,threshold)) if usable else None
     occurrences=[];overflow=False
     for key in ('proposal','address','application_type'):
         value=row['fields'].get(key,{})
@@ -102,8 +133,18 @@ def screen_row(row):
     elif q.classification in {'Excluded - non-residential','Excluded - likely single-unit change of use'} or q.category=='non_target_admin_or_minor':
         disposition='DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'
     else:disposition='INSUFFICIENT_EVIDENCE'
-    return dict(rule_version='manchester-listing-screen-assessment-v1',proposal_usable=usable,
+    out=dict(rule_version=rule,proposal_usable=usable,
         disposition=disposition,retained=True,permanent_exclusion=False,commercial_relevance='UNKNOWN',
         existing_classification=q.classification if q else None,existing_category=q.category if q else None,
         raw_generic_count=q.unit_count if q else None,residential_dwelling_count=None,
         citations=c,site_relationship='UNKNOWN',progress='UNKNOWN')
+    if rule==RULE_V2:
+        count=q.unit_count if q is not None else None
+        if q is None:assessment,reason=SIZE_NOT_ESTABLISHED,'PROPOSAL_NOT_USABLE'
+        elif count is None:assessment,reason=SIZE_NOT_ESTABLISHED,'NO_UNIT_COUNT'
+        elif not residential:assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_WITHOUT_RESIDENTIAL_WORDING'      # e.g. "1 NO. AIR HANDLING UNIT": a number, not a dwelling count
+        elif related:assessment,reason=SIZE_NOT_ESTABLISHED,'RELATED_APPLICATION_LEAD'      # the related-application lead takes precedence; the count may describe the parent scheme
+        elif count<threshold:assessment,reason=SIZE_BELOW,'DWELLING_COUNT_BELOW_THRESHOLD'
+        else:assessment,reason=SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'
+        out.update(size_assessment=assessment,known_unit_count=count if assessment!=SIZE_NOT_ESTABLISHED else None,screening_threshold=threshold,size_reason=reason)
+    return out
