@@ -690,7 +690,7 @@
    "proposal": "INSTALLATION OF 1 NO. AIR HANDLING UNIT",
    "proposal_state": "PRESENT_VALUE",
    "expected": {
-    "category": "primary_residential",
+    "category": "unknown",
     "scheme_role": "NEW_SCHEME",
     "proposed_total": "NONE",
     "approved_total": "NOT_ESTABLISHED",
@@ -702,6 +702,7 @@
     "admission": "RETAIN_NOT_RESIDENTIAL_SUPPLY",
     "reason": "NO_RESIDENTIAL_CREATED"
    },
+   "note": "Category corrected in the Phase A review: plant installation is not a residential application; the existing classifier says unknown (the earlier example said primary_residential in error).",
    "baseline_current": {
     "qualify_unit_count": 1,
     "qualify_category": "unknown",

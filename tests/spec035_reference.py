@@ -207,6 +207,8 @@ def dedupe_by_scheme(results):
 
 
 def _qty(state):
+    if state['state'] in (CONFLICT,ALTERNATIVES):return 'under review'      # a phase whose own figures conflict is never silently resolved in a by-phase label
+    if state['state']==NOT_ESTABLISHED:return 'not established'
     if state['state']==QUALIFIED:
         return 'minimum %d, up to %d'%(state['minimum'],state['maximum']) if state.get('minimum') else 'up to %d'%state['maximum']
     return '%d'%state['quantity']
