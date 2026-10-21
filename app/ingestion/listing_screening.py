@@ -78,7 +78,7 @@ def citations(text):
     return dict(occurrences=records,overflow=len(matches)>32,complete=len(matches)<=32)
 
 
-def screen_row(row):
+def _screen_v1(row):
     from app.scrapers.unit_filter import qualify
     f=row['fields']['proposal'];text=f.get('value') or ''
     usable=f['state']=='PRESENT_VALUE' and bool(text.strip()) and not f.get('truncated')
@@ -107,3 +107,58 @@ def screen_row(row):
         existing_classification=q.classification if q else None,existing_category=q.category if q else None,
         raw_generic_count=q.unit_count if q else None,residential_dwelling_count=None,
         citations=c,site_relationship='UNKNOWN',progress='UNKNOWN')
+
+
+RULE_V1='manchester-listing-screen-assessment-v1'
+RULE_V3='manchester-listing-screen-assessment-v3'
+
+
+def council_unit_threshold(council):
+    """The council's CONFIGURED platform admission threshold (config/councils.yaml `unit_threshold`; specification 035 decision D6: a platform threshold, not a buyer parameter)."""
+    from app.config import get_council
+    return get_council(council).unit_threshold
+
+
+def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
+    """Record-level screening.
+
+    `rule_version=RULE_V1` (the DEFAULT) is the original behaviour, byte for byte: every existing caller, stored result and stored-versus-recomputed comparison is unchanged, and it takes no threshold.
+    `RULE_V3` (specification 035, Phase A) is OPT-IN per call and ADDITIVE: the v1 result is carried unchanged and a `count_assessment` block is added (the four counts, category, scheme role, parent context,
+    size-gate admission and headline), with `routing_authority = "count_assessment"`. The v1-shaped `disposition` of a v3 result is informational and must not route anything (use `routing_of`). Nothing in the
+    repository selects v3, nothing re-screens an existing item, and a v3 result is a NEW result under its own rule version, never an edit of an old one.
+    BOUNDEDNESS CAVEAT: v3 calls the legacy qualifier first (through the v1 result), and that qualifier is cubic-time on a very long run of digits (tracked as a separate task). The new modules are linear, but
+    end-to-end v3 screening is NOT claimed to be bounded until that dependency is fixed and tested (tests/test_ingestion_count_assessment.py carries a strict xfail that turns green when it is)."""
+    if rule_version not in (RULE_V1,RULE_V3):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
+    if rule_version==RULE_V1:
+        if council is not None or unit_threshold is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')
+        return _screen_v1(row)
+    if (council is None)==(unit_threshold is None):raise ValueError('RULE_V3_REQUIRES_EXACTLY_ONE_OF_COUNCIL_OR_THRESHOLD')
+    threshold=council_unit_threshold(council) if council is not None else unit_threshold
+    if type(threshold) is not int or threshold<=0:raise ValueError('INVALID_SCREENING_THRESHOLD')
+    from .count_assessment import assess_proposal
+    out=_screen_v1(row);f=row['fields']['proposal']
+    state=f['state'] if not f.get('truncated') else 'TRUNCATED'
+    out['rule_version']=RULE_V3
+    out['routing_authority']='count_assessment'
+    out['count_assessment']=assess_proposal(f.get('value') or '',proposal_state=state,threshold=threshold)
+    out['count_assessment_threshold']=threshold
+    return out
+
+
+# The allowed routing outcomes per rule version. A value outside the named version's vocabulary fails closed (specification 035 section 6A).
+ROUTING_VOCABULARY={
+    RULE_V1:frozenset({'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE','INSUFFICIENT_EVIDENCE'}),
+    RULE_V3:frozenset({'ADMIT_SCHEME','ADMIT_FOR_ASSESSMENT','ROUTE_COUNT_UNCONFIRMED','RETAIN_BELOW_THRESHOLD','RETAIN_NOT_RESIDENTIAL_SUPPLY','RETAIN_RELATED_TO_PARENT','RETAIN_WATCHLIST','RETAIN_UNUSABLE_PROPOSAL'})}
+
+
+def routing_of(result):
+    """The ONE authoritative routing field of a stored or fresh screening result, chosen by its rule version (specification 035 section 6A): ('disposition', value) for v1 results,
+    ('count_assessment', admission) for v3 results. Any other rule version, a missing field, or a result whose authority label disagrees with its rule version fails closed."""
+    version=result.get('rule_version')
+    if version==RULE_V1 and 'routing_authority' not in result and 'disposition' in result:
+        outcome=result['disposition'];authority='disposition'
+    elif version==RULE_V3 and result.get('routing_authority')=='count_assessment' and isinstance(result.get('count_assessment'),dict):
+        outcome=result['count_assessment'].get('admission');authority='count_assessment'
+    else:raise ValueError('ROUTING_AUTHORITY_UNRESOLVED')
+    if not isinstance(outcome,str) or outcome not in ROUTING_VOCABULARY[version]:raise ValueError('ROUTING_OUTCOME_NOT_IN_VOCABULARY')      # unknown, misspelt, wrong-version or non-string outcomes fail closed
+    return authority,outcome
