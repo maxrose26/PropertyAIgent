@@ -76,6 +76,21 @@ def test_a_different_configured_threshold_changes_the_assessment_and_the_stated_
 
 
 @pytest.mark.parametrize('text,assessment,reason',[
+    ('ERECTION OF 3 RETAIL UNITS',ls.SIZE_NOT_ESTABLISHED,'NOT_RESIDENTIAL_PROPOSAL'),      # the existing qualifier's own non-residential exclusion
+    ('SCREENING OPINION FOR 40 DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'ADMINISTRATIVE_OR_SECONDARY_APPLICATION'),
+    ('DISCHARGE OF CONDITIONS FOR 20 DWELLINGS',ls.SIZE_NOT_ESTABLISHED,'RELATED_APPLICATION_LEAD'),
+    ('CHANGE OF USE OF 12 FLATS TO A HOTEL',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),      # the 12 are the existing flats
+    ('DEMOLITION OF 14 EXISTING FLATS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),
+    ('ALTERATIONS TO THE EXISTING 12 FLATS INCLUDING NEW WINDOWS',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),
+    ('CONVERSION OF 12 FLATS INTO 24 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),      # the largest count is the created one
+    ('DEMOLITION OF 14 FLATS AND ERECTION OF 12 HOUSES',ls.SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'),      # the qualifier takes the largest number (14); v2 refuses to call it the scheme size
+    ('ERECTION OF A 60 BEDROOM CARE HOME',ls.SIZE_NOT_ESTABLISHED,'COUNT_NOT_ATTACHED_TO_A_DWELLING_NOUN'),      # bedrooms, not dwellings
+    ('CHANGE OF USE OF OFFICES TO 12 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
+    ('CONVERSION OF EXISTING BUILDING TO PROVIDE 12 FLATS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
+    ('DEMOLITION OF EXISTING BUNGALOW AND ERECTION OF 12 DWELLINGS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
+    ('ERECTION OF 12 DWELLINGS FOLLOWING DEMOLITION OF 2 EXISTING HOUSES',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
+    ('ERECTION OF TWELVE DWELLINGS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
+    ('ERECTION OF 12 NO. 2 STOREY DWELLINGS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
     ('ERECTION OF 12 DWELLINGS WITH ACCESS',ls.SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'),
     ('ERECTION OF 9 DWELLINGS WITH ACCESS',ls.SIZE_BELOW,'DWELLING_COUNT_BELOW_THRESHOLD'),
     ('ERECTION OF DWELLINGS WITH ACCESS (NUMBER NOT STATED)',ls.SIZE_NOT_ESTABLISHED,'NO_UNIT_COUNT'),
@@ -107,3 +122,27 @@ def test_nothing_in_the_repository_selects_version_2_so_no_existing_screening_ch
         if 'RULE_V2' in text or "rule_version='manchester-listing-screen-assessment-v2'" in text:offenders.append(str(path.relative_to(root)))
     assert offenders==[]      # opt-in only: no caller selects v2 yet, and there is no re-screening function
     assert not [n for n in dir(ls) if 'rescreen' in n.lower() or 're_screen' in n.lower()]
+
+
+@pytest.mark.parametrize('text',['CHANGE OF USE OF 12 FLATS TO A HOTEL','DEMOLITION OF 14 EXISTING FLATS','ERECTION OF A 60 BEDROOM CARE HOME','ERECTION OF 3 RETAIL UNITS','DISCHARGE OF CONDITIONS FOR 20 DWELLINGS'])
+def test_a_size_that_is_not_established_never_changes_the_disposition_or_any_version_1_field(text):
+    v1=ls.screen_row(synthetic(text));v2=ls.screen_row(synthetic(text),rule_version=ls.RULE_V2,unit_threshold=10)
+    assert v2['size_assessment']==ls.SIZE_NOT_ESTABLISHED and v2['known_unit_count'] is None
+    assert {k:x for k,x in v2.items() if k not in ('rule_version','size_assessment','known_unit_count','screening_threshold','size_reason')}=={k:x for k,x in v1.items() if k!='rule_version'}      # the v1 dispositions (including any v1 weakness) are untouched: v2 only declines to claim a size
+
+
+def test_the_threshold_is_still_the_configured_ten_and_the_assessment_agrees_with_the_qualifier_for_every_established_size():
+    for text in ('ERECTION OF 9 DWELLINGS','ERECTION OF 10 DWELLINGS','ERECTION OF 11 DWELLINGS'):
+        q=ls.screen_row(synthetic(text));v2=ls.screen_row(synthetic(text),rule_version=ls.RULE_V2,unit_threshold=10)
+        assert (v2['size_assessment']==ls.SIZE_AT_OR_ABOVE)==q['existing_classification'].startswith('Confirmed') and v2['screening_threshold']==10
+
+
+V1_GOLDEN="bd1585f3f44023771c050807d1906d37ccbaf5b01a6c273ee3167a4f3ba6ffc6"      # digest of master 82988cb listing_screening.screen_row(row) over the inputs below, produced by that unmodified module (this change must not move it)
+
+
+def test_version_1_output_over_the_archived_records_and_the_probe_wordings_equals_the_digest_recorded_from_master():
+    texts=[r["proposal"] for r in RECORDS]+["CHANGE OF USE OF 12 FLATS TO A HOTEL","DEMOLITION OF 14 EXISTING FLATS","ERECTION OF A 60 BEDROOM CARE HOME","ERECTION OF 3 RETAIL UNITS","DISCHARGE OF CONDITIONS FOR 20 DWELLINGS","ERECTION OF TWELVE DWELLINGS","","  "]
+    def one(t,**over):
+        return dict(reference="T/1",fields={"proposal":dict(state=over.get("state","PRESENT_VALUE"),value=t,locator="x",truncated=over.get("truncated",False)),"address":dict(state="PRESENT_VALUE",value="1 St",locator="x",truncated=False),
+                                            "application_type":dict(state="UNKNOWN",value=None,locator="x",truncated=False)})
+    assert digest([ls.screen_row(one(t,**kw)) for t in texts for kw in (dict(),dict(state="UNKNOWN"),dict(truncated=True))])==V1_GOLDEN

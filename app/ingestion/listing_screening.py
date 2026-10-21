@@ -83,7 +83,19 @@ RULE_V2='manchester-listing-screen-assessment-v2'
 SIZE_BELOW='KNOWN_BELOW_SCREENING_THRESHOLD'
 SIZE_AT_OR_ABOVE='KNOWN_AT_OR_ABOVE_SCREENING_THRESHOLD'
 SIZE_NOT_ESTABLISHED='SIZE_NOT_ESTABLISHED'
-RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?)\b',re.I)
+RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?)\b',re.I)      # the v1 test, unchanged; v1 and v2 share it
+# What a number may describe (v2 only). A count is a SCHEME SIZE only when it is attached to a dwelling noun ("12 dwellings", "six self contained flats"; deliberately not a bare "unit") and that mention
+# is not about existing or removed dwellings ("demolition of 14 flats") and the number is not a bedroom, storey, space or person count ("a 60 bedroom care home"). Anything else is left as SIZE_NOT_ESTABLISHED, which makes no claim and changes no disposition.
+_NUMBER_WORDS={'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12,'thirteen':13,'fourteen':14,'fifteen':15,'sixteen':16,'seventeen':17,'eighteen':18,'nineteen':19,
+               'twenty':20,'thirty':30,'forty':40,'fifty':50,'sixty':60,'seventy':70,'eighty':80,'ninety':90}
+_DWELLING_NOUN=r'(?:dwellings?|dwellinghouses?|houses?|flats?|apartments?|maisonettes?|bungalows?|townhouses?|homes?|(?:residential|self[- ]contained|affordable|retirement|extra[- ]care|student|living)\s+(?:units?|accommodation))'
+ATTACHED_COUNT=re.compile(r'(?<![\w/.,-])(\d{1,4}|'+'|'.join(_NUMBER_WORDS)+r')\b[\s-]*(?:no\.?\s+)?(?!(?:bed|beds|bedroom|bedrooms|bedded|room|rooms|storey|storeys|story|stories|car|cars|parking|space|spaces|person|persons|bay|bays|m|metres?)\b)(?:[\w-]+\.?\s+){0,3}?'+_DWELLING_NOUN+r'\b',re.I)
+EXISTING_OR_REMOVED=re.compile(r'\b(?:demolition|demolish\w*|removal|loss|clearance|existing|retention|retain\w*|former)\b',re.I)
+CREATING=re.compile(r'\b(?:erection|construction|construct\w*|development|creation|provision|provid\w+|formation|comprising|proposed|new|build\w*|redevelopment|replac\w+)\b',re.I)
+# "change of use of 12 flats" / "conversion of 12 flats" / "alterations to 12 flats" name the EXISTING dwellings, until a "to / into / as / provide ..." introduces what is created: "change of use of offices to 12 flats" is new.
+TRANSFORMING=re.compile(r'\b(?:change of use|conversions?|alterations?|extensions?|refurbishment|renovation|sub-?division|amalgamation)\s+(?:of|to)\b',re.I)
+INTRODUCES=re.compile(r'\b(?:to|into|as)\b|\bprovid\w+|\bcreat\w+',re.I)
+CLAUSE_BREAK=re.compile(r'[.;:,()\n]')
 
 
 def council_unit_threshold(council):
@@ -109,6 +121,24 @@ def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
     return out
 
 
+def _count_attachment(text,count):
+    """How the qualifier's count appears in the wording: ('ATTACHED_NEW'|'ATTACHED_EXISTING'|'NOT_ATTACHED'). A mention counts as about existing or removed dwellings when existing/removal wording precedes it in
+    its own clause and no creating wording (erection, construction, conversion, ...) sits between that wording and the number."""
+    seen=False
+    for m in ATTACHED_COUNT.finditer(text):
+        word=m.group(1).lower();value=_NUMBER_WORDS[word] if word in _NUMBER_WORDS else int(word)
+        if value!=count:continue
+        seen=True
+        cuts=[c.end() for c in CLAUSE_BREAK.finditer(text,0,m.start())]
+        window=text[max(cuts[-1] if cuts else 0,m.start()-120):m.start()]
+        existing=[x.start() for x in EXISTING_OR_REMOVED.finditer(window)];creating=[x.start() for x in CREATING.finditer(window)]
+        for t in TRANSFORMING.finditer(window):
+            if not INTRODUCES.search(window,t.end()):existing.append(t.start())      # the transformation names the existing dwellings and nothing after it introduces the new ones
+        existing.sort()
+        if not existing or (creating and creating[-1]>existing[-1]):return 'ATTACHED_NEW'
+    return 'ATTACHED_EXISTING' if seen else 'NOT_ATTACHED'
+
+
 def _screen(row,threshold,rule):
     from app.scrapers.unit_filter import qualify
     f=row['fields']['proposal'];text=f.get('value') or ''
@@ -126,7 +156,7 @@ def _screen(row,threshold,rule):
            coverage='OBSERVED_ALLOWLISTED_TEXT_ONLY')
     # Existing secondary/admin qualification must not suppress relation signals.
     related=q is not None and (q.category in {'variation_or_amendment','condition_discharge_or_details','reserved_matters','external_consultation'} or bool(c['occurrences']))
-    residential=bool(re.search(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?)\b',text,re.I))
+    residential=bool(RESIDENTIAL_WORDING.search(text))
     if not usable or c['overflow']:disposition='INSUFFICIENT_EVIDENCE'
     elif related:disposition='RELATED_APPLICATION_FOLLOW_THROUGH'
     elif residential and q.qualifies:disposition='SUPPORTED_PROCESSING_PRIORITY'
@@ -140,11 +170,19 @@ def _screen(row,threshold,rule):
         citations=c,site_relationship='UNKNOWN',progress='UNKNOWN')
     if rule==RULE_V2:
         count=q.unit_count if q is not None else None
+        # The existing qualifier decides eligibility; v2 only adds what the number describes. First applicable reason wins.
         if q is None:assessment,reason=SIZE_NOT_ESTABLISHED,'PROPOSAL_NOT_USABLE'
+        elif related:assessment,reason=SIZE_NOT_ESTABLISHED,'RELATED_APPLICATION_LEAD'      # the related-application lead takes precedence; the count may describe the parent scheme
+        elif q.classification=='Excluded - non-residential':assessment,reason=SIZE_NOT_ESTABLISHED,'NOT_RESIDENTIAL_PROPOSAL'      # e.g. "change of use of 12 flats to a hotel": not a housing scheme, whatever the number
+        elif q.classification=='Excluded - secondary/admin':assessment,reason=SIZE_NOT_ESTABLISHED,'ADMINISTRATIVE_OR_SECONDARY_APPLICATION'
         elif count is None:assessment,reason=SIZE_NOT_ESTABLISHED,'NO_UNIT_COUNT'
         elif not residential:assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_WITHOUT_RESIDENTIAL_WORDING'      # e.g. "1 NO. AIR HANDLING UNIT": a number, not a dwelling count
-        elif related:assessment,reason=SIZE_NOT_ESTABLISHED,'RELATED_APPLICATION_LEAD'      # the related-application lead takes precedence; the count may describe the parent scheme
-        elif count<threshold:assessment,reason=SIZE_BELOW,'DWELLING_COUNT_BELOW_THRESHOLD'
-        else:assessment,reason=SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'
+        elif not (q.classification.startswith('Ignore - under ') or q.classification.startswith('Confirmed - ')):assessment,reason=SIZE_NOT_ESTABLISHED,'UNRECOGNISED_QUALIFIER_OUTCOME'      # default-deny
+        else:
+            attachment=_count_attachment(text,count)
+            if attachment=='NOT_ATTACHED':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_NOT_ATTACHED_TO_A_DWELLING_NOUN'
+            elif attachment=='ATTACHED_EXISTING':assessment,reason=SIZE_NOT_ESTABLISHED,'COUNT_DESCRIBES_EXISTING_OR_REMOVED_DWELLINGS'
+            elif count<threshold:assessment,reason=SIZE_BELOW,'DWELLING_COUNT_BELOW_THRESHOLD'
+            else:assessment,reason=SIZE_AT_OR_ABOVE,'DWELLING_COUNT_AT_OR_ABOVE_THRESHOLD'
         out.update(size_assessment=assessment,known_unit_count=count if assessment!=SIZE_NOT_ESTABLISHED else None,screening_threshold=threshold,size_reason=reason)
     return out
