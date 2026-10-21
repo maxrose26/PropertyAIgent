@@ -248,6 +248,14 @@ class ScreeningRule:
         return screen_row(record,rule_version=RULE_V3,unit_threshold=self.unit_threshold)
 
 
+def screening_plan_binding(rule):
+    """(plan binding, config_sha256) of a v3 rule: the `screening` object a batch plan carries and the digest a v3 registration lists. v1 has none."""
+    from .ledger import digest
+    if not isinstance(rule,ScreeningRule) or rule.rule_version!=RULE_V3:raise ValueError('V3_SCREENING_RULE_REQUIRED')
+    sha=digest(rule.config())
+    return dict(contract=V3_CONTRACT,config_sha256=sha),sha
+
+
 def assessment_identity(record,rule):
     """(record_sha256, config, config_sha256, revision) of a v3 assessment of one source record. The revision is the ledger item revision: it binds the source record AND the configuration, so the same
     record under the same configuration is one item (idempotent) and a changed threshold is a different item. v1 keeps its historical revision (the record digest) and is not handled here."""

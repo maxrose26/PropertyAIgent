@@ -393,10 +393,19 @@ class Owner:
     stop_manual='STORAGE_TEST_STOP'      # the manual stop this registration is bound to (a mode bound to the observed generation-2 baseline sets its exact value)
     stop_sha=None      # None = the accepted generation-1 checkpoint digest
 
-    def register(self,items,authority,*,capture_key,source_calls,prepared=(),capture_only=True):
+    def build_grant(self,items,prepared,*,capture_key,source_calls,capture_only=True,screening=None):
+        """The grant and bindings of one registration. With `screening=None` the grant is exactly the historical v1 grant; with a ScreeningRule (v3) it additionally lists that rule's config digest in
+        `screening_configs` and widens the SCREENING completion vocabulary by the v3 admission outcomes (and by nothing else)."""
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}
         grant=dict(keys=sorted(bindings),contracts=sorted({x['contract'] for x in [*items,*prepared]}),expires_at=(self.grant_expiry or self.expiry).timestamp(),source_calls=source_calls,writes=0,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=['required_once'],bindings=bindings,detail_source_keys=[],capture_key=capture_key,capture_only=capture_only,execution_binding=self.bindings,
                    completion_outcomes={'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'LISTING_METADATA':['BATCH_SCREENED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE']})
+        if screening is not None:
+            from .screening_v3_grant import apply_screening
+            apply_screening(grant,screening)
+        return bindings,grant
+
+    def register(self,items,authority,*,capture_key,source_calls,prepared=(),capture_only=True,screening=None):
+        bindings,grant=self.build_grant(items,prepared,capture_key=capture_key,source_calls=source_calls,capture_only=capture_only,screening=screening)
         # Owner-only fixed insertion/issuance. No runtime principal receives the
         # owner, issuer, barrier or recovery memberships used here.
         with self.connection() as c:
