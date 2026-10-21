@@ -59,6 +59,14 @@ UNIT_COUNT_PATTERNS = [
     r"(?:apartments?|flats?|dwellings?|dwellinghouses?|houses?|homes?|units?)\s*\(?\s*up\s*to\s*(\d+)\)?",
 ]
 
+# Performance bound (the digit-run stall). The patterns above ran in time CUBIC in the length of a digit run, and QUADRATIC in a long word, because a bare `(\d+)` is attempted from every digit of
+# a run (each attempt re-scans the rest of the run) and `\w+` can swallow digits that `\d+` has just given back. Two textual substitutions, nothing else:
+#   * `(\d+)` -> `(?<!\d)(\d+)`: a number is only attempted from the START of a digit run. Every match that could start inside a run also matches from the run's start (the tail is the same and `\d+` is
+#     greedy), and the leftmost start wins, so results are identical; the capture is still the whole run.
+#   * `(?:\w+[\s-]+){0,3}` -> `(?:\w{1,40}[\s-]+){0,3}`: the descriptive words between a count and its noun are at most 40 characters each. This is the ONE intended behaviour change: a "word" of more than
+#     40 word characters between a number and its noun no longer counts as a qualifying phrase (no real planning wording does this; the regression tests pin it).
+UNIT_COUNT_PATTERNS = [p.replace(r"(\d+)", r"(?<!\d)(\d+)").replace(r"(?:\w+[\s-]+){0,3}", r"(?:\w{1,40}[\s-]+){0,3}") for p in UNIT_COUNT_PATTERNS]
+
 EXCLUDE_CATEGORIES = {
     "variation_or_amendment",
     "condition_discharge_or_details",

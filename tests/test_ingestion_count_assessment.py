@@ -397,16 +397,24 @@ def test_every_assessment_outcome_is_inside_the_v3_vocabulary():
     for t in texts:assert ca.assess_proposal(t)['admission'] in vocab,t
 
 
-# ------------------------------------------------------------------ the digit-run dependency is tracked, not hidden
-@pytest.mark.xfail(strict=True,reason='v3 still calls the legacy qualifier first (through the v1 result) and app.scrapers.unit_filter.extract_unit_count is cubic on a long digit run; tracked as a separate task. '
-                   'This flips to an unexpected pass (a strict failure that forces removal of this marker) when that dependency is fixed, so end-to-end boundedness is never claimed before it is tested.')
-def test_end_to_end_v3_screening_is_not_yet_bounded_on_a_long_digit_run():
-    start=time.monotonic();ls.screen_row(row('1'*900),rule_version=ls.RULE_V3,unit_threshold=10)
-    assert time.monotonic()-start<0.5
+# ------------------------------------------------------------------ the digit-run dependency is resolved: end-to-end boundedness is tested under a hard timeout
+def test_end_to_end_v3_screening_is_bounded_on_a_long_digit_run_and_a_regression_fails_rather_than_hangs():
+    """Runs v3 screening on long digit runs in a CHILD process with a hard timeout, so a regression of the legacy qualifier's digit-run stall fails this test instead of hanging CI.
+    The wider adversarial battery (comma/dash/letter-separated runs, long words, every entry point) is in tests/test_unit_filter_digit_runs.py."""
+    import json,subprocess,sys
+    child=("import sys,time\nsys.path.insert(0,sys.argv[1])\nfrom app.ingestion import listing_screening as ls\n"
+           "r=lambda t:dict(reference='T/1',fields={'proposal':dict(state='PRESENT_VALUE',value=t,locator='x',truncated=False),'address':dict(state='PRESENT_VALUE',value='1 St',locator='x',truncated=False),'application_type':dict(state='UNKNOWN',value=None,locator='x',truncated=False)})\n"
+           "out={}\nfor n,t in (('digits900','1'*900),('digits8192','1'*8192),('commas','1,'*4096)):\n    s=time.monotonic();ls.screen_row(r(t),rule_version=ls.RULE_V3,unit_threshold=10);out[n]=round(time.monotonic()-s,3)\nprint(sorted(out.items()))\n")
+    try:
+        done=subprocess.run([sys.executable,'-I','-c',child,str(ROOT)],capture_output=True,text=True,timeout=20)
+    except subprocess.TimeoutExpired:
+        pytest.fail('HUNG: v3 screening of a long digit run did not finish within 20 s (the digit-run stall has regressed)')
+    assert done.returncode==0,done.stderr[-300:]
+    assert all(v<3.0 for _,v in eval(done.stdout.strip().splitlines()[-1])),done.stdout
 
 
 def test_the_new_modules_alone_are_bounded_on_the_same_digit_run():
-    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear; only the legacy qualifier is not
+    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear
 
 
 # ------------------------------------------------------------------ third review: conversions of existing stock into a counted scheme
