@@ -184,7 +184,7 @@ def test_a_v3_item_stores_the_binding_and_routes_by_the_count_assessment(ledger)
     row = ledger.get(child)
     cp = row['checkpoint']
     record_sha = digest(rec)
-    config = dict(rule_version=ls.RULE_V3, count_spec_version='residential-count-v2', assessor='count_assessment', unit_threshold=10, max_text_chars=8192)
+    config = dict(rule_version=ls.RULE_V3, count_spec_version='residential-count-v2', assessor='count_assessment', unit_threshold=10, max_text_chars=8192, code_binding=ls.code_binding(), digest_probe=ls.digest_probe())
     assert row['contract'] == V3 and row['task'] == 'SCREENING'
     assert cp['record_sha256'] == record_sha and cp['config'] == config and cp['config_sha256'] == digest(config)
     assert row['revision'] == cp['assessment_revision'] == digest(dict(record_sha256=record_sha, config_sha256=digest(config)))
