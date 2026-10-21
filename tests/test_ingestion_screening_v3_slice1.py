@@ -419,6 +419,15 @@ def test_every_unconfirmed_and_every_qualified_maximum_result_has_a_non_executab
         if cp and cp.get('rule_version') == ls.RULE_V3 and cp['count_assessment']['admission'] in ('ROUTE_COUNT_UNCONFIRMED', 'ADMIT_FOR_ASSESSMENT'):
             expected.add(it['key'])
     assert len(expected) >= 4 + 2 + 1      # the four Bolton unknowns, the reserved matters and the qualified maximum, plus the examples
+    unusable = [record('UN/1', ''), record('UN/2', 'x' * 9000)]
+    run(ledger, unusable, v3_rule(10), n=2)
+    stored = items(ledger)
+    reqs = sp.investigation_requirements(stored)
+    for it in stored:
+        cp = it['checkpoint']
+        if cp and cp.get('rule_version') == ls.RULE_V3 and cp['count_assessment']['admission'] == 'RETAIN_UNUSABLE_PROPOSAL':
+            expected.add(it['key'])
+    assert {r['assessment_item'] for r in reqs if r['requirement_kind'] == 'PROPOSAL_REFETCH_OR_REVIEW'} == {k for k in expected if ls.routing_of(ledger.get(k)['checkpoint'])[1] == 'RETAIN_UNUSABLE_PROPOSAL'} and len(unusable) == 2
     assert {r['assessment_item'] for r in reqs} == expected      # set equality: nothing uncertain is dropped, nothing certain is added
     assert reqs and all(r['executable'] is False and r['executor'] == 'NONE' and r['note'] == sp.NOTE for r in reqs)
     for r in reqs:
@@ -532,3 +541,33 @@ def test_only_the_slice_one_files_reference_v3_and_every_held_production_path_is
         text = (ROOT / held).read_text(encoding='utf-8', errors='ignore')
         assert not pattern.search(text) and 'listing-screen-v3' not in text, held      # production SQL, grants, controller and owner knowledge of v3: none
     assert "contract='listing-screen-v1'" not in (ROOT / 'app/ingestion/coordinator.py').read_text(encoding='utf-8')      # the hard-coded contract is gone from the disposable path
+
+
+# ------------------------------------------------------------------ review hardening
+def test_a_screening_rule_is_frozen_after_construction():
+    rule = v3_rule(10)
+    for name in ('unit_threshold', 'rule_version', '_config', 'extra'):
+        with pytest.raises(AttributeError):
+            setattr(rule, name, 99)
+    assert rule.config()['unit_threshold'] == 10
+    rule.config()['unit_threshold'] = 99      # a returned copy cannot change the frozen binding
+    assert rule.config()['unit_threshold'] == 10
+
+
+def test_eligibility_checks_the_item_it_is_given_against_the_result(ledger):
+    co, (child,), (cp,) = (lambda r: (r[0], r[1], list(r[2].values())))(run(ledger, [record('01768/26', 'Erection of 49 dwellings')], v3_rule()))
+    item = ledger.get(child)
+    assert ls.identity_admission_eligible(cp, item)
+    assert not ls.identity_admission_eligible(cp, dict(item, contract=V1))      # contract disagrees with the result's rule version
+    assert not ls.identity_admission_eligible(cp, dict(item, revision='0' * 64))      # revision disagrees with the recorded assessment revision
+    assert not ls.identity_admission_eligible(dict(disposition=['SUPPORTED_PROCESSING_PRIORITY']))      # unhashable legacy value: a clean False
+
+
+def test_related_assessments_are_capped_and_report_the_true_total(ledger, monkeypatch):
+    import app.ingestion.coordinator as cm
+    monkeypatch.setattr(cm, 'RELATED_ASSESSMENTS_CAP', 2)
+    rec = record('01768/26', 'Erection of 49 dwellings')
+    for n, t in enumerate((10, 20, 30, 40)):
+        co, kids, res = run(ledger, [rec], v3_rule(t), n=n)
+    (cp,) = res.values()
+    assert len(cp['related_assessments']) == 2 and cp['related_assessments_total'] == 3

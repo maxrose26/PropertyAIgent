@@ -180,16 +180,27 @@ class ScreeningRule:
             if (unit_threshold is None)==(council is None):raise ValueError('RULE_V3_REQUIRES_EXACTLY_ONE_OF_COUNCIL_OR_THRESHOLD')
             if council is not None:unit_threshold=council_unit_threshold(council)
             if type(unit_threshold) is not int or unit_threshold<=0:raise ValueError('INVALID_SCREENING_THRESHOLD')
-        self.rule_version=rule_version;self.unit_threshold=unit_threshold
+        # Frozen: the threshold and the configuration binding are computed once, here, and cannot be reassigned.
+        self._rule_version=rule_version;self._unit_threshold=unit_threshold
+        self._config=None if rule_version==RULE_V1 else self._build_config()
+
+    rule_version=property(lambda self:self._rule_version)
+    unit_threshold=property(lambda self:self._unit_threshold)
+
+    def __setattr__(self,name,value):
+        if name.startswith('_') and name not in self.__dict__:object.__setattr__(self,name,value)
+        else:raise AttributeError('SCREENING_RULE_IS_FROZEN')
+
+    def _build_config(self):
+        from .count_assessment import RULE_VERSION,MAX_TEXT
+        return dict(rule_version=RULE_V3,count_spec_version=RULE_VERSION,assessor='count_assessment',unit_threshold=self._unit_threshold,max_text_chars=MAX_TEXT)
 
     def contract(self):
         return V1_CONTRACT if self.rule_version==RULE_V1 else V3_CONTRACT
 
     def config(self):
         """Every decision-affecting setting of a v3 assessment. Changing any of them gives a different config_sha256 and so a different assessment identity."""
-        if self.rule_version==RULE_V1:return None
-        from .count_assessment import RULE_VERSION,MAX_TEXT
-        return dict(rule_version=RULE_V3,count_spec_version=RULE_VERSION,assessor='count_assessment',unit_threshold=self.unit_threshold,max_text_chars=MAX_TEXT)
+        return None if self._config is None else dict(self._config)
 
     def screen(self,record):
         if self.rule_version==RULE_V1:return screen_row(record)
@@ -209,13 +220,18 @@ def assessment_identity(record,rule):
 IDENTITY_ELIGIBLE={RULE_V1:frozenset({'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}),RULE_V3:frozenset({'ADMIT_SCHEME','ADMIT_FOR_ASSESSMENT'})}
 
 
-def identity_admission_eligible(result):
+def identity_admission_eligible(result,item=None):
     """True only when a stored screening result's ONE authoritative routing outcome (`routing_of`) permits creating a pending identity. It is the first condition of the two identity gates, never the only one:
     every existing factual-admission check still applies. Neither version's eligible outcome writes a count or confirms qualification. A legacy checkpoint with no rule version (the shape the existing tests
     build) is read as v1. Anything unresolvable, unknown or not in the named version's vocabulary is NOT eligible (fail closed)."""
     if not isinstance(result,dict) or not result:return False
     if 'rule_version' not in result and 'routing_authority' not in result:
-        return result.get('disposition') in IDENTITY_ELIGIBLE[RULE_V1]
+        d=result.get('disposition')
+        return isinstance(d,str) and d in IDENTITY_ELIGIBLE[RULE_V1]
     try:authority,outcome=routing_of(result)
     except ValueError:return False
+    if item is not None:
+        # When the stored screening item is supplied it must be the item this result claims to be: contract matches the rule version, and a v3 revision matches the recorded assessment revision.
+        if SCREENING_CONTRACT_RULES.get(item.get('contract'))!=result['rule_version']:return False
+        if result['rule_version']==RULE_V3 and item.get('revision')!=result.get('assessment_revision'):return False
     return outcome in IDENTITY_ELIGIBLE[result['rule_version']]

@@ -36,7 +36,7 @@ def execute(coordinator,claim,*,envelope,council,source):
         or (target['council'],target['reference'],target['source_url'])!=(envelope.council,envelope.reference,envelope.source_url)
         or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE):raise Denied('NEW_IDENTITY_BINDING')
     parent=ledger.get(row['dependencies'][0]);screen=parent['checkpoint']
-    if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not screen or not identity_admission_eligible(screen):
+    if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not screen or not identity_admission_eligible(screen,parent):
         raise Denied('SELECTIVE_SCREENING_REQUIRED')
     def lookup():
         with Session(ledger.engine) as s:

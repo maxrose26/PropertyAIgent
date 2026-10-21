@@ -69,6 +69,9 @@ class FactualContract:
     verification_scope:str='COUPLED'
 
 
+RELATED_ASSESSMENTS_CAP=50
+
+
 class Coordinator:
     def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None):
         self.ledger=ledger;self.contracts=dict(contracts);self.isolated_contracts=frozenset(isolated_contracts)
@@ -234,7 +237,9 @@ class Coordinator:
             from .screening_projection import screening_items,assessment_history
             result.update(binding,assessment_sha256=digest(result['count_assessment']),capture_key=row['dependencies'][0],capture_sha256=receipt['source_sha256'])
             # Informational links to other stored assessments of the same record; never `supersedes`, never "current", and no earlier item is touched.
-            result['related_assessments']=[e for e in assessment_history(screening_items(self.ledger),row['subject'],record_sha) if e['item_key']!=claim.key]
+            # Snapshot at screening time, capped so a checkpoint stays far inside the payload bound; assessment_history() over the ledger is the only authoritative, order-independent view.
+            related=[e for e in assessment_history(screening_items(self.ledger),row['subject'],record_sha) if e['item_key']!=claim.key]
+            result['related_assessments']=related[:RELATED_ASSESSMENTS_CAP];result['related_assessments_total']=len(related)
         self.ledger.checkpoint(claim,result);self.ledger.finish(claim,dict(outcome=routing_of(result)[1],retained=True))
         # No automatic factual task, parent retrieval or Application admission.
         return result
@@ -330,7 +335,7 @@ class Coordinator:
         if row['task']!='FACTUAL_REFRESH' or (contract.row['council'],contract.row['reference'],contract.row['source_url'])!=(envelope.council,envelope.reference,envelope.source_url) or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE:raise Denied('EXACT_DETAIL_CONTRACT_BEFORE_SOURCE')
         if len(row['dependencies'])!=1:raise Denied('SELECTIVE_SCREENING_REQUIRED')
         parent=self.ledger.get(row['dependencies'][0]);screen=parent['checkpoint'] or {}
-        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not identity_admission_eligible(screen) or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or not identity_admission_eligible(screen,parent) or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
         prior=row['checkpoint']
         if prior is not None:
             if prior.get('kind')=='DETAIL_RECEIPT_V1':return self.new_identity(claim,envelope=envelope,council=council,source=prior['source'])

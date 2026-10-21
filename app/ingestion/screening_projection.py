@@ -42,8 +42,8 @@ def assessment_history(items,subject,record_sha256):
 
 
 def investigation_requirements(items):
-    """One entry per (v3 screening item, requirement kind) for every result that is not final: ROUTE_COUNT_UNCONFIRMED (the reason code decides the kinds) and ADMIT_FOR_ASSESSMENT (a qualified maximum that still
-    needs targeted document extraction). A parent's figure is shown only as CONTEXT_ONLY and is never copied into any total."""
+    """One entry per (v3 screening item, requirement kind) for every result that is not final: ROUTE_COUNT_UNCONFIRMED (the reason code decides the kinds), ADMIT_FOR_ASSESSMENT (a qualified maximum that still
+    needs targeted document extraction) and RETAIN_UNUSABLE_PROPOSAL (the proposal could not be read at all). A parent's figure is shown only as CONTEXT_ONLY and is never copied into any total."""
     out=[]
     for item in items:
         v=_view(item)
@@ -53,7 +53,8 @@ def investigation_requirements(items):
         ca=v['result']['count_assessment']
         if outcome=='ROUTE_COUNT_UNCONFIRMED':kinds=REQUIREMENT_KINDS.get(ca.get('reason'),('REVIEW_REQUIRED',))
         elif outcome=='ADMIT_FOR_ASSESSMENT':kinds=('TARGETED_DOCUMENT_EXTRACTION',)
-        else:continue
+        elif outcome=='RETAIN_UNUSABLE_PROPOSAL':kinds=('PROPOSAL_REFETCH_OR_REVIEW',)      # nothing about the scheme was read: the least certain case there is
+        else:continue      # RETAIN_WATCHLIST and the settled RETAIN_* outcomes record no open question
         for kind in kinds:
             out.append(dict(subject=v['subject'],assessment_item=v['item_key'],record_sha256=v['record_sha256'],requirement_kind=kind,reason=ca.get('reason'),routing_outcome=outcome,
                             parent_context=dict(relation='CONTEXT_ONLY',value=ca.get('parent_context')) if ca.get('parent_context') else None,executable=False,executor='NONE',note=NOTE))
