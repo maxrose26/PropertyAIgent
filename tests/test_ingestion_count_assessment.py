@@ -248,7 +248,7 @@ def test_a_count_followed_by_retained_or_existing_wording_is_existing_stock_not_
     got=_a(text);assert (got['proposed_total'],got['existing'])==(total,existing)
 
 
-@pytest.mark.parametrize('text',['Erection of 10 student cluster flats','Erection of 150 bed student accommodation comprising 20 cluster flats','3 dwellings and 12 flats for students'])
+@pytest.mark.parametrize('text',['Erection of 10 student cluster flats','Erection of 150 bed student accommodation comprising 20 cluster flats'])
 def test_student_accommodation_is_not_dwelling_supply_decision_d4(text):
     got=_a(text);assert (got['proposed_total'],got['admission'],got['reason'])==('NOT_ESTABLISHED','RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')
 
@@ -300,3 +300,36 @@ def test_owner_assessments_need_authentication_and_every_field_in_production_too
     for field,bad in (('authenticated',False),('authenticated',None),('authenticated','yes'),('actor',''),('timestamp',''),('rationale','  '),('citations',[]),('citations',['']),('scope',''),('scope','Phase 2'),('subject','a1'),('target','zz'),('kind','LEGALLY_SUPERSEDES')):
         st=ce.resolve_basis(recs,'APPROVED',(),[dict(good,**{field:bad})]);assert st['state']=='CONFLICT_UNRESOLVED' and st['rejected_assessments']==['as1'],(field,bad)
     st=ce.resolve_basis(recs,'APPROVED',(),[{k:v for k,v in good.items() if k!='scope'}]);assert st['state']=='CONFLICT_UNRESOLVED'
+
+
+# ------------------------------------------------------------------ second review round: no false demotion of genuine schemes
+@pytest.mark.parametrize('text,total',[('Erection of 90 dwellings and retention of existing 2 dwellings',90),('Erection of 90 dwellings and existing 2 dwellings to be retained',90),('Erection of 60 dwellings and retained community hall',60),
+    ('Erection of 60 dwellings with existing access retained',60),('Erection of 60 dwellings, existing barn retained',60),('Erection of 45 dwellings (affordable homes retained by RP)',45)])
+def test_retained_wording_about_something_else_never_demotes_a_genuine_scheme(text,total):
+    got=_a(text);assert (got['proposed_total'],got['admission'])==(total,'ADMIT_SCHEME')
+
+
+def test_a_count_directly_followed_by_existing_is_existing_stock_not_new():
+    got=_a('Erection of 40 houses and 20 flats existing');assert got['proposed_total']==40 and got['existing']==20
+    got=_a('Erection of 12 dwellings; 3 dwellings to be demolished');assert (got['proposed_total'],got['lost'])==(12,3)
+
+
+@pytest.mark.parametrize('text,total',[('Erection of 120 dwellings and a student common room',120),('45 dwellings on land adjacent to student halls',45),('12 dwellings on student union car park',12),('Erection of 90 dwellings, student accommodation of 200 bedspaces',90)])
+def test_student_wording_elsewhere_in_the_text_never_demotes_genuine_dwellings(text,total):
+    got=_a(text);assert (got['proposed_total'],got['admission'])==(total,'ADMIT_SCHEME' if total>=10 else 'RETAIN_BELOW_THRESHOLD')
+
+
+def test_student_counts_alongside_dwellings_are_routed_and_all_student_schemes_retained():
+    got=_a('3 dwellings and 12 flats for students');assert (got['admission'],got['reason'])==('ROUTE_COUNT_UNCONFIRMED','STUDENT_ACCOMMODATION_IN_MIXED_SCHEME')
+    got=_a('Erection of 40 dwellings and 20 student cluster flats');assert (got['admission'],got['reason'])==('ROUTE_COUNT_UNCONFIRMED','STUDENT_ACCOMMODATION_IN_MIXED_SCHEME')
+
+
+@pytest.mark.parametrize('text',['Erection of 200 dwellings with a 2 thousand sq m school','Erection of 200 dwellings and a hundred-space car park'])
+def test_hundred_and_thousand_only_matter_where_they_count_dwellings(text):
+    assert _a(text)['proposed_total']==200
+
+
+@pytest.mark.parametrize('text,total',[('Erection of 60 dwellings. Approved under reference 21/0001/FUL the access is unchanged',60),('120 dwellings in substitution for office use approved under 18/0033/PNR',120),
+    ('Erection of 80 dwellings, substitute house types and amend layout, ref 19/123/OUT',80),('Erection of 100 dwellings pursuant to outline 20/0001/OUT',100)])
+def test_a_text_that_opens_with_a_new_creation_clause_is_not_turned_into_an_amendment(text,total):
+    got=_a(text);assert got['scheme_role'] in ('NEW_SCHEME','PHASE_OF_PARENT') and got['proposed_total']==total

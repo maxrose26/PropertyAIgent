@@ -28,8 +28,11 @@ PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+(?:of|comprising|con
 PRODUCT_IN_EACH=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+in\s+each\s+of\s+'+_NUM+r'\s+'+_GROUP+r'\b',re.I)
 GROUP_OF_UNCLEAR=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+of\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b(?!\s+each\b)',re.I)      # "2 blocks of 6 flats": per block or in total? not decided by guessing
 STUDENT=re.compile(r'\bstudents?\b|\bcluster\s+(?:flats?|units?|apartments?)\b',re.I)      # decision D4: student accommodation is not dwelling supply
-AFTER_RETAINED=re.compile(r'\A\W{0,3}(?:\w+\s+){0,2}?(?:retained|retention|existing|remaining|to\s+remain)\b',re.I)
-AFTER_REMOVED=re.compile(r'\A\W{0,3}(?:\w+\s+){0,2}?(?:demolished|removed|to\s+be\s+demolished)\b',re.I)
+_AUX=r'(?:(?:are|is|will\s+be|to\s+be|being|be)\s+)?'
+AFTER_RETAINED=re.compile(r'\A\s*'+_AUX+r'(?:retained|existing|remaining|to\s+remain)\b',re.I)      # directly after the count's own noun: "3 dwellings retained", never "... and retained community hall"
+AFTER_REMOVED=re.compile(r'\A\s*'+_AUX+r'(?:demolished|removed)\b',re.I)
+AFTER_STUDENT=re.compile(r'\A\s*(?:for|to\s+house|to\s+accommodate)\s+students?\b|\A\s*\(?\s*student\s+(?:use|accommodation|housing)\b',re.I)      # "12 flats for students"
+HUNDRED=re.compile(r'\b(?:hundred|thousand)\b(?:\s+and\s+[\w-]+(?:[- ]\w+)?)?\s+(?:[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b',re.I)      # number words this module does not parse, only where they count dwellings
 BARE_UNITS=re.compile(r'(?<![\w/.,-])(\d{1,4})\s+(?:no\.?\s+)?units?\b',re.I)
 RESIDENTIAL_WORDING=re.compile(r'\b(?:dwellings?|houses?|flats?|apartments?|residential|housing|homes?|bungalows?|maisonettes?)\b',re.I)
 NON_RES_UNIT_WORDS=re.compile(r'\b(?:retail|commercial|office|offices|storage|industrial|warehouse|shops?|workshops?|air\s+handling|extract|plant|parking|student|hotel|bed|beds)\b',re.I)
@@ -66,8 +69,9 @@ def _value(token):
 
 def _classify_mention(text,m):
     """('NEW'|'LOST'|'RETAINED'|'CONTEXT'|'ADJACENT'|'NOT_HOUSING', reason) for one attached dwelling count (R-EXISTING, R-CONTEXT, R-HOUSING)."""
-    if NOT_HOUSING_SUPPLY.search(m.group(0)) or STUDENT.search(m.group(0)):return 'NOT_HOUSING',None
-    after=CLAUSE_BREAK.split(text[m.end():m.end()+40],1)[0]      # only the words up to the end of this clause say what this count is
+    if NOT_HOUSING_SUPPLY.search(m.group(0)):return 'NOT_HOUSING',None
+    after=CLAUSE_BREAK.split(text[m.end():m.end()+40],1)[0]
+    if STUDENT.search(m.group(0)) or AFTER_STUDENT.search(after):return 'STUDENT',None      # D4, only where the student wording belongs to THIS count      # only the words up to the end of this clause say what this count is
     if AFTER_REMOVED.search(after):return 'LOST','DEMOLITION'      # "3 dwellings to be demolished": the words AFTER the count say what it is
     if AFTER_RETAINED.search(after):return 'RETAINED',None
     cuts=[c.end() for c in CLAUSE_BREAK.finditer(text,0,m.start())]
@@ -122,7 +126,8 @@ def _first_attached(text):
 def _category(text,application_type):
     from app.scrapers.unit_filter import classify_application_category
     c=classify_application_category(text)
-    if c=='primary_residential' and _parent_reference(text) and SECTION_73.search(text):c='variation_or_amendment'      # a section 73 variation of a named permission is an amendment, not a new scheme
+    amend=SECTION_73.search(text);create=CREATING.search(text);first_count=ATTACHED.search(text)
+    if c=='primary_residential' and _parent_reference(text) and amend and (create is None or amend.start()<=create.start()) and (first_count is None or amend.start()<=first_count.start()):c='variation_or_amendment'      # amending wording that leads the text (before any creation clause or count), with a named permission: an amendment, not a new scheme; a text that opens with a creation clause stays a new scheme
     return c
 
 
@@ -164,11 +169,10 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
         if m:own=text[:m.start()];parent=dict(reference=ref,context_count=_first_attached(text[m.end():]),relation='PART_OF_WIDER_SCHEME')
     nonres=_nonres(own)
     ambiguous=None
-    if STUDENT.search(own):ambiguous=('RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')      # D4: student cluster beds and flats are not dwelling supply; a mixed scheme is for review, not guessed
-    elif GROUP_OF_UNCLEAR.search(own):ambiguous=('ROUTE_COUNT_UNCONFIRMED','AMBIGUOUS_PER_GROUP_COUNT')
-    elif re.search(r'\b(?:hundred|thousand)\b',own,re.I):ambiguous=('ROUTE_COUNT_UNCONFIRMED','COUNT_WORDING_NOT_PARSED')
+    if GROUP_OF_UNCLEAR.search(own):ambiguous=('ROUTE_COUNT_UNCONFIRMED','AMBIGUOUS_PER_GROUP_COUNT')
+    elif HUNDRED.search(own):ambiguous=('ROUTE_COUNT_UNCONFIRMED','COUNT_WORDING_NOT_PARSED')
     # ---- classify every attached count in the application's own words
-    new=[];lost=[];retained=[];not_housing=False
+    new=[];lost=[];retained=[];not_housing=False;student=False
     for kind,a,b,value,m in _mentions(own):
         if kind=='PRODUCT':new.append((kind,a,b,value));continue
         c,why=_classify_mention(own,m)
@@ -176,6 +180,9 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
         elif c=='LOST':lost.append((a,b,value,why))
         elif c=='RETAINED':retained.append((a,b,value))
         elif c=='NOT_HOUSING':not_housing=True
+        elif c=='STUDENT':student=True
+    if student and not ambiguous:      # D4: student cluster flats and beds are not dwelling supply; alongside genuine dwellings the scheme is for review, never guessed
+        ambiguous=('ROUTE_COUNT_UNCONFIRMED','STUDENT_ACCOMMODATION_IN_MIXED_SCHEME') if new else ('RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')
     lost_total=sum(v for _,_,v,_ in lost) if lost else None
     existing_total=(sum(v for _,_,v,_ in lost)+sum(v for _,_,v in retained)) if (lost or retained) else None
     works_only=bool(retained) and not lost
