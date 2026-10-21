@@ -3,7 +3,7 @@ read model). This is the SPECIFICATION written as code so its examples can be ch
 (and these examples are its acceptance tests). Pure functions over plain dicts."""
 PROPOSED='PROPOSED';APPROVED='APPROVED';EITHER='EITHER'
 PERMISSION_SOURCES={'DECISION_NOTICE','APPROVED_PLANS_SCHEDULE'}      # only these can establish an APPROVED count: a form, proposal, statement or officer recommendation cannot (and no assessment can)
-RESOLVED='RESOLVED';QUALIFIED='QUALIFIED_MAXIMUM';CONFLICT='CONFLICT_UNRESOLVED';ALTERNATIVES='ALTERNATIVE_PERMISSIONS';NOT_ESTABLISHED='NOT_ESTABLISHED';PER_SCOPE='PER_SCOPE'
+RESOLVED='RESOLVED';COMBINED='COMBINED_SCOPES';QUALIFIED='QUALIFIED_MAXIMUM';CONFLICT='CONFLICT_UNRESOLVED';ALTERNATIVES='ALTERNATIVE_PERMISSIONS';NOT_ESTABLISHED='NOT_ESTABLISHED';PER_SCOPE='PER_SCOPE'
 MEETS='MEETS_SIZE_FILTER';POSSIBLE='POSSIBLE_SIZE_MATCH';NO_MATCH='NONE'
 LABELS={MEETS:'Meets size filter',POSSIBLE:'Possible size match'}
 LABEL_NOTE='A size match is not a confirmed quantity, a planning approval or a buyer fit.'
@@ -100,17 +100,22 @@ def resolve_basis(records,basis,scope_relations=(),assessments=()):
     names=set(per)
     metrics={r.get('metric',DEFAULT_METRIC) for r in recs if r.get('scope','whole') in names}
     non_overlap=_covers(scope_relations,valid,'NON_OVERLAPPING_PARTS',names)
+    membership=_covers(scope_relations,valid,'COMMON_DEVELOPMENT',names) or _covers(scope_relations,valid,'EXHAUSTS_DEVELOPMENT',names)
+    exhaustion=_covers(scope_relations,valid,'EXHAUSTS_DEVELOPMENT',names)
     if all(v['state']==RESOLVED for v in per.values()) and non_overlap and len(metrics)==1:
-        out=dict(state=RESOLVED,quantity=sum(v['quantity'] for v in per.values()),scopes=per,combined=True,competing=[],historical=[],unsupported_as_approved=unsupported,rejected_assessments=rejected)
-        if non_overlap==REVIEWER_ASSESSED:out.update(relationship_basis=REVIEWER_ASSESSED,legal_supersession_established=False)
+        # Supported non-overlap makes the EXACT SUM a combined-SCOPE quantity: the count of exactly these scopes together. It is a whole-development total only with supported
+        # common-development membership AND evidence that these scopes exhaust the development; with membership alone the development is at least the sum; with neither it is no claim about the development.
+        total=sum(v['quantity'] for v in per.values())
+        out=dict(state=COMBINED,quantity=total,scopes=per,combined=True,overlap='NONE_SUPPORTED',union_bounds=(total,total),membership=bool(membership),exhaustion=bool(exhaustion),
+                 whole_development_total=total if (membership and exhaustion) else None,scheme_bounds=((total,total) if exhaustion else (total,None)) if membership else None,
+                 competing=[],historical=[],unsupported_as_approved=unsupported,rejected_assessments=rejected)
+        if REVIEWER_ASSESSED in (non_overlap,membership,exhaustion):out.update(relationship_basis=REVIEWER_ASSESSED,legal_supersession_established=False)
         return out
     out=dict(state=PER_SCOPE,overlap='UNRESOLVED',scopes=per,combined=False,competing=[],historical=[],unsupported_as_approved=unsupported,rejected_assessments=rejected)
     # Bounds. The UNION of the specified scopes is at least its largest member and at most all added (true however the scopes overlap), but only for compatible counts (one basis, one metric).
     if len(metrics)==1:
         sc=[scenarios(v) for v in per.values()]
         union=(max(min(lo for lo,_ in p) for p in sc),sum(max(hi for _,hi in p) for p in sc))
-        membership=_covers(scope_relations,valid,'COMMON_DEVELOPMENT',names) or _covers(scope_relations,valid,'EXHAUSTS_DEVELOPMENT',names)
-        exhaustion=_covers(scope_relations,valid,'EXHAUSTS_DEVELOPMENT',names)
         # A WHOLE-SCHEME total needs supported common-development membership; its upper bound exists only with evidence that those scopes exhaust the development.
         scheme=None if not membership else ((union[0],union[1]) if exhaustion else (union[0],None))
         out.update(union_bounds=union,membership=bool(membership),exhaustion=bool(exhaustion),scheme_bounds=scheme)
@@ -132,6 +137,7 @@ def scenarios(state):
     bounds of their union, which is not a whole-scheme total (search then judges each scope on its own)."""
     s=state['state']
     if s==NOT_ESTABLISHED:return []
+    if s==COMBINED:return [state['scheme_bounds']] if state.get('scheme_bounds') else [(state['quantity'],state['quantity'])]      # no membership: exactly the combined scopes, nothing about the development
     if s==PER_SCOPE:
         if state.get('scheme_bounds'):return [state['scheme_bounds']]
         parts=[scenarios(v) for v in state['scopes'].values()]
@@ -156,6 +162,9 @@ def _fold(classes):
 def basis_result(state,size_min=10,size_max=None):
     """(class, level, scopes). Certainty is judged against the ENTIRE selected range. Several scopes with no supported common-development membership are judged one scope at a time: that is a SCOPE-level
     result naming the scopes that earn it, never a statement about the whole scheme."""
+    if state['state']==COMBINED and not state.get('scheme_bounds'):
+        c=_fold([_scenario_class(i,size_min,size_max) for i in scenarios(state)])      # judged on the combined exact quantity, but labelled scope-level
+        return c,'SCOPE',(sorted(state['scopes']) if c!=NO_MATCH else [])
     if state['state']==PER_SCOPE and not state.get('scheme_bounds'):
         per={n:basis_class(v,size_min,size_max) for n,v in state['scopes'].items()}
         best=MEETS if MEETS in per.values() else POSSIBLE if POSSIBLE in per.values() else NO_MATCH
@@ -168,6 +177,7 @@ def basis_class(state,size_min=10,size_max=None):
 
 
 def quantity_status(state):
+    if state['state']==COMBINED:return 'CONFIRMED_QUANTITY' if state.get('whole_development_total') is not None else 'COMBINED_SCOPE_QUANTITY'
     if state['state']==PER_SCOPE and state.get('scheme_bounds'):return 'WHOLE_SCHEME_BOUNDS_ONLY'
     return {RESOLVED:'CONFIRMED_QUANTITY',QUALIFIED:'QUALIFIED_QUANTITY',CONFLICT:'QUANTITY_UNDER_REVIEW',ALTERNATIVES:'QUANTITY_UNDER_REVIEW',PER_SCOPE:'QUANTITY_UNDER_REVIEW',NOT_ESTABLISHED:'NOT_ESTABLISHED'}[state['state']]
 
@@ -209,21 +219,25 @@ def headline(records,scope_relations=(),assessments=()):
     def scoped(state,label):
         parts=', '.join('%s: %s'%(name,_qty(v)) for name,v in sorted(state['scopes'].items()))
         return '%s by phase (%s; overlap not established)'%(label,parts)
+    def combined_label(state,basis_word):
+        parts=', '.join('%s: %d'%(n,v['quantity']) for n,v in sorted(state['scopes'].items()))
+        if state.get('whole_development_total') is not None:return '%s: %d (%s)'%(basis_word,state['quantity'],parts)
+        return '%s (combined scopes): %d (%s)'%(basis_word,state['quantity'],parts)      # the exact sum of these scopes, not a whole-development total
     def tag(state,label):
         return label+(' (%s)'%('supersession reviewer-assessed' if state.get('historical') else 'relationship reviewer-assessed') if state.get('relationship_basis')==REVIEWER_ASSESSED else '')
-    if ap['state'] in (RESOLVED,QUALIFIED):
+    if ap['state'] in (RESOLVED,QUALIFIED,COMBINED):
         q=ap.get('qualifier');label='Approved%s: %s'%(' (%s)'%q if q else '',_qty(ap))
-        if ap.get('combined'):label='Approved: %d (%s)'%(ap['quantity'],', '.join('%s: %d'%(n,v['quantity']) for n,v in sorted(ap['scopes'].items())))
+        if ap.get('combined'):label=combined_label(ap,'Approved')
         out=dict(kind='APPROVED',label=tag(ap,label))
-        if pr['state'] in (RESOLVED,QUALIFIED) and _qty(pr)!=_qty(ap):
+        if pr['state'] in (RESOLVED,QUALIFIED,COMBINED) and _qty(pr)!=_qty(ap):
             revises=any(r['basis']==PROPOSED and r.get('relations',{}).get('revises') for r in records)
             out['alongside']='Proposed revision: %s'%_qty(pr) if revises else 'Proposed (relationship to the approval not established): %s'%_qty(pr)
         return out
     if ap['state'] in (CONFLICT,ALTERNATIVES):return dict(kind='UNDER_REVIEW',label='Unit count under review',competing=competing(ap),basis=APPROVED)
     if ap['state']==PER_SCOPE:return dict(kind='APPROVED_BY_PHASE',label=scoped(ap,'Approved'))
-    if pr['state'] in (RESOLVED,QUALIFIED):
+    if pr['state'] in (RESOLVED,QUALIFIED,COMBINED):
         label='Proposed: %s'%_qty(pr)
-        if pr.get('combined'):label='Proposed: %d (%s)'%(pr['quantity'],', '.join('%s: %d'%(n,v['quantity']) for n,v in sorted(pr['scopes'].items())))
+        if pr.get('combined'):label=combined_label(pr,'Proposed')
         elif pr['state']==QUALIFIED and pr.get('qualifier'):label='Proposed (%s): %s'%(pr['qualifier'],_qty(pr))
         return dict(kind='PROPOSED',label=tag(pr,label))
     if pr['state'] in (CONFLICT,ALTERNATIVES):return dict(kind='UNDER_REVIEW',label='Unit count under review',competing=competing(pr),basis=PROPOSED)
@@ -236,7 +250,7 @@ def size_outcome(records,threshold=10,scope_relations=(),assessments=()):
     The platform threshold is a minimum with no maximum."""
     states=[resolve_basis(records,b,scope_relations,assessments) for b in (APPROVED,PROPOSED)]
     def resolved_ok(s):
-        if s['state']==RESOLVED:return s['quantity']>=threshold
+        if s['state'] in (RESOLVED,COMBINED):return s['quantity']>=threshold      # a combined-scope quantity is an exact supported count for those scopes
         if s['state']==PER_SCOPE:return any(resolved_ok(v) for v in s['scopes'].values())      # scope-level eligibility: a scope that itself reaches the threshold admits; no whole-scheme claim is made
         return False
     if any(resolved_ok(s) for s in states):return 'ADMIT_SCHEME'
@@ -255,6 +269,8 @@ def read_model(records,scope_relations=(),assessments=()):
         s=bases[b]
         if s['state']==RESOLVED and not s.get('relationship_basis'):      # a reviewer-assessed resolution is shown, labelled, but never exported as a plain scalar
             cache=dict(value=s['quantity'],basis=b,qualifier=s.get('qualifier'),state=RESOLVED,semantics='residential-count-v2:headline_exact');break
+        if s['state']==COMBINED and s.get('whole_development_total') is not None and not s.get('relationship_basis'):      # only an exact WHOLE-DEVELOPMENT total (membership and exhaustion supported) is cached; a combined-scope sum never is
+            cache=dict(value=s['whole_development_total'],basis=b,qualifier=None,state='RESOLVED_WHOLE_DEVELOPMENT',semantics='residential-count-v2:headline_exact');break
         if s['state']!=NOT_ESTABLISHED:break      # an established-but-unresolved (or assessed) approval is not replaced by a proposed figure
-    return dict(headline=hl,bases={b:dict(state=s['state'],qualifier=s.get('qualifier'),quantity=s.get('quantity'),maximum=s.get('maximum'),minimum=s.get('minimum'),competing=s.get('competing'),
-                                          relationship_basis=s.get('relationship_basis')) for b,s in bases.items()},headline_scalar=cache)
+    return dict(headline=hl,bases={b:dict(state=s['state'],qualifier=s.get('qualifier'),quantity=s.get('quantity') if s['state']!=COMBINED else None,maximum=s.get('maximum'),minimum=s.get('minimum'),competing=s.get('competing'),
+                                          relationship_basis=s.get('relationship_basis'),combined_scope_quantity=s.get('quantity') if s['state']==COMBINED else None,whole_development_total=s.get('whole_development_total')) for b,s in bases.items()},headline_scalar=cache)

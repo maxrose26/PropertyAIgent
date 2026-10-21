@@ -1547,7 +1547,7 @@
    "expected": {
     "category": "primary_residential",
     "scheme_role": "NEW_SCHEME",
-    "proposed_total": 101,
+    "proposed_total": "COMBINED_SCOPES",
     "approved_total": "NOT_ESTABLISHED",
     "lost": "NOT_ESTABLISHED",
     "existing": "NOT_ESTABLISHED",
@@ -1558,8 +1558,22 @@
     "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
     "bases": {
      "proposed": {
-      "state": "RESOLVED",
-      "quantity": 101
+      "state": "COMBINED_SCOPES",
+      "quantity": 101,
+      "overlap": "NONE_SUPPORTED",
+      "membership": false,
+      "exhaustion": false,
+      "whole_development_total": null,
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
      },
      "approved": {
       "state": "NOT_ESTABLISHED"
@@ -1567,7 +1581,7 @@
     },
     "headline": {
      "kind": "PROPOSED",
-     "label": "Proposed: 101 (Phase 1: 49, Phase 2: 52)"
+     "label": "Proposed (combined scopes): 101 (Phase 1: 49, Phase 2: 52)"
     },
     "search": [
      {
@@ -1584,6 +1598,11 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      },
      {
@@ -1593,7 +1612,33 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 101,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "NONE",
+      "matched_by": []
      }
     ]
    },
@@ -1633,7 +1678,337 @@
     }
    ],
    "assessments": [],
-   "note": "A combined total exists only because a supported source (a phasing plan, with its literal words) states that the two phases do not overlap.",
+   "note": "Non-overlap alone: a supported source (a phasing plan, with its literal words) says the phases do not overlap, so the exact sum 101 is the quantity of EXACTLY THESE TWO SCOPES together. It is labelled a combined-scope quantity, search is scope-level, no scalar is cached, and nothing is said about the whole development.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38s",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "COMBINED_SCOPES",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "COMBINED_SCOPES",
+      "quantity": 101,
+      "overlap": "NONE_SUPPORTED",
+      "membership": true,
+      "exhaustion": false,
+      "whole_development_total": null,
+      "scheme_bounds": [
+       101,
+       null
+      ],
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed (combined scopes): 101 (Phase 1: 49, Phase 2: 52)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 200,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 102,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "NON_OVERLAPPING_PARTS",
+     "source_kind": "PHASING_PLAN",
+     "quote": "Phase 1 (plots 1-49) and Phase 2 (plots 50-101) are separate and do not overlap"
+    },
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "COMMON_DEVELOPMENT",
+     "source_kind": "PLANNING_STATEMENT",
+     "quote": "Phases 1 and 2 form one development"
+    }
+   ],
+   "assessments": [],
+   "note": "Non-overlap plus supported common-development membership: the development is AT LEAST 101 and has no evidenced upper bound, so the sum is still a combined-scope quantity, not the whole-development total (no scalar is cached).",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38t",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": 101,
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "COMBINED_SCOPES",
+      "quantity": 101,
+      "overlap": "NONE_SUPPORTED",
+      "membership": true,
+      "exhaustion": true,
+      "whole_development_total": 101,
+      "scheme_bounds": [
+       101,
+       101
+      ],
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED",
+     "label": "Proposed: 101 (Phase 1: 49, Phase 2: 52)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 101,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 102,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "NON_OVERLAPPING_PARTS",
+     "source_kind": "PHASING_PLAN",
+     "quote": "Phase 1 (plots 1-49) and Phase 2 (plots 50-101) are separate and do not overlap"
+    },
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "EXHAUSTS_DEVELOPMENT",
+     "source_kind": "PHASING_PLAN",
+     "quote": "Phases 1 and 2 together are the whole development"
+    }
+   ],
+   "assessments": [],
+   "note": "Non-overlap, common-development membership AND exhaustion are all supported: 101 is an exact whole-development total, the headline drops the \"combined scopes\" label, search is whole-scheme and certain, and (only here) an exact scalar cache is offered, typed RESOLVED_WHOLE_DEVELOPMENT.",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",

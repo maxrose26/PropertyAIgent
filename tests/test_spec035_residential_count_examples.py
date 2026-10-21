@@ -27,7 +27,7 @@ NE='NOT_ESTABLISHED';NONE='NONE'
 LEGACY_FALSE_NEGATIVES={'E06','E07','E08','E10'}      # supported total >= threshold, legacy does not admit (it takes one component, not the total)
 LEGACY_FALSE_POSITIVES={'E17','E21','E22','E34','E35','E36','E44','E47'}      # legacy admits although no supported total >= threshold exists (E44: an amendment; E47: the output is 6)
 LEGACY_COUNT_GAPS={'E06','E07','E08','E10','E14','E17','E21','E22','E23','E24','E25','E26','E27','E28','E29','E33','E34','E35','E36','E44','E45','E47'}
-EVIDENCE_MODEL_EXAMPLES={'E37','E38','E38b','E38c','E38d','E38e','E38f','E38g','E38h','E38i','E38j','E38k','E38l','E38m','E38n','E38o','E38p','E38q','E38r'}      # the legacy single scalar cannot represent basis, scope, source, revision, overlap or conflict
+EVIDENCE_MODEL_EXAMPLES={'E37','E38','E38b','E38c','E38d','E38e','E38f','E38g','E38h','E38i','E38j','E38k','E38l','E38m','E38n','E38o','E38p','E38q','E38r','E38s','E38t'}      # the legacy single scalar cannot represent basis, scope, source, revision, overlap or conflict
 
 
 def number(value):
@@ -46,6 +46,10 @@ def project(state):
     keys=('state','quantity','maximum','minimum','historical','unsupported_as_approved','overlap','relationship_basis','legal_supersession_established')
     out={k:state[k] for k in keys if k in state and state[k] not in ([],None)}
     if 'legal_supersession_established' in state:out['legal_supersession_established']=state['legal_supersession_established']
+    if state['state']=='COMBINED_SCOPES':
+        for k in ('membership','exhaustion','whole_development_total'):out[k]=state[k]
+        if state.get('scheme_bounds'):out['scheme_bounds']=list(state['scheme_bounds'])
+        out['scopes']={n:project(v) for n,v in state['scopes'].items()}
     if state['state']=='PER_SCOPE':
         for k in ('membership','exhaustion'):out[k]=state[k]
         if state.get('union_bounds'):out['union_bounds']=list(state['union_bounds'])
@@ -56,7 +60,7 @@ def project(state):
 
 
 def test_the_document_header_is_the_specified_version_and_threshold():
-    assert DOC['spec_version']=='residential-count-v2' and THRESHOLD==10 and len(EXAMPLES)==len({e['id'] for e in EXAMPLES})>=60
+    assert DOC['spec_version']=='residential-count-v2' and THRESHOLD==10 and len(EXAMPLES)==len({e['id'] for e in EXAMPLES})>=62
 
 
 @pytest.mark.parametrize('e',EXAMPLES,ids=[e['id'] for e in EXAMPLES])
@@ -140,6 +144,41 @@ def test_phase_labels_alone_never_prove_disjoint_scopes_and_a_total_needs_suppor
     assert ref.headline(with_status)==ref.headline(PH)      # planning status and construction progress are never read
 
 
+def test_an_exact_sum_is_a_combined_scope_quantity_and_only_membership_plus_exhaustion_make_it_the_whole_development():
+    NO=rel('NON_OVERLAPPING_PARTS');MEM=rel('COMMON_DEVELOPMENT',source='PLANNING_STATEMENT',quote='one development');EXH=rel('EXHAUSTS_DEVELOPMENT',quote='together the whole development')
+    # 1. non-overlap alone: the quantity of exactly these scopes together
+    a=ref.resolve_basis(PH,ref.PROPOSED,[NO])
+    assert (a['state'],a['quantity'],a['membership'],a['exhaustion'],a['whole_development_total'],a['scheme_bounds'])==(ref.COMBINED,101,False,False,None,None)
+    assert ref.headline(PH,[NO])['label']=='Proposed (combined scopes): 101 (Phase 1: 49, Phase 2: 52)'
+    r=ref.search_match(PH,ref.PROPOSED,10,None,[NO]);assert (r['match'],r['level'],r['scopes'],r['quantity_status'])==(ref.MEETS,'SCOPE',['Phase 1','Phase 2'],{'PROPOSED':'COMBINED_SCOPE_QUANTITY'})
+    assert ref.search_match(PH,ref.PROPOSED,10,100,[NO])['match']==ref.NO_MATCH and ref.search_match(PH,ref.PROPOSED,10,101,[NO])['match']==ref.MEETS
+    assert ref.read_model(PH,[NO])['headline_scalar'] is None and ref.read_model(PH,[NO])['bases']['PROPOSED']['combined_scope_quantity']==101 and ref.read_model(PH,[NO])['bases']['PROPOSED']['whole_development_total'] is None
+    # 2. plus membership, no exhaustion: the development is at least the sum, no upper bound; still not a whole-development total
+    b=ref.resolve_basis(PH,ref.PROPOSED,[NO,MEM])
+    assert (b['state'],b['quantity'],b['membership'],b['exhaustion'],b['whole_development_total'],b['scheme_bounds'])==(ref.COMBINED,101,True,False,None,(101,None))
+    assert ref.headline(PH,[NO,MEM])['label']=='Proposed (combined scopes): 101 (Phase 1: 49, Phase 2: 52)'
+    for hi,want in ((None,ref.MEETS),(100,ref.NO_MATCH),(200,ref.POSSIBLE)):
+        r=ref.search_match(PH,ref.PROPOSED,10,hi,[NO,MEM]);assert (r['match'],r['level'],r['quantity_status'])==(want,'SCHEME' if want!=ref.NO_MATCH else 'SCHEME',{'PROPOSED':'COMBINED_SCOPE_QUANTITY'} if want!=ref.NO_MATCH else {}),(hi,r)
+    assert ref.search_match(PH,ref.PROPOSED,102,None,[NO,MEM])['match']==ref.POSSIBLE      # the development may be larger than the sum
+    assert ref.read_model(PH,[NO,MEM])['headline_scalar'] is None
+    # 3. plus exhaustion: an exact whole-development total
+    c=ref.resolve_basis(PH,ref.PROPOSED,[NO,MEM,EXH])
+    assert (c['state'],c['quantity'],c['whole_development_total'],c['scheme_bounds'])==(ref.COMBINED,101,101,(101,101))
+    assert ref.headline(PH,[NO,MEM,EXH])['label']=='Proposed: 101 (Phase 1: 49, Phase 2: 52)'
+    r=ref.search_match(PH,ref.PROPOSED,10,None,[NO,MEM,EXH]);assert (r['match'],r['level'],r['quantity_status'])==(ref.MEETS,'SCHEME',{'PROPOSED':'CONFIRMED_QUANTITY'})
+    assert ref.search_match(PH,ref.PROPOSED,102,None,[NO,MEM,EXH])['match']==ref.NO_MATCH and ref.search_match(PH,ref.PROPOSED,10,100,[NO,MEM,EXH])['match']==ref.NO_MATCH
+    sc=ref.read_model(PH,[NO,MEM,EXH])['headline_scalar']
+    assert sc=={'value':101,'basis':'PROPOSED','qualifier':None,'state':'RESOLVED_WHOLE_DEVELOPMENT','semantics':'residential-count-v2:headline_exact'}
+    # exhaustion without non-overlap supports no total at all; exhaustion alone is membership too but the overlap stays unresolved
+    d=ref.resolve_basis(PH,ref.PROPOSED,[EXH]);assert d['state']==ref.PER_SCOPE and d['scheme_bounds']==(52,101) and 'quantity' not in d and ref.read_model(PH,[EXH])['headline_scalar'] is None
+    # a reviewer-assessed chain is labelled and never cached
+    asm=[dict(good_assessment(id='n',kind='NON_OVERLAPPING_PARTS'),scopes=['Phase 1','Phase 2']),dict(good_assessment(id='e',kind='EXHAUSTS_DEVELOPMENT'),scopes=['Phase 1','Phase 2'])]
+    e=ref.resolve_basis(PH,ref.PROPOSED,(),asm);assert e['whole_development_total']==101 and e['relationship_basis']=='REVIEWER_ASSESSED' and ref.read_model(PH,(),asm)['headline_scalar'] is None
+    assert ref.headline(PH,(),asm)['label'].endswith('(relationship reviewer-assessed)')
+    # the sum never decides admission differently from its scopes: each scope and the sum are exact supported counts
+    assert ref.size_outcome(PH,10,[NO])=='ADMIT_SCHEME'
+
+
 def test_bounds_of_the_union_of_scopes_are_not_a_whole_scheme_total_without_supported_membership_and_exhaustion():
     none=ref.resolve_basis(PH,ref.PROPOSED,[])
     assert none['union_bounds']==(52,101) and none['scheme_bounds'] is None and not none['membership'] and not none['exhaustion']      # a bound on these two phases together, nothing about the scheme
@@ -208,7 +247,7 @@ def test_an_owner_assessment_cannot_create_permission_evidence_alter_planning_st
     assert ref.read_model(PERMS,(),[good_assessment()])['bases']['APPROVED']['relationship_basis']=='REVIEWER_ASSESSED'
     asm=[dict(good_assessment(id='as2',kind='NON_OVERLAPPING_PARTS'),scopes=['Phase 1','Phase 2'])]
     st=ref.resolve_basis(PH,ref.PROPOSED,(),asm)
-    assert st['state']==ref.RESOLVED and st['quantity']==101 and st['relationship_basis']=='REVIEWER_ASSESSED' and st['legal_supersession_established'] is False      # a scope relation can be assessed too, and says so
+    assert st['state']==ref.COMBINED and st['quantity']==101 and st['whole_development_total'] is None and st['relationship_basis']=='REVIEWER_ASSESSED' and st['legal_supersession_established'] is False      # a scope relation can be assessed too, and says so
     assert ref.resolve_basis(PH,ref.PROPOSED,(),[dict(asm[0],scopes=['Phase 1'])])['state']==ref.PER_SCOPE      # an assessment must name the exact scopes (at least two)
 
 
