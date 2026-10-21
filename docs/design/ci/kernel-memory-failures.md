@@ -5,26 +5,33 @@ Status: **cause NOT established.** This file records facts, labels hypotheses, a
 ## What the steps do
 In the `restricted-provisioning` job of `.github/workflows/stage4-discovery-offline.yml`, three steps start a command inside a `systemd-run --scope` with a hard memory ceiling, let it exceed the ceiling, and then assert three things: the command failed; `systemctl show <unit>.scope -p Result` is `oom-kill`; `ControlGroup` is empty (the scope is gone). Units: `propertyaigent-storage-memory-20261017`, `propertyaigent-operational-cleanup-timing-20261018`, `propertyaigent-operational-once`.
 
-## Observed occurrences (facts)
-| When | Where | Failing step | Outcome |
-|---|---|---|---|
-| 20-21 Oct 2026, PR 162, [run 39517067678](https://github.com/maxrose26/PropertyAIgent/actions/runs/39517067678) attempt 1 | restricted-provisioning | "Cleanup actual-memory excess kills entire owned scope" | exit 1 after the scope command; the log shows nothing about which of the three assertions failed |
-| same run, attempt 2 (rerun of the failed job, same commit) | restricted-provisioning | "Operational controller and all descendants killed above256MiB" | exit 1; log line `Killed  timeout --kill-after=2s 30s sudo systemd-run ...` |
-| same run, attempt 3 | restricted-provisioning | none | passed |
-| earlier in this work (before 20 Oct 2026 evening) | various PRs | kernel-kill steps | four earlier intermittent failures were recorded in the session notes; their run ids are not reproduced here and must be filled in from the Actions history |
-The same job passed on the unchanged master commit immediately before (23:21-23:29Z on 20 Oct 2026). The failing code paths touch no code changed by those PRs (the steps run kernel/systemd tests only).
+## Observed occurrences (facts, from the Actions history of `stage4-discovery-offline.yml`)
+Five failures of a kernel-kill step have been found. Each of the 35 failed runs of this workflow since 19 Oct 2026 was checked for the failing step; the other failures were in other steps (stable pipeline lifecycle, wrapper, connection matrix, driver diagnostics) and are not part of this note.
+| When (UTC) | Run | Commit | Failing step | Outcome |
+|---|---|---|---|---|
+| 19 Oct 19:34 | [39312077249](https://github.com/maxrose26/PropertyAIgent/actions/runs/39312077249) (`stage4/stable-pipeline-20261020`) | `ba7a3ede` | "Operational controller and all descendants killed above256MiB" | failed; the commit was followed by further commits, so no same-commit rerun exists |
+| 20 Oct 08:01 | [39390449075](https://github.com/maxrose26/PropertyAIgent/actions/runs/39390449075) (`stage4/pipeline-publication-correction-20261020`) | `9c96da81` | "Cleanup actual-memory excess kills entire owned scope" | failed |
+| 20 Oct 08:37 | [39394772967](https://github.com/maxrose26/PropertyAIgent/actions/runs/39394772967) (`stage4/control-observer-and-probe-20261021`) | `e786e51c` | "Operational controller and all descendants killed above256MiB" | failed |
+| 20 Oct 23:45 | [39517067678](https://github.com/maxrose26/PropertyAIgent/actions/runs/39517067678) attempt 1 (PR 162) | `895976c6` | "Cleanup actual-memory excess kills entire owned scope" | failed |
+| 20 Oct 23:54 | same run, attempt 2 (rerun of the failed job, same commit) | `895976c6` | "Operational controller and all descendants killed above256MiB" | failed; log line `Killed  timeout --kill-after=2s 30s sudo systemd-run ...` |
+| 21 Oct 00:03 | same run, attempt 3 | `895976c6` | none | passed |
+Correction: an earlier session note said four earlier failures; the Actions history shows three before PR 162 (the table above). The same job passed on other commits between these failures, and on the unchanged master commit immediately before PR 162 (23:21-23:29Z on 20 Oct). The failing code paths touch no code changed by those PRs (the steps run kernel/systemd tests only). Three different steps have failed, none consistently.
 
 ## What the steps never printed (the diagnostic gap)
 Neither the observed `Result` nor `ControlGroup`, nor any kernel OOM message, so the first failure above cannot be attributed to a specific assertion.
 Note: the `Killed` line in attempt 2 is **expected** behaviour, not itself the failure: GNU `timeout` re-raises the signal that terminated its child, so a scope killed by the kernel makes the shell print `Killed` for `timeout`.
 
 ## Hypotheses (unverified, for the diagnostics to separate)
+The 30 s `timeout --kill-after=2s` around the scope command is itself a candidate: if the command did not die from the memory limit within 30 s, `timeout` would terminate it, the shell would print `Killed` or a non-zero status exactly as for an OOM kill, and `Result` would not be `oom-kill`. The `Killed timeout ...` line therefore **fits** an OOM kill but does **not prove** one, and it does not rule out the timeout firing.
 * **H1 teardown race:** `Result` or `ControlGroup` is read before systemd has finished tearing the scope down (intermittent by nature).
-* **H2 different kill path:** the scope ends by a path other than the cgroup OOM kill (for example `RuntimeMaxSec`, the 30 s `timeout`, or a runner-wide OOM), so `Result` is not `oom-kill`.
+* **H2 different kill path:** the scope ends by a path other than the cgroup OOM kill (for example `RuntimeMaxSec`, the 30 s `timeout` expiring, or a runner-wide OOM), so `Result` is not `oom-kill`.
 * **H3 runner memory pressure or reuse of a unit name** across steps within one job leaves a previous scope's state visible.
 
 ## Diagnostic improvement (this change; observation only)
-`verification/ingestion_storage/ci_scope_diagnostics.sh`: `assert_killed_scope` performs **exactly the original three assertions** and then `reset-failed`, but first prints the command exit status and the scope's systemd properties and cgroup counters, and on any failure prints the observed values, kernel OOM messages, `dmesg`, memory pressure, and re-observes the scope at +0 s, +2 s and +5 s (a race shows up as a value that changes between the three). A failure-only step reports all three units. The helper is tested under bash with stubbed `systemctl` (`tests/test_ci_kernel_diagnostics.py`).
+`verification/ingestion_storage/ci_scope_diagnostics.sh`: `assert_killed_scope` performs **exactly the original three assertions** and then `reset-failed`, but first prints the command exit status and the scope's systemd properties and cgroup counters, and on any failure prints the observed values, kernel OOM messages, `dmesg`, memory pressure, and re-observes the scope at +0 s, +2 s and +5 s (a race shows up as a value that changes between the three). A failure-only step reports all three units.
+* **Survives errors:** every diagnostic command is run through `observe`, which reports a non-zero status instead of propagating it, so nothing can abort the step under `bash -e` / `pipefail` before the report is complete. A failing `systemctl show` in the assertion path is reported and then judged on its output exactly as the original `test "$(...)" = ...` was (an empty `Result` fails; an empty `ControlGroup` passes). A failed assertion still returns **1**, the status the failing `test` produced.
+* **Bounded:** every diagnostic command, and the assertion's two `systemctl show` reads, run under `timeout --kill-after=2s ${DIAG_TIMEOUT_SECONDS:-10}`; a timeout is reported as status 124. The only unbounded commands are the original ones (`reset-failed`, the scope command itself, which keeps its 30 s `timeout`).
+* **Tested under CI's shell options:** `tests/test_ci_kernel_diagnostics.py` runs the helper with `bash --noprofile --norc -eo pipefail` against fake `sudo`/`systemctl`/`journalctl`/`dmesg`/`free` executables on `PATH` (so the real `timeout` is used), covering a failing and a hanging `systemctl show`, failing and hanging kernel commands, and unchanged assertion outcomes.
 
 ## Closing criteria
 The next failure's output identifies the failing assertion and the observed values. Only then decide between fixing a race in the harness, correcting the expectation, or reporting a runner problem. Do not add retries or loosen an assertion before that.
