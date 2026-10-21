@@ -1,0 +1,39 @@
+{
+  "kind": "PURE_SYNTHETIC_LEGACY_QUALIFIER_PROBE",
+  "revision": "9e906b0f0edc8e79b5c245c678f7f69cbe840bdf",
+  "module": "app/scrapers/unit_filter.py",
+  "database_connections": 0,
+  "source_calls": 0,
+  "model_calls": 0,
+  "results": [
+    {
+      "proposal": "Erection of five houses and five flats",
+      "qualifies": false,
+      "count": 5,
+      "classification": "Ignore - under 10 units",
+      "category": "primary_residential"
+    },
+    {
+      "proposal": "Erection of 5 houses and 5 flats",
+      "qualifies": false,
+      "count": 5,
+      "classification": "Ignore - under 10 units",
+      "category": "primary_residential"
+    },
+    {
+      "proposal": "Mixed use development of nine flats and one commercial unit",
+      "qualifies": false,
+      "count": 9,
+      "classification": "Ignore - under 10 units",
+      "category": "mixed_use"
+    },
+    {
+      "proposal": "Conversion of twelve flats into a hotel",
+      "qualifies": true,
+      "count": 12,
+      "classification": "Confirmed - 10+ units",
+      "category": "primary_residential"
+    }
+  ],
+  "limitation": "Legacy qualifier result only; not an end-to-end admission or buyer-surface finding"
+}

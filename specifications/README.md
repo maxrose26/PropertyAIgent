@@ -28,3 +28,7 @@ A specification is a short document that explains **what** we are building and *
 ## What belongs here
 
 Specifications for anything that changes what PropertyAIgent does or how it's structured - a new intelligence layer, a new data source, a change to the core data model, a new user-facing capability. Not every code change needs one (a bug fix or a small refactor doesn't), but anything that a future contributor would need context to understand the "why" of should have one.
+
+## Intelligence rules reference
+
+[The Intelligence Rules Index](../docs/INTELLIGENCE_RULES_INDEX.md) maps current domain contracts, implementation, consumers and meaningful tests. [The gap assessment](../docs/INTELLIGENCE_RULES_GAPS.md) prioritises at most three follow-on packages. This is an assessment, not a new policy or implementation authority; open specifications and production-verification limits are explicit.
