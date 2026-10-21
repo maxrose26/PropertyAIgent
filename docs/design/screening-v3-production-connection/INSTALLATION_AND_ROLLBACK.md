@@ -43,7 +43,7 @@ The ceremony is the one the policy files use (`policy-window-allowance.sql` and 
 | control row | digest equal to the digest read before (the ceremony writes no row) |
 | rows | counts and a digest of every existing `ingestion_work_items` / `ingestion_work_attempts` row unchanged |
 
-`READBACK_SQL` in `screening_v3_worker_sql.py` holds the first four queries; the disposable rehearsal runs them after installation and after rollback (it measured the ceremony at 0.011 s).
+`READBACK_SQL` in `screening_v3_worker_sql.py` holds the first four queries; the disposable rehearsal runs them after installation and after rollback. The rehearsal's timings (ceremony 0.011 s, five batches 0.52-0.61 s each and 3.64 s in total, registration 0.007 s) are **rehearsal figures only**: they exclude TLS and connection set-up and the real `DatabaseBudget` accounting (the rehearsal uses a minimal stand-in), and must not be read as the expected production cost. The retained production screening slots took 9.2-10.7 s of supervised elapsed time each.
 
 ## 3. Rollback (exact)
 
@@ -53,7 +53,13 @@ Rollback preserves evidence: it never deletes or edits a row. Any v3 children al
 
 **Rollback does not undo a registered authority.** An authority registered earlier is invalidated by the existing invalidation with a committed readback (R3/R4 steps, not part of this slice).
 
-## 4. What remains for later approval
+## 4. Registration shape and trust boundaries this implies
+
+* `assess_retained` reads the capture and every earlier assessment it must prove unchanged. `SQLLedger.get` refuses a key that is not bound in the registration, so those rows must be bound **read-only** in the registered grant (the earlier registration did the same for the capture root). In the rehearsal that is 30 read-only bindings plus 29 new ones = 59 keys, within the 74-key limit in the v5 registration text. `preserved_keys` is a required, non-empty argument: a caller cannot silently prove less.
+* SQL checks that a v3 receipt is internally consistent (rule version, authority, vocabulary, revision from record and configuration digests, configuration listed by the grant, outcome equal to the stored admission). It **cannot recompute the count assessment**, so a worker holding a valid grant could checkpoint any admission in the vocabulary; only the controller's trusted-memory recomputation (`assess_retained`, `execute`) catches that. Anything that merely reads a stored outcome (for example the bounded history query) presents what the worker stored and is a presentation, not an authority.
+* Every v3 identity includes the code binding. Any later edit to `listing_screening.py`, `count_assessment.py`, `count_evidence.py` or `unit_filter.py` changes every new v3 identity and requires a conscious re-pin in `tests/test_ingestion_screening_v3_code_binding.py`; assessments made under the earlier binding are preserved and never replaced. A record re-presented under a different capture parent is refused as a conflicting duplicate, exactly as for v1.
+
+## 5. What remains for later approval
 
 * D3: the policy-successor route for the recorded stop state (or an owner decision on the stop). Not designed or installed here.
 * D7: who runs R2 and signs the readbacks.

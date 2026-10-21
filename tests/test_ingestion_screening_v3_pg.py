@@ -29,6 +29,7 @@ from app.ingestion.ledger import DEFAULT_LIMITS, Denied, digest
 from app.ingestion.schema import WorkAttempt as A, WorkItem as W
 from app.ingestion.sql_ledger import SQLLedger
 from tests.test_discovery_ingestion_provisioning_pg import PACKAGE, ROLES
+from tests.test_ingestion_screening_v3_worker_sql import SPEC034
 from tests.test_ingestion_retained_capture_reconciliation import CAPTURE_CHECKPOINT, CAPTURE_KEY, CON, SCOPE, identities, item, retained
 from verification.ingestion_storage import screening_v3_worker_sql as sv3
 from verification.ingestion_storage.operational_controller import ControllerLedger, assess_retained
@@ -167,7 +168,7 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
                 r['source_record_id'] = 'SYN-%s-%d' % (tag, i)
                 return r
 
-            def scenario(name, n, rule, *, kind='LISTING_RECEIPT_V1', screening_grant=True, expiry=900, authority=None, source_calls=0, tag=None):
+            def scenario(name, n, rule, *, kind='LISTING_RECEIPT_V1', screening_grant=True, expiry=900, authority=None, source_calls=0, tag=None, extra_grant=None):
                 """A synthetic capture of the first n retained records (COMPLETE, own root), its batch items inserted as the owner's registration does, and a grant."""
                 capture = dict(receipt, records=[synthetic(tag or name, i) for i in range(n)], kind=kind)
                 root = item(dict(subject=dict(SCOPE, semantics='RECEIVED', start='2026-09-28', end='2026-10-04'), task='DISCOVERY', contract=CON, revision='scenario-' + name), max_attempts=1, limits=dict(DEFAULT_LIMITS, requests=10, bytes=3000000, rows=60, pages=6))
@@ -180,6 +181,8 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
                     children = [item(dict(subject=dict(kind='APPLICATION', council='bolton', reference=r['reference']), task='SCREENING', contract='listing-screen-v3', revision=ls.assessment_identity(r, rule)[3]), dependencies=[root['key']]) for r in capture['records']]
                 set_expiry(expiry)
                 bindings, grant = owner.build_grant(batches, [root, *children], capture_key=root['key'], source_calls=source_calls, screening=rule if (rule is not None and screening_grant) else None)
+                if extra_grant:
+                    grant.update(extra_grant)
                 authority = authority or ('INGESTION_TEST_' + name)
                 insert_rows(batches)
                 put_grant(authority, grant)
@@ -266,6 +269,74 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             with pytest.raises(Exception) as e:
                 obs['ledger'].batch_row(claim, obs['plans'][0]['checkpoint']['plan'], obs['capture'], obs['capture']['records'][0])
             assert 'CAPTURE_BINDING' in message(e) or 'BATCH_ROW_TYPES' in message(e)      # an observation parent never parents a v3 child
+            assert count("task='SCREENING' AND contract='listing-screen-v3'") == 0
+
+            # ------------------------------------------------------------------ phase 3b: the SQL's own defences, by direct calls with hand-built payloads (a consistent Python client never presents these)
+            def canonical(x):
+                return json.dumps(x, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+            def raw_batch_row(ledger, claim, plan, capture, record, contract, revision):
+                identity = dict(subject={'kind': 'APPLICATION', 'council': capture['council'], 'reference': record['reference']}, task='SCREENING', contract=contract, revision=revision)
+                row = ledger.get(claim.key)
+                child = dict(identity, key=digest(identity), dependencies=[plan['capture_key']], priority=row['priority'], max_attempts=2, limits=row['limits'])
+                with ledger.broker_engine.begin() as c:
+                    ledger._limits(c)
+                    return ledger._step('batch_row', claim.key, claim.fence, dict(child=child, plan_json=canonical(plan), capture_json=canonical(capture), record_json=canonical(record), identity_json=canonical(identity)), connection=c)
+
+            sc = scenario('craft', 2, V3)
+            claim = sc['ledger'].claim(sc['batches'][0]['key'], lease_seconds=165)
+            plan, capture, record = sc['plans'][0]['checkpoint']['plan'], sc['capture'], sc['capture']['records'][0]
+            good_revision = ls.assessment_identity(record, V3)[3]
+            with pytest.raises(Exception) as e:
+                raw_batch_row(sc['ledger'], claim, plan, capture, record, 'listing-screen-v1', digest(record))      # a v1-contract child under a v3 plan
+            assert 'BATCH_ROW_TYPES' in message(e)
+            with pytest.raises(Exception) as e:
+                raw_batch_row(sc['ledger'], claim, plan, capture, record, 'listing-screen-v3', digest(record))      # a v3 child carrying the plain record digest
+            assert 'BATCH_ROW_IDENTITY' in message(e)
+            with pytest.raises(Exception) as e:
+                raw_batch_row(sc['ledger'], claim, plan, capture, record, 'listing-screen-v3', digest(dict(record_sha256=digest(record), config_sha256='2' * 64)))      # right shape, another configuration
+            assert 'BATCH_ROW_IDENTITY' in message(e)
+            sc1 = scenario('craft1', 2, None)
+            claim1 = sc1['ledger'].claim(sc1['batches'][0]['key'], lease_seconds=165)
+            with pytest.raises(Exception) as e:
+                raw_batch_row(sc1['ledger'], claim1, sc1['plans'][0]['checkpoint']['plan'], sc1['capture'], sc1['capture']['records'][0], 'listing-screen-v3', good_revision)      # a v3 child under a plan with no screening binding
+            assert 'BATCH_ROW_TYPES' in message(e)
+            _, listed = ls.screening_plan_binding(V3)
+            for label, binding in (('extra_key', dict(contract='listing-screen-v3', config_sha256=listed, extra=1)), ('bad_hex', dict(contract='listing-screen-v3', config_sha256='Z' * 64)),
+                                   ('null', None), ('wrong_contract', dict(contract='listing-screen-v1', config_sha256=listed))):
+                base = scenario('craft_' + label, 2, V3)
+                bad_plan = dict(base['plans'][0]['checkpoint']['plan'], screening=binding)
+                bad_batch = item(dict(subject=base['plans'][0]['subject'], task='LISTING_METADATA', contract='listing-batch-v1', revision=digest(bad_plan)), dependencies=base['plans'][0]['dependencies'], checkpoint=dict(kind='BATCH_PLAN_V1', plan=bad_plan))
+                insert_rows([bad_batch])
+                bindings_bad, grant_bad = owner.build_grant([bad_batch], [base['root']], capture_key=base['root']['key'], source_calls=0, screening=V3)
+                put_grant('INGESTION_TEST_craft_' + label + '2', grant_bad)
+                led = RehearsalLedger(worker, owner=WORKER_NAME, authority='INGESTION_TEST_craft_' + label + '2', bindings=bindings_bad, application_engine=app, broker_engine=broker, budget=Budget())
+                cl = led.claim(bad_batch['key'], lease_seconds=165)
+                with pytest.raises(Exception) as e:
+                    raw_batch_row(led, cl, bad_plan, base['capture'], base['capture']['records'][0], 'listing-screen-v3', good_revision)
+                assert 'BATCH_ROW_TYPES' in message(e), label      # a malformed or foreign screening binding creates nothing
+            assert count("task='SCREENING' AND contract='listing-screen-v3'") == 0
+
+            # an observation parent with specification 034's substitutions applied (installed here, disposable only): 034 admits the parent for v1, the v3 clause still refuses it
+            variant = sv3.replacement_function()
+            for old, new in SPEC034:
+                assert variant.count(old) == 1
+                variant = variant.replace(old, new)
+            with connect('provisioning_migrator') as m:
+                m.execute(sv3.CEREMONY_OPEN + variant + '\n' + sv3.CEREMONY_CLOSE)
+            obs_extra = {'observation_councils': ['bolton']}
+            ov1 = scenario('obs034v1', 2, None, kind='LISTING_OBSERVATION_V1', extra_grant=obs_extra)
+            cl = ov1['ledger'].claim(ov1['batches'][0]['key'], lease_seconds=165)
+            created, _ = ov1['ledger'].batch_row(cl, ov1['plans'][0]['checkpoint']['plan'], ov1['capture'], ov1['capture']['records'][0])
+            assert rows("key=%s", created)[0]['contract'] == 'listing-screen-v1'      # control: with 034 applied an observation parent DOES parent a v1 child
+            ov3 = scenario('obs034v3', 2, V3, kind='LISTING_OBSERVATION_V1', extra_grant=obs_extra)
+            cl = ov3['ledger'].claim(ov3['batches'][0]['key'], lease_seconds=165)
+            with pytest.raises(Exception) as e:
+                ov3['ledger'].batch_row(cl, ov3['plans'][0]['checkpoint']['plan'], ov3['capture'], ov3['capture']['records'][0])
+            assert 'BATCH_ROW_TYPES' in message(e)      # and the same parent can never parent a v3 child
+            with connect('provisioning_migrator') as m:
+                m.execute(sv3.installation_script())      # back to the v3 replacement alone
+            assert boot.execute(sv3.READBACK_SQL['body_sha256']).fetchone()[0] == hashlib.sha256(derived_body.encode()).hexdigest()
             assert count("task='SCREENING' AND contract='listing-screen-v3'") == 0
 
             # ------------------------------------------------------------------ phase 4: v1 compatibility, duplicates, stripped/malformed receipts, expiry, recovery
@@ -425,6 +496,7 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             with pytest.raises(Exception) as e:
                 sc6['ledger'].batch_row(claim, sc6['plans'][0]['checkpoint']['plan'], sc6['capture'], sc6['capture']['records'][0])
             assert 'BATCH_ROW_TYPES' in message(e)      # v3 is disabled again
+            timings['note'] = 'rehearsal figures only: they exclude TLS and connection set-up and the real DatabaseBudget accounting; the retained production screening slots took 9.2-10.7 s of supervised elapsed time each'
             for key, value in timings.items():
                 record_property(key, json.dumps(value))
             print('V3_REHEARSAL_TIMINGS ' + json.dumps(timings, sort_keys=True))

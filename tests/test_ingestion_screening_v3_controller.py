@@ -209,6 +209,25 @@ def test_a_forged_assessment_stops_the_run(engine, monkeypatch):
         run_assess(ledger, key, receipt, kids, monkeypatch, mutate=forge)
 
 
+def test_the_preserved_rows_must_be_named_and_a_forged_coordinator_field_is_caught(engine, monkeypatch):
+    from app.ingestion.schema import WorkItem as W
+    ledger, key, receipt, kids = retained_ledger(engine)
+    co = Coordinator(ledger, {}, screening_rules={V3.contract(): V3})
+    keys = [p['key'] for p in batching.batch_plans(key, receipt, V3)]
+    for bad in ((), None, [kids[0], kids[0]]):
+        with pytest.raises(Denied, match='PRESERVED_KEYS_REQUIRED'):
+            assess_retained(co, key, capture_sha256=CAPTURE_CHECKPOINT, batch_keys=keys, preserved_keys=bad)
+    forged = []
+
+    def forge(ledger_, child, result):
+        if not forged:      # a stored receipt with a wrong source URL: routing is unaffected, but the stored evidence is not what the capture says
+            forged.append(child)
+            with ledger_.engine.begin() as c:
+                c.execute(W.update().where(W.c.key == child).values(checkpoint=dict(result, source_url='https://example.invalid/forged')))
+    with pytest.raises(Denied, match='FORGED_OR_MISMATCHED_ASSESSMENT'):
+        run_assess(ledger, key, receipt, kids, monkeypatch, mutate=forge)
+
+
 def test_a_modified_earlier_row_stops_the_run(engine, monkeypatch):
     from app.ingestion.schema import WorkItem as W
     ledger, key, receipt, kids = retained_ledger(engine)

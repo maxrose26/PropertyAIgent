@@ -406,7 +406,7 @@ def resume_capture(coordinator,key,*,checkpoint_sha256,prior_accounting_sha256,s
     return dict(outcome='DISCOVERY_SCREENING_ONLY',checkpoint_sha256=checkpoint_sha256,children=children,screening=results,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED')
 
 
-def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys=(),check=lambda:None):
+def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys,check=lambda:None):
     """Source-free v3 assessment of a retained, COMPLETE capture under an explicitly registered v3 rule (proposal section 2.4). No source client, no council, no application database, no identity.
 
     Verifies the capture (state, kind, immutable archive, pinned checkpoint digest), recomputes the exact v3 batch plans from it and requires `batch_keys` to be exactly those, snapshots the rows that must not
@@ -416,6 +416,7 @@ def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserve
     l=coordinator.ledger;rule=coordinator.screening_rule
     if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
     if rule.rule_version==RULE_V1:raise Denied('V3_RULE_REQUIRED')
+    if not preserved_keys or len(set(preserved_keys))!=len(preserved_keys):raise Denied('PRESERVED_KEYS_REQUIRED')      # the earlier assessments and batches the run must prove unchanged; they must be bound (read-only) in the registration
     check();root=l.get(capture_key);receipt=root['checkpoint']
     if (root['state']!='COMPLETE' or root['task']!='DISCOVERY' or not isinstance(receipt,dict) or receipt.get('kind')!='LISTING_RECEIPT_V1'
         or digest(receipt)!=capture_sha256 or not receipt.get('durable_archive')):raise Denied('RETAINED_CAPTURE_BINDING')
@@ -431,7 +432,8 @@ def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserve
         check();record_sha,config,config_sha,revision=assessment_identity(record,rule)
         key=digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':record['reference']},task='SCREENING',contract=coordinator.screening_contract,revision=revision))
         item=l.get(key);stored=item['checkpoint'] or {}
-        expected=dict(rule.screen(record),record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision)
+        expected=dict(rule.screen(record),record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision,
+                      source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])      # the fields the coordinator adds are compared too
         expected['assessment_sha256']=digest(expected['count_assessment']);expected['qualifier_output_sha256']=digest(qualifier_output_of(expected))
         if (item['state']!='COMPLETE' or item['task']!='SCREENING' or item['contract']!=coordinator.screening_contract or item['revision']!=revision or item['dependencies']!=[capture_key]
             or any(stored.get(k)!=v for k,v in expected.items()) or stored.get('capture_key')!=capture_key or stored.get('capture_checkpoint_sha256')!=capture_sha256
