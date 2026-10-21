@@ -268,4 +268,5 @@ def test_the_owner_inventory_states_equal_what_installation_produces_and_rollbac
     apply_text(installer, tmp_path, p.v5_text()[p.v5_text().index('BEGIN;'):], 'rollback_policy.sql')
     assert installed() == oo.Owner.window_inventory()      # then the policy: the previous reviewed inventory, byte for byte
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()[0] == before_rows      # the ceremonies change no row
-    assert boot.execute("SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','USAGE')").fetchone() == (False, False)
+    with installer.connection() as c:      # the migration identity (not the bootstrap superuser) holds no transient owner capability after the ceremonies
+        assert tuple(installer.q(c, sv3.READBACK_SQL['capability_absent'])[0]) == (False, False, False, False, False)
