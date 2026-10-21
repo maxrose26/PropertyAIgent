@@ -27,7 +27,7 @@ NE='NOT_ESTABLISHED';NONE='NONE'
 LEGACY_FALSE_NEGATIVES={'E06','E07','E08','E10'}      # supported total >= threshold, legacy does not admit (it takes one component, not the total)
 LEGACY_FALSE_POSITIVES={'E17','E21','E22','E34','E35','E36','E44','E47'}      # legacy admits although no supported total >= threshold exists (E44: an amendment; E47: the output is 6)
 LEGACY_COUNT_GAPS={'E06','E07','E08','E10','E14','E17','E21','E22','E23','E24','E25','E26','E27','E28','E29','E33','E34','E35','E36','E44','E45','E47'}
-EVIDENCE_MODEL_EXAMPLES={'E37','E38','E38b','E38c','E38d','E38e','E38f','E38g','E38h','E38i','E38j','E38k','E38l','E38m','E38n'}      # the legacy single scalar cannot represent basis, scope, source, revision, overlap or conflict
+EVIDENCE_MODEL_EXAMPLES={'E37','E38','E38b','E38c','E38d','E38e','E38f','E38g','E38h','E38i','E38j','E38k','E38l','E38m','E38n','E38o','E38p','E38q','E38r'}      # the legacy single scalar cannot represent basis, scope, source, revision, overlap or conflict
 
 
 def number(value):
@@ -43,15 +43,20 @@ def records_of(e):
 
 
 def project(state):
-    keys=('state','quantity','maximum','historical','unsupported_as_approved','overlap')
+    keys=('state','quantity','maximum','minimum','historical','unsupported_as_approved','overlap','relationship_basis','legal_supersession_established')
     out={k:state[k] for k in keys if k in state and state[k] not in ([],None)}
+    if 'legal_supersession_established' in state:out['legal_supersession_established']=state['legal_supersession_established']
+    if state['state']=='PER_SCOPE':
+        for k in ('membership','exhaustion'):out[k]=state[k]
+        if state.get('union_bounds'):out['union_bounds']=list(state['union_bounds'])
+        if state.get('scheme_bounds'):out['scheme_bounds']=list(state['scheme_bounds'])
     if state['state'] in ('CONFLICT_UNRESOLVED','ALTERNATIVE_PERMISSIONS'):out['competing']=[list(x) for x in state['competing']]
     if state['state']=='PER_SCOPE':out['scopes']={n:project(v) for n,v in state['scopes'].items()}
     return out
 
 
 def test_the_document_header_is_the_specified_version_and_threshold():
-    assert DOC['spec_version']=='residential-count-v2' and THRESHOLD==10 and len(EXAMPLES)==len({e['id'] for e in EXAMPLES})>=55
+    assert DOC['spec_version']=='residential-count-v2' and THRESHOLD==10 and len(EXAMPLES)==len({e['id'] for e in EXAMPLES})>=60
 
 
 @pytest.mark.parametrize('e',EXAMPLES,ids=[e['id'] for e in EXAMPLES])
@@ -59,7 +64,7 @@ def test_each_example_obeys_the_specified_rules(e):
     x=e['expected'];p=x['proposed_total'];a=x['admission']
     assert a in ADMISSIONS and x['scheme_role'] in ROLES and x['reason'] and isinstance(x['non_residential_units'],dict) and 'demolished' not in x
     # R-ADMIT: size eligibility comes from the supported proposed or approved count against the platform threshold (a minimum, no maximum), nothing else; conflicts and qualified quantities route to assessment
-    if a in SIZE_OUTCOMES:assert ref.size_outcome(records_of(e),THRESHOLD,e.get('scope_relations',()))==a
+    if a in SIZE_OUTCOMES:assert ref.size_outcome(records_of(e),THRESHOLD,e.get('scope_relations',()),e.get('assessments',()))==a
     if a=='ADMIT_FOR_ASSESSMENT':assert x['reason'] in ('QUALIFIED_MAXIMUM_AT_OR_ABOVE_THRESHOLD','COUNT_CONFLICT')
     if a in ('ROUTE_COUNT_UNCONFIRMED','RETAIN_UNUSABLE_PROPOSAL','RETAIN_WATCHLIST'):assert p==NE and not records_of(e)
     # R-RELATED / R-AMEND: an amendment, discharge or pre-application signal never carries its own total and never admits as a scheme. Parent figures are context; ONLY a clause stating the resulting
@@ -81,13 +86,14 @@ def test_each_example_obeys_the_specified_rules(e):
 
 @pytest.mark.parametrize('e',[e for e in EXAMPLES if 'records' in e],ids=[e['id'] for e in EXAMPLES if 'records' in e])
 def test_the_evidence_model_reproduces_every_hand_written_expectation(e):
-    recs=e['records'];rel=e['scope_relations'];x=e['expected']
+    recs=e['records'];rel=e['scope_relations'];asm=e.get('assessments',[]);x=e['expected']
     for basis,name in ((ref.PROPOSED,'proposed'),(ref.APPROVED,'approved')):
-        assert project(ref.resolve_basis(recs,basis,rel))==x['bases'][name],(e['id'],name)
-    assert ref.headline(recs,rel)==x['headline']
+        assert project(ref.resolve_basis(recs,basis,rel,asm))==x['bases'][name],(e['id'],name)
+    assert ref.headline(recs,rel,asm)==x['headline']
     for s in x['search']:
-        got=ref.search_match(recs,s['basis'],s['size_min'],s['size_max'],rel)
+        got=ref.search_match(recs,s['basis'],s['size_min'],s['size_max'],rel,asm)
         assert dict(match=got['match'],matched_by=got['matched_by'])==dict(match=s['match'],matched_by=s['matched_by']),(e['id'],s)
+        if 'level' in s:assert (got['level'],got['scopes'])==(s['level'],s['scopes']),(e['id'],s)
     assert {s['basis'] for s in x['search'] if s['size_min']==THRESHOLD and s['size_max'] is None}=={'APPROVED','PROPOSED','EITHER'}      # every example states all three bases at the default range
 
 
@@ -121,38 +127,111 @@ def test_source_precedence_only_orders_the_citation_when_sources_agree_and_never
     assert s['state']==ref.RESOLVED and s['quantity']==49 and sorted(i for i,_ in s['competing'])==['f','t']      # both sources are kept and both are cited
 
 
+PH=[dict(id='p1',basis='PROPOSED',scope='Phase 1',value=49,source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='p2',basis='PROPOSED',scope='Phase 2',value=52,source_kind='LISTING_PROPOSAL_TEXT',relations={})]
+def rel(kind,source='PHASING_PLAN',quote='Phases 1 and 2 ...',scopes=('Phase 1','Phase 2')):return dict(scopes=list(scopes),relation=kind,source_kind=source,quote=quote)
+
+
 def test_phase_labels_alone_never_prove_disjoint_scopes_and_a_total_needs_supported_non_overlap():
-    recs=[dict(id='p1',basis='PROPOSED',scope='Phase 1',value=49,source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='p2',basis='PROPOSED',scope='Phase 2',value=52,source_kind='LISTING_PROPOSAL_TEXT',relations={})]
-    for rel in ([],[dict(scopes=['Phase 1','Phase 2'],relation='NON_OVERLAPPING_PARTS')],[dict(scopes=['Phase 1','Phase 2'],relation='NON_OVERLAPPING_PARTS',source_kind='PHASING_PLAN',quote='  ')],
-                [dict(scopes=['Phase 1','Phase 2'],relation='NON_OVERLAPPING_PARTS',source_kind=None,quote='they do not overlap')],[dict(scopes=['Phase 1','Phase 2'],relation='PART_OF',source_kind='PHASING_PLAN',quote='x')]):
-        s=ref.resolve_basis(recs,ref.PROPOSED,rel)
-        assert s['state']==ref.PER_SCOPE and s['overlap']=='UNRESOLVED' and 'quantity' not in s      # unresolved overlap is preserved and no total exists
-    good=[dict(scopes=['Phase 1','Phase 2'],relation='NON_OVERLAPPING_PARTS',source_kind='PHASING_PLAN',quote='Phase 1 and Phase 2 do not overlap')]
-    assert ref.resolve_basis(recs,ref.PROPOSED,good)['quantity']==101
-    assert ref.resolve_basis(recs,ref.PROPOSED,[dict(good[0],scopes=['Phase 1','Phase 3'])])['state']==ref.PER_SCOPE      # support for other scopes does not cover these
-    assert ref.scenarios(ref.resolve_basis(recs,ref.PROPOSED))==[(52,101)]      # unresolved overlap: at least the larger phase, at most both
-    assert ref.search_match(recs,ref.PROPOSED,10,100)['match']==ref.POSSIBLE and ref.search_match(recs,ref.PROPOSED,10,None)['match']==ref.MEETS and ref.search_match(recs,ref.PROPOSED,10,51)['match']==ref.NO_MATCH
-    with_status=copy.deepcopy(recs);[r.update(planning_status='REFUSED',construction_progress='STARTED') for r in with_status]
-    assert ref.headline(with_status)==ref.headline(recs)      # planning status and construction progress are never read
+    for relations in ([],[rel('NON_OVERLAPPING_PARTS',quote='')],[rel('NON_OVERLAPPING_PARTS',quote='  ')],[rel('NON_OVERLAPPING_PARTS',source=None)],[rel('PART_OF')],[rel('NON_OVERLAPPING_PARTS',scopes=('Phase 1','Phase 3'))]):
+        st=ref.resolve_basis(PH,ref.PROPOSED,relations)
+        assert st['state']==ref.PER_SCOPE and st['overlap']=='UNRESOLVED' and 'quantity' not in st      # unresolved overlap is preserved and no total exists
+    assert ref.resolve_basis(PH,ref.PROPOSED,[rel('NON_OVERLAPPING_PARTS')])['quantity']==101
+    with_status=copy.deepcopy(PH);[r.update(planning_status='REFUSED',construction_progress='STARTED') for r in with_status]
+    assert ref.headline(with_status)==ref.headline(PH)      # planning status and construction progress are never read
+
+
+def test_bounds_of_the_union_of_scopes_are_not_a_whole_scheme_total_without_supported_membership_and_exhaustion():
+    none=ref.resolve_basis(PH,ref.PROPOSED,[])
+    assert none['union_bounds']==(52,101) and none['scheme_bounds'] is None and not none['membership'] and not none['exhaustion']      # a bound on these two phases together, nothing about the scheme
+    r=ref.search_match(PH,ref.PROPOSED,10,100);assert (r['match'],r['level'],r['scopes'])==(ref.MEETS,'SCOPE',['Phase 1','Phase 2'])      # judged one scope at a time and labelled so
+    r=ref.search_match(PH,ref.PROPOSED,10,51);assert (r['match'],r['level'],r['scopes'])==(ref.MEETS,'SCOPE',['Phase 1'])
+    member=ref.resolve_basis(PH,ref.PROPOSED,[rel('COMMON_DEVELOPMENT',source='PLANNING_STATEMENT')])
+    assert member['membership'] and not member['exhaustion'] and member['scheme_bounds']==(52,None)      # at least the larger phase, NO upper bound
+    for hi,want in ((100,ref.POSSIBLE),(1000,ref.POSSIBLE),(51,ref.NO_MATCH),(None,ref.MEETS)):assert ref.search_match(PH,ref.PROPOSED,10,hi,[rel('COMMON_DEVELOPMENT',source='PLANNING_STATEMENT')])['match']==want
+    assert ref.search_match(PH,ref.PROPOSED,60,None,[rel('COMMON_DEVELOPMENT',source='PLANNING_STATEMENT')])['match']==ref.POSSIBLE      # the scheme may well be larger than 60
+    ex=ref.resolve_basis(PH,ref.PROPOSED,[rel('EXHAUSTS_DEVELOPMENT')])
+    assert ex['membership'] and ex['exhaustion'] and ex['scheme_bounds']==(52,101)      # exhaustion gives the upper bound
+    for hi,want in ((100,ref.POSSIBLE),(101,ref.MEETS),(51,ref.NO_MATCH)):assert ref.search_match(PH,ref.PROPOSED,10,hi,[rel('EXHAUSTS_DEVELOPMENT')])['match']==want
+    assert ref.search_match(PH,ref.PROPOSED,102,None,[rel('EXHAUSTS_DEVELOPMENT')])['match']==ref.NO_MATCH
+    assert ref.resolve_basis(PH,ref.PROPOSED,[rel('EXHAUSTS_DEVELOPMENT',scopes=('Phase 1','Phase 3'))])['scheme_bounds'] is None      # support for other scopes covers nothing here
+
+
+def test_union_bounds_need_compatible_count_bases_and_never_mix_proposed_with_approved():
+    mixed=[dict(id='p1',basis='PROPOSED',scope='Phase 1',value=49,source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='a2',basis='APPROVED',scope='Phase 2',value=52,source_kind='DECISION_NOTICE',relations={})]
+    for basis in (ref.PROPOSED,ref.APPROVED):
+        st=ref.resolve_basis(mixed,basis,[rel('EXHAUSTS_DEVELOPMENT')])
+        assert st['state']==ref.RESOLVED and len(st['scopes'])==1      # each basis keeps only its own scope; nothing is added across bases
+    other_metric=copy.deepcopy(PH);other_metric[1]['metric']='bedspaces'
+    st=ref.resolve_basis(other_metric,ref.PROPOSED,[rel('EXHAUSTS_DEVELOPMENT'),rel('NON_OVERLAPPING_PARTS')])
+    assert st['state']==ref.PER_SCOPE and st['union_bounds'] is None and st['scheme_bounds'] is None and 'quantity' not in st      # dwellings and bedspaces are not compatible counts
+
+
+def test_a_qualified_maximum_has_no_positive_lower_bound_unless_one_is_separately_supported():
+    rec=lambda **kw:[dict(id='a',basis='APPROVED',value='UP_TO:50',source_kind='DECISION_NOTICE',relations={},**kw)]
+    assert ref.scenarios(ref.resolve_basis(rec(),ref.APPROVED))==[(0,50)]
+    for bad in (dict(value=0,source_kind='DECISION_NOTICE',quote='q'),dict(value=40,source_kind='DECISION_NOTICE',quote=''),dict(value=40,source_kind=None,quote='q'),dict(value=True,source_kind='DECISION_NOTICE',quote='q'),'40'):
+        assert ref.scenarios(ref.resolve_basis(rec(minimum=bad),ref.APPROVED))==[(0,50)],bad      # an unsupported or malformed minimum is ignored
+    good=dict(value=40,source_kind='DECISION_NOTICE',quote='a minimum of 40 and up to 50 dwellings')
+    assert ref.scenarios(ref.resolve_basis(rec(minimum=good),ref.APPROVED))==[(40,50)]
+    for lo,hi,want in ((1,100,ref.MEETS),(10,100,ref.MEETS),(0,100,ref.MEETS),(40,50,ref.MEETS),(41,50,ref.POSSIBLE),(10,45,ref.POSSIBLE),(10,39,ref.NO_MATCH),(51,None,ref.NO_MATCH)):      # with the supported minimum the interval is 40 to 50
+        assert ref.search_match(rec(minimum=good),ref.APPROVED,lo,hi)['match']==want,(lo,hi)
+    assert ref.search_match(rec(),ref.APPROVED,1,100)['match']==ref.POSSIBLE and ref.search_match(rec(),ref.APPROVED,0,100)['match']==ref.MEETS      # "up to 50" never meets a positive minimum on its own
+
+
+def good_assessment(**kw):
+    a=dict(id='as1',kind='SUPERSEDES',subject='a2',target='a1',scope='whole',actor='owner:max.rose',authenticated=True,timestamp='2026-10-20T09:30:00+00:00',rationale='s73 variation of the same site',citations=['decision notice 2, recital 3'])
+    a.update(kw);return a
+PERMS=[dict(id='a1',basis='APPROVED',value=49,source_kind='DECISION_NOTICE',relations={}),dict(id='a2',basis='APPROVED',value=52,source_kind='DECISION_NOTICE',relations={})]
+
+
+def test_an_owner_relationship_assessment_needs_every_field_and_is_always_labelled_reviewer_assessed():
+    ok=ref.resolve_basis(PERMS,ref.APPROVED,(),[good_assessment()])
+    assert ok['state']==ref.RESOLVED and ok['quantity']==52 and ok['historical']==['a1'] and ok['relationship_basis']=='REVIEWER_ASSESSED' and ok['legal_supersession_established'] is False
+    assert ref.headline(PERMS,(),[good_assessment()])['label']=='Approved: 52 (supersession reviewer-assessed)'
+    for field,bad in (('actor',''),('actor',None),('authenticated',False),('authenticated','yes'),('timestamp',''),('rationale','  '),('citations',[]),('citations',['']),('citations','x'),('scope',''),('scope','Phase 2'),('kind','LEGALLY_SUPERSEDES'),('subject','zz'),('target','zz')):
+        st=ref.resolve_basis(PERMS,ref.APPROVED,(),[good_assessment(**{field:bad})])
+        assert st['state']==ref.CONFLICT and st['rejected_assessments']==['as1'],(field,bad)      # an incomplete or unauthenticated assessment is ignored and the conflict stays
+    both=[dict(PERMS[0]),dict(PERMS[1],relations={'supersedes':'a1'})]
+    st=ref.resolve_basis(both,ref.APPROVED,(),[good_assessment()])
+    assert st['quantity']==52 and 'relationship_basis' not in st      # a document-stated relationship is not downgraded by a redundant assessment
+
+
+def test_an_owner_assessment_cannot_create_permission_evidence_alter_planning_status_or_establish_legal_supersession():
+    form=[dict(id='a1',basis='APPROVED',value=49,source_kind='DECISION_NOTICE',relations={}),dict(id='a2',basis='APPROVED',value=52,source_kind='APPLICATION_FORM_STRUCTURED',relations={})]
+    st=ref.resolve_basis(form,ref.APPROVED,(),[good_assessment()])
+    assert st['state']==ref.RESOLVED and st['quantity']==49 and st['unsupported_as_approved']==['a2'] and 'relationship_basis' not in st      # an unsupported record stays unsupported; an assessment cannot promote it or supersede with it
+    only=[dict(id='a2',basis='APPROVED',value=52,source_kind='LISTING_PROPOSAL_TEXT',relations={})]
+    assert ref.resolve_basis(only,ref.APPROVED,(),[good_assessment(subject='a2',target='a2')])['state']==ref.NOT_ESTABLISHED      # no assessment creates an approved count
+    status=copy.deepcopy(PERMS);[r.update(planning_status='REFUSED') for r in status]
+    assert ref.headline(status,(),[good_assessment()])==ref.headline(PERMS,(),[good_assessment()])      # planning status is never read or written
+    assert ref.read_model(PERMS,(),[good_assessment()])['headline_scalar'] is None      # a reviewer-assessed resolution is shown, labelled, never exported as a plain scalar
+    assert ref.read_model(PERMS,(),[good_assessment()])['bases']['APPROVED']['relationship_basis']=='REVIEWER_ASSESSED'
+    asm=[dict(good_assessment(id='as2',kind='NON_OVERLAPPING_PARTS'),scopes=['Phase 1','Phase 2'])]
+    st=ref.resolve_basis(PH,ref.PROPOSED,(),asm)
+    assert st['state']==ref.RESOLVED and st['quantity']==101 and st['relationship_basis']=='REVIEWER_ASSESSED' and st['legal_supersession_established'] is False      # a scope relation can be assessed too, and says so
+    assert ref.resolve_basis(PH,ref.PROPOSED,(),[dict(asm[0],scopes=['Phase 1'])])['state']==ref.PER_SCOPE      # an assessment must name the exact scopes (at least two)
 
 
 def test_search_certainty_is_judged_against_the_whole_selected_range_minimum_and_maximum():
     def m(records,lo,hi,basis=ref.EITHER):return ref.search_match(records,basis,lo,hi)['match']
     exact=lambda n,b='PROPOSED':[dict(id='r',basis=b,value=n,source_kind='LISTING_PROPOSAL_TEXT' if b=='PROPOSED' else 'DECISION_NOTICE',relations={})]
     assert (m(exact(30),10,50),m(exact(5),10,50),m(exact(60),10,50),m(exact(10),10,10),m(exact(50),10,50),m(exact(51),10,50))==(ref.MEETS,ref.NO_MATCH,ref.NO_MATCH,ref.MEETS,ref.MEETS,ref.NO_MATCH)
-    upto=exact('UP_TO:50')      # "up to 50" can be anything from 1 to 50
-    assert m(upto,10,100)==ref.POSSIBLE and m(upto,1,100)==ref.MEETS and m(upto,60,None)==ref.NO_MATCH and m(upto,10,None)==ref.POSSIBLE and m(upto,1,40)==ref.POSSIBLE
+    upto=exact('UP_TO:50')      # "up to 50" has no evidenced positive lower bound: anything from 0 to 50
+    assert m(upto,10,100)==ref.POSSIBLE and m(upto,1,100)==ref.POSSIBLE and m(upto,60,None)==ref.NO_MATCH and m(upto,10,None)==ref.POSSIBLE and m(upto,1,40)==ref.POSSIBLE and m(upto,0,100)==ref.MEETS
     conflict=[dict(id='a',basis='PROPOSED',value=9,source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='b',basis='PROPOSED',value=60,source_kind='APPLICATION_FORM_STRUCTURED',relations={})]
     assert m(conflict,10,50)==ref.NO_MATCH      # one of the two is true and neither is inside 10-50: not a possible match, though the hull overlaps
     assert m(conflict,10,None)==ref.POSSIBLE and m(conflict,5,100)==ref.MEETS and m(conflict,10,30)==ref.NO_MATCH
+    qual_conflict=[dict(id='a',basis='PROPOSED',value='UP_TO:50',source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='b',basis='PROPOSED',value=70,source_kind='APPLICATION_FORM_STRUCTURED',relations={})]
+    assert m(qual_conflict,1,100)==ref.POSSIBLE and m(qual_conflict,0,100)==ref.MEETS      # a qualified figure inside a conflict also starts at 0, not 1
     straddle=[dict(id='a',basis='PROPOSED',value=49,source_kind='LISTING_PROPOSAL_TEXT',relations={}),dict(id='b',basis='PROPOSED',value=52,source_kind='APPLICATION_FORM_STRUCTURED',relations={})]
     assert m(straddle,10,50)==ref.POSSIBLE and m(straddle,10,100)==ref.MEETS and m(straddle,50,None)==ref.POSSIBLE and m(straddle,53,None)==ref.NO_MATCH
 
 
 def test_a_size_match_is_not_a_confirmed_quantity_planning_approval_or_buyer_fit():
     by_id={e['id']:e for e in EXAMPLES}
-    got=ref.search_match(by_id['E38g']['records'],ref.APPROVED,1,100)
-    assert got['match']==ref.MEETS and got['quantity_status']=={'APPROVED':'QUALIFIED_QUANTITY'}      # meets the filter, quantity still qualified
+    got=ref.search_match(by_id['E38q']['records'],ref.APPROVED,10,100)
+    assert got['match']==ref.MEETS and got['quantity_status']=={'APPROVED':'QUALIFIED_QUANTITY'}      # meets the filter (a supported minimum of 40), quantity still qualified
+    assert ref.search_match(by_id['E38g']['records'],ref.APPROVED,1,100)['match']==ref.POSSIBLE      # the same wording without a supported minimum cannot
     got=ref.search_match(by_id['E38']['records'],ref.PROPOSED,10,100)
     assert got['match']==ref.MEETS and got['quantity_status']=={'PROPOSED':'QUANTITY_UNDER_REVIEW'}
     got=ref.search_match(by_id['E38m']['records'],ref.PROPOSED,10,None)
@@ -182,10 +261,10 @@ def test_the_read_model_never_returns_a_bare_number_and_an_exact_cache_keeps_bas
     m=ref.read_model(by_id['E38e']['records'])
     assert m['headline_scalar']=={'value':49,'basis':'APPROVED','qualifier':None,'state':'RESOLVED','semantics':'residential-count-v2:headline_exact'}      # approved is the headline basis; the proposed revision is NOT swapped in
     assert m['bases']['PROPOSED']['quantity']==52 and m['bases']['APPROVED']['quantity']==49      # both bases stay visible beside the cache
-    for ident in ('E38','E38c','E38g','E38j','E38k','E38n','E38h'):
-        assert ref.read_model(by_id[ident]['records'],by_id[ident]['scope_relations'])['headline_scalar'] is None      # qualified, conflicting, alternative or per-phase: no scalar at all
+    for ident in ('E38','E38c','E38g','E38j','E38k','E38n','E38h','E38o','E38p','E38q','E38r'):
+        assert ref.read_model(by_id[ident]['records'],by_id[ident]['scope_relations'],by_id[ident].get('assessments',()))['headline_scalar'] is None      # qualified, conflicting, alternative or per-phase: no scalar at all
     for e in [e for e in EXAMPLES if 'records' in e]:
-        m=ref.read_model(e['records'],e['scope_relations']);c=m['headline_scalar']
+        m=ref.read_model(e['records'],e['scope_relations'],e.get('assessments',()));c=m['headline_scalar']
         assert isinstance(m,dict) and (c is None or (isinstance(c,dict) and {'value','basis','qualifier','state','semantics'}<=set(c)))
         assert not isinstance(c,int)
 

@@ -1158,6 +1158,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Provenance: a single supported structured-form record; the baseline (proposal text only) cannot see it. Source ranking never resolves a disagreement (E38).",
    "baseline_current": {
     "qualify_unit_count": null,
@@ -1299,6 +1300,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Unknown chronology: no dates, revisions or supersession statement. Two figures in the same basis and scope stay unresolved; neither silently wins. Both are at or above 10, so size is established while the quantity is under review.",
    "baseline_current": {
     "qualify_unit_count": 49,
@@ -1400,6 +1402,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Explicit supersession: revision B states it supersedes revision A. Revision A is preserved as history, not deleted.",
    "baseline_current": {
     "qualify_unit_count": 52,
@@ -1434,6 +1437,12 @@
      "proposed": {
       "state": "PER_SCOPE",
       "overlap": "UNRESOLVED",
+      "union_bounds": [
+       52,
+       101
+      ],
+      "membership": false,
+      "exhaustion": false,
       "scopes": {
        "Phase 1": {
         "state": "RESOLVED",
@@ -1468,6 +1477,11 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      },
      {
@@ -1477,6 +1491,11 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      }
     ]
@@ -1506,7 +1525,8 @@
     }
    ],
    "scope_relations": [],
-   "note": "Different phase labels are different scopes, not a conflict, but a label alone does not prove the scopes are disjoint: the overlap stays unresolved, no total is formed, and the scheme size is anywhere from the larger phase to both added (52 to 101). A total needs supported non-overlap (E38d).",
+   "assessments": [],
+   "note": "Different phase labels are different scopes, not a conflict, but a label alone does not prove the scopes are disjoint: the overlap stays unresolved and no total is formed. The two phases TOGETHER are between 52 (the larger) and 101 (both added); that is a bound on their union, not on the whole scheme, which needs supported common-development membership (E38o) and, for an upper bound, evidence that these phases exhaust it (E38p). Search here is scope-level. A total needs supported non-overlap (E38d).",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
@@ -1612,6 +1632,7 @@
      "quote": "Phase 1 (plots 1-49) and Phase 2 (plots 50-101) are separate and do not overlap"
     }
    ],
+   "assessments": [],
    "note": "A combined total exists only because a supported source (a phasing plan, with its literal words) states that the two phases do not overlap.",
    "baseline_current": {
     "qualify_unit_count": null,
@@ -1765,6 +1786,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Approved 49 with a later proposed revision of 52. At a minimum of 50 only the proposed basis meets the filter; with a range of 10 to 50 only the approved basis does; the result names the basis either way. Meeting a size filter is not a confirmed quantity, a planning approval or a buyer fit.",
    "baseline_current": {
     "qualify_unit_count": 52,
@@ -1866,6 +1888,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Revised approval: permission 2 states it supersedes permission 1; the 49 is preserved as historical evidence.",
    "baseline_current": {
     "qualify_unit_count": 52,
@@ -1939,7 +1962,7 @@
       "basis": "APPROVED",
       "size_min": 1,
       "size_max": 100,
-      "match": "MEETS_SIZE_FILTER",
+      "match": "POSSIBLE_SIZE_MATCH",
       "matched_by": [
        "APPROVED"
       ]
@@ -1959,6 +1982,15 @@
       "size_max": null,
       "match": "NONE",
       "matched_by": []
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 0,
+      "size_max": 100,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
      }
     ]
    },
@@ -1976,7 +2008,8 @@
     }
    ],
    "scope_relations": [],
-   "note": "A qualified approved maximum keeps its qualifier everywhere and routes to assessment. \"Up to 50\" can be anything from 1 to 50, so against 10-100 it is only a possible size match, but against 1-100 every possible count lies inside the range and it meets the filter - still with a qualified, not a confirmed, quantity.",
+   "assessments": [],
+   "note": "A qualified approved maximum keeps its qualifier everywhere and routes to assessment. \"Up to 50\" has no evidenced positive lower bound, so it can be anything from 0 to 50: it is only a possible size match for 10-100 and even for 1-100, and meets only a range that starts at 0. See E38q for a separately supported minimum.",
    "baseline_current": {
     "qualify_unit_count": 50,
     "qualify_category": "outline_application",
@@ -2108,6 +2141,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "9 versus 12 crosses the 10+ threshold: a possible size match, listed separately from matches that meet the filter, routed to assessment. Against 5-20 both figures lie inside, so it meets that filter (the quantity is still under review).",
    "baseline_current": {
     "qualify_unit_count": null,
@@ -2207,6 +2241,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "A form or proposal alone cannot establish an approved count: the claimed approval is recorded as unsupported and the supported proposed quantity is shown.",
    "baseline_current": {
     "qualify_unit_count": 49,
@@ -2325,6 +2360,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "Alternative permissions are preserved side by side; the larger or the later does not replace the other.",
    "baseline_current": {
     "qualify_unit_count": null,
@@ -2441,6 +2477,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "note": "The later document does not supersede the earlier one: without an explicit relationship the conflict stays unresolved.",
    "baseline_current": {
     "qualify_unit_count": null,
@@ -2526,6 +2563,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "planning": {
     "planning_status": "GRANTED",
     "construction_progress": "STARTED"
@@ -2615,6 +2653,7 @@
     }
    ],
    "scope_relations": [],
+   "assessments": [],
    "planning": {
     "planning_status": "REFUSED",
     "construction_progress": "NONE"
@@ -2653,6 +2692,12 @@
      "proposed": {
       "state": "PER_SCOPE",
       "overlap": "UNRESOLVED",
+      "union_bounds": [
+       52,
+       101
+      ],
+      "membership": false,
+      "exhaustion": false,
       "scopes": {
        "Phase 1": {
         "state": "RESOLVED",
@@ -2687,6 +2732,11 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      },
      {
@@ -2696,30 +2746,44 @@
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      },
      {
       "basis": "PROPOSED",
       "size_min": 10,
       "size_max": 100,
-      "match": "POSSIBLE_SIZE_MATCH",
-      "matched_by": [
-       "PROPOSED"
-      ]
-     },
-     {
-      "basis": "PROPOSED",
-      "size_min": 10,
-      "size_max": 200,
       "match": "MEETS_SIZE_FILTER",
       "matched_by": [
        "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1",
+       "Phase 2"
       ]
      },
      {
       "basis": "PROPOSED",
       "size_min": 10,
       "size_max": 51,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCOPE",
+      "scopes": [
+       "Phase 1"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 60,
+      "size_max": null,
       "match": "NONE",
       "matched_by": []
      }
@@ -2758,9 +2822,608 @@
      "relation": "NON_OVERLAPPING_PARTS",
      "source_kind": null,
      "quote": ""
+    },
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "COMMON_DEVELOPMENT",
+     "source_kind": null,
+     "quote": ""
     }
    ],
-   "note": "A claimed non-overlap with no supporting source or words is ignored: the overlap stays unresolved. The scheme is between 52 (the larger phase) and 101 (both), so 10-100 is only a possible size match.",
+   "assessments": [],
+   "note": "Claimed non-overlap and common-development membership with no supporting source or words are ignored. The union of the two phases is bounded by 52 and 101, but with no supported membership there is NO whole-scheme claim at all: each phase is judged on its own, the result is labelled scope-level and names the phase that earns it (Phase 1 alone for a maximum of 51). The sum is not offered as the scheme.",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38o",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "PER_SCOPE",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "PER_SCOPE",
+      "overlap": "UNRESOLVED",
+      "union_bounds": [
+       52,
+       101
+      ],
+      "membership": true,
+      "exhaustion": false,
+      "scheme_bounds": [
+       52,
+       null
+      ],
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED_BY_PHASE",
+     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52; overlap not established)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 1000,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 51,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 60,
+      "size_max": null,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "COMMON_DEVELOPMENT",
+     "source_kind": "PLANNING_STATEMENT",
+     "quote": "Phases 1 and 2 form one development"
+    }
+   ],
+   "assessments": [],
+   "note": "With supported common-development membership the whole scheme is at least 52 (the larger phase) and, because nothing says these two phases exhaust the development, has NO evidenced upper bound: 101 is not offered as one (a range with any maximum is only a possible match; a maximum below 52 cannot match).",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38p",
+   "proposal": "ERECTION OF DWELLINGS (PHASES 1 AND 2)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "PER_SCOPE",
+    "approved_total": "NOT_ESTABLISHED",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "PROPOSED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "PER_SCOPE",
+      "overlap": "UNRESOLVED",
+      "union_bounds": [
+       52,
+       101
+      ],
+      "membership": true,
+      "exhaustion": true,
+      "scheme_bounds": [
+       52,
+       101
+      ],
+      "scopes": {
+       "Phase 1": {
+        "state": "RESOLVED",
+        "quantity": 49
+       },
+       "Phase 2": {
+        "state": "RESOLVED",
+        "quantity": 52
+       }
+      }
+     },
+     "approved": {
+      "state": "NOT_ESTABLISHED"
+     }
+    },
+    "headline": {
+     "kind": "PROPOSED_BY_PHASE",
+     "label": "Proposed by phase (Phase 1: 49, Phase 2: 52; overlap not established)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 100,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 101,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "PROPOSED"
+      ],
+      "level": "SCHEME",
+      "scopes": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": 51,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 102,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "p1",
+     "basis": "PROPOSED",
+     "scope": "Phase 1",
+     "value": 49,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "p2",
+     "basis": "PROPOSED",
+     "scope": "Phase 2",
+     "value": 52,
+     "source_kind": "LISTING_PROPOSAL_TEXT",
+     "document_date": null,
+     "revision": null,
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [
+    {
+     "scopes": [
+      "Phase 1",
+      "Phase 2"
+     ],
+     "relation": "EXHAUSTS_DEVELOPMENT",
+     "source_kind": "PHASING_PLAN",
+     "quote": "Phases 1 and 2 together are the whole development"
+    }
+   ],
+   "assessments": [],
+   "note": "Membership AND exhaustion are supported by a phasing plan, so the whole scheme is bounded: at least 52 and at most 101 (overlap between the phases is still unresolved, so no single total exists).",
+   "baseline_current": {
+    "qualify_unit_count": null,
+    "qualify_category": "primary_residential",
+    "qualify_classification": "Ignore",
+    "legacy_admits": false,
+    "screen_v1_disposition": "INSUFFICIENT_EVIDENCE"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38q",
+   "proposal": "OUTLINE PERMISSION FOR A MINIMUM OF 40 AND UP TO 50 DWELLINGS",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "outline_application",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": "UP_TO:50",
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_FOR_ASSESSMENT",
+    "reason": "QUALIFIED_MAXIMUM_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "QUALIFIED_MAXIMUM",
+      "maximum": 50,
+      "minimum": 40
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved (outline): minimum 40, up to 50"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 40,
+      "size_max": 50,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 41,
+      "size_max": 50,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": 45,
+      "match": "POSSIBLE_SIZE_MATCH",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": 39,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "APPROVED",
+      "size_min": 51,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": "UP_TO:50",
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": null,
+     "qualifier": "outline",
+     "relations": {},
+     "minimum": {
+      "value": 40,
+      "source_kind": "DECISION_NOTICE",
+      "quote": "a minimum of 40 and up to 50 dwellings"
+     }
+    }
+   ],
+   "scope_relations": [],
+   "assessments": [],
+   "note": "A positive lower bound exists only because the decision notice separately states it (source and literal words); the quantity is still a qualified one. Without that support the same wording would leave the lower bound at 0 (E38g).",
+   "baseline_current": {
+    "qualify_unit_count": 50,
+    "qualify_category": "outline_application",
+    "qualify_classification": "Confirmed - 10+ units",
+    "legacy_admits": true,
+    "screen_v1_disposition": "SUPPORTED_PROCESSING_PRIORITY"
+   },
+   "baseline_conformance": {
+    "admission_matches": null,
+    "count_matches": null,
+    "legacy_cannot_represent": true
+   }
+  },
+  {
+   "id": "E38r",
+   "proposal": "ERECTION OF DWELLINGS (TWO PERMISSIONS, OWNER-ASSESSED)",
+   "proposal_state": "PRESENT_VALUE",
+   "expected": {
+    "category": "primary_residential",
+    "scheme_role": "NEW_SCHEME",
+    "proposed_total": "NOT_ESTABLISHED",
+    "approved_total": 52,
+    "lost": "NOT_ESTABLISHED",
+    "existing": "NOT_ESTABLISHED",
+    "net": "NOT_ESTABLISHED",
+    "non_residential_units": {},
+    "parent_context": null,
+    "admission": "ADMIT_SCHEME",
+    "reason": "APPROVED_TOTAL_AT_OR_ABOVE_THRESHOLD",
+    "bases": {
+     "proposed": {
+      "state": "NOT_ESTABLISHED"
+     },
+     "approved": {
+      "state": "RESOLVED",
+      "quantity": 52,
+      "historical": [
+       "a1"
+      ],
+      "relationship_basis": "REVIEWER_ASSESSED",
+      "legal_supersession_established": false
+     }
+    },
+    "headline": {
+     "kind": "APPROVED",
+     "label": "Approved: 52 (supersession reviewer-assessed)"
+    },
+    "search": [
+     {
+      "basis": "APPROVED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     },
+     {
+      "basis": "PROPOSED",
+      "size_min": 10,
+      "size_max": null,
+      "match": "NONE",
+      "matched_by": []
+     },
+     {
+      "basis": "EITHER",
+      "size_min": 10,
+      "size_max": null,
+      "match": "MEETS_SIZE_FILTER",
+      "matched_by": [
+       "APPROVED"
+      ]
+     }
+    ]
+   },
+   "records": [
+    {
+     "id": "a1",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 49,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2025-11-03",
+     "revision": "permission 1",
+     "qualifier": null,
+     "relations": {}
+    },
+    {
+     "id": "a2",
+     "basis": "APPROVED",
+     "scope": "whole",
+     "value": 52,
+     "source_kind": "DECISION_NOTICE",
+     "document_date": "2026-07-01",
+     "revision": "permission 2",
+     "qualifier": null,
+     "relations": {}
+    }
+   ],
+   "scope_relations": [],
+   "assessments": [
+    {
+     "id": "as1",
+     "kind": "SUPERSEDES",
+     "subject": "a2",
+     "target": "a1",
+     "scope": "whole",
+     "actor": "owner:max.rose",
+     "authenticated": true,
+     "timestamp": "2026-10-20T09:30:00+00:00",
+     "rationale": "Permission 2 is a section 73 variation of permission 1 on the same site; both decision notices read together.",
+     "citations": [
+      "decision notice 2, recital 3",
+      "application 00284/26 file"
+     ]
+    }
+   ],
+   "note": "D10: an authenticated owner recorded the relationship (actor, timestamp, rationale, citations, exact scope). The 49 is preserved as history, the headline says the supersession is reviewer-assessed, legal supersession is NOT established, no exact scalar cache is exported, and nothing about planning status or permission evidence changed.",
    "baseline_current": {
     "qualify_unit_count": null,
     "qualify_category": "primary_residential",
