@@ -407,3 +407,24 @@ def test_end_to_end_v3_screening_is_not_yet_bounded_on_a_long_digit_run():
 
 def test_the_new_modules_alone_are_bounded_on_the_same_digit_run():
     start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear; only the legacy qualifier is not
+
+
+# ------------------------------------------------------------------ third review: conversions of existing stock into a counted scheme
+@pytest.mark.parametrize('text,proposed,lost,existing,net,admission',[
+    ('Conversion of existing 3 blocks of 4 flats each to 18 flats',18,12,12,6,'ADMIT_SCHEME'),
+    ('Conversion and extension of the existing 2 blocks of 6 flats each to form 30 apartments',30,12,12,18,'ADMIT_SCHEME'),
+    ('Conversion of existing 12 flats to 18 flats',18,12,12,6,'ADMIT_SCHEME'),
+    ('Conversion of 12 flats into 24 flats',24,12,12,12,'ADMIT_SCHEME'),
+    ('Conversion of existing 12 flats to 6 flats',6,12,12,-6,'RETAIN_BELOW_THRESHOLD'),
+    ('Conversion of offices to 12 flats',12,'NOT_ESTABLISHED','NOT_ESTABLISHED','NOT_ESTABLISHED','ADMIT_SCHEME')])
+def test_conversion_of_existing_stock_into_a_counted_scheme_is_the_proposal_not_retained_stock(text,proposed,lost,existing,net,admission):
+    got=_a(text);assert (got['proposed_total'],got['lost'],got['existing'],got['net'],got['admission'])==(proposed,lost,existing,net,admission),text
+
+
+@pytest.mark.parametrize('text,total',[('Erection of 2 blocks each containing 6 flats',12),('Erection of 3 terraces each comprising 4 houses',12),('Erection of 2 blocks each of 6 flats',12)])
+def test_blocks_each_containing_flats_multiply_and_never_undercount(text,total):
+    got=_a(text);assert got['proposed_total']==total and got['admission']=='ADMIT_SCHEME'
+
+
+def test_demolition_of_blocks_each_containing_flats_is_loss_not_proposal():
+    got=_a('Demolition of 2 blocks each containing 6 flats');assert (got['proposed_total'],got['lost']) == ('NONE',12)

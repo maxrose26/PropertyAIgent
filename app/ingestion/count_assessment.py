@@ -26,6 +26,7 @@ UP_TO=re.compile(r'\b(?:up\s+to|not\s+exceeding|no\s+more\s+than|maximum\s+of)\s
 _GROUP=r'(?:apartment\s+)?(?:blocks?|buildings?|terraces?|towers?|wings?)'
 _STATE=r'(?:(?:existing|former|retained|redundant|derelict|vacant)\s+)?'      # "2 existing blocks of 6 flats each" is still a product, and an existing one
 PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_STATE+_GROUP+r'\s+(?:of|comprising|containing)\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+each\b',re.I)
+PRODUCT_EACH_FIRST=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_STATE+_GROUP+r'\s+each\s+(?:of|comprising|containing|having)\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b',re.I)
 PRODUCT_IN_EACH=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+in\s+each\s+of\s+'+_NUM+r'\s+'+_GROUP+r'\b',re.I)
 GROUP_OF_UNCLEAR=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+of\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b(?!\s+each\b)',re.I)      # "2 blocks of 6 flats": per block or in total? not decided by guessing
 STUDENT=re.compile(r'\bstudents?\b|\bcluster\s+(?:flats?|units?|apartments?)\b',re.I)      # decision D4: student accommodation is not dwelling supply
@@ -48,7 +49,7 @@ REPLACE_WORDS=re.compile(r'\breplac\w+\b',re.I)
 CONTEXT_WORDS=re.compile(r'\b(?:wider|overall|masterplan|allocation|parent|approved|previously)\b',re.I)
 ADJACENT_WORDS=re.compile(r'\b(?:adjoining|adjacent|neighbouring|next\s+to|opposite)\b',re.I)
 CREATING=re.compile(r'\b(?:erection|construction|construct\w*|development|creation|provision|provid\w+|formation|comprising|proposed|new|build\w*|redevelopment|replac\w+)\b',re.I)
-CHANGE_AWAY=re.compile(r'\b(?:change\s+of\s+use|conversions?|sub-?division|amalgamation)\s+(?:of|to|from)\b',re.I)
+CHANGE_AWAY=re.compile(r'\b(?:change\s+of\s+use|conversions?(?:\s+and\s+\w+)?|sub-?division|amalgamation)\s+(?:of|to|from)\b',re.I)
 WORKS=re.compile(r'\b(?:alterations?|extensions?|refurbishment|renovation|repairs?)\s+(?:of|to)\b',re.I)
 INTRODUCES=re.compile(r'\b(?:to|into|as)\b|\bprovid\w+|\bcreat\w+',re.I)
 CLAUSE_BREAK=re.compile(r'[.;:,()\n]')
@@ -85,7 +86,9 @@ def _classify_mention(text,m):
     if context and not (creating and creating[-1]>context[-1]):return 'CONTEXT',None
     away=[t.start() for t in CHANGE_AWAY.finditer(window) if not INTRODUCES.search(window,t.end())]
     works=[t.start() for t in WORKS.finditer(window) if not INTRODUCES.search(window,t.end())]
+    introduced=[t for t in list(CHANGE_AWAY.finditer(window))+list(WORKS.finditer(window)) if INTRODUCES.search(window,t.end())]
     if away:return 'LOST','CONVERSION_AWAY'
+    if introduced and not inside_existing and not works:return 'NEW',None      # "conversion of existing 12 flats TO 18 flats": the 18 is what is proposed
     if works:return 'RETAINED',None
     if inside_existing or (existing and not (creating and creating[-1]>existing[-1])):
         if DEMOLITION_WORDS.search(window[existing[-1]-0:] if existing else '') or DEMOLITION_WORDS.search(m.group(0)):return 'LOST','DEMOLITION'
@@ -99,6 +102,8 @@ def _mentions(text):
     """Attached dwelling counts in order, after consuming blocks-of-N products and qualified maxima, with R-UNITS as the only fallback."""
     spans=[];work=text
     for m in PRODUCT.finditer(text):
+        spans.append(('PRODUCT',m.start(),m.end(),_value(m.group(1))*_value(m.group(2)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
+    for m in PRODUCT_EACH_FIRST.finditer(work):
         spans.append(('PRODUCT',m.start(),m.end(),_value(m.group(1))*_value(m.group(2)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
     for m in PRODUCT_IN_EACH.finditer(work):
         spans.append(('PRODUCT',m.start(),m.end(),_value(m.group(1))*_value(m.group(2)),m));work=work[:m.start()]+' '*(m.end()-m.start())+work[m.end():]
