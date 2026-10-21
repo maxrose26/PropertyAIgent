@@ -77,7 +77,7 @@ Interaction with batch identity: a batch item's identity is `(subject, 'LISTING_
 ### 2.4 Controller
 
 * New source-free function `assess_retained(coordinator, key, plan_keys, ...)`, modelled on `resume_capture` (`operational_controller.py:377-400`): verifies the retained capture digest and sealed prior accounting, recomputes the 24 expected v3 child keys, runs the registered rule, and **compares each stored receipt with a trusted-memory recomputation** (the F5 discipline, extended to the v3 binding fields and `assessment_sha256`).
-* `execute` (nomination path): the gates and bindings at `:324`, `:327`, `:330` (`screen_task['revision'] != digest(r)`, which a v3 parent would fail closed on as `EXACT_COMPLETED_SCREENING_REQUIRED`), `:331` and `:333` become `identity_admission_eligible(expected, screening_item)` and a contract check against the **registered** rule's contract, so a v3 parent can reach the existing pending-identity path and a v1 parent behaves exactly as now. All later checks (known application, B2/verification scope, coupled gate, `FACTUAL_DEPENDENCY_BINDING`, `new_identity_source`) are untouched. **This wiring is required for the acceptance test of section 5 but is not exercised in production by the first demonstration** (section 8).
+* `execute` (nomination path): the gates and bindings at `:324`, `:327`, `:330` (`screen_task['revision'] != digest(r)`, which a v3 parent would fail closed on as `EXACT_COMPLETED_SCREENING_REQUIRED`), `:331` and `:333` become `identity_admission_eligible(expected, screening_item)` and a contract check against the **registered** rule's contract, so a v3 parent can reach the existing pending-identity path and a v1 parent behaves exactly as now. All later checks (known application, B2/verification scope, coupled gate, `FACTUAL_DEPENDENCY_BINDING`, `new_identity_source`) are untouched. **This wiring is required for the acceptance test of section 5 but is not exercised in production by the first demonstration** (sections 6 and 9.4).
 * `capture()` and `resume_capture()` remain v1.
 
 ### 2.5 Creating v3 assessments from the completed Bolton capture, without changing it
@@ -122,7 +122,7 @@ Stored beside the identity (provenance, not identity): `qualifier_output_sha256`
 
 **How dependency coverage and Windows/Linux consistency are tested (all offline, runnable in the existing CI job):**
 
-1. *Closure test.* In a fresh interpreter, import the modules, run the v3 screen on a probe record, and collect every loaded module whose file is under the repository. The set must be a subset of `{bound modules} ∪ {declared exclusions: ledger.py, schema.py, package __init__ files}`. A new import in the assessment path fails the test until it is bound or consciously excluded.
+1. *Closure test.* In a fresh interpreter, import the modules, run the v3 screen on a probe record, **over all 24 retained records** (so lazy, branch-dependent imports are exercised) and take the union of loaded modules whose file is under the repository. The set must be a subset of `{bound modules} ∪ {declared exclusions: ledger.py, schema.py, package __init__ files}`. A new import in the assessment path fails the test until it is bound or consciously excluded.
 2. *Pinned digest.* The expected `code_binding` is a constant in the test. Changing any bound byte fails it, forcing a conscious update (the failure message names the file).
 3. *Line-ending independence.* The digest function reads bytes (never text mode) and replaces `\r\n` with `\n` before hashing. Test: for each bound module, hash the bytes, a CRLF-transformed copy and an LF copy; all three give the same file digest; a lone `\r` or a UTF-8 BOM in a bound file fails the test.
 4. *Cross-platform.* The same test runs on the Linux CI job; its pinned value was also produced from the git blob (`git show <rev>:<path>`), not the working tree, so a Windows `autocrlf` checkout and a Linux checkout agree. Run on both before the pin is accepted; this proposal only specifies it.
@@ -151,7 +151,7 @@ FROM ingestion_work_items
 WHERE task = 'SCREENING'
   AND subject::jsonb = :subject::jsonb
   AND (revision = :record_sha256 OR checkpoint::jsonb->>'record_sha256' = :record_sha256)
-  AND key > :cursor
+  AND (:cursor IS NULL OR key > :cursor)
 ORDER BY key
 LIMIT :page_plus_one
 ```
@@ -160,7 +160,7 @@ LIMIT :page_plus_one
 * **Unscreened v3 items** (queued, no checkpoint) have no result and therefore no assessment to present; they do not match, by definition. Their existence is visible by contract and revision to the owner's registration readback.
 * **Pagination.** Keyset on the unique primary key `key`. `page_size` default **25**, maximum **50** (enforced; larger values are clamped, not rejected). The function fetches `page_size + 1` rows: if an extra row exists the response carries `next_cursor = key of the last returned row`, otherwise `next_cursor = null`. **One page and one query per request.** There is no automatic traversal and no multi-page call; a caller who wants the next page makes a new request with the cursor. No write, no lock beyond `ACCESS SHARE`.
 * **Bounds.** *Enforced today (code constants; nothing here is measured):* 4,096 items, 12,288 attempts, 32 MiB (F12), `statement_timeout 10s`, `lock_timeout 3s`. *Proposed:* ≤ 1 query per request, ≤ 50 rows per page, a scan of at most 4,096 rows (the table bound; no secondary index exists), returned bytes ≤ 50 rows × the scalar fields (a few kilobytes). *To be measured in the disposable PostgreSQL job:* latency at the 4,096-row bound and returned bytes. **No new index is proposed**: that would be a schema change and a held decision.
-* **Tests (disposable PostgreSQL, no skipped or duplicated matches).** Seed one record with mixed v1 and v3 assessments (several configurations), plus non-matching records, with more than 50 matches in one scenario and exactly `page_size` matches in another (the boundary case: `next_cursor` must be null). Assert: the concatenation of all pages equals the complete match set; no key appears twice; no match is missing; the order is ascending by key on every page; page size never exceeds 50 and defaults to 25; a request with a valid cursor beyond the last key returns an empty page and a null cursor; rows inserted between two requests with keys above the cursor appear later, rows with keys below it are never inserted into an already-passed range (so a traversal never repeats); no row contains `supersedes`, `current` or `latest`; and the plan touches no more than the table bound.
+* **Tests (disposable PostgreSQL, no skipped or duplicated matches).** Seed one record with mixed v1 and v3 assessments (several configurations), plus non-matching records, with more than 50 matches in one scenario and exactly `page_size` matches in another (the boundary case: `next_cursor` must be null). Assert: the concatenation of all pages equals the complete match set; no key appears twice; no match is missing; the order is ascending by key on every page; page size never exceeds 50 and defaults to 25; a request with a valid cursor beyond the last key returns an empty page and a null cursor; the first request (null cursor) returns the first page; keyset pagination is snapshot-free, so a traversal never repeats a row, but a row created mid-traversal whose key (a sha256 digest) falls below the cursor is missed by that traversal (stated, not asserted away); no row contains `supersedes`, `current` or `latest`; and the plan touches no more than the table bound.
 
 The query runs under the existing worker login's `SELECT` (the worker already reads rows, `sql_ledger.py:23-27`); it adds no function, grant or privilege.
 
@@ -168,7 +168,7 @@ The query runs under the existing worker login's `SELECT` (the worker already re
 
 ### 5.1 Retained-capture reconciliation, resolved offline
 
-The demonstration must use the **verified full retained capture**. This was reconciled offline on 2026-10-21 using only committed evidence and the repository's own generating code; no database, host or council was contacted. Full values are in [`retained-capture-reconciliation.json`](retained-capture-reconciliation.json). Four different objects carry four different hashes, and they are **not expected to match each other**:
+The demonstration must use the **verified full retained capture**. This was reconciled offline on 2026-10-21 using only committed evidence and the repository's own generating code; no database, host or council was contacted. Full values are in [`retained-capture-reconciliation.json`](retained-capture-reconciliation.json). Five different objects carry five different hashes, and they are **not expected to match each other**:
 
 | Object | Representation | Generating code | Value (prefix) | Reproduced |
 |---|---|---|---|---|
@@ -180,7 +180,7 @@ The demonstration must use the **verified full retained capture**. This was reco
 
 Why the hashes differ legitimately: the archive hash covers the raw `source`; the checkpoint hash covers a *different object derived from it* plus runtime facts (supervisor receipt, archive commit); a record digest covers one projected record; the capture key covers an identity, not content; the bindings hash covers task identities. None is a hash of another. The chain is: file bytes → `source` → (project + supervisor + archive receipt) → checkpoint → projected records → child identities → registered bindings. Every link was recomputed, and every recomputed value matches the retained value.
 
-The reproduction was run with the code at `master` **and** with an export of the generating revision `b851b358…` (`idox_adapter.py` and `batching.py` differ between them only by the additive observation support from PR #162); both give `d5fa9e29…`. The reproduction script is in Appendix A; it needs only the five committed evidence files.
+The reproduction was run with the code at `master` **and** with an export of the generating revision `b851b358…` (`idox_adapter.py` and `batching.py` differ between them only by additive observation support from PR #162 plus a behaviour-preserving extraction of the row validation into `_row`); both give `d5fa9e29…`. The reproduction script is in Appendix A; it needs only the five committed evidence files.
 
 **What this does and does not establish.** Offline evidence proves the committed archive file is exactly the capture that the retained checkpoint digest, the capture key and the registered child identities were derived from, and that the 24 v1 children's identities are reproducible. It does **not** prove, offline, that those rows are currently `COMPLETE` in the production database, nor that the control row is in any particular state; those are facts about production that were last recorded in the owner's archive (events 88 and 163 in the reconciliation) and can only be re-checked by a read-only readback during the approved run.
 
@@ -280,7 +280,7 @@ Four **separately approvable** stages. None is authorised by this proposal. Name
 |---|---|---|
 | New `ingestion_work_items` | 5 (batch items) | 24 (v3 children) |
 | `ingestion_work_attempts` | 0 | at most **58** (batch items `max_attempts = 2` ⇒ ≤ 10; children `max_attempts = 2` ⇒ ≤ 48); expected 29 (one claim each) |
-| Control-row change | grant added | grant invalidated; no stop/generation change |
+| Control-row change | grant **and** `bolton_exceptions[authority]` entry added (`operational_owner.py:415-416`) | both zeroed at invalidation; no stop/generation change |
 | Source calls / council requests | 0 | **0** |
 | **Application-database writes** | **0** | **0** |
 | Identities created | 0 | **0** (the nomination path is built and tested but not used) |
@@ -294,9 +294,9 @@ Four **separately approvable** stages. None is authorised by this proposal. Name
 * **Scope:** exactly Bolton `RECEIVED` 2026-09-28 to 2026-10-04 (the retained window); `source_calls = 0`, `writes = 0`; contracts `listing-batch-v1` and `listing-screen-v3`; `screening_configs = [one config_sha256]`; bindings for the 5 batch items, the 24 v3 children and the root capture binding (30 bindings, as in the reconciliation); `capture_sha256 = d5fa9e29…`.
 * **Stops are preserved.** The allowance does not clear, reset or advance any stop or generation. The policy successor admits it only when the control row is in the stop state **read and digested at ceremony time**; this proposal does not assume the last recorded state (generation 3, last read on 2026-10-20) is current. If the state differs, the ceremony stops and a new proposal is needed.
 * **Lifetime and deadline (proposed; the SQL ceiling of 24 h is not used).**
-  * *Measured (retained final result, 2026-10-20):* each of the five batch slots took 9.2–10.7 s of database time (sum ≈ 51.4 s), 56–65 driver statements, 2 connections, 70–82 KB returned. v3 computation for 24 records is ~0.02 s locally.
+  * *Measured (retained final result, 2026-10-20):* each of the five batch slots took 9.2–10.7 s of supervised elapsed time (sum ≈ 51.4 s; the measured database connection-active time is only about 1.5 s per slot), 56–65 driver statements, 2 connections, 70–82 KB returned. v3 computation for 24 records is ~0.02 s locally.
   * *Enforced ceilings today:* a slot claim lease of 165 s and a per-slot supervised ceiling of 165 s (`batching.py`, `operational_runner.py`); batch claim leases 1-480 s (`worker.sql` claim).
-  * *Proposed:* **execution deadline 600 s** for the whole screening run (≈ 11× the measured 51.4 s total, and below the 5 × 165 s = 825 s slot ceilings, so the tighter bound binds first); **cleanup and invalidation reserve 300 s**; **authority lifetime 900 s (15 minutes) from registration** (= deadline + reserve). A run that has not finished by the deadline stops with the barrier set; it is not extended. These are proposals to be confirmed by a rehearsal in the disposable PostgreSQL job, not measured production figures.
+  * *Proposed:* **execution deadline 600 s** (runner-enforced, not SQL-enforced) for the whole screening run (≈ 12× the measured 51.4 s total, and below the 5 × 165 s = 825 s slot ceilings, so the tighter bound binds first); **cleanup and invalidation reserve 300 s**; **authority lifetime 900 s (15 minutes) from registration** (the only SQL-enforced bound, via the grant's `expires_at`) (= deadline + reserve). A run that has not finished by the deadline stops with the barrier set; it is not extended. These are proposals to be confirmed by a rehearsal in the disposable PostgreSQL job, not measured production figures.
 
 **Disabling v3 while preserving evidence.**
 
