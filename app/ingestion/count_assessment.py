@@ -24,7 +24,8 @@ _NOT_COUNT=r'(?:bed|beds|bedroom|bedrooms|bedded|room|rooms|storey|storeys|story
 ATTACHED=re.compile(r'(?<![\w/.,-])'+_NUM+r'\b[\s-]*(?:no\.?\s+)?(?!'+_NOT_COUNT+r'\b)(?:(?!'+_STOP+r'\b)[\w-]+\.?\s+){0,3}?'+DWELLING_NOUN+r'\b(?!\s+(?:blocks?|buildings?)\b)',re.I)
 UP_TO=re.compile(r'\b(?:up\s+to|not\s+exceeding|no\s+more\s+than|maximum\s+of)\s+'+_NUM+r'\b[\s-]*(?:no\.?\s+)?(?:(?!'+_STOP+r'\b)[\w-]+\.?\s+){0,4}?'+DWELLING_NOUN+r'\b',re.I)
 _GROUP=r'(?:apartment\s+)?(?:blocks?|buildings?|terraces?|towers?|wings?)'
-PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+(?:of|comprising|containing)\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+each\b',re.I)
+_STATE=r'(?:(?:existing|former|retained|redundant|derelict|vacant)\s+)?'      # "2 existing blocks of 6 flats each" is still a product, and an existing one
+PRODUCT=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_STATE+_GROUP+r'\s+(?:of|comprising|containing)\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+each\b',re.I)
 PRODUCT_IN_EACH=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\s+in\s+each\s+of\s+'+_NUM+r'\s+'+_GROUP+r'\b',re.I)
 GROUP_OF_UNCLEAR=re.compile(r'(?<![\w/.,-])'+_NUM+r'\s+'+_GROUP+r'\s+of\s+'+_NUM+r'\s+(?:(?!'+_STOP+r'\b)[\w-]+\s+){0,2}?'+DWELLING_NOUN+r'\b(?!\s+each\b)',re.I)      # "2 blocks of 6 flats": per block or in total? not decided by guessing
 STUDENT=re.compile(r'\bstudents?\b|\bcluster\s+(?:flats?|units?|apartments?)\b',re.I)      # decision D4: student accommodation is not dwelling supply
@@ -54,6 +55,7 @@ CLAUSE_BREAK=re.compile(r'[.;:,()\n]')
 PARENT_MARKER=re.compile(r'\bpursuant\s+to\b',re.I)
 WIDER_MARKER=re.compile(r',?\s*\bpart\s+of\s+(?:a\s+|the\s+)?wider\s+(?:scheme|development|site|allocation)\b(?:\s+of)?',re.I)
 JOIN=re.compile(r'\s*(?:,\s*and\b|,|;|&|\band\b|\bplus\b|\btogether\s+with\b)\s*(?:(?:the\s+)?(?:erection|construction|conversion|change\s+of\s+use|provision|formation)\s+of\s+(?:an?\s+|the\s+)?[\w\s-]{0,40}?\s+(?:to|into|as)\s+)?\Z',re.I)
+MIXED_WORDING=re.compile(r'\b(?:mixed[- ]use|ground[- ]floor|commercial|retail|shops?|offices?|cafes?|restaurants?|workspace|community\s+use)\b',re.I)
 REVISED=re.compile(r'\b(?:increase|reduce|decrease|amend|change|vary)\s+(?:the\s+)?(?:number\s+of\s+)?(?:dwellings|homes|houses|flats|apartments|units)?\s*from\s+'+_NUM+r'(?:\s+(?:dwellings|homes|houses|flats|apartments|units))?\s+to\s+'+_NUM+r'\b',re.I)
 SECTION_73=re.compile(r'\b(?:section\s*73|s\.?\s*73|variation\s+(?:of|to)|non-?material|amendments?|amend|vary|substitution|substitute|removal\s+of\s+(?:conditions?|condition\s+\d+)|(?:plans?|scheme|dwellings?|permission|development)\s+approved|approved\s+(?:plans?|scheme|under|pursuant|permission))\b',re.I)
 
@@ -164,6 +166,7 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     if role=='PHASE_OF_PARENT':
         m=PARENT_MARKER.search(text)
         if m:own=text[:m.start()];parent=dict(reference=ref,context_count=_first_attached(text[m.end():]),relation='PURSUANT_TO')
+        elif ref:parent=dict(reference=ref,context_count=None,relation='PURSUANT_TO')      # reserved matters always keep their parent relationship
     else:
         m=WIDER_MARKER.search(text)
         if m:own=text[:m.start()];parent=dict(reference=ref,context_count=_first_attached(text[m.end():]),relation='PART_OF_WIDER_SCHEME')
@@ -174,8 +177,7 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     # ---- classify every attached count in the application's own words
     new=[];lost=[];retained=[];not_housing=False;student=False
     for kind,a,b,value,m in _mentions(own):
-        if kind=='PRODUCT':new.append((kind,a,b,value));continue
-        c,why=_classify_mention(own,m)
+        c,why=_classify_mention(own,m)      # a multiplied block count is classified exactly like any other count BEFORE it is assigned: demolishing 2 blocks of 6 flats each loses 12, it does not propose 12
         if c=='NEW':new.append((kind,a,b,value))
         elif c=='LOST':lost.append((a,b,value,why))
         elif c=='RETAINED':retained.append((a,b,value))
@@ -183,6 +185,10 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
         elif c=='STUDENT':student=True
     if student and not ambiguous:      # D4: student cluster flats and beds are not dwelling supply; alongside genuine dwellings the scheme is for review, never guessed
         ambiguous=('ROUTE_COUNT_UNCONFIRMED','STUDENT_ACCOMMODATION_IN_MIXED_SCHEME') if new else ('RETAIN_NOT_RESIDENTIAL_SUPPLY','STUDENT_ACCOMMODATION')
+    # residential wording that is NOT merely the description of existing or lost stock (E17 "12 flats to a hotel" has none left; "residential flats and a ground floor shop" has)
+    stripped=own
+    for a,b,*_ in sorted(lost+retained,reverse=True):stripped=stripped[:a]+' '*(b-a)+stripped[b:]
+    res_left=bool(RESIDENTIAL_WORDING.search(stripped))
     lost_total=sum(v for _,_,v,_ in lost) if lost else None
     existing_total=(sum(v for _,_,v,_ in lost)+sum(v for _,_,v in retained)) if (lost or retained) else None
     works_only=bool(retained) and not lost
@@ -207,7 +213,11 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
         elif reason:admission,reason='ROUTE_COUNT_UNCONFIRMED',reason
         elif not_housing:proposed,admission,reason=NONE,'RETAIN_NOT_RESIDENTIAL_SUPPLY','NOT_HOUSING_SUPPLY'
         elif BEDSPACES.search(own) and CARE_USE.search(own):admission,reason='RETAIN_NOT_RESIDENTIAL_SUPPLY','BEDS_NOT_DWELLINGS'
-        elif lost or retained or nonres or not RESIDENTIAL_WORDING.search(own) or NONRES_DEST.search(own):proposed,admission,reason=NONE,'RETAIN_NOT_RESIDENTIAL_SUPPLY','NO_RESIDENTIAL_CREATED'
+        elif role=='PHASE_OF_PARENT':admission,reason='ROUTE_COUNT_UNCONFIRMED','RESERVED_MATTERS_WITHOUT_STATED_COUNT'      # no count in a reserved-matters clause is a question for investigation, never "no residential created"
+        elif res_left and (nonres or NONRES_DEST.search(stripped) or MIXED_WORDING.search(stripped)):
+            admission,reason='ROUTE_COUNT_UNCONFIRMED','MIXED_USE_WITHOUT_STATED_RESIDENTIAL_COUNT'      # explicit residential wording alongside commercial use, but no count
+            if category in ('primary_residential','unknown'):category='mixed_use'
+        elif lost or retained or nonres or not res_left or NONRES_DEST.search(stripped):proposed,admission,reason=NONE,'RETAIN_NOT_RESIDENTIAL_SUPPLY','NO_RESIDENTIAL_CREATED'
         else:admission,reason='ROUTE_COUNT_UNCONFIRMED','RESIDENTIAL_WITHOUT_STATED_COUNT'
         if lost and not retained and category=='primary_residential':category='non_target_admin_or_minor'      # change of use away from housing
     # ---- loss, existing and net (proposed basis; NONE counts as 0; nothing inferred)

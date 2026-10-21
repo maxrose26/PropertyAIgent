@@ -125,7 +125,9 @@ def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
     `rule_version=RULE_V1` (the DEFAULT) is the original behaviour, byte for byte: every existing caller, stored result and stored-versus-recomputed comparison is unchanged, and it takes no threshold.
     `RULE_V3` (specification 035, Phase A) is OPT-IN per call and ADDITIVE: the v1 result is carried unchanged and a `count_assessment` block is added (the four counts, category, scheme role, parent context,
     size-gate admission and headline), with `routing_authority = "count_assessment"`. The v1-shaped `disposition` of a v3 result is informational and must not route anything (use `routing_of`). Nothing in the
-    repository selects v3, nothing re-screens an existing item, and a v3 result is a NEW result under its own rule version, never an edit of an old one."""
+    repository selects v3, nothing re-screens an existing item, and a v3 result is a NEW result under its own rule version, never an edit of an old one.
+    BOUNDEDNESS CAVEAT: v3 calls the legacy qualifier first (through the v1 result), and that qualifier is cubic-time on a very long run of digits (tracked as a separate task). The new modules are linear, but
+    end-to-end v3 screening is NOT claimed to be bounded until that dependency is fixed and tested (tests/test_ingestion_count_assessment.py carries a strict xfail that turns green when it is)."""
     if rule_version not in (RULE_V1,RULE_V3):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
     if rule_version==RULE_V1:
         if council is not None or unit_threshold is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')
@@ -143,11 +145,20 @@ def screen_row(row,*,rule_version=RULE_V1,council=None,unit_threshold=None):
     return out
 
 
+# The allowed routing outcomes per rule version. A value outside the named version's vocabulary fails closed (specification 035 section 6A).
+ROUTING_VOCABULARY={
+    RULE_V1:frozenset({'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE','INSUFFICIENT_EVIDENCE'}),
+    RULE_V3:frozenset({'ADMIT_SCHEME','ADMIT_FOR_ASSESSMENT','ROUTE_COUNT_UNCONFIRMED','RETAIN_BELOW_THRESHOLD','RETAIN_NOT_RESIDENTIAL_SUPPLY','RETAIN_RELATED_TO_PARENT','RETAIN_WATCHLIST','RETAIN_UNUSABLE_PROPOSAL'})}
+
+
 def routing_of(result):
     """The ONE authoritative routing field of a stored or fresh screening result, chosen by its rule version (specification 035 section 6A): ('disposition', value) for v1 results,
     ('count_assessment', admission) for v3 results. Any other rule version, a missing field, or a result whose authority label disagrees with its rule version fails closed."""
     version=result.get('rule_version')
-    if version==RULE_V1 and 'routing_authority' not in result and 'disposition' in result:return 'disposition',result['disposition']
-    if version==RULE_V3 and result.get('routing_authority')=='count_assessment' and isinstance(result.get('count_assessment'),dict) and result['count_assessment'].get('admission'):
-        return 'count_assessment',result['count_assessment']['admission']
-    raise ValueError('ROUTING_AUTHORITY_UNRESOLVED')
+    if version==RULE_V1 and 'routing_authority' not in result and 'disposition' in result:
+        outcome=result['disposition'];authority='disposition'
+    elif version==RULE_V3 and result.get('routing_authority')=='count_assessment' and isinstance(result.get('count_assessment'),dict):
+        outcome=result['count_assessment'].get('admission');authority='count_assessment'
+    else:raise ValueError('ROUTING_AUTHORITY_UNRESOLVED')
+    if not isinstance(outcome,str) or outcome not in ROUTING_VOCABULARY[version]:raise ValueError('ROUTING_OUTCOME_NOT_IN_VOCABULARY')      # unknown, misspelt, wrong-version or non-string outcomes fail closed
+    return authority,outcome

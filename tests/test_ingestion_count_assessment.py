@@ -156,7 +156,7 @@ def test_routing_fails_closed_on_anything_ambiguous_or_tampered():
     bad=[dict(v3,routing_authority='disposition'),{k:x for k,x in v3.items() if k!='routing_authority'},{k:x for k,x in v3.items() if k!='count_assessment'},dict(v3,count_assessment=dict(v3['count_assessment'],admission='')),
          dict(v1,routing_authority='count_assessment'),dict(v1,rule_version='manchester-listing-screen-assessment-v2'),dict(v1,rule_version=None),{k:x for k,x in v1.items() if k!='disposition'},{}]
     for r in bad:
-        with pytest.raises(ValueError,match='ROUTING_AUTHORITY_UNRESOLVED'):ls.routing_of(r)
+        with pytest.raises(ValueError,match='ROUTING_(?:AUTHORITY_UNRESOLVED|OUTCOME_NOT_IN_VOCABULARY)'):ls.routing_of(r)
 
 
 def test_nothing_in_the_repository_selects_v3_or_imports_the_new_modules_and_nothing_re_screens():
@@ -186,7 +186,7 @@ def test_the_counting_rules_directly():
     for t in ('ERECTION OF 12 DWELLINGS AND ALSO 40 CAR PARKING SPACES AND 6 FLATS ELSEWHERE ON THE SITE OF THE FORMER MILL','ERECTION OF 12 DWELLINGS. ERECTION OF 6 FLATS'):
         got=a(t);assert got['proposed_total'] in ('NOT_ESTABLISHED',18) and (got['proposed_total']!=18 or t.startswith('ERECTION OF 12 DWELLINGS AND'))      # unjoined components are never added
     assert a('ERECTION OF 12 DWELLINGS. ERECTION OF 6 FLATS')['proposed_total']=='NOT_ESTABLISHED' and a('ERECTION OF 12 DWELLINGS. ERECTION OF 6 FLATS')['admission']=='ROUTE_COUNT_UNCONFIRMED'
-    assert a('RESIDENTIAL DEVELOPMENT OF 25 RETAIL UNITS')['admission']=='RETAIN_NOT_RESIDENTIAL_SUPPLY'      # R-UNITS: bare units only in an explicitly residential clause with no other unit type
+    got=a('RESIDENTIAL DEVELOPMENT OF 25 RETAIL UNITS');assert got['proposed_total']=='NOT_ESTABLISHED' and got['admission']=='ROUTE_COUNT_UNCONFIRMED'      # R-UNITS: bare units never count where another unit type is named; the contradictory wording is routed
     assert a('ERECTION OF 9 FLATS AND 1 SHOP')['proposed_total']==9 and a('ERECTION OF 9 FLATS AND 1 SHOP')['non_residential_units']=={'retail':1}      # R-MIXED
     x=a('DEMOLITION OF EXISTING BUNGALOW AND ERECTION OF 12 DWELLINGS');assert (x['lost'],x['existing'],x['net'])==('NOT_ESTABLISHED',)*3      # nothing inferred from an unnumbered mention
     x=a('ERECTION OF 12 HOUSES ON LAND ADJOINING 20 EXISTING HOUSES');assert (x['lost'],x['existing'])==('NOT_ESTABLISHED',)*2      # adjoining stock is not site stock
@@ -333,3 +333,77 @@ def test_hundred_and_thousand_only_matter_where_they_count_dwellings(text):
     ('Erection of 80 dwellings, substitute house types and amend layout, ref 19/123/OUT',80),('Erection of 100 dwellings pursuant to outline 20/0001/OUT',100)])
 def test_a_text_that_opens_with_a_new_creation_clause_is_not_turned_into_an_amendment(text,total):
     got=_a(text);assert got['scheme_role'] in ('NEW_SCHEME','PHASE_OF_PARENT') and got['proposed_total']==total
+
+
+# ------------------------------------------------------------------ third round (owner corrections): reserved matters, mixed use, multiplied blocks, routing vocabulary
+@pytest.mark.parametrize('text,context',[('APPLICATION FOR RESERVED MATTERS APPROVAL PURSUANT TO OUTLINE 91352/14 FOR APPEARANCE, LAYOUT, SCALE AND LANDSCAPING',None),
+    ('RESERVED MATTERS PURSUANT TO OUTLINE 91352/14 FOR UP TO 1700 DWELLINGS: ACCESS AND LAYOUT','UP_TO:1700'),('RESERVED MATTERS APPLICATION FOR PHASE 2 OF 91352/14',None),('APPROVAL OF RESERVED MATTERS PURSUANT TO 91352/14',None)])
+def test_reserved_matters_without_a_count_keep_their_parent_and_route_for_investigation_never_no_residential(text,context):
+    got=_a(text)
+    assert got['scheme_role']=='PHASE_OF_PARENT' and got['category']=='reserved_matters'
+    assert (got['admission'],got['reason'])==('ROUTE_COUNT_UNCONFIRMED','RESERVED_MATTERS_WITHOUT_STATED_COUNT') and got['proposed_total']=='NOT_ESTABLISHED'      # missing residential wording in the clause is not "none created"
+    assert got['parent_context']['reference']=='91352/14' and got['parent_context']['relation']=='PURSUANT_TO' and got['parent_context']['context_count']==context
+
+
+@pytest.mark.parametrize('text',['MIXED USE DEVELOPMENT COMPRISING RESIDENTIAL FLATS AND GROUND FLOOR RETAIL','ERECTION OF FLATS WITH GROUND FLOOR COMMERCIAL UNITS','RESIDENTIAL AND RETAIL DEVELOPMENT',
+    'ERECTION OF DWELLINGS AND A SHOP','MIXED-USE SCHEME OF HOUSES, OFFICES AND A CAFE'])
+def test_explicit_residential_mixed_use_without_a_count_routes_as_count_unconfirmed(text):
+    got=_a(text)
+    assert (got['admission'],got['reason'],got['category'])==('ROUTE_COUNT_UNCONFIRMED','MIXED_USE_WITHOUT_STATED_RESIDENTIAL_COUNT','mixed_use') and got['proposed_total']=='NOT_ESTABLISHED'
+
+
+def test_genuinely_non_residential_wording_is_still_not_residential_supply():
+    for text,reason in (('CHANGE OF USE OF 12 FLATS TO A HOTEL','NO_RESIDENTIAL_CREATED'),('ERECTION OF 3 RETAIL UNITS','NO_RESIDENTIAL_CREATED'),('ALTERATIONS TO THE EXISTING 12 FLATS INCLUDING NEW WINDOWS','NO_RESIDENTIAL_CREATED'),
+                        ('INSTALLATION OF 1 NO. AIR HANDLING UNIT','NO_RESIDENTIAL_CREATED'),('CONSTRUCTION OF 12 HOLIDAY HOMES','NOT_HOUSING_SUPPLY'),('ERECTION OF A 60 BEDROOM CARE HOME','BEDS_NOT_DWELLINGS')):
+        got=_a(text);assert (got['admission'],got['reason'])==('RETAIN_NOT_RESIDENTIAL_SUPPLY',reason),text
+
+
+@pytest.mark.parametrize('text,proposed,lost,existing,net,admission',[
+    ('DEMOLITION OF 2 BLOCKS OF 6 FLATS EACH','NONE',12,12,-12,'RETAIN_NOT_RESIDENTIAL_SUPPLY'),
+    ('DEMOLITION OF TWO BLOCKS CONTAINING SIX FLATS EACH','NONE',12,12,-12,'RETAIN_NOT_RESIDENTIAL_SUPPLY'),
+    ('RETENTION OF TWO BLOCKS CONTAINING SIX FLATS EACH','NONE','NONE',12,0,'RETAIN_NOT_RESIDENTIAL_SUPPLY'),
+    ('DEMOLITION OF 2 BLOCKS OF 6 FLATS EACH AND ERECTION OF 3 BLOCKS OF 8 FLATS EACH',24,12,12,12,'ADMIT_SCHEME'),
+    ('DEMOLITION OF 2 EXISTING BLOCKS OF 6 FLATS EACH AND ERECTION OF 3 BLOCKS OF 8 FLATS EACH',24,12,12,12,'ADMIT_SCHEME'),
+    ('ERECTION OF 12 DWELLINGS FOLLOWING DEMOLITION OF 2 EXISTING BLOCKS OF 6 FLATS EACH',12,12,12,0,'ADMIT_SCHEME'),
+    ('ERECTION OF 3 BLOCKS OF 8 FLATS EACH FOLLOWING DEMOLITION OF 2 BLOCKS OF 6 FLATS EACH',24,12,12,12,'ADMIT_SCHEME'),
+    ('ERECTION OF 2 BLOCKS OF 6 FLATS EACH WITH RETENTION OF 1 BLOCK OF 4 FLATS EACH',12,'NONE',4,12,'ADMIT_SCHEME')])
+def test_multiplied_block_counts_are_classified_before_they_are_assigned(text,proposed,lost,existing,net,admission):
+    got=_a(text)
+    assert (got['proposed_total'],got['lost'],got['existing'],got['net'],got['admission'])==(proposed,lost,existing,net,admission),text
+
+
+def test_demolishing_or_retaining_blocks_never_proposes_their_product():
+    for text in ('DEMOLITION OF 2 BLOCKS OF 6 FLATS EACH','RETENTION OF 2 BLOCKS CONTAINING 6 FLATS EACH','2 EXISTING BLOCKS OF 6 FLATS EACH TO BE DEMOLISHED','ALTERATIONS TO 2 BLOCKS OF 6 FLATS EACH'):
+        got=_a(text);assert got['proposed_total'] in ('NONE','NOT_ESTABLISHED') and got['admission']!='ADMIT_SCHEME' and not got['records'],text
+    assert _a('ERECTION OF 2 BLOCKS OF 6 FLATS EACH')['proposed_total']==12      # the same wording is still a product when it IS the proposal
+
+
+def test_routing_outcomes_are_validated_against_the_named_rule_versions_vocabulary():
+    v1=ls.screen_row(row('ERECTION OF 12 DWELLINGS'));v3=ls.screen_row(row('ERECTION OF 12 DWELLINGS'),rule_version=ls.RULE_V3,unit_threshold=10)
+    assert ls.routing_of(v1)==('disposition','SUPPORTED_PROCESSING_PRIORITY') and ls.routing_of(v3)==('count_assessment','ADMIT_SCHEME')
+    assert set(ls.ROUTING_VOCABULARY)=={ls.RULE_V1,ls.RULE_V3} and ls.ROUTING_VOCABULARY[ls.RULE_V1].isdisjoint(ls.ROUTING_VOCABULARY[ls.RULE_V3])
+    for value in ('ADMIT_SCHEMES','admit_scheme','','SUPPORTED_PROCESSING_PRIORITY',None,5,['ADMIT_SCHEME'],'ROUTE_COUNT_UNCONFIRMED '):      # unknown, misspelt, wrong-version, empty and non-string outcomes
+        with pytest.raises(ValueError,match='ROUTING_(?:AUTHORITY_UNRESOLVED|OUTCOME_NOT_IN_VOCABULARY)'):ls.routing_of(dict(v3,count_assessment=dict(v3['count_assessment'],admission=value)))
+    for value in ('ADMIT_SCHEME','UNKNOWN_OUTCOME','',None,3):
+        with pytest.raises(ValueError,match='ROUTING_(?:AUTHORITY_UNRESOLVED|OUTCOME_NOT_IN_VOCABULARY)'):ls.routing_of(dict(v1,disposition=value))      # a v3 outcome is not a v1 disposition
+    with pytest.raises(ValueError):ls.routing_of(dict(v1,rule_version='manchester-listing-screen-assessment-v2'))
+
+
+def test_every_assessment_outcome_is_inside_the_v3_vocabulary():
+    vocab=ls.ROUTING_VOCABULARY[ls.RULE_V3]
+    rnd=random.Random(169)
+    words=['ERECTION','DEMOLITION','OF','AND','12','6','FLATS','DWELLINGS','BLOCKS','EACH','RETAIL','SHOP','RESERVED MATTERS','PURSUANT TO','91352/14','STUDENT','UP TO','HOTEL','RETENTION','EXISTING','MIXED USE','TWENTY-FOUR','2','NO.','']
+    texts=[e['proposal'] for e in EXAMPLES]+[' '.join(rnd.choice(words) for _ in range(rnd.randint(0,10))) for _ in range(500)]
+    for t in texts:assert ca.assess_proposal(t)['admission'] in vocab,t
+
+
+# ------------------------------------------------------------------ the digit-run dependency is tracked, not hidden
+@pytest.mark.xfail(strict=True,reason='v3 still calls the legacy qualifier first (through the v1 result) and app.scrapers.unit_filter.extract_unit_count is cubic on a long digit run; tracked as a separate task. '
+                   'This flips to an unexpected pass (a strict failure that forces removal of this marker) when that dependency is fixed, so end-to-end boundedness is never claimed before it is tested.')
+def test_end_to_end_v3_screening_is_not_yet_bounded_on_a_long_digit_run():
+    start=time.monotonic();ls.screen_row(row('1'*900),rule_version=ls.RULE_V3,unit_threshold=10)
+    assert time.monotonic()-start<0.5
+
+
+def test_the_new_modules_alone_are_bounded_on_the_same_digit_run():
+    start=time.monotonic();ca._mentions('1'*8000);ca._nonres('1'*8000);assert time.monotonic()-start<1      # the new regexes are linear; only the legacy qualifier is not
