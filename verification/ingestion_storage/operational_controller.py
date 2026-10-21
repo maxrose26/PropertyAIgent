@@ -10,7 +10,7 @@ from sqlalchemy import create_engine,event
 from sqlalchemy.pool import QueuePool
 from app.ingestion.ledger import Denied,digest,bounded,Ledger
 from app.ingestion.sql_ledger import SQLLedger
-from app.ingestion.listing_screening import screen_row
+from app.ingestion.listing_screening import screen_row,identity_admission_eligible,assessment_identity,qualifier_output_of,RULE_V1
 
 
 def runtime_principal(url, ssl, route=None):
@@ -283,7 +283,7 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     All task bindings/allowances must already exist. No issue/grant/barrier API.
     Other rows are retained and cheaply screened offline; they receive no effects.
     """
-    l=coordinator.ledger
+    l=coordinator.ledger;rule=coordinator.screening_rule      # v1 unless the coordinator was explicitly built with a registered v3 rule
     if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
     if binding.retained_capture_sha256 and isinstance(l,ControllerLedger):
         prior=l.budget.previous
@@ -316,21 +316,26 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     if isinstance(l,ControllerLedger):l.budget.capture_checkpoint_sha256=digest(receipt)
     # Recompute every disposition in trusted controller memory. A worker's
     # assertion is not used as evidence for selecting expensive effects.
-    screens=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']]
+    screens=[dict(reference=r['reference'],**rule.screen(r)) for r in receipt['records']]
     matches=[r for r in receipt['records'] if r['reference']==binding.reference]
     result=dict(enumeration='COMPLETE_METADATA_RETAINED',screening=screens,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',other_candidates_retrieved=0)
     if not matches:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_NOMINEE_NOT_RETURNED')
     r=matches[0]
     if digest(r)!=binding.listing_revision or binding.screening_key not in children:return dict(result,outcome='HOLD_CHANGED_ROW_OR_UNBOUND_TASK')
     if (r['source_url'],r['source_record_id'])!=(binding.source_url,binding.source_record_id):raise Denied('ROW_IDENTITY')
-    expected=screen_row(r)
-    if expected['disposition'] not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')
+    expected=rule.screen(r)
+    if not identity_admission_eligible(expected):return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')      # the ONE authoritative routing outcome decides (v1 dispositions, or v3 ADMIT_SCHEME / ADMIT_FOR_ASSESSMENT)
+    want_revision=digest(r) if rule.rule_version==RULE_V1 else assessment_identity(r,rule)[3]
+    if rule.rule_version!=RULE_V1:
+        record_sha,config,config_sha,revision=assessment_identity(r,rule)
+        expected=dict(expected,record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision,assessment_sha256=digest(expected['count_assessment']),qualifier_output_sha256=digest(qualifier_output_of(expected)))
     check();screen_task=l.get(binding.screening_key)
     if binding.screening_batch_key and (screen_task['state']!='COMPLETE' or screen_task['dependencies']!=[binding.discovery_key]
-        or screen_task['revision']!=digest(r) or screen_task['subject']!={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']}
-        or screen_task['task']!='SCREENING' or screen_task['contract']!='listing-screen-v1'):raise Denied('EXACT_COMPLETED_SCREENING_REQUIRED')
+        or screen_task['revision']!=want_revision or screen_task['subject']!={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']}
+        or screen_task['task']!='SCREENING' or screen_task['contract']!=coordinator.screening_contract):raise Denied('EXACT_COMPLETED_SCREENING_REQUIRED')
     sc=screen_task['checkpoint'] if screen_task['state']=='COMPLETE' else coordinator.screening(l.claim(binding.screening_key,lease_seconds=165))
     if any(sc[k]!=v for k,v in expected.items()):raise Denied('FORGED_SCREENING_RECEIPT')
+    if not identity_admission_eligible(sc,l.get(binding.screening_key)):raise Denied('FORGED_SCREENING_RECEIPT')      # the stored item must itself be the registered rule's eligible item
     from sqlalchemy import select
     from sqlalchemy.orm import Session
     from app.db.models import Application
@@ -387,7 +392,8 @@ def resume_capture(coordinator,key,*,checkpoint_sha256,prior_accounting_sha256,s
         or prior.get('capture_checkpoint_sha256')!=checkpoint_sha256):raise Denied('SEALED_PRIOR_ACCOUNTING_REQUIRED')
     check();root=l.get(key);receipt=root['checkpoint']
     if not receipt or digest(receipt)!=checkpoint_sha256 or receipt.get('kind')!='LISTING_RECEIPT_V1':raise Denied('RETAINED_CAPTURE_BINDING')
-    expected=[digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(r))) for r in receipt['records']]
+    rule=coordinator.screening_rule
+    expected=[digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']},task='SCREENING',contract=coordinator.screening_contract,revision=digest(r) if rule.rule_version==RULE_V1 else assessment_identity(r,rule)[3])) for r in receipt['records']]
     if set(expected)!=set(screening_keys) or len(expected)!=len(screening_keys):raise Denied('EXACT_SCREENING_BATCH')
     if root['state']=='COMPLETE':children=root['outcome']['children']
     else:children=coordinator.resume_listing(l.claim(key,lease_seconds=165))
@@ -398,3 +404,40 @@ def resume_capture(coordinator,key,*,checkpoint_sha256,prior_accounting_sha256,s
         if row['state']=='COMPLETE':results.append(row['checkpoint'])
         else:results.append(coordinator.screening(l.claim(child,lease_seconds=165)))
     return dict(outcome='DISCOVERY_SCREENING_ONLY',checkpoint_sha256=checkpoint_sha256,children=children,screening=results,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED')
+
+
+def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys,check=lambda:None):
+    """Source-free v3 assessment of a retained, COMPLETE capture under an explicitly registered v3 rule (proposal section 2.4). No source client, no council, no application database, no identity.
+
+    Verifies the capture (state, kind, immutable archive, pinned checkpoint digest), recomputes the exact v3 batch plans from it and requires `batch_keys` to be exactly those, snapshots the rows that must not
+    change (the capture and `preserved_keys`, e.g. the earlier v1 assessments), screens each batch through the existing `process_batch`, then recomputes EVERY assessment in trusted memory and compares it with the
+    stored receipt (a forged or mismatched receipt stops the run), and finally proves the preserved rows are byte-identical. Admission, B2 and every factual check are not attempted here."""
+    from app.ingestion.batching import batch_plans,process_batch
+    l=coordinator.ledger;rule=coordinator.screening_rule
+    if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
+    if rule.rule_version==RULE_V1:raise Denied('V3_RULE_REQUIRED')
+    if not preserved_keys or len(set(preserved_keys))!=len(preserved_keys):raise Denied('PRESERVED_KEYS_REQUIRED')      # the earlier assessments and batches the run must prove unchanged; they must be named among the registered bindings so they can be read (a binding is not a new permission: they are COMPLETE, so the existing claim/fence checks already refuse any change)
+    check();root=l.get(capture_key);receipt=root['checkpoint']
+    if (root['state']!='COMPLETE' or root['task']!='DISCOVERY' or not isinstance(receipt,dict) or receipt.get('kind')!='LISTING_RECEIPT_V1'
+        or digest(receipt)!=capture_sha256 or not receipt.get('durable_archive')):raise Denied('RETAINED_CAPTURE_BINDING')
+    plans=batch_plans(capture_key,receipt,rule)
+    if len(set(batch_keys))!=len(batch_keys) or set(batch_keys)!={p['key'] for p in plans}:raise Denied('EXACT_SCREENING_BATCH')
+    snapshot=lambda:{k:digest(l.get(k)) for k in (capture_key,*preserved_keys)}
+    before=snapshot()
+    for plan in plans:
+        check();done=process_batch(coordinator,plan['key'],check=check)
+        if done['outcome'] not in {'BATCH_SCREENED','BATCH_ALREADY_COMPLETE'}:raise Denied('SCREENING_OUTCOME')
+    assessments=[]
+    for record in receipt['records']:
+        check();record_sha,config,config_sha,revision=assessment_identity(record,rule)
+        key=digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':record['reference']},task='SCREENING',contract=coordinator.screening_contract,revision=revision))
+        item=l.get(key);stored=item['checkpoint'] or {}
+        expected=dict(rule.screen(record),record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision,
+                      source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])      # the fields the coordinator adds are compared too
+        expected['assessment_sha256']=digest(expected['count_assessment']);expected['qualifier_output_sha256']=digest(qualifier_output_of(expected))
+        if (item['state']!='COMPLETE' or item['task']!='SCREENING' or item['contract']!=coordinator.screening_contract or item['revision']!=revision or item['dependencies']!=[capture_key]
+            or any(stored.get(k)!=v for k,v in expected.items()) or stored.get('capture_key')!=capture_key or stored.get('capture_checkpoint_sha256')!=capture_sha256
+            or item['outcome']!=dict(outcome=expected['count_assessment']['admission'],retained=True)):raise Denied('FORGED_OR_MISMATCHED_ASSESSMENT')
+        assessments.append(dict(reference=record['reference'],key=key,admission=expected['count_assessment']['admission'],eligible=identity_admission_eligible(stored,item)))
+    if snapshot()!=before:raise Denied('PRESERVED_ROWS_CHANGED')
+    return dict(outcome='SCREENING_V3_ASSESSED',assessments=assessments,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',application_writes=0,source_calls=0)

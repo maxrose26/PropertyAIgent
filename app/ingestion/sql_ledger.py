@@ -4,6 +4,7 @@ Connections/credentials/supervision belong to the reviewed controller. Worker
 and trusted effect broker use separate principals. Application engine is never
 passed to the source worker; it is used only by the shared writer callback.
 """
+import re
 from sqlalchemy import select,text
 from .ledger import Claim,Denied,UncertainPersistence,bounded
 from .schema import WorkItem as W
@@ -60,7 +61,12 @@ class SQLLedger:
     def batch_row(self,claim,plan,capture,record,*,reseal=False):
         from .ledger import digest
         import json
-        identity=dict(subject={'kind':'APPLICATION','council':capture['council'],'reference':record['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(record))
+        screening=plan.get('screening')
+        if screening is None:contract,revision='listing-screen-v1',digest(record)
+        else:
+            if set(screening)!={'contract','config_sha256'} or screening['contract']!='listing-screen-v3' or not re.fullmatch('[a-f0-9]{64}',str(screening['config_sha256'])):raise Denied('SCREENING_PLAN_BINDING')
+            contract,revision='listing-screen-v3',digest(dict(record_sha256=digest(record),config_sha256=screening['config_sha256']))
+        identity=dict(subject={'kind':'APPLICATION','council':capture['council'],'reference':record['reference']},task='SCREENING',contract=contract,revision=revision)
         row=self.get(claim.key)
         child=dict(identity,key=digest(identity),dependencies=[plan['capture_key']],priority=row['priority'],max_attempts=2,limits=row['limits'])
         canonical=lambda x:json.dumps(x,sort_keys=True,separators=(',',':'),allow_nan=False)

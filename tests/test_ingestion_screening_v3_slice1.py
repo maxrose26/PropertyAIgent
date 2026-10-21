@@ -184,7 +184,7 @@ def test_a_v3_item_stores_the_binding_and_routes_by_the_count_assessment(ledger)
     row = ledger.get(child)
     cp = row['checkpoint']
     record_sha = digest(rec)
-    config = dict(rule_version=ls.RULE_V3, count_spec_version='residential-count-v2', assessor='count_assessment', unit_threshold=10, max_text_chars=8192)
+    config = dict(rule_version=ls.RULE_V3, count_spec_version='residential-count-v2', assessor='count_assessment', unit_threshold=10, max_text_chars=8192, code_binding=ls.code_binding(), digest_probe=ls.digest_probe())
     assert row['contract'] == V3 and row['task'] == 'SCREENING'
     assert cp['record_sha256'] == record_sha and cp['config'] == config and cp['config_sha256'] == digest(config)
     assert row['revision'] == cp['assessment_revision'] == digest(dict(record_sha256=record_sha, config_sha256=digest(config)))
@@ -522,9 +522,11 @@ def test_switching_back_to_v1_keeps_every_v3_assessment_and_history_readable(led
     assert {h['item_key'] for h in hist} == {kids1[0], kids3[0]}
 
 
-FILES_THAT_MAY_SELECT_OR_READ_V3 = {'app/ingestion/coordinator.py', 'app/ingestion/screening_projection.py'}
-HELD = ['verification/ingestion_storage/operational_controller.py', 'verification/ingestion_storage/operational_owner.py', 'verification/ingestion_storage/operational_runner.py', 'app/ingestion/sql_ledger.py',
-        'docs/design/ingestion-operational-20261016/worker.sql']
+# Slice 1 allowed the disposable coordinator and the read-only projections. The offline production connection (PR #173 implementation) adds exactly these explicit, default-off consumers; the runner (which prepares and
+# registers real work) and the installed worker.sql (the original definition; the replacement exists only as derived text) still know nothing about v3.
+FILES_THAT_MAY_SELECT_OR_READ_V3 = {'app/ingestion/coordinator.py', 'app/ingestion/screening_projection.py', 'app/ingestion/sql_ledger.py', 'verification/ingestion_storage/operational_controller.py',
+                                    'verification/ingestion_storage/operational_owner.py', 'verification/ingestion_storage/screening_v3_grant.py', 'verification/ingestion_storage/screening_v3_worker_sql.py'}
+HELD = ['verification/ingestion_storage/operational_runner.py', 'docs/design/ingestion-operational-20261016/worker.sql']
 
 
 def test_only_the_slice_one_files_reference_v3_and_every_held_production_path_is_untouched_by_it():

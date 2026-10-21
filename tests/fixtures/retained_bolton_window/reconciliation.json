@@ -1,0 +1,208 @@
+{
+ "batches": [
+  {
+   "key": "f973f6d834359d8d7a0e1e855f61e5f4f5dfb5688cb983457ca1707cdc9734f9",
+   "revision": "62e3b122eac14ba976d214b18852b985c0f8ca8c10869159876db73acea915bc"
+  },
+  {
+   "key": "f24119f711ef9ded4a8529bbf087b72e4a87a9192eab8f2e6e0770a3c3ef0ef1",
+   "revision": "186696d3bf485160e8dbf8cd1db027521e9d43b96c8cb673ab8bcecbdb63e97f"
+  },
+  {
+   "key": "3850a90aa0f96855f544574bdd3ecb1d75bcdeef34fd7ae7f6f2b96d4e0adf08",
+   "revision": "0e9bdd9b045b293b6118fc0f09cc907bacea01cea1831d7bf8aaa2603bbe8bdd"
+  },
+  {
+   "key": "28d653f313496c560f59bc53c0b1581a66ad0e53c196363d2babc96aae2767fb",
+   "revision": "4fa3be284657ec7e12345e134bb0cb317af812ffc3d8afab79010e2781a509e9"
+  },
+  {
+   "key": "88f6ba66f2f63fa892f257cdecf5f7d176bfc81b43db8e3a8d43c889fe2a6a20",
+   "revision": "2c89b7e8e8ca109b4f65ae6b6c5f1e59efb0f48e40cc52acb613bd2c5ed78490"
+  }
+ ],
+ "evidence": {
+  "branch": "stage4/narrow-continuation-evidence-20261016",
+  "branch_head_at_inspection": "3a0b52f018e25b6430f259bd25d47416e24d88b5",
+  "directory": "docs/design/ingestion-operational-execution-bolton-window-demonstration-20261023",
+  "files": {
+   "capture-retained/retained.json": {
+    "last_commit": "b56d26b4dbc04def8777145fde8b1e3f3bbf7f8f",
+    "sha256": "a47122d0bf386a83f423d0f41d0fb2984a4f3eb8d2cf7cf0aeff74016d7ec2ee"
+   },
+   "capture/source.json": {
+    "bytes": 20733,
+    "last_commit": "3587e2778720f56a9510b33c7bbce7584f6be59d",
+    "sha256": "5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a"
+   },
+   "completed/events.jsonl": {
+    "last_commit": "3a0b52f018e25b6430f259bd25d47416e24d88b5",
+    "sha256": "26d6392b5f91ce49baa11f45f49dd36371a7e0cdefa837cfadb3aa5b23de2dd0"
+   },
+   "completed/final-result.json": {
+    "last_commit": "3a0b52f018e25b6430f259bd25d47416e24d88b5",
+    "sha256": "d38db9b67dbc8715e9257d040d7dff19c2b759ca6b25393169388d310437ab9e"
+   },
+   "screening-authority/registered.json": {
+    "last_commit": "50bf769",
+    "sha256": "458c50efd3c55e2ef10193f4449e85ddcb84e2b7eda397eb9bb872fdeedb7c5d"
+   }
+  }
+ },
+ "generating_code_revision": "b851b358b9a8665f5c661d252013149301aa8524",
+ "note": "Offline reconciliation of the retained 24-record Bolton capture. Values recomputed on 2026-10-21 from committed evidence with the repository's own generating code; no database or council was contacted.",
+ "records": [
+  {
+   "record_digest": "ce303d7f8f52adae2a040e0017d87e150f7e43a7d8162e78b49c4a20ae65c744",
+   "reference": "01797/26",
+   "v1_child_key": "b99019c0aed86e3a3595ae9da2e1275db87c5cbd92e9d3e3c751e7ac22b0cf7e",
+   "v1_child_revision": "ce303d7f8f52adae2a040e0017d87e150f7e43a7d8162e78b49c4a20ae65c744"
+  },
+  {
+   "record_digest": "39b4884355c6e8ded602f86254ab977e42aa568fdc9930c51e4765a86b421178",
+   "reference": "01790/26",
+   "v1_child_key": "c13dc2f71675e8634c211c32c38f7a2511b6adae9e64023cb38e7913e0a4acb1",
+   "v1_child_revision": "39b4884355c6e8ded602f86254ab977e42aa568fdc9930c51e4765a86b421178"
+  },
+  {
+   "record_digest": "61e38b59a360dbabd1fb9068b7e571f466da3c861e7cdc4f57d1259e3804fa68",
+   "reference": "01789/26",
+   "v1_child_key": "a870ebe1fe825b6ba7bbb248968dab1b2ae4ac0f3c38d014b91fa94012307270",
+   "v1_child_revision": "61e38b59a360dbabd1fb9068b7e571f466da3c861e7cdc4f57d1259e3804fa68"
+  },
+  {
+   "record_digest": "9c1cf6f8aedda689b069d2a64e0ab706ff8883756f9df3030760f576502e3d7f",
+   "reference": "01787/26",
+   "v1_child_key": "fcf8e7c5445a93939c1003d6068f7a66a74f27b42c02c9ba033982b1d47f7364",
+   "v1_child_revision": "9c1cf6f8aedda689b069d2a64e0ab706ff8883756f9df3030760f576502e3d7f"
+  },
+  {
+   "record_digest": "9660f4919c8b7b810081fd6c35cd52f28af91083612c028d1ca5dfe7ea2e94ab",
+   "reference": "01786/26",
+   "v1_child_key": "76f17c9755b427932a382f519fcf0771610a88fbc260fc6806b0b5c6d1862e44",
+   "v1_child_revision": "9660f4919c8b7b810081fd6c35cd52f28af91083612c028d1ca5dfe7ea2e94ab"
+  },
+  {
+   "record_digest": "c17b7ee4083de93c2a652073707f13f36ff669873a4aafdecbb12f7e1a71fd4a",
+   "reference": "01785/26",
+   "v1_child_key": "d0bf44776213c279bd544f679daf8c6c48b15ba74c111ba0762d7cd8b40a06bb",
+   "v1_child_revision": "c17b7ee4083de93c2a652073707f13f36ff669873a4aafdecbb12f7e1a71fd4a"
+  },
+  {
+   "record_digest": "7b485fdfcb71c96ca5bfc5abddf3643dd460558b71753455c471754c811d36d5",
+   "reference": "01784/26",
+   "v1_child_key": "12dfe6187c5753736470b689ca09aa520dab2c9a60ff22726df16571f3144ee9",
+   "v1_child_revision": "7b485fdfcb71c96ca5bfc5abddf3643dd460558b71753455c471754c811d36d5"
+  },
+  {
+   "record_digest": "ec3fc085283825ed021a2336141f07c2c5d46166c5fa8ab1a98c3495bbd6fe3a",
+   "reference": "01783/26",
+   "v1_child_key": "412b44e2dfeee8d20ff629c2f45c52987a674171c1136494f3f073a5503ef742",
+   "v1_child_revision": "ec3fc085283825ed021a2336141f07c2c5d46166c5fa8ab1a98c3495bbd6fe3a"
+  },
+  {
+   "record_digest": "6b5bbb64004ff3dbb0dc055e83eaf646992e35903df104b5b8fb8504a546119e",
+   "reference": "01782/26",
+   "v1_child_key": "589377d5b052158a62a9c8335f153a99664b228e13a37a33b553fa8d9aa91b77",
+   "v1_child_revision": "6b5bbb64004ff3dbb0dc055e83eaf646992e35903df104b5b8fb8504a546119e"
+  },
+  {
+   "record_digest": "0d5b29a9a388a494aca85999ba2eb3a262b9924fae0606054d9cbc0219189427",
+   "reference": "01780/26",
+   "v1_child_key": "8619b9a4dd19e01867635580a48da567132a91259aec8ffcf581c88817f23485",
+   "v1_child_revision": "0d5b29a9a388a494aca85999ba2eb3a262b9924fae0606054d9cbc0219189427"
+  },
+  {
+   "record_digest": "ce8b1b3fd95726194523c0ac12857dbd054c1e331e3816c1fbdff0741eca98a6",
+   "reference": "01778/26",
+   "v1_child_key": "e142d0e01c52610563ddf2188922467ca76f6655c2b00ba88241bb0ae6a0ad37",
+   "v1_child_revision": "ce8b1b3fd95726194523c0ac12857dbd054c1e331e3816c1fbdff0741eca98a6"
+  },
+  {
+   "record_digest": "4165192edc6e16d7041faf07c43aebe9ceb4f0aaf9803ca0bf83d5e2f5245ab4",
+   "reference": "01777/26",
+   "v1_child_key": "01ff311f1dce087c4e786e63963396345c2e39f8e99e9c79b65bf4b2ce810fd7",
+   "v1_child_revision": "4165192edc6e16d7041faf07c43aebe9ceb4f0aaf9803ca0bf83d5e2f5245ab4"
+  },
+  {
+   "record_digest": "46ef806484b63f79e9f8339d652e1c22f5b59925190cd38fbf69f4fe999740a5",
+   "reference": "01776/26",
+   "v1_child_key": "b98c498bd9621b1ddf24274adf2beb599ee3f850108d64650188da0e656e2b42",
+   "v1_child_revision": "46ef806484b63f79e9f8339d652e1c22f5b59925190cd38fbf69f4fe999740a5"
+  },
+  {
+   "record_digest": "d1359a867079865ee1b1978179d927cbff8a94cb49739007c9364313118c97e5",
+   "reference": "01775/26",
+   "v1_child_key": "fedc083aae18acd4c45b4ea68b1fd0d91133bb203b361326fdb0a997c0c07604",
+   "v1_child_revision": "d1359a867079865ee1b1978179d927cbff8a94cb49739007c9364313118c97e5"
+  },
+  {
+   "record_digest": "33ca271a06e78fcd92ef34776c19c4be29885d34faa784d21c5afc32382468b4",
+   "reference": "01769/26",
+   "v1_child_key": "674029f7396789725a94147a6551a60289c3c9167217b7ebe1cf1e59694d3337",
+   "v1_child_revision": "33ca271a06e78fcd92ef34776c19c4be29885d34faa784d21c5afc32382468b4"
+  },
+  {
+   "record_digest": "3231be66e8b6076136048423c855f9b459beb6de5b874837f064884c7625ba79",
+   "reference": "01768/26",
+   "v1_child_key": "59339be8756ef22cdf93afe28d03e21a6ed884c6d8ec793a1dac421db819a168",
+   "v1_child_revision": "3231be66e8b6076136048423c855f9b459beb6de5b874837f064884c7625ba79"
+  },
+  {
+   "record_digest": "70575cb587d4432aeb51cdfe7e3250b5730d8a52986dd3fabc6009157a5cac73",
+   "reference": "01767/26",
+   "v1_child_key": "e850bac0b4dae4713e882304c4096c5f55236ce080e0ca817a08cb7693a3e73d",
+   "v1_child_revision": "70575cb587d4432aeb51cdfe7e3250b5730d8a52986dd3fabc6009157a5cac73"
+  },
+  {
+   "record_digest": "4eb6f56d440cc40be63efe34ae6f58fb755f7f6fb2edb6ce6c03c02f4ab8330a",
+   "reference": "01766/26",
+   "v1_child_key": "75891ee46ea1746400b1523c6140c161a6a6f38b58e0d8f22780e2d9912b6a86",
+   "v1_child_revision": "4eb6f56d440cc40be63efe34ae6f58fb755f7f6fb2edb6ce6c03c02f4ab8330a"
+  },
+  {
+   "record_digest": "097778603b14bd37a7231b30a1a9ad450e0514db8c18c4d2e25d9f00c3ac3b49",
+   "reference": "01764/26",
+   "v1_child_key": "2ab30833c692838abeee762e3c9553d57656afaac1383b9dea49810864b169fe",
+   "v1_child_revision": "097778603b14bd37a7231b30a1a9ad450e0514db8c18c4d2e25d9f00c3ac3b49"
+  },
+  {
+   "record_digest": "92a82c4dd33856b8a5a6921e3a3e109faf8580c63ba344d8a5fbb7c9cd86bcd6",
+   "reference": "01763/26",
+   "v1_child_key": "0eb3e5b21a28fb5b8313f3794e3c53cb4b904f59a025741500ccd80cf2c03a0b",
+   "v1_child_revision": "92a82c4dd33856b8a5a6921e3a3e109faf8580c63ba344d8a5fbb7c9cd86bcd6"
+  },
+  {
+   "record_digest": "7d011c7524d1a27b9129b40af52618123c0238ae408d0a6d1f34693c27fea9c3",
+   "reference": "01762/26",
+   "v1_child_key": "d484eee1dbfa76b45993134625f42d64fa67305552ad27d12be3807aeb62d2ce",
+   "v1_child_revision": "7d011c7524d1a27b9129b40af52618123c0238ae408d0a6d1f34693c27fea9c3"
+  },
+  {
+   "record_digest": "17f7196168b0e565c7732e62ed2a0169fccce25f87ed452de428280fe4db3cc3",
+   "reference": "01759/26",
+   "v1_child_key": "3460cf6323eb4afbc2c564f7f39acc3a9ae6831201bf8b8dc0035c73cd95864d",
+   "v1_child_revision": "17f7196168b0e565c7732e62ed2a0169fccce25f87ed452de428280fe4db3cc3"
+  },
+  {
+   "record_digest": "8914525877cdd0622dbc495a921414c271f52ade9ba272ff7f5a4db86ea738c7",
+   "reference": "01758/26",
+   "v1_child_key": "bbf7af1c551e8a78885c955a5cb07c865884cd3ac823936f03f0ddaebf27827d",
+   "v1_child_revision": "8914525877cdd0622dbc495a921414c271f52ade9ba272ff7f5a4db86ea738c7"
+  },
+  {
+   "record_digest": "137141e437949145dfbc750286e3b9f4506448074cdddfa9b50b25a14acaf5d4",
+   "reference": "01757/26",
+   "v1_child_key": "f3fe53b1e0e3bdfd86494c1bf9202a0e2fae8dfb66ccf87edc2eaebce8f05c15",
+   "v1_child_revision": "137141e437949145dfbc750286e3b9f4506448074cdddfa9b50b25a14acaf5d4"
+  }
+ ],
+ "reproduced": {
+  "archive_file_sha256": "5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a",
+  "bindings_count": 30,
+  "capture_key": "d1ff23c04af746a5219e7c109255db0310d2a006c732bcac4f66f126b0240545",
+  "checkpoint_digest": "d5fa9e29bdd51afbf36772e9b08880af6811a8cec771a3335bad0095801445ee",
+  "registered_bindings_sha256": "ad4e598267d2104a6d2e0d2321087d84ac6313270f58a2411b3100e66762445f",
+  "source_digest_equals_file_sha256": true
+ }
+}

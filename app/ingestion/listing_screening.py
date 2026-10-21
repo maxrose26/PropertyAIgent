@@ -170,9 +170,47 @@ V3_CONTRACT='listing-screen-v3'
 SCREENING_CONTRACT_RULES={V1_CONTRACT:RULE_V1,V3_CONTRACT:RULE_V3}      # a contract name fixes its rule version; there is no other way to select v3
 
 
+# The code that produces a saved v3 assessment, including its embedded v1 result (listing_screening._screen_v1 -> unit_filter). Bound by byte digest so a change to any of it can never silently share an identity.
+# `ledger.py` is also loaded (for `digest`) but is bound through DIGEST_PROBE instead of by file, so an unrelated ledger edit does not re-key every identity.
+BOUND_MODULES=('app/ingestion/listing_screening.py','app/ingestion/count_assessment.py','app/ingestion/count_evidence.py','app/scrapers/unit_filter.py')
+DIGEST_PROBE_VECTOR={'b':[1,2.5,{'z':None,'a':'\u00e9'}],'a':True}
+V1_RESULT_KEYS=('citations','commercial_relevance','disposition','existing_category','existing_classification','permanent_exclusion','progress','proposal_usable','raw_generic_count','residential_dwelling_count','retained','site_relationship')      # what _screen_v1 returns, less rule_version
+
+
+def lf_sha256(raw):
+    """sha256 of bytes with CRLF normalised to LF (never a text-mode read)."""
+    return hashlib.sha256(raw.replace(b'\r\n',b'\n')).hexdigest()
+
+
+def code_binding(files=None):
+    """sha256 over the canonical list of {path, sha256(LF-normalised bytes)} of the bound modules. Bytes are read in binary and CRLF is normalised to LF, so a Windows autocrlf checkout and a Linux checkout agree.
+    Fails closed if a bound file cannot be read."""
+    from pathlib import Path
+    from .ledger import digest
+    base=Path(__file__).resolve().parents[2];entries=[]
+    for rel in (files or BOUND_MODULES):
+        try:raw=(base/rel).read_bytes()
+        except OSError:raise ValueError('CODE_BINDING_UNAVAILABLE') from None
+        entries.append(dict(path=rel,sha256=lf_sha256(raw)))
+    return digest(entries)
+
+
+def digest_probe():
+    """The digest of a fixed vector: detects a change in the canonical-JSON `ledger.digest` function without binding the whole of ledger.py."""
+    from .ledger import digest
+    return digest(DIGEST_PROBE_VECTOR)
+
+
+def qualifier_output_of(result):
+    """The embedded v1 result of a screening result: everything the v1 qualifier and citation extractor produced, without the v3 additions."""
+    return {k:result[k] for k in V1_RESULT_KEYS}
+
+
 class ScreeningRule:
-    """One explicitly registered screening rule. v1 takes no threshold. v3 carries the council-configured threshold FROZEN at construction (read once, here, never per record)."""
-    def __init__(self,rule_version,*,unit_threshold=None,council=None):
+    """One explicitly registered screening rule. v1 takes no threshold. v3 carries the council-configured threshold FROZEN at construction (read once, here, never per record).
+    `link_related` (default True, the disposable-ledger behaviour) controls only whether `Coordinator.screening` stores a snapshot of other assessments; production registrations set it False (history is a
+    separate bounded read). It is not decision-affecting and so is not part of the identity."""
+    def __init__(self,rule_version,*,unit_threshold=None,council=None,link_related=True):
         if rule_version not in (RULE_V1,RULE_V3):raise ValueError('UNKNOWN_SCREENING_RULE_VERSION')
         if rule_version==RULE_V1:
             if unit_threshold is not None or council is not None:raise ValueError('RULE_V1_TAKES_NO_THRESHOLD')
@@ -181,11 +219,13 @@ class ScreeningRule:
             if council is not None:unit_threshold=council_unit_threshold(council)
             if type(unit_threshold) is not int or unit_threshold<=0:raise ValueError('INVALID_SCREENING_THRESHOLD')
         # Frozen: the threshold and the configuration binding are computed once, here, and cannot be reassigned.
-        self._rule_version=rule_version;self._unit_threshold=unit_threshold
+        if type(link_related) is not bool:raise ValueError('INVALID_LINK_RELATED')
+        self._rule_version=rule_version;self._unit_threshold=unit_threshold;self._link_related=link_related
         self._config=None if rule_version==RULE_V1 else self._build_config()
 
     rule_version=property(lambda self:self._rule_version)
     unit_threshold=property(lambda self:self._unit_threshold)
+    link_related=property(lambda self:self._link_related)
 
     def __setattr__(self,name,value):
         if name.startswith('_') and name not in self.__dict__:object.__setattr__(self,name,value)
@@ -193,7 +233,8 @@ class ScreeningRule:
 
     def _build_config(self):
         from .count_assessment import RULE_VERSION,MAX_TEXT
-        return dict(rule_version=RULE_V3,count_spec_version=RULE_VERSION,assessor='count_assessment',unit_threshold=self._unit_threshold,max_text_chars=MAX_TEXT)
+        return dict(rule_version=RULE_V3,count_spec_version=RULE_VERSION,assessor='count_assessment',unit_threshold=self._unit_threshold,max_text_chars=MAX_TEXT,
+                    code_binding=code_binding(),digest_probe=digest_probe())
 
     def contract(self):
         return V1_CONTRACT if self.rule_version==RULE_V1 else V3_CONTRACT
@@ -205,6 +246,14 @@ class ScreeningRule:
     def screen(self,record):
         if self.rule_version==RULE_V1:return screen_row(record)
         return screen_row(record,rule_version=RULE_V3,unit_threshold=self.unit_threshold)
+
+
+def screening_plan_binding(rule):
+    """(plan binding, config_sha256) of a v3 rule: the `screening` object a batch plan carries and the digest a v3 registration lists. v1 has none."""
+    from .ledger import digest
+    if not isinstance(rule,ScreeningRule) or rule.rule_version!=RULE_V3:raise ValueError('V3_SCREENING_RULE_REQUIRED')
+    sha=digest(rule.config())
+    return dict(contract=V3_CONTRACT,config_sha256=sha),sha
 
 
 def assessment_identity(record,rule):

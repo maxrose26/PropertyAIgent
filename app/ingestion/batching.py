@@ -13,13 +13,16 @@ def archive_capture(source,archive):
     return receipt
 
 
-def batch_plans(capture_key,capture):
+def batch_plans(capture_key,capture,screening=None):
     if capture['kind']!='LISTING_RECEIPT_V1' or not capture.get('durable_archive'):raise Denied('ARCHIVED_CAPTURE_REQUIRED')
     records=capture['records']
     if len(records)>60:raise Denied('ROW_CEILING')
     plans=[];previous=None
     for first in range(0,len(records),5):
         plan=dict(capture_key=capture_key,capture_sha256=digest(capture),first=first,last=min(first+5,len(records)))
+        if screening is not None:
+            from .listing_screening import screening_plan_binding
+            plan['screening']=screening_plan_binding(screening)[0]      # explicit v3 selection: part of the plan, so part of the batch identity (new keys; the v1 batches are never touched)
         identity=dict(subject={'kind':'DISCOVERY_SCOPE','council':capture['council'],'start':capture['interval'][0],'end':capture['interval'][1],'semantics':'RECEIVED'},task='LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan))
         key=digest(identity);plans.append(dict(identity,key=key,dependencies=sorted([capture_key]+([previous] if previous else [])),checkpoint={'kind':'BATCH_PLAN_V1','plan':plan},max_attempts=2));previous=key
     return plans
@@ -51,6 +54,11 @@ def _process_batch(coordinator,key,*,check=lambda:None,after_row=lambda _:None,p
     if row['contract']!='listing-batch-v1' or row['task']!='LISTING_METADATA':raise Denied('BATCH_CONTRACT')
     plan=row['checkpoint']['plan']
     if digest(plan)!=row['revision'] or not 0<=plan['first']<plan['last']<=60 or plan['last']-plan['first']>5:raise Denied('EXACT_BATCH_PLAN')
+    from .listing_screening import RULE_V1,screening_plan_binding
+    rule=getattr(coordinator,'screening_rule',None)      # a coordinator that predates the registry (historical stubs) is v1
+    if plan.get('screening') is None:
+        if rule is not None and rule.rule_version!=RULE_V1:raise Denied('BATCH_RULE_MISMATCH')      # a v1 plan is never screened by a v3 coordinator
+    elif rule is None or rule.rule_version==RULE_V1 or screening_plan_binding(rule)[0]!=plan['screening']:raise Denied('BATCH_RULE_MISMATCH')      # a v3 plan only by the exact registered rule
     if row['state']=='COMPLETE':return dict(outcome='BATCH_ALREADY_COMPLETE',checkpoint=row['checkpoint'])
     budget=getattr(l,'budget',None)
     if budget is None or budget.slot_key!=key:raise Denied('LOGICAL_BATCH_BUDGET_REQUIRED')

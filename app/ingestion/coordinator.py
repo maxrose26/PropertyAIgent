@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import hashlib,json,math
 from sqlalchemy import select
 from .ledger import Denied,bounded,digest
-from .listing_screening import screen_row,routing_of,identity_admission_eligible,ScreeningRule,assessment_identity,SCREENING_CONTRACT_RULES,V1_CONTRACT,RULE_V1
+from .listing_screening import qualifier_output_of,screen_row,routing_of,identity_admission_eligible,ScreeningRule,assessment_identity,SCREENING_CONTRACT_RULES,V1_CONTRACT,RULE_V1
 from .resource_accounting import combined_bytes
 
 
@@ -234,12 +234,14 @@ class Coordinator:
         result=rule.screen(record)
         result.update(source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])
         if binding:
-            from .screening_projection import screening_items,assessment_history
-            result.update(binding,assessment_sha256=digest(result['count_assessment']),capture_key=row['dependencies'][0],capture_sha256=receipt['source_sha256'])
+            from .screening_projection import screening_items,assessment_history      # imported lazily: a production registration never reaches here
+            result.update(binding,assessment_sha256=digest(result['count_assessment']),qualifier_output_sha256=digest(qualifier_output_of(result)),capture_key=row['dependencies'][0],capture_sha256=receipt['source_sha256'],
+                          capture_checkpoint_sha256=digest(receipt))
             # Informational links to other stored assessments of the same record; never `supersedes`, never "current", and no earlier item is touched.
             # Snapshot at screening time, capped so a checkpoint stays far inside the payload bound; assessment_history() over the ledger is the only authoritative, order-independent view.
-            related=[e for e in assessment_history(screening_items(self.ledger),row['subject'],record_sha) if e['item_key']!=claim.key]
-            result['related_assessments']=related[:RELATED_ASSESSMENTS_CAP];result['related_assessments_total']=len(related)
+            if rule.link_related:
+                related=[e for e in assessment_history(screening_items(self.ledger),row['subject'],record_sha) if e['item_key']!=claim.key]
+                result['related_assessments']=related[:RELATED_ASSESSMENTS_CAP];result['related_assessments_total']=len(related)
         self.ledger.checkpoint(claim,result);self.ledger.finish(claim,dict(outcome=routing_of(result)[1],retained=True))
         # No automatic factual task, parent retrieval or Application admission.
         return result
