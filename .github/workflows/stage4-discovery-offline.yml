@@ -12,6 +12,8 @@ on:
       - 'app/pipeline/status_verification.py'
       - 'app/pipeline/bolton_initial_status.py'
       - 'app/scrapers/idox_portal.py'
+      - 'app/scrapers/unit_filter.py'
+      - 'tests/test_unit_filter_digit_runs.py'
       - 'app/scrapers/discovery_idox.py'
       - 'app/scrapers/arcus_portal.py'
       - 'tests/test_discovery_*.py'

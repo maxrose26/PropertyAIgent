@@ -53,6 +53,7 @@ def test_exact_cohort_and_shared_bytes():
         source=(root/'history/refresh-v1.py.txt' if path=='verification/direct_reference/refresh.py'
                 else root/'history/models-v1.py.txt' if path=='app/db/models.py'
                 else root/'history/idox-v1.py.txt' if path=='app/scrapers/idox_portal.py'
+                else root/'history/unit-filter-v1.py.txt' if path=='app/scrapers/unit_filter.py'
                 else root/'history/request-boundary-pre-no-retry.py.txt' if path=='verification/stage26b_l1/request_boundary.py' else Path(path))
         assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
     provenance=json.loads((root/'history/provenance.json').read_text())

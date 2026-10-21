@@ -158,6 +158,7 @@ def assess_proposal(text,*,application_type=None,threshold=10,proposal_state='PR
     record the text supports, and the labelled headline."""
     text=text if isinstance(text,str) else ''
     if proposal_state!='PRESENT_VALUE' or not text.strip() or len(text)>MAX_TEXT:return _blank('unknown','NEW_SCHEME','RETAIN_UNUSABLE_PROPOSAL','PROPOSAL_NOT_USABLE')
+    text=re.sub(r'-{2,}','-',re.sub(r'\s+',' ',text))      # runs of whitespace or hyphens mean the same as one; collapsing them keeps every later pattern linear
     category=_category(text,application_type);role='PHASE_OF_PARENT' if category=='reserved_matters' else RELATED_ROLES.get(category,'NEW_SCHEME')
     ref=_parent_reference(text)
     if role in ('AMENDMENT_OF_PARENT','DISCHARGE_OF_PARENT','PRE_APPLICATION_SIGNAL'):

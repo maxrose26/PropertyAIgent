@@ -21,7 +21,7 @@ EXAMPLES=json.loads((ROOT/'specifications/035-residential-count-examples.json').
 
 # sha256 of json.dumps(UNIT_COUNT_PATTERNS) on master dddb5dd, before this change (12 patterns)
 ORIGINAL_PATTERNS_DIGEST='a964b0665841f38781538663429936fcdca53f607d5970d14d2522c5c9df9a6f'
-ORIGINAL_SUBSTITUTIONS=((r'(?<!\d)(\d+)',r'(\d+)'),(r'(?:\w{1,40}[\s-]+){0,3}',r'(?:\w+[\s-]+){0,3}'))
+ORIGINAL_SUBSTITUTIONS=((r'(?<!\d)(\d+)',r'(\d+)'),(r'(?:\w{1,40}[\s-]+){0,3}',r'(?:\w+[\s-]+){0,3}'),(r'\s*(?:(?:comprising|of|for)\s*)?',r'\s*(?:comprising|of|for)?\s*'),(r'\s*(?:\(\s*)?up',r'\s*\(?\s*up'))
 
 
 def original_patterns():
@@ -51,7 +51,7 @@ def original_extract(text):
 def test_reversing_the_two_substitutions_gives_the_original_patterns_exactly():
     assert len(u.UNIT_COUNT_PATTERNS)==12
     assert hashlib.sha256(json.dumps(original_patterns()).encode()).hexdigest()==ORIGINAL_PATTERNS_DIGEST      # nothing else in any pattern changed
-    assert sum(p.count(r'(?<!\d)(\d+)') for p in u.UNIT_COUNT_PATTERNS)>=10 and any(r'\w{1,40}' in p for p in u.UNIT_COUNT_PATTERNS)
+    assert sum(p.count(r'(?<!\d)(\d+)') for p in u.UNIT_COUNT_PATTERNS)>=10 and sum(p.count(r'\w{1,40}') for p in u.UNIT_COUNT_PATTERNS)==1 and sum(p.count('(?:(?:comprising|of|for)') for p in u.UNIT_COUNT_PATTERNS)==1 and sum(p.count(r'(?:\(\s*)?up') for p in u.UNIT_COUNT_PATTERNS)==1      # each substitution applied exactly where intended
 
 
 # ------------------------------------------------------------------ boundedness, end to end, under a hard timeout
@@ -60,7 +60,7 @@ CHILD=textwrap.dedent('''
     sys.path.insert(0,sys.argv[1])
     from app.scrapers import unit_filter as u
     from app.ingestion import listing_screening as ls, count_assessment as ca
-    text=json.loads(sys.argv[2])
+    text=json.loads(sys.stdin.read())      # via stdin: a long argument list is refused by Windows
     def row(t):return dict(reference="T/1",fields={"proposal":dict(state="PRESENT_VALUE",value=t,locator="x",truncated=False),"address":dict(state="PRESENT_VALUE",value="1 Test Street",locator="x",truncated=False),"application_type":dict(state="UNKNOWN",value=None,locator="x",truncated=False)})
     steps=[("extract_unit_count",lambda:u.extract_unit_count(text)),("qualify",lambda:u.qualify(text)),("screen_row_v1",lambda:ls.screen_row(row(text))),
            ("screen_row_v3",lambda:ls.screen_row(row(text),rule_version=ls.RULE_V3,unit_threshold=10)),("assess_proposal",lambda:ca.assess_proposal(text))]
@@ -75,8 +75,9 @@ ADVERSARIAL={
     'number_of_digits':'number of dwellings '+'1'*8000,'units_proposed_digits':'units proposed '+'1'*8000,'up_to_digits':'flats (up to '+'1'*8000+')',
     'comma_digits':'1,'*4096,'dot_digits':'1.'*4096,'newline_digits':'1\n'*4096,'dash_digits':'1-'*4096,'space_digits':'1 '*4096,
     'runs_of_32_then_a':('1'*32+'a')*248,'runs_of_32_then_dash':('1'*32+'-')*248,'runs_of_200_then_x1':('1'*200+'x1')*40,'alnum_token':'a1'*4096,'word_then_alnum':'twelve '+'a1'*4000,
-    'number_words_run':'one'*2730,'long_word_then_flats':'12 '+'a'*8000+' flats','hyphenated_words':'12 '+'a-'*4000+'flats'}
-PER_STEP_SECONDS=3.0      # generous for CI; measured worst case after the fix is about 1 s (see the PR)
+    'number_words_run':'one'*2730,'flats_then_spaces':'flats'+' '*8187,'flats_spaces_digit':'flats'+' '*8186+'1','units_then_spaces':'units'+' '*8187,'ideographic_spaces':'flats'+'\u3000'*8187,'number_of_units_spaces':'number of units'+' '*8177,
+    'flats_up_to_spaces':'flats (up to'+' '*8180,'hyphen_run':'12'+'-'*8190,'hyphen_run_flats':'12'+'-'*8187+'flats','btr_many':'btr '*2048,'tab_newline_runs':('1\t\n')*2730,'long_word_then_flats':'12 '+'a'*8000+' flats','hyphenated_words':'12 '+'a-'*4000+'flats'}
+PER_STEP_SECONDS=1.5      # CI headroom over a measured worst case of about 0.3 s after the fix; the old code takes 2.6 s at 800 digits and never finishes at 1,600
 CHILD_TIMEOUT=15
 
 
@@ -84,7 +85,7 @@ CHILD_TIMEOUT=15
 def test_screening_is_bounded_end_to_end_and_a_regression_fails_rather_than_hangs(name):
     text=ADVERSARIAL[name][:N]
     try:
-        done=subprocess.run([sys.executable,'-I','-c',CHILD,str(ROOT),json.dumps(text)],capture_output=True,text=True,timeout=CHILD_TIMEOUT)
+        done=subprocess.run([sys.executable,'-I','-c',CHILD,str(ROOT)],input=json.dumps(text),capture_output=True,text=True,timeout=CHILD_TIMEOUT)
     except subprocess.TimeoutExpired:
         pytest.fail('HUNG: %s did not finish within %d s (the digit-run stall has regressed)'%(name,CHILD_TIMEOUT))
     assert done.returncode==0,done.stderr[-400:]
@@ -118,7 +119,8 @@ def test_digit_runs_near_valid_count_wording_do_not_change_the_valid_count():
 
 def test_old_and_new_agree_on_seeded_fuzz_with_digit_runs_and_words_up_to_forty_characters():
     rnd=random.Random(20261026)
-    atoms=['1','12','7','49','150','1'*14,'1'*30,'9'*38,'x','abc','a1b2','dwellings','flats','house','units','apartment','erection','of','and','no.','2no.','up to','(',')',',','.','-','/','self contained','residential','number of','total','proposed','adults','comprising','new homes','build to rent','btr','plots','twelve','one','pursuant to','2022-2039','per year','a'*30,'b2'*20]
+    atoms=['1','12','7','49','150','1'*14,'1'*30,'9'*38,'x','abc','a1b2','dwellings','flats','house','units','apartment','erection','of','and','no.','2no.','up to','(up to','  ','
+','	','(',')',',','.','-','/','self contained','residential','number of','total','proposed','adults','comprising','new homes','build to rent','btr','plots','twelve','one','pursuant to','2022-2039','per year','a'*30,'b2'*20]
     compared=skipped=0
     for _ in range(3000):
         t=' '.join(rnd.choice(atoms) for _ in range(rnd.randint(1,24)))
