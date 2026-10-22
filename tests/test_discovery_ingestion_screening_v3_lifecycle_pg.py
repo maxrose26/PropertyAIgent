@@ -106,7 +106,8 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
     assert prunner.owner.commands<=orr.SV3_POLICY_OWNER_LIMITS['commands'][0] and prunner.owner.connections<=orr.SV3_POLICY_OWNER_LIMITS['connections'][0],(prunner.owner.commands,prunner.owner.connections)
     # ---------------------------------------------------------------- ceremony 2: the screening-only assessment
     real_revision=subprocess.run(['git','rev-parse','HEAD'],cwd=ROOT,stdout=subprocess.PIPE,check=True).stdout.decode().strip()
-    registration=dict(w.registration,mode=orr.SV3_MODE,revision=real_revision,controller_sha256=hashlib.sha256((ROOT/'verification/ingestion_storage/operational_runner.py').read_bytes()).hexdigest(),
+    real_tree=subprocess.run(['git','rev-parse','HEAD^{tree}'],cwd=ROOT,stdout=subprocess.PIPE,check=True).stdout.decode().strip()      # the owner binds the tree the hosted checkout reports
+    registration=dict(w.registration,mode=orr.SV3_MODE,revision=real_revision,tree=real_tree,controller_sha256=hashlib.sha256((ROOT/'verification/ingestion_storage/operational_runner.py').read_bytes()).hexdigest(),
                       manifest_sha256=sv3_manifest,evidence_directory=orr.SV3_EVIDENCE_DIRECTORY,control_sha256=pol['control_sha256_after'],expires_at=(datetime.now(timezone.utc)+timedelta(minutes=100)).isoformat())
     if fault=='wrong_revision':registration['revision']='e'*40
     valid_until=min(r[3] for r in w.standing[0]).astimezone(timezone.utc).isoformat()
