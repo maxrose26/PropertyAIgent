@@ -236,11 +236,18 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
         # Both deliveries use the real restricted application engine and writer;
         # the one-connection contract deliberately serialises their DB effects.
         import app.pipeline.discovery_admission as admission
-        from concurrent.futures import ThreadPoolExecutor
+        import subprocess, sys
+        from dataclasses import asdict
         real = admission.admit_identity
+        race_costs = []
         def race(engine, envelope):
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                winner = pool.submit(real, engine, envelope).result(timeout=5)
+            engine.dispose()  # close idle connection: reviewed login limit is one
+            child = subprocess.run([sys.executable, '-m', 'tests.v3_admission_supervised', 'race'],
+                input=json.dumps(asdict(envelope), default=str), text=True, capture_output=True, timeout=10,
+                env=dict(PATH='/usr/bin:/bin', HOME=os.environ['HOME'], DATABASE_URL='sqlite:///:memory:', V3_DISPOSABLE_WRITER_URL=pg['urls']['ingestion_application_login']))
+            assert child.returncode == 0, 'disposable competing writer failed'
+            winner = json.loads(child.stdout)
+            race_costs.append(winner['costs'])
             assert winner['outcome'] == 'CREATED_PENDING'
             return real(engine, envelope)
         monkeypatch.setattr(admission, 'admit_identity', race)
@@ -276,7 +283,7 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
     before = boot.execute('SELECT count(*) FROM applications').fetchone()[0]
     result = None
     try:
-        if case.startswith('wrong_') or case in {'forged_v1', 'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
+        if case.startswith('wrong_') or case in {'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
             with pytest.raises(BaseException) as exc:
                 execute(co, b, listing_reader=lambda _: pytest.fail('no listing refetch'), detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
             assert not isinstance(exc.value, (AssertionError, TypeError, KeyError, AttributeError)), type(exc.value).__name__
@@ -286,14 +293,18 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
         if case in {'exact', 'qualified'}:
             assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED' and after == 1 and called == [1]
             assert result['factual']['unit_facts'] == 'NOT_WRITTEN'
+            saved = boot.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s', (sc['screen']['key'],)).fetchone()[0]
+            assert saved['count_assessment']['admission'] == ('ADMIT_SCHEME' if case == 'exact' else 'ADMIT_FOR_ASSESSMENT')
         elif case == 'known':
             assert after == before == 1 and called == []
             assert boot.execute('SELECT status FROM applications').fetchone()[0] == 'PRESERVED'
         elif case == 'race':
             assert result['admission'] == 'EXISTING_IDENTITY_PRESERVED' and after == 1
             assert boot.execute('SELECT status FROM applications').fetchone()[0] is None
-        elif case in {'unknown', 'parent'}:
+        elif case in {'unknown', 'parent', 'forged_v1'}:
             assert result['admission'] == 'NOT_ATTEMPTED' and after == 0 and not called
+            if case == 'forged_v1':
+                assert boot.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s', (sc['screen']['key'],)).fetchone()[0]['disposition'] == 'SUPPORTED_PROCESSING_PRIORITY'
         elif case == 'unsupported':
             assert result['factual']['identity'] == 'NOT_CREATED' and after == 0
         elif case in {'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
@@ -315,5 +326,9 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
         costs = budget.close([])
         assert costs['cleanup'] == 'CLOSED' and costs['connections_opened'] == costs['connections_closed_count']
         assert costs['driver_statements'] <= 120 and costs['connection_attempts'] <= 16
+        if case == 'race':
+            assert sum(x['driver_statements'] for x in race_costs) + costs['driver_statements'] <= 120
+            assert sum(x['connection_attempts'] for x in race_costs) + costs['connection_attempts'] <= 16
+            assert all(x['cleanup'] == 'CLOSED' for x in race_costs)
         record_property('measured', json.dumps(dict(case=case, admission=result and result.get('admission'), runtime=costs, screening=sc['screening_cost'], fixture_setup_seconds=pg['setup_seconds']), sort_keys=True))
         print('V3_HANDOFF_MEASURED ' + json.dumps(dict(case=case, runtime=costs, screening=sc['screening_cost']), sort_keys=True))
