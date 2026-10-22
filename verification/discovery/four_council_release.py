@@ -19,6 +19,7 @@ import time
 
 from verification.ingestion_storage.operational_publication import GitHub, canonical, blob_bytes, Uncertain
 from verification.ingestion_storage.operational_memory import OperationalMemory
+from verification.ingestion_storage.memory_enforcement import MemoryUnavailable
 from . import finite_acceptance as finite
 from . import four_council_proof as proof
 from .r0_recovery_proposal import resources, identities
@@ -74,6 +75,46 @@ def fixed_reason(error):
     code=str(error)
     # Fixed uppercase diagnostic codes only. No arbitrary driver/transport text.
     return code if re.fullmatch(r'[A-Z][A-Z0-9_]{1,64}',code) else 'UNCLASSIFIED_STOP'
+
+
+MEMORY_CODES=frozenset({'CGROUP_V2_REQUIRED','DEDICATED_OPERATIONAL_SCOPE',
+    'EXCLUSIVE_OPERATIONAL_SCOPE','MEMORY_DELEGATION_REQUIRED',
+    'EXACT_AGGREGATE_MEMORY_LIMIT','MEMORY_ENFORCEMENT_LOST','MEMORY_LIMIT_HIT',
+    'SOURCE_SURVIVORS','CONTROLLER_OWNED_SURVIVORS'})
+PUBLICATION_CODES=frozenset({'PUBLICATION_BLOB_IDENTITY','GITHUB_RESPONSE_UNCERTAIN',
+    'EVIDENCE_HEAD_MOVED_RECONCILE','BLOB_IDENTITY','PUBLICATION_HEAD_READBACK',
+    'PUBLICATION_BYTES_READBACK','PRIOR_GITHUB_MUTATION_UNCERTAIN'})
+
+
+def failure_detail(error,stage):
+    """Never serialize an arbitrary exception message, URL or environment."""
+    if isinstance(error,SourceFailure):return error.primary
+    if isinstance(error,MemoryUnavailable):
+        code=error.args[0] if len(error.args)==1 and isinstance(error.args[0],str) and error.args[0] in MEMORY_CODES else 'MEMORY_FAILURE_UNCLASSIFIED'
+        kind='MEMORY'
+    elif isinstance(error,Stop):code=fixed_reason(error);kind='STOP'
+    elif isinstance(error,Uncertain):
+        code=error.args[0] if len(error.args)==1 and isinstance(error.args[0],str) and error.args[0] in PUBLICATION_CODES else 'PUBLICATION_UNCERTAIN'
+        kind='PUBLICATION'
+    elif isinstance(error,(KeyboardInterrupt,SystemExit)):code='CANCELLED';kind='CANCELLATION'
+    elif isinstance(error,subprocess.TimeoutExpired):code='LOCAL_PROCESS_TIMEOUT';kind='PROCESS'
+    elif isinstance(error,PermissionError):code='LOCAL_PERMISSION_DENIED';kind='IO'
+    elif isinstance(error,FileNotFoundError):code='LOCAL_PATH_UNAVAILABLE';kind='IO'
+    elif isinstance(error,OSError):code='LOCAL_IO_FAILURE';kind='IO'
+    elif isinstance(error,json.JSONDecodeError):code='SOURCE_JSON_MALFORMED';kind='FORMAT'
+    else:code='UNCLASSIFIED_FAILURE';kind='UNKNOWN'
+    return dict(stage=stage,code=code,kind=kind,message_exported=False)
+
+
+class SourceFailure(Stop):
+    def __init__(self,primary,closure):
+        super().__init__(primary['code']);self.primary=primary;self.closure=closure
+
+
+def memory_observation(memory):
+    try:return memory.observe()
+    except BaseException as error:
+        return dict(status='UNAVAILABLE',failure=failure_detail(error,'CONTAINMENT_OBSERVATION'),execution_authority=False)
 
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
@@ -187,43 +228,54 @@ class Source:
         return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source)]+(['--three-council-successor'] if self.r['version']==SUCCESSOR_VERSION else [])
     def run(self,index,check):
         out=self.root/f'source-{index}.json';started=self.clock();poll_at=started
-        if not (self.memory.source/'cgroup.kill').is_file(): raise Stop('SOURCE_KILL_UNAVAILABLE')
-        def attach_before_exec():
-            fd=os.open(self.memory.source/'cgroup.procs',os.O_WRONLY)
-            try:os.write(fd,str(os.getpid()).encode())
-            finally:os.close(fd)
-        child=subprocess.Popen(self.command(index,out),cwd=ROOT,preexec_fn=attach_before_exec,
-            env=dict(PATH='/usr/bin:/bin',HOME=str(self.root),TMPDIR=str(self.root),PYTHONDONTWRITEBYTECODE='1',
-                PLAYWRIGHT_BROWSERS_PATH=str(Path.home()/'.cache/ms-playwright')),
-            stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
-        reason=None;closed=False
+        child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK'
+        closure=dict(source_group_closed=False,child_reaped=False,failures=[])
         try:
+            if not (self.memory.source/'cgroup.kill').is_file():raise Stop('SOURCE_KILL_UNAVAILABLE')
+            def attach_before_exec():
+                fd=os.open(self.memory.source/'cgroup.procs',os.O_WRONLY)
+                try:os.write(fd,str(os.getpid()).encode())
+                finally:os.close(fd)
+            stage='SOURCE_PROCESS_START'
+            child=subprocess.Popen(self.command(index,out),cwd=ROOT,preexec_fn=attach_before_exec,
+                env=dict(PATH='/usr/bin:/bin',HOME=str(self.root),TMPDIR=str(self.root),PYTHONDONTWRITEBYTECODE='1',
+                    PLAYWRIGHT_BROWSERS_PATH=str(Path.home()/'.cache/ms-playwright')),
+                stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
             while child.poll() is None:
-                self.memory.snapshot()
-                if self.clock()-started>=49: raise Stop('SOURCE_OUTER_DEADLINE')
+                stage='SOURCE_MEMORY_CHECK';self.memory.snapshot()
+                if self.clock()-started>=49:raise Stop('SOURCE_OUTER_DEADLINE')
                 if self.clock()>=poll_at:
-                    if self.clock()-started>49:raise Stop('SOURCE_OUTER_DEADLINE')
-                    check();poll_at=self.clock()+LIMITS['control_interval_seconds']
-                if out.exists() and out.stat().st_size>512000: raise Stop('SOURCE_OUTPUT_BOUND')
+                    stage='SOURCE_CONTROL_CHECK';check();poll_at=self.clock()+LIMITS['control_interval_seconds']
+                stage='SOURCE_OUTPUT_BOUND'
+                if out.exists() and out.stat().st_size>512000:raise Stop('SOURCE_OUTPUT_BOUND')
                 self.sleep(.05)
-            if child.returncode: raise Stop('SOURCE_CHILD_FAILURE')
-        except BaseException as e:
-            reason=e
+            stage='SOURCE_PROCESS_EXIT'
+            if child.returncode:raise Stop('SOURCE_CHILD_FAILURE')
+        except BaseException as error:primary=failure_detail(error,stage)
         finally:
-            # Even a normally exited leader may leave a detached nested worker.
-            if self.memory.source.joinpath('cgroup.events').exists():
+            # Always attempt owned termination/readback; never replace the first
+            # source failure with an exception raised by cleanup.
+            try:
+                stage='SOURCE_GROUP_TERMINATION'
                 self.memory.source.joinpath('cgroup.kill').write_text('1')
                 deadline=self.clock()+LIMITS['source_close_seconds']
+                stage='SOURCE_GROUP_READBACK'
                 while 'populated 1' in self.memory.source.joinpath('cgroup.events').read_text() and self.clock()<deadline:self.sleep(.05)
-                closed='populated 1' not in self.memory.source.joinpath('cgroup.events').read_text()
-            try:child.wait(timeout=1)
-            except subprocess.TimeoutExpired:closed=False
-        if not closed:raise Stop('SOURCE_CLEANUP_UNCERTAIN')
-        if reason:raise reason
-        bound=65535 if index==1 else 512000
-        if not out.is_file() or out.is_symlink() or out.stat().st_size>bound:raise Stop('SOURCE_OUTPUT_BOUND')
-        raw=out.read_bytes();audit=json.loads(raw)
-        return audit,dict(supervised_seconds=self.clock()-started,source_group_closed=True)
+                closure['source_group_closed']='populated 1' not in self.memory.source.joinpath('cgroup.events').read_text()
+            except BaseException as error:closure['failures'].append(failure_detail(error,stage))
+            try:
+                if child is not None:child.wait(timeout=1)
+                closure['child_reaped']=True
+            except BaseException as error:closure['failures'].append(failure_detail(error,'SOURCE_CHILD_REAP'))
+        if not closure['source_group_closed'] or not closure['child_reaped'] or closure['failures']:
+            if primary is None:primary=failure_detail(Stop('SOURCE_CLEANUP_UNCERTAIN'),'SOURCE_CLOSURE')
+        if primary is not None:raise SourceFailure(primary,closure)
+        try:
+            stage='SOURCE_OUTPUT_READ';bound=65535 if index==1 else 512000
+            if not out.is_file() or out.is_symlink() or out.stat().st_size>bound:raise Stop('SOURCE_OUTPUT_BOUND')
+            raw=out.read_bytes();stage='SOURCE_OUTPUT_DECODE';audit=json.loads(raw)
+        except BaseException as error:raise SourceFailure(failure_detail(error,stage),closure) from None
+        return audit,dict(closure,supervised_seconds=self.clock()-started)
 
 
 class Launcher:
@@ -238,6 +290,8 @@ class Launcher:
         self.publication_calls=0;self.exported=0;self.requests=0;self.source_bytes=0
         self.source_seconds=0;self.active_seconds=0;self.results=[];self.reserved=[];self.returned_evidence=[];self.source_cleanup_uncertain=False
         self.consumed=False;self.cancelled=False;self.accounting_complete=True
+        self.failure=None;self.reporting_failures=[];self.containment_uncertain=False;self.reporting_cleanup_uncertain=False
+        self.source_closure=None;self.stage='INITIAL_CONTROL'
         self.continued=[]
         self.baseline=sockets();self.control_checks=0;self.memory_closed=False;self.slot_deadline=None
     def deadline(self):
@@ -408,10 +462,12 @@ class Launcher:
         reason=None;process='UNCERTAIN';closure={};publication='NOT_ATTEMPTED';active_slot=None;active_started=None
         try:
             self.slot_deadline=self.start+self.limits['per_job_seconds']-10
-            self.poll()
+            self.stage='INITIAL_CONTROL';self.poll()
+            self.stage='CONSUMED_HISTORY'
             history=self.github.probe(REPO+'/contents/'+self.r['directory']+'/claim/consumed.json?ref='+self.expected)
             if history is not None:raise Stop('REGISTRATION_ALREADY_CONSUMED')
             # First durable CAS wins. Existing directory/old head cannot be replayed.
+            self.stage='CLAIM_PUBLICATION'
             self.publish({'consumed.json':canonical(dict(registration_sha256=sha(canonical(self.r)),release_id=self.r['release_id'])),
                           'manifest.json':canonical(self.r['manifest'])},'claim')
             self.consumed=True
@@ -425,8 +481,10 @@ class Launcher:
                 self.emit('source_intent',dict(index=i,scope=row,reserved=self.reserved[-1]))
                 print(f'[{i+1}/{len(self.rows)}] {row["council"].upper()}: one observation; '+('exact isolation policy applies.' if self.successor else 'stop-all applies.'),flush=True)
                 active_started=self.clock()
+                self.stage='SOURCE_RUN'
                 a,owned=self.source.run(reader_index,lambda:self.poll(active=True))
-                used=self.clock()-active_started;self.active_seconds+=used
+                self.source_closure=owned
+                used=self.clock()-active_started;self.active_seconds+=used;active_started=None
                 if used>60 or self.active_seconds>self.limits['active_seconds']:raise Stop('ACTIVE_ALLOCATION')
                 raw=canonical(a)
                 if len(raw)>(65535 if reader_index==1 else 512000):raise Stop('RETURNED_AUDIT_BOUND')
@@ -435,8 +493,10 @@ class Launcher:
                 self.returned_evidence.append(retained)
                 # Reuse #180's scope/hash/projection gate; malformed or transplanted
                 # proof stays local with its hash. Never export an unvalidated body.
+                self.stage='SOURCE_PROOF_VALIDATION'
                 proof.validate_audit(a,tuple(row[k] for k in ('council','semantics','start','end')))
                 rejection=None
+                self.stage='SOURCE_ACCEPTANCE'
                 try:state=self.accept(reader_index,a)
                 except Stop as exc:
                     state='FAILED';rejection=fixed_reason(exc)
@@ -451,6 +511,7 @@ class Launcher:
                         continuation_eligible=local_code is not None)
                 receipt_raw=canonical(receipt)
                 if len(raw)+len(receipt_raw)+8192>self.limits['per_slot_export_bytes']:raise Stop('SLOT_EXPORT_BOUND')
+                self.stage='SLOT_PUBLICATION'
                 self.publish({'source.json':raw,'receipt.json':receipt_raw,
                     'HASHES.json':canonical({'source.json':sha(raw),'receipt.json':sha(receipt_raw)})},f'slot-{i}')
                 retained['export']='COMMITTED_READBACK_VERIFIED'
@@ -469,32 +530,54 @@ class Launcher:
                         print('Source result remains unresolved; exact reviewed continuation admitted.',flush=True)
                 active_slot=None
         except BaseException as e:
-            reason=fixed_reason(e) if isinstance(e,Stop) else ('CANCELLED' if isinstance(e,(KeyboardInterrupt,SystemExit)) else 'BOUNDARY_FAILURE')
+            self.failure=failure_detail(e,self.stage);reason=self.failure['code']
+            if isinstance(e,SourceFailure):
+                self.source_closure=e.closure
+                if not e.closure['source_group_closed'] or not e.closure['child_reaped'] or e.closure['failures']:self.source_cleanup_uncertain=True
+            if self.failure['kind']=='MEMORY' or self.failure['stage'] in {'SOURCE_MEMORY_CHECK','SOURCE_CONTAINMENT_CHECK'}:self.containment_uncertain=True
             if active_slot is not None and len(self.results)<=active_slot:
                 self.accounting_complete=False
                 if active_started is not None:self.active_seconds+=max(0,self.clock()-active_started)
             if getattr(self.github,'mutation_uncertain',False):publication='UNCERTAIN'
         finally:
+            process='UNCERTAIN';children_known=False;memory_known=False
             try:
                 import psutil
                 children=psutil.Process().children(recursive=True)
                 new=sockets()-self.baseline
-                closure=dict(memory=self.memory.snapshot(),owned_groups_removed=False,live_child_count=len(children),new_socket_count=len(new))
-                if children or new:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
-                process='PENDING_MEMORY_SCOPE_CLOSURE'
-            except BaseException:process='UNCERTAIN'
+                closure.update(live_child_count=len(children),new_socket_count=len(new),owned_groups_removed=False)
+                children_known=not children and not new
+                if not children_known:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
+            except BaseException as error:self.reporting_failures.append(failure_detail(error,'FINAL_CHILD_SOCKET_READBACK'))
+            try:
+                closure['memory']=self.memory.snapshot();memory_known=True
+            except BaseException as error:
+                self.containment_uncertain=True
+                self.reporting_failures.append(failure_detail(error,'FINAL_CONTAINMENT_CHECK'))
+                closure['observation']=memory_observation(self.memory)
+            if children_known and memory_known:process='PENDING_MEMORY_SCOPE_CLOSURE'
         all_complete=reason is None and len(self.results)==len(self.rows) and all(x['outcome']=='COMPLETE' for x in self.results)
         result=dict(version=self.r['version'],release_id=self.r['release_id'],
             status=('THREE_COMPLETE' if self.successor else 'FOUR_COMPLETE') if all_complete else
                 ('OBSERVATIONS_FINISHED_WITH_GAPS' if self.successor and reason is None and len(self.results)==3 else 'STOP_RECONCILE_NO_RETRY'),
             reason=reason,results=self.results,returned_evidence=self.returned_evidence,not_attempted=self.rows[len(self.reserved):],
             consumed=self.consumed,accounting_complete=self.accounting_complete,
+            failure=self.failure,reporting_failures=list(self.reporting_failures),
+            source_closure=self.source_closure,
+            source_outcome='UNVERIFIED' if active_slot is not None and len(self.results)<=active_slot else 'SEE_SLOT_RECEIPTS' if self.results else 'NOT_STARTED',
+            accounting_status='VERIFIED' if self.accounting_complete else 'PARTIAL_SOURCE_USAGE_UNKNOWN',
+            source_usage=dict(requests=self.requests if self.accounting_complete else None,
+                mixed_bytes=self.source_bytes if self.accounting_complete else None,
+                worker_seconds=self.source_seconds if self.accounting_complete else None),
+            containment_observation=memory_observation(self.memory),
+            containment_status='UNCERTAIN' if self.containment_uncertain else 'CHECKS_PASSED',
+            owned_group_closure='NOT_VERIFIED',outer_scope_observation='NOT_OBSERVED_FROM_INSIDE_SCOPE',
             accounting=dict(observed_requests=self.requests,observed_mixed_source_bytes=self.source_bytes,
                 observed_worker_seconds=self.source_seconds,active_seconds=self.active_seconds,
                 reservations=self.reserved,github_requests=self.github.requests,publication_requests=self.publication_calls,
                 attempted_exported_bytes=self.exported,supervised_seconds=self.clock()-self.start),
             process_cleanup=process,owned_cleanup=closure,publication=publication,
-            source_contract_cleanup='UNCERTAIN' if self.source_cleanup_uncertain else 'NO_UNRESOLVED_CLOSURE',
+            source_contract_cleanup='UNVERIFIED' if not self.accounting_complete else 'UNCERTAIN' if self.source_cleanup_uncertain else 'NO_UNRESOLVED_CLOSURE',
             cleanup='PENDING_MEMORY_SCOPE_CLOSURE' if process=='PENDING_MEMORY_SCOPE_CLOSURE' and publication!='UNCERTAIN' and not self.source_cleanup_uncertain else 'UNCERTAIN',
             database_connections=0,application_writes=0,coverage_advance=False,preserved_stops=PRESERVED)
         if process!='PENDING_MEMORY_SCOPE_CLOSURE':result['status']='STOP_RECONCILE_NO_RETRY'
@@ -570,43 +653,84 @@ def main():
 
 
 def finish(launch,journal,result,root):
-    """Final publication stays inside memory enforcement; closure runs on ALL exits."""
-    github=launch.github;publication_journal=None;audit_raw=b''
+    """Preserve controller evidence first; all publication gates stay enforced."""
+    github=launch.github;publication_journal=None;audit_raw=b'';files=None
+    errors=result.setdefault('reporting_failures',[])
+    def failed(error,stage):
+        detail=failure_detail(error,stage);errors.append(detail)
+        if detail['kind']=='MEMORY':launch.containment_uncertain=True
+        result['status']='STOP_RECONCILE_NO_RETRY'
+        if result.get('reason') is None:result['reason']=detail['code']
+    result['controller_audit_status']='VERIFIED'
+    try:journal.emit('result_before_final_publication',result)
+    except BaseException as error:
+        result['controller_audit_status']='PARTIAL';failed(error,'FINAL_AUDIT_EVENT')
+    try:journal.close()
+    except BaseException as error:
+        launch.reporting_cleanup_uncertain=True
+        result['controller_audit_status']='PARTIAL';failed(error,'FINAL_AUDIT_CLOSE')
     try:
-        journal.emit('result_before_final_publication',result);journal.close()
-        audit_raw=journal.path.read_bytes();verify_chain(audit_raw)
-        result['audit_chain_validated']=True
-        # No archive can contain its own publication acknowledgement or final
-        # memory closure. Those are in the authoritative local sealed receipt.
-        publication_journal=Journal(root/'publication-events.jsonl')
-        github.emit=publication_journal.emit
+        if journal.path.stat().st_size>launch.limits['exported_bytes']:raise Stop('FINAL_ENVELOPE_BOUND')
+        audit_raw=journal.path.read_bytes()
+        if not audit_raw:raise Stop('EMPTY_AUDIT_PREFIX')
+        verify_chain(audit_raw);result['audit_chain_validated']=True
+        result['evidence_scope']='CONTROLLER_PARTIAL_SOURCE_UNVERIFIED' if not result['accounting_complete'] else 'CONTROLLER_PARTIAL_VALIDATED_SLOT_RECEIPTS' if result['controller_audit_status']=='PARTIAL' else 'CONTROLLER_AND_VALIDATED_SLOT_RECEIPTS'
+        result['containment_observation']=memory_observation(launch.memory)
+        if result['containment_observation']['status'] in {'UNAVAILABLE','PARTIAL'}:
+            launch.containment_uncertain=True
+            failed(Stop('CONTAINMENT_OBSERVATION_UNAVAILABLE'),'CONTAINMENT_OBSERVATION')
         files={'events.jsonl':audit_raw,'result-before-publication.json':canonical(result)}
         files['HASHES.json']=canonical({k:sha(v) for k,v in files.items()})
-        if not launch.consumed or github.mutation_uncertain:raise Stop('FINAL_PUBLICATION_HELD')
-        launch.publish(files,'completed')
+        if sum(map(len,files.values()))+launch.exported>launch.limits['exported_bytes']:raise Stop('FINAL_ENVELOPE_BOUND')
+        # The full original audit is already on disk. Save the exact bounded
+        # packet/readback hashes locally even when the publication gate refuses.
+        for name in ('result-before-publication.json','HASHES.json'):write_new(root/name,files[name])
+        result['local_evidence_packet']=dict(status='PRESERVED',files={k:dict(bytes=len(v),sha256=sha(v)) for k,v in files.items()})
+    except BaseException as error:
+        files=None;failed(error,'LOCAL_EVIDENCE_PACKET')
+        result['controller_audit_status']='UNVERIFIED' if not result.get('audit_chain_validated') else result['controller_audit_status']
+        result['local_evidence_packet']=dict(status='UNVERIFIED_OR_UNWRITABLE_OR_OVER_BOUND')
+    try:
+        publication_journal=Journal(root/'publication-events.jsonl');github.emit=publication_journal.emit
+        if files is None or not launch.consumed or github.mutation_uncertain:raise Stop('FINAL_PUBLICATION_HELD')
+        # No fallback check: the original expiry, deadline and memory.snapshot
+        # guard is used for every API call, including after a containment error.
+        # Persistent enforcement failure therefore keeps the packet local.
+        launch.deadline()
+        remaining=min(launch.limits['publication_requests']-launch.publication_calls,launch.limits['github_requests']-github.requests)
+        seconds=min(launch.limits['closure_publication_seconds'],launch.limits['package_seconds']-10-(launch.clock()-launch.start))
+        with github.reserve_scope(remaining,seconds):launch.publish(files,'completed')
         result.update(final_publication='VERIFIED',evidence_commit=launch.expected)
-    except BaseException:
-        result.update(status='STOP_RECONCILE_NO_RETRY',final_publication='UNCERTAIN_OR_HELD')
-        if result.get('reason') is None:result['reason']='FINAL_EVIDENCE_OR_PUBLICATION_FAILURE'
+    except BaseException as error:
+        failed(error,'FINAL_PUBLICATION');result['final_publication']='UNCERTAIN_OR_HELD'
     finally:
-        for log in (journal,publication_journal):
-            if log is not None:
-                try:log.close()
-                except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',reason='JOURNAL_CLOSE_FAILURE')
+        if publication_journal is not None:
+            try:publication_journal.close()
+            except BaseException as error:
+                launch.reporting_cleanup_uncertain=True;failed(error,'FINAL_PUBLICATION_JOURNAL_CLOSE')
         final_clean=False
         try:
             children=__import__('psutil').Process().children(recursive=True)
             new=sockets()-launch.baseline
             result['final_process_readback']=dict(live_child_count=len(children),new_socket_count=len(new))
             final_clean=not children and not new
-        except BaseException:pass
+            result['child_socket_closure']='CLOSED' if final_clean else 'UNCERTAIN'
+        except BaseException as error:
+            result['child_socket_closure']='UNCERTAIN';failed(error,'FINAL_CHILD_SOCKET_READBACK')
+        result['containment_observation']=memory_observation(launch.memory)
+        if result['containment_observation']['status'] in {'UNAVAILABLE','PARTIAL'}:launch.containment_uncertain=True
         try:
             result['owned_cleanup']=launch.memory.close();launch.memory_closed=True
+            result['owned_group_closure']='CLOSED'
             if not final_clean:raise Stop('FINAL_PROCESS_CLOSURE')
             result.update(final_process_cleanup='CLOSED',process_cleanup='CLOSED',
-                cleanup='UNCERTAIN' if launch.source_cleanup_uncertain else 'CLOSED')
-        except BaseException:
-            result.update(status='STOP_RECONCILE_NO_RETRY',process_cleanup='UNCERTAIN',final_process_cleanup='UNCERTAIN',cleanup='UNCERTAIN')
+                cleanup='UNCERTAIN' if launch.source_cleanup_uncertain or launch.containment_uncertain or launch.reporting_cleanup_uncertain else 'CLOSED')
+        except BaseException as error:
+            failed(error,'OWNED_GROUP_CLOSURE')
+            result.update(process_cleanup='UNCERTAIN',final_process_cleanup='UNCERTAIN',cleanup='UNCERTAIN')
+        result['reporting_resource_closure']='UNCERTAIN' if launch.reporting_cleanup_uncertain else 'CLOSED'
+        result['containment_status']='UNCERTAIN' if launch.containment_uncertain else 'CHECKS_PASSED'
+        result['outer_scope_observation']='NOT_OBSERVED_FROM_INSIDE_SCOPE'
         if github.mutation_uncertain:result['cleanup']='UNCERTAIN'
     result['accounting'].update(github_requests=github.requests,publication_requests=launch.publication_calls,
         attempted_exported_bytes=launch.exported,supervised_seconds=launch.clock()-launch.start)
@@ -618,6 +742,9 @@ def finish(launch,journal,result,root):
     try:write_new(root/'final-result.json',final_raw)
     except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',reason='FINAL_RESULT_UNWRITABLE')
     summary=dict(status=result['status'],reason=result['reason'],cleanup=result['cleanup'],
+        failure=result.get('failure'),reporting_failures=result.get('reporting_failures',[]),
+        child_socket_closure=result.get('child_socket_closure'),owned_group_closure=result.get('owned_group_closure'),
+        accounting_status=result['accounting_status'],local_evidence_packet=result.get('local_evidence_packet'),
         audit=str(journal.path),audit_sha256=sha(audit_raw) if audit_raw else None,
         final_result=str(root/'final-result.json'),evidence_commit=result.get('evidence_commit'),
         accounting=result['accounting'],outcomes=[dict(council=x['scope']['council'],outcome=x['outcome']) for x in result['results']])

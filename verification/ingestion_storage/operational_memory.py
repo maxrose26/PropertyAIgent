@@ -4,6 +4,43 @@ from pathlib import Path
 from .memory_enforcement import MemoryUnavailable,values
 
 class OperationalMemory:
+    def observe(self):
+        """Bounded, read-only diagnostics, never permission to proceed or close.
+
+        Snapshot remains the execution/publication gate. Observation deliberately
+        retains a partial readback even when that gate rejects an event or file.
+        """
+        result={'groups':{},'failures':[],'execution_authority':False}
+        for name,path in [('aggregate',self.root),('controller',self.controller),('source',self.source)]:
+            group={};result['groups'][name]=group
+            for field in ('memory.max','memory.swap.max','memory.oom.group','memory.current','memory.peak','memory.events','cgroup.events','cgroup.procs'):
+                try:
+                    with (path/field).open() as stream:raw=stream.read(4097)
+                    if len(raw)>4096:raise ValueError()
+                    if field in ('memory.events','cgroup.events'):
+                        allowed={'low','high','max','oom','oom_kill','oom_group_kill'} if field=='memory.events' else {'populated','frozen'}
+                        parsed={}
+                        for line in raw.splitlines():
+                            key,value=line.split()
+                            if key in allowed:
+                                if key in parsed or not value.isdecimal():raise ValueError()
+                                parsed[key]=int(value)
+                        required={'max','oom','oom_kill'} if field=='memory.events' else {'populated'}
+                        if not required<=parsed.keys():raise ValueError()
+                        group[field]=parsed
+                    elif field=='cgroup.procs':
+                        parts=raw.split()
+                        if len(parts)>128 or any(not p.isdecimal() for p in parts):raise ValueError()
+                        group[field]=[int(p) for p in parts]
+                    elif raw.strip()=='max' and field=='memory.max':group[field]='max'
+                    else:
+                        if not raw.strip().isdecimal():raise ValueError()
+                        group[field]=int(raw.strip())
+                except (OSError,ValueError):
+                    result['failures'].append({'group':name,'field':field,'code':'KERNEL_FIELD_UNAVAILABLE_OR_MALFORMED'})
+        result['status']='PARTIAL' if result['failures'] else 'OBSERVED'
+        return result
+
     def __init__(self):
         lines=Path('/proc/self/cgroup').read_text().splitlines()
         if len(lines)!=1 or not lines[0].startswith('0::/'):raise MemoryUnavailable('CGROUP_V2_REQUIRED')
