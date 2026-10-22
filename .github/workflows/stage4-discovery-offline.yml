@@ -14,6 +14,8 @@ on:
       - 'app/scrapers/idox_portal.py'
       - 'app/scrapers/unit_filter.py'
       - 'tests/test_unit_filter_digit_runs.py'
+      - 'tests/test_ingestion_observation*.py'
+      - 'app/ingestion/observation*.py'
       - 'tests/test_ingestion_screening_v3_*.py'
       - 'tests/test_discovery_ingestion_screening_v3_policy_pg.py'
       - 'tests/test_discovery_ingestion_screening_v3_lifecycle_pg.py'

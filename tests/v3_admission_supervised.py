@@ -14,7 +14,7 @@ def main():
     if (info.get('host'), info.get('port'), info.get('dbname'), info.get('user')) != ('127.0.0.1', '5432', 'ingestion_provisioning_test', 'provisioning_bootstrap'):
         raise ValueError('FIXED_DISPOSABLE_ONLY')
     root = Path(sys.argv[1])
-    receipt = supervise([sys.executable, '-m', 'pytest', 'tests/test_ingestion_v3_admission_pg.py', '-q', '--junitxml=' + str(root / 'results.xml')],
+    receipt = supervise([sys.executable, '-m', 'pytest', 'tests/test_ingestion_v3_admission_pg.py', 'tests/test_ingestion_observation_pg.py', 'tests/test_ingestion_observation_worker_sql.py', '-q', '--junitxml=' + str(root / 'results.xml')],
                         environment=dict(DATABASE_URL='sqlite:///:memory:', INGESTION_PROVISIONING_TEST_URL=raw), root=root, seconds=150)
     (root / 'supervisor.json').write_text(json.dumps(receipt, sort_keys=True))
     print(json.dumps(receipt, sort_keys=True))
