@@ -1,6 +1,6 @@
 # Screening v3 activation: recovery and rollback sequence (PR #175; nothing here is executed by the candidate)
 
-Rollback is an OWNER terminal action. It is never automatic, never a retry, and never run blindly: the owner first reads the inventory state and the authority state, and chooses the row below that matches what was observed. Every function-restoring script is transactional (BEGIN/COMMIT), so a script either took effect completely or not at all; a state matching no reviewed inventory is therefore evidence of something other than an interrupted script and is never rolled back.
+Immediately before each script the owner re-runs the inventory verification on the SAME connection (the scripts themselves check nothing and are unconditional CREATE OR REPLACE). Rollback is an OWNER terminal action. It is never automatic, never a retry, and never run blindly: the owner first reads the inventory state and the authority state, and chooses the row below that matches what was observed. Every function-restoring script is transactional (BEGIN/COMMIT), so a script either took effect completely or not at all; a state matching no reviewed inventory is therefore evidence of something other than an interrupted script and is never rolled back.
 
 ## What is restored, separately
 | Object | Installed by this candidate | Restored to (reviewed, byte-exact) | Script |
@@ -19,6 +19,7 @@ No other function, role, membership, secret, stop value or control field is touc
 In every case first confirm by control observation that the control record is byte-identical to the baseline (digest unchanged) and that the screening allowance name is absent from grants and exceptions. If it is present, use section B.
 
 ## B. After authority issuance
+0. If the owner process died after registration there is no reviewed tool to invalidate (invalidation acts on the running owner's own authorities): do nothing, let the 900 s grant lifetime lapse, and go to section C.
 1. Confirm invalidation FIRST: the grant and the exception for the one named allowance are expired/revoked in a COMMITTED readback (`ACKNOWLEDGED_READBACK` or `ALREADY_INVALIDATED_READBACK`). Invalidation never depends on stops or generation and sets only the two expiry values.
 2. Reconcile active work: read the 59 bound items. No item may be claimed or in flight; the hosted job must have published its result or its stop, or the grant lifetime (900 s from registration, never extended) must have passed. Items COMPLETE or untouched are left exactly as found: the 30 retained rows and any completed new items are evidence and are not deleted or rewritten.
 3. Only when 1 and 2 hold: restore the worker function, verify, restore the policy, verify (section A rows).

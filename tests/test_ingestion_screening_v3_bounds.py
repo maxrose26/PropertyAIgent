@@ -5,7 +5,8 @@ pytest.importorskip('resource')
 
 from verification.ingestion_storage import operational_runner as orr
 
-POLL = orr.SV3_BINDING['poll_seconds']
+POLL = orr.PIPELINE_BINDING['poll_seconds']      # the loop sleeps on this binding
+assert POLL == orr.SV3_BINDING['poll_seconds']
 READY_WAIT = orr.SV3_BINDING['ready_wait_seconds']
 RESULT_WAIT = orr.SV3_BINDING['screening_wait_seconds']
 READY_HEADS = 3      # distinct evidence heads while waiting for READY (initial, the hosted ready commit, one further hosted commit)
@@ -21,16 +22,17 @@ def polls(wait):
     return -(-wait // POLL) + 1      # one ref read per poll plus the boundary poll
 
 
-def worst_case():
+def worst_case(moving=False):
+    """EXPECTED worst case (a bounded number of distinct heads: only the hosted job and the owner publish to the evidence branch). moving=True is the pathological case where the branch advances on EVERY poll (an unrelated push), each head costing one probe."""
     reprobes = orr.Runner.REPROBES
     items = dict(
         account=1,
         freshness=1 + 1 + 3,      # ref, README anchor, three absent-file probes, before anything is issued
-        ready_head_reads=polls(READY_WAIT), ready_file_probes=READY_HEADS * reprobes,
+        ready_head_reads=polls(READY_WAIT), ready_file_probes=polls(READY_WAIT) if moving else READY_HEADS * reprobes,
         registration_publication=publish_requests(1),
-        result_head_reads=polls(RESULT_WAIT), result_file_probes=RESULT_HEADS * reprobes,
+        result_head_reads=polls(RESULT_WAIT), result_file_probes=polls(RESULT_WAIT) if moving else RESULT_HEADS * reprobes,
         owner_publication=publish_requests(2),
-        failure_reads=1)
+        failure_reads=1)      # the failure path's single secret-name read, as in the pipeline modes' derivation
     return items, sum(items.values())
 
 
@@ -75,20 +77,25 @@ def test_each_distinct_head_costs_at_most_reprobes_file_probes_and_the_head_coun
     for wait, heads_allowed in ((READY_WAIT, READY_HEADS), (RESULT_WAIT, RESULT_HEADS)):
         step = max(1, polls(wait) // heads_allowed)
         reads, probes, _ = run_wait(monkeypatch, wait, lambda n, s=step: 'h%d' % (n // s))      # the head advances evenly through the wait
-        assert reads == polls(wait) and probes <= (heads_allowed + 1) * orr.Runner.REPROBES      # the initial head plus those observed
+        assert reads == polls(wait) and probes <= (heads_allowed + 1) * orr.Runner.REPROBES      # the initial head plus the (heads_allowed) observed ones; the derivation counts heads_allowed, the initial head is one of them in practice
 
 
 def test_the_derived_worst_case_with_its_reserve_fits_the_bound_the_screening_mode_actually_uses():
     items, total = worst_case()
     assert items['ready_head_reads'] == 61 and items['result_head_reads'] == 21 and items['registration_publication'] == 8 and items['owner_publication'] == 10
-    assert total == 128
+    assert total == 128      # EXPECTED worst case; the moving-branch case is asserted separately
     source = open(orr.__file__, encoding='utf-8').read()
     assert "dict(bound=PIPELINE_GITHUB_BOUND) if r.get('mode') in (PIPELINE_MODE,CAPTURE_MODE,WINDOW_MODE,SV3_MODE)" in source      # this mode shares the pipeline bound
     assert orr.PIPELINE_GITHUB_BOUND == 180 and total + RESERVE <= orr.PIPELINE_GITHUB_BOUND
     assert orr.OWNER_PUBLICATION_RESERVE['requests'] >= publish_requests(2) + 4      # the final publication's own reserve covers its ten requests and four head reads
 
 
-def test_a_wait_that_needs_more_requests_than_the_bound_is_a_stop_not_an_overrun():
+def test_a_branch_that_moves_on_every_poll_exceeds_the_bound_and_is_then_a_stop_not_an_overrun():
+    _, pathological = worst_case(moving=True)
+    assert pathological == 189 and pathological > orr.PIPELINE_GITHUB_BOUND      # documented residual: stops with GITHUB_REQUEST_BOUND, authority invalidated database-side, owner publication then uncertain
+
+
+def test_the_bound_check_is_in_both_request_paths():
     source = open('verification/ingestion_storage/operational_publication.py', encoding='utf-8').read()
     assert source.count("if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')") == 2      # call and probe both stop at the bound
 
