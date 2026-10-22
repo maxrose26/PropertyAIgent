@@ -12,6 +12,9 @@ which must match once. It adds ONE name; it is not a reusable mechanism and not 
 Generation, stops, consumed names and every historical entry are untouched; a name that already exists can never be registered again."""
 from pathlib import Path
 
+from app.ingestion.ledger import digest
+from app.ingestion.listing_screening import RULE_V3, ScreeningRule
+
 from verification.ingestion_storage.operational_owner import GENERATION3_STOP, GENERATION3_WINDOW_POLICY
 
 NAME = 'AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_WINDOW_ONCE_20261030_SCREEN'      # the date is a namespace identifier
@@ -20,6 +23,7 @@ WINDOW_CAPTURE = 'AUTHORISE_INGESTION_BOLTON_WINDOW_DEMONSTRATION_ONCE_20261023_
 WINDOW_SCREEN = 'AUTHORISE_INGESTION_BOLTON_WINDOW_DEMONSTRATION_ONCE_20261023_SCREEN'
 IDOX = GENERATION3_STOP['manual_stop']
 G3_SHA = GENERATION3_STOP['stop_state_sha256']
+CONFIG_SHA = digest(ScreeningRule(RULE_V3, unit_threshold=10, link_related=False).config())      # the one frozen v3 configuration (the hosted half freezes the same one)
 EXPECTED_KEYS = 59
 EXPECTED_CONTRACTS = ['bolton-received-idox-coordinator-v1', 'listing-batch-v1', 'listing-screen-v1', 'listing-screen-v3']      # sorted, as the owner's grant builds them
 POLICY_FILE = Path('docs/design/ingestion-screening-v3-activation-20261030/policy-screening-v3-allowance.sql')
@@ -34,13 +38,14 @@ HEADER = """-- POLICY V6 (screening-v3 retained-window assessment). Derived MECH
 
 EXACT_CHECK = """ IF a = '%(name)s' AND (g->>'capture_key' IS DISTINCT FROM '%(key)s' OR root.state<>'COMPLETE' OR root.checkpoint::jsonb->>'kind' IS DISTINCT FROM 'LISTING_RECEIPT_V1'
   OR (g->>'source_calls')::integer IS DISTINCT FROM 0 OR (g->>'writes')::integer IS DISTINCT FROM 0
-  OR jsonb_typeof(g->'screening_configs') IS DISTINCT FROM 'array' OR jsonb_array_length(g->'screening_configs')<>1
+  OR jsonb_typeof(g->'screening_configs') IS DISTINCT FROM 'array' OR jsonb_array_length(g->'screening_configs')<>1 OR g->'screening_configs' IS DISTINCT FROM '["%(cfg)s"]'::jsonb
+  OR (SELECT count(*) FROM jsonb_each(g->'bindings'))<>%(keys)d
   OR jsonb_array_length(g->'keys')<>%(keys)d OR g->'contracts' IS DISTINCT FROM '%(contracts)s'::jsonb
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='DISCOVERY')<>1
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='LISTING_METADATA' AND x.value->>'contract'='listing-batch-v1')<>10
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='SCREENING' AND x.value->>'contract'='listing-screen-v1')<>24
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='SCREENING' AND x.value->>'contract'='listing-screen-v3')<>24) THEN RAISE EXCEPTION 'EXACT_SCREENING_V3_ALLOWANCE'; END IF;
-""" % dict(name=NAME, key=CAPTURE_KEY, keys=EXPECTED_KEYS, contracts='["' + '","'.join(EXPECTED_CONTRACTS) + '"]')
+""" % dict(name=NAME, key=CAPTURE_KEY, keys=EXPECTED_KEYS, cfg=CONFIG_SHA, contracts='["' + '","'.join(EXPECTED_CONTRACTS) + '"]')
 
 
 def derive(v5):

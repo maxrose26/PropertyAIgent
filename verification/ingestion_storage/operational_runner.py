@@ -1024,9 +1024,10 @@ class Runner:
         binding=ready.get('checkout_binding') if isinstance(ready,dict) else None
         if (not isinstance(ready,dict) or ready.get('execution')!=self.pipeline_execution() or ready.get('capture_sha256')!=CAPTURE_CHECKPOINT or ready.get('config_sha256')!=digest(rule.config())
             or ready.get('new_items_sha256')!=digest(sorted(x['key'] for x in (*batches3,*children3))) or not isinstance(binding,dict) or binding.get('tracked_files_modified') is not False
-            or (binding.get('revision'),binding.get('controller_sha256'),binding.get('manifest_sha256'))!=(self.r['revision'],self.r['controller_sha256'],self.r['manifest_sha256'])
+            or (binding.get('revision'),binding.get('tree'),binding.get('controller_sha256'),binding.get('manifest_sha256'))!=(self.r['revision'],self.r['tree'],self.r['controller_sha256'],self.r['manifest_sha256'])
             or ready.get('qualification')!='STABLE_CREDENTIALS_QUALIFIED'):raise Uncertain('HOSTED_READY_BINDING')      # the hosted job names this exact revision, controller, manifest, configuration, capture and item set
         self.operation_phase='SV3_SCREENING_AUTHORITY'
+        if (self.expiry-datetime.now(timezone.utc)).total_seconds()<pb['grant_lifetime_seconds']:raise Denied('SV3_REGISTRATION_EXPIRES_BEFORE_FULL_GRANT')      # the full 900 s must fit before the registration expires: nothing is issued with a shortened window
         self.owner.grant_expiry=min(self.expiry,datetime.now(timezone.utc)+timedelta(seconds=pb['grant_lifetime_seconds']))      # fixed here; never extended
         self.owner.require_control_sha256=self.r['control_sha256']      # exactly the record the installation ceremony left
         read_only=[root,*children,*batches1]

@@ -73,7 +73,8 @@ BEGIN
  OR g->'execution_binding' IS DISTINCT FROM jsonb_build_object('revision',p->>'revision','workflow_sha256',p->>'workflow_sha256','manifest_sha256',p->>'manifest_sha256') THEN RAISE EXCEPTION 'EXECUTION_AND_CAPTURE_BINDING'; END IF;
  IF a = 'AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_WINDOW_ONCE_20261030_SCREEN' AND (g->>'capture_key' IS DISTINCT FROM 'd1ff23c04af746a5219e7c109255db0310d2a006c732bcac4f66f126b0240545' OR root.state<>'COMPLETE' OR root.checkpoint::jsonb->>'kind' IS DISTINCT FROM 'LISTING_RECEIPT_V1'
   OR (g->>'source_calls')::integer IS DISTINCT FROM 0 OR (g->>'writes')::integer IS DISTINCT FROM 0
-  OR jsonb_typeof(g->'screening_configs') IS DISTINCT FROM 'array' OR jsonb_array_length(g->'screening_configs')<>1
+  OR jsonb_typeof(g->'screening_configs') IS DISTINCT FROM 'array' OR jsonb_array_length(g->'screening_configs')<>1 OR g->'screening_configs' IS DISTINCT FROM '["58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e"]'::jsonb
+  OR (SELECT count(*) FROM jsonb_each(g->'bindings'))<>59
   OR jsonb_array_length(g->'keys')<>59 OR g->'contracts' IS DISTINCT FROM '["bolton-received-idox-coordinator-v1","listing-batch-v1","listing-screen-v1","listing-screen-v3"]'::jsonb
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='DISCOVERY')<>1
   OR (SELECT count(*) FROM jsonb_each(g->'bindings') x WHERE x.value->>'task'='LISTING_METADATA' AND x.value->>'contract'='listing-batch-v1')<>10
