@@ -33,8 +33,11 @@ def manifest(start,end,purpose):
             cursor=stop+timedelta(days=1)
     return dict(purpose=purpose,start=start,end=end,rule=RULE,limits=LIMITS.copy(),rows=rows)
 
-def read(row, *, no_transport_retry=False, retain_proof=False):
+def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False):
     if type(no_transport_retry) is not bool or type(retain_proof) is not bool:raise ValueError('retry/proof policy')
+    if type(fixed_four_rows) is not bool or (fixed_four_rows and (not retain_proof or not no_transport_retry)):raise ValueError('fixed row policy')
+    if execution_mode is not None and (execution_mode!='four-council-owner-local' or not retain_proof or row['council']!='rochdale'):
+        raise ValueError('proof execution context')
     if retain_proof:
         from .four_council_proof import require_scope
         require_scope(row['council'],row['semantics'],row['start'],row['end'])
@@ -43,7 +46,7 @@ def read(row, *, no_transport_retry=False, retain_proof=False):
         with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
             path=Path(td)/'source.json'
             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
-            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+['--output',str(path)],env=env,deadline=50)
+            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+['--output',str(path)],env=env,deadline=50)
             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
             value=json.loads(path.read_bytes())
             if retain_proof and 'retained_proof' in value:
@@ -55,7 +58,7 @@ def read(row, *, no_transport_retry=False, retain_proof=False):
     with tempfile.TemporaryDirectory(prefix='discovery-finite-') as td:
         path=Path(td)/'source.json'
         with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
-            supervised(case,path,window=(row['start'],row['end']),**({'retain_proof':True} if retain_proof else {}))
+            supervised(case,path,**({'execution_mode':execution_mode} if execution_mode else {}),window=(row['start'],row['end']),**({'retain_proof':True} if retain_proof else {}))
         if not path.is_file() or path.stat().st_size>=65536:raise ValueError('bounded audit')
         value=json.loads(path.read_bytes())
         if retain_proof and 'retained_proof' in value:
@@ -124,11 +127,12 @@ def main():
     """Private child entry only; no registered round/acceptance authority."""
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--no-transport-retry',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true')
+    p.add_argument('--no-transport-retry',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true');p.add_argument('--fixed-four-row-limit',action='store_true')
     a=p.parse_args();c,start,end=a.idox_worker
+    if a.fixed_four_row_limit and (not a.retain_four_council_proof or not a.no_transport_retry):raise ValueError('fixed row selection')
     if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
     if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
-    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1),**({'retain_proof':True} if a.retain_four_council_proof else {}))
+    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
     raw=json.dumps(result,sort_keys=True).encode()
     if len(raw)>512000:raise ValueError('bounded child audit')
     if a.retain_four_council_proof:

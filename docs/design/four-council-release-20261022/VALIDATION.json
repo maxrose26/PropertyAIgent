@@ -1,0 +1,47 @@
+{
+  "baseline": "608aa07d496ff00ccd405dc77de31eb6bbfc6edd",
+  "baseline_tree": "dab51f217310ef19b1e4a3d4c8e2de40df69e8ea",
+  "scope": "OFFLINE_FIXTURES_NO_COUNCIL_OR_PRODUCTION",
+  "tests": 157,
+  "junit_sha256": "d96e4632641b40a7ad36317248664d5c362ddf3210afcc1a0ba89440fce2a705",
+  "measurements": [
+    {
+      "case": "test_complete_reporting_and_archive[none]",
+      "test_seconds": "0.123",
+      "properties": {
+        "complete_active_seconds": "0.028124361000664067",
+        "complete_attempted_exported_bytes": "94085",
+        "complete_github_requests": "81",
+        "complete_observed_mixed_source_bytes": "11856",
+        "complete_observed_requests": "14",
+        "complete_observed_worker_seconds": "0.036",
+        "complete_publication_requests": "70",
+        "complete_reservations": "[{\"bytes\": 3000000, \"index\": 0, \"requests\": 10}, {\"bytes\": 20971520, \"index\": 1, \"requests\": 80}, {\"bytes\": 3000000, \"index\": 2, \"requests\": 10}, {\"bytes\": 3000000, \"index\": 3, \"requests\": 10}]",
+        "complete_supervised_seconds": "0.11712634600553429"
+      }
+    },
+    {
+      "case": "test_actual_complete_cli_with_fixture_boundaries[none]",
+      "test_seconds": "0.531",
+      "properties": {
+        "fault": "none",
+        "accounting": "{\"active_seconds\": 0.0501063909905497, \"attempted_exported_bytes\": 98038, \"github_requests\": 85, \"observed_mixed_source_bytes\": 11856, \"observed_requests\": 14, \"observed_worker_seconds\": 0.049999999999999996, \"publication_requests\": 70, \"reservations\": [{\"bytes\": 3000000, \"index\": 0, \"requests\": 10}, {\"bytes\": 20971520, \"index\": 1, \"requests\": 80}, {\"bytes\": 3000000, \"index\": 2, \"requests\": 10}, {\"bytes\": 3000000, \"index\": 3, \"requests\": 10}], \"supervised_seconds\": 0.15566814799967688}"
+      }
+    }
+  ],
+  "limits": "PROPOSED_NOT_EXECUTED",
+  "native_validation": "EXACT_HEAD_HOSTED_CI_REQUIRED_SEE_PR",
+  "production_actions": 0,
+  "simulation_boundaries": [
+    "source transport and GitHub CLI API responses are fixtures",
+    "actual readers, proof, classifier, launcher/main and publisher algorithms are reused",
+    "local process closure uses contract double because host /proc PIDs differ; native cgroup rehearsal is hosted CI",
+    "no inference about historical public availability or current council shape"
+  ],
+  "review_corrections": [
+    "final publication stays within existing controller256MiB; close once afterwards; never mutate parent memory.max",
+    "archive closure pending until authoritative local final readback",
+    "record actual preliminary child/socket counts",
+    "close memory exactly once even when prefinal journal is unwritable"
+  ]
+}

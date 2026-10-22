@@ -585,7 +585,14 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         if case not in UI_CASES:raise ValueError("listing window only")
         dated_config(UI_CASES[case],*window)
     import psutil
-    if not execution_environment_allowed(case, execution_mode, os.environ):
+    owner_proof=False
+    if execution_mode=='four-council-owner-local' and retain_proof:
+        # Exact opt-in proof scope was checked above. This is kernel containment,
+        # not a caller's claim to be a hosted runner or a new source qualification.
+        from verification.discovery.four_council_release import owner_source_context
+        owner_source_context()
+        owner_proof=True
+    if not owner_proof and not execution_environment_allowed(case, execution_mode, os.environ):
         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
     if int(Path('/proc/self/stat').read_text().split()[0]) != os.getpid():
         raise ValueError('PROCESS_NAMESPACE_MISMATCH')
