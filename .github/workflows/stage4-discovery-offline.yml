@@ -357,6 +357,7 @@ jobs:
         if: always()
         with:
           name: ingestion-provisioning-disposable-${{ github.event.pull_request.head.sha || github.sha }}
+          include-hidden-files: true # Only the explicit artifact file allowlist below.
           path: |
             ${{ runner.temp }}/provisioning.xml
             ${{ runner.temp }}/kernel-memory.xml
