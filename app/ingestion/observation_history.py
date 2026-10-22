@@ -73,6 +73,7 @@ def append(history,evidence,*,observed_at=None):
         entry=dict(evidence_digest=evidence_digest,evidence_kind=evidence['kind'],observed_at=stamp,record_digest=digest(record),source_record_id=record['source_record_id'],
                    received_date=_value(record,'received_date'),fields={n:_value(record,n) for n in (*DESCRIPTIVE_FIELDS,*LATER_PUBLISHED_FIELDS)})
         app=out['applications'].setdefault(k,dict(identity=ident,observations=[],first_observed_at=None,first_observed_in=None))
+        if any(all(o[n]==entry[n] for n in ('evidence_digest','record_digest','observed_at')) for o in app['observations']):continue
         if keys.get(entry['source_record_id'],record['reference'])!=record['reference']:
             out['conflicts'].append(dict(identity=ident,reason='SOURCE_KEY_USED_BY_ANOTHER_REFERENCE',evidence_digest=evidence_digest,other_reference=keys[entry['source_record_id']]))
         keys.setdefault(entry['source_record_id'],record['reference'])

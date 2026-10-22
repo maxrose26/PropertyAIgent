@@ -73,7 +73,7 @@ RELATED_ASSESSMENTS_CAP=50
 
 
 class Coordinator:
-    def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None):
+    def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None,observation_councils=()):
         self.ledger=ledger;self.contracts=dict(contracts);self.isolated_contracts=frozenset(isolated_contracts)
         # Explicit rule selection: v1 unless a rule is registered under its own contract name. ONE screening contract per run; a v3 threshold is read once, at ScreeningRule construction, and frozen here.
         rules=dict(screening_rules) if screening_rules else {V1_CONTRACT:ScreeningRule(RULE_V1)}
@@ -81,6 +81,8 @@ class Coordinator:
         (name,rule),=rules.items()
         if not isinstance(rule,ScreeningRule) or SCREENING_CONTRACT_RULES.get(name)!=rule.rule_version:raise ValueError('SCREENING_CONTRACT_RULE_MISMATCH')
         self.screening_rules=rules;self.screening_contract=name;self.screening_rule=rule
+        if observation_councils not in ((), ('bolton',)):raise Denied('EXACT_OBSERVATION_ENABLEMENT')
+        self.observation_councils=observation_councils
 
     def _preflight_listing(self,claim):
         row=self.ledger.get(claim.key);subject=row['subject'];contract=self.contracts.get(row['contract'])
@@ -159,8 +161,15 @@ class Coordinator:
             if archive is not None:
                 from .batching import archive_capture
                 saved=archive_capture(source,archive)
-            receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024) if not materialize else contract.project(source,outer,row['limits'])
-            receipt.pop('window')
+            try:
+                receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024) if not materialize else contract.project(source,outer,row['limits'])
+                receipt.pop('window')
+            except Denied:
+                if materialize or source.get('enumeration_evidence')!='TOTAL_UNKNOWN':raise
+                from .observation_screening import require_enabled
+                from datetime import datetime,timezone
+                require_enabled(self.observation_councils,c.council)
+                receipt=contract.observe(source,outer,row['limits'],observed_at=datetime.now(timezone.utc).isoformat(),source_bytes_limit=512*1024)
             if saved is not None:receipt['durable_archive']=saved
             try:bounded(receipt)
             except Denied:
@@ -220,18 +229,26 @@ class Coordinator:
         if row['contract']!=self.screening_contract:raise Denied('SCREENING_CONTRACT_NOT_REGISTERED')
         rule=self.screening_rule
         parent=self.ledger.get(row['dependencies'][0]);receipt=parent['checkpoint']
+        observation=receipt.get('kind')=='LISTING_OBSERVATION_V1'
+        if observation:
+            from .observation_screening import require_enabled,observation_revision
+            require_enabled(self.observation_councils,receipt['council'])
         records=[r for r in receipt['records'] if r['reference']==row['subject']['reference']]
         if len(records)!=1 or receipt['council']!=row['subject']['council']:raise Denied('SCREENING_IDENTITY')
         record=records[0]
         if rule.rule_version==RULE_V1:
-            if digest(record)!=row['revision']:raise Denied('SCREENING_IDENTITY')
+            expected=observation_revision(digest(record),digest(receipt)) if observation else digest(record)
+            if expected!=row['revision']:raise Denied('SCREENING_IDENTITY')
             binding={}
         else:
             # The stored identity must be exactly the one this run's frozen configuration derives from the record; a mismatch means the item was made under another record or configuration.
             record_sha,config,config_sha,revision=assessment_identity(record,rule)
+            if observation:revision=observation_revision(revision,digest(receipt))
             if revision!=row['revision']:raise Denied('SCREENING_CONFIG_BINDING')
             binding=dict(record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision)
         result=rule.screen(record)
+        if observation:
+            result.update(source_kind=receipt['kind'],window_claim='NONE',observed_at=receipt['observed_at'],observation_digest=digest(receipt),record_sha256=digest(record),display_label=receipt['display_label'])
         result.update(source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])
         if binding:
             from .screening_projection import screening_items,assessment_history      # imported lazily: a production registration never reaches here

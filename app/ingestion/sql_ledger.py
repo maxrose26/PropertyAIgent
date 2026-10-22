@@ -66,6 +66,10 @@ class SQLLedger:
         else:
             if set(screening)!={'contract','config_sha256'} or screening['contract']!='listing-screen-v3' or not re.fullmatch('[a-f0-9]{64}',str(screening['config_sha256'])):raise Denied('SCREENING_PLAN_BINDING')
             contract,revision='listing-screen-v3',digest(dict(record_sha256=digest(record),config_sha256=screening['config_sha256']))
+        if capture.get('kind')=='LISTING_OBSERVATION_V1':
+            from .observation_screening import observation_revision
+            if plan.get('source_kind')!='LISTING_OBSERVATION_V1':raise Denied('OBSERVATION_PLAN_BINDING')
+            revision=observation_revision(revision,digest(capture))
         identity=dict(subject={'kind':'APPLICATION','council':capture['council'],'reference':record['reference']},task='SCREENING',contract=contract,revision=revision)
         row=self.get(claim.key)
         child=dict(identity,key=digest(identity),dependencies=[plan['capture_key']],priority=row['priority'],max_attempts=2,limits=row['limits'])

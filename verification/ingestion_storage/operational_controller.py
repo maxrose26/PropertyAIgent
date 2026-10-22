@@ -247,7 +247,7 @@ class DatabaseBudget:
 class ControllerLedger(SQLLedger):
     def resolve_source(self,claim,receipt):
         super().resolve_source(claim,receipt)
-        if receipt.get('kind')=='LISTING_RECEIPT_V1':
+        if receipt.get('kind') in ('LISTING_RECEIPT_V1','LISTING_OBSERVATION_V1'):
             self.budget.capture_checkpoint_sha256=digest(receipt)
 
     @staticmethod

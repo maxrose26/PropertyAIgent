@@ -13,17 +13,24 @@ def archive_capture(source,archive):
     return receipt
 
 
-def batch_plans(capture_key,capture,screening=None):
-    if capture['kind']!='LISTING_RECEIPT_V1' or not capture.get('durable_archive'):raise Denied('ARCHIVED_CAPTURE_REQUIRED')
+def batch_plans(capture_key,capture,screening=None,*,observation_councils=()):
+    observation=capture.get('kind')=='LISTING_OBSERVATION_V1'
+    if observation:
+        if observation_councils!=('bolton',):raise Denied('ARCHIVED_CAPTURE_REQUIRED')
+        from .observation_screening import require_enabled
+        require_enabled(observation_councils,capture['council'])
+    if capture['kind'] not in ('LISTING_RECEIPT_V1','LISTING_OBSERVATION_V1') or not capture.get('durable_archive'):raise Denied('ARCHIVED_CAPTURE_REQUIRED')
     records=capture['records']
     if len(records)>60:raise Denied('ROW_CEILING')
     plans=[];previous=None
     for first in range(0,len(records),5):
         plan=dict(capture_key=capture_key,capture_sha256=digest(capture),first=first,last=min(first+5,len(records)))
+        if observation:plan['source_kind']='LISTING_OBSERVATION_V1'
         if screening is not None:
             from .listing_screening import screening_plan_binding
             plan['screening']=screening_plan_binding(screening)[0]      # explicit v3 selection: part of the plan, so part of the batch identity (new keys; the v1 batches are never touched)
-        identity=dict(subject={'kind':'DISCOVERY_SCOPE','council':capture['council'],'start':capture['interval'][0],'end':capture['interval'][1],'semantics':'RECEIVED'},task='LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan))
+        interval=capture['requested_interval'] if observation else capture['interval']
+        identity=dict(subject={'kind':'DISCOVERY_SCOPE','council':capture['council'],'start':interval[0],'end':interval[1],'semantics':'RECEIVED'},task='LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan))
         key=digest(identity);plans.append(dict(identity,key=key,dependencies=sorted([capture_key]+([previous] if previous else [])),checkpoint={'kind':'BATCH_PLAN_V1','plan':plan},max_attempts=2));previous=key
     return plans
 
@@ -66,6 +73,11 @@ def _process_batch(coordinator,key,*,check=lambda:None,after_row=lambda _:None,p
     if row['attempt_count']>0 and (not budget.previous or budget.previous.get('slot_key')!=key or budget.previous.get('capture_checkpoint_sha256')!=plan['capture_sha256']):raise Denied('RECOVERY_CANNOT_RESET_BUDGET')
     parent=l.get(plan['capture_key']);capture=parent['checkpoint']
     if parent['state']!='COMPLETE' or digest(capture)!=plan['capture_sha256'] or not capture.get('durable_archive'):raise Denied('IMMUTABLE_CAPTURE_REQUIRED')
+    if capture.get('kind')=='LISTING_OBSERVATION_V1':
+        from .observation_screening import require_enabled
+        require_enabled(getattr(coordinator,'observation_councils',()),capture['council'])
+        if plan.get('source_kind')!='LISTING_OBSERVATION_V1':raise Denied('OBSERVATION_PLAN_BINDING')
+    elif capture.get('kind')!='LISTING_RECEIPT_V1' or 'source_kind' in plan:raise Denied('CAPTURE_KIND_BINDING')
     if plan['last']>len(capture['records']):raise Denied('BATCH_RANGE')
     budget.capture_checkpoint_sha256=plan['capture_sha256']
     claim=l.claim(key,lease_seconds=165);progress=row['checkpoint'];children=list(progress.get('children',[]))
