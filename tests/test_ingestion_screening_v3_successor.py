@@ -118,6 +118,18 @@ def test_cancellation_is_explained_as_ending_the_attempt_never_as_forbidden():
         assert not re.search(r'do not (press )?ctrl-?c|must not (press )?ctrl-?c|cannot (stop|cancel)', text, re.I)
 
 
+def test_a_terminal_that_cannot_be_written_to_never_disrupts_the_run(monkeypatch):
+    class Broken:
+        def write(self, *a):
+            raise BrokenPipeError
+
+        def flush(self):
+            raise BrokenPipeError
+    monkeypatch.setattr(orr.sys, 'stderr', Broken())
+    orr.operator_print('anything')      # swallowed: the message is lost, the revocation and the result are not
+    assert 'instant of registration' in SCRIPT and 'in the middle of being registered' in SCRIPT      # the one uncertain window is stated
+
+
 def test_nothing_in_the_owner_path_dispatches_the_workflow():
     for forbidden in ('workflow run', 'actions/workflows', '/dispatches', 'workflow_dispatch'):
         assert forbidden not in SCRIPT and forbidden not in RUNNER.replace('SV3_WORKFLOW', ''), forbidden

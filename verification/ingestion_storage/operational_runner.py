@@ -241,12 +241,14 @@ SV3_OPERATOR_TEXT=dict(
 
 
 def operator_print(text):
-    print(text,file=sys.stderr,flush=True)
+    """The owner's terminal. A terminal that cannot be written to (closed or broken) never disrupts the run, its cleanup or its result."""
+    try:print(text,file=sys.stderr,flush=True)
+    except (OSError,ValueError):pass
 
 
 def announce(emit,out,stage,text):
     """One secret-free operator message AND the journal event that proves it was printed at that stage (the text is fixed; only reviewed non-secret fields are formatted into it)."""
-    emit('operator_progress',dict(stage=stage));out(text)
+    emit('operator_progress',dict(stage=stage));out(text)      # the event records that the message was ISSUED at this stage, not that a terminal displayed it
 
 
 def clock_text(moment):
@@ -648,7 +650,7 @@ class Runner:
                 invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
             if self.pipeline_mode:
-                if self.sv3_mode and self.owner.authorities:self.announce_revocation()
+                if getattr(self,'sv3_mode',False) and self.owner.authorities:self.announce_revocation()
                 self.owner.diagnostic_mode=True      # the reserved failure allowance: ending an authority must never be refused for want of administrative capacity
                 invalidation=self.owner.invalidate_authorities()      # revocation-only: independent of every stop-state; credentials, memberships and secrets are untouched
                 if invalidation in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'):access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'

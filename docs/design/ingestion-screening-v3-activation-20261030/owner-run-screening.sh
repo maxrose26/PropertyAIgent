@@ -83,7 +83,8 @@ printf '%s\n' \
   '  [5/7] the owner registers the ONE named source-free allowance (900-second grant, 600-second execution deadline, 300-second cleanup reserve, source_calls=0, writes=0) and the hosted job screens the 24 records.' \
   '  [6/7] the owner ENDS the allowance with committed readbacks, publishes inside the enforced envelope, closes and seals.' \
   '  [7/7] final result. NO stop, credential, membership, role setting or secret is changed.' \
-  'Ctrl-C ENDS THIS ATTEMPT: before [5/7] nothing has been issued; after it the owner revokes the allowance before exiting. Either way the attempt is then spent and nothing is retried or replaced.' \
+  'Ctrl-C ENDS THIS ATTEMPT. Until [5/7] appears nothing has been issued, except that the allowance may be in the middle of being registered, and the owner revokes it before exiting.' \
+  'If Ctrl-C lands at the very instant of registration the result can be marked uncertain: then do nothing further, report it, and the allowance expires by itself within 900 seconds. Either way the attempt is spent and nothing is retried or replaced.' \
   'Keep this terminal open until controller_exit_status is printed (at most about 70 minutes by this mode deadlines).'
 printf '%s\n' 'The 120-second hidden-input timer starts at the prompt below (you are asked once).'
 set +e
