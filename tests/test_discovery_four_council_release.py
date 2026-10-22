@@ -396,3 +396,23 @@ def test_final_publication_before_close_without_parent_limit_mutation(world,tmp_
     launch.github.runner=enforce
     assert r.finish(launch,journal,out,tmp_path)==0 and memory.closed
     assert (memory.root/'memory.max').read_text()==str(1536*1024**2)
+
+
+def test_prefinal_journal_failure_still_closes_once(world,tmp_path):
+    reg,api,memory,source,launch=world
+    out=launch.execute();journal=r.Journal(tmp_path/'events.jsonl');closed=[]
+    original=memory.close
+    def close():closed.append(1);return original()
+    memory.close=close
+    journal.emit=lambda *args:(_ for _ in ()).throw(OSError('synthetic unwritable'))
+    assert r.finish(launch,journal,out,tmp_path)==1 and closed==[1]
+    final=json.loads((tmp_path/'final-result.json').read_bytes())
+    assert final['process_cleanup']=='CLOSED' and final['final_publication']=='UNCERTAIN_OR_HELD'
+
+
+def test_pending_closure_reports_actual_children(world,monkeypatch):
+    reg,api,memory,source,launch=world
+    monkeypatch.setattr('psutil.Process',lambda:type('P',(),{'children':lambda self,recursive:[object()]})())
+    out=launch.execute()
+    assert out['owned_cleanup']['live_child_count']==1 and out['process_cleanup']=='UNCERTAIN'
+    assert 'owned_survivors' not in out['owned_cleanup']

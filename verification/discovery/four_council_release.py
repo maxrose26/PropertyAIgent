@@ -334,7 +334,7 @@ class Launcher:
                 import psutil
                 children=psutil.Process().children(recursive=True)
                 new=sockets()-self.baseline
-                closure=dict(memory=self.memory.snapshot(),owned_groups_removed=False,owned_survivors=0)
+                closure=dict(memory=self.memory.snapshot(),owned_groups_removed=False,live_child_count=len(children),new_socket_count=len(new))
                 if children or new:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
                 process='PENDING_MEMORY_SCOPE_CLOSURE'
             except BaseException:process='UNCERTAIN'
@@ -422,46 +422,59 @@ def main():
 
 
 def finish(launch,journal,result,root):
-    github=launch.github
-    journal.emit('result_before_final_publication',result);journal.close()
-    verify_chain(journal.path.read_bytes())
-    # The complete operational chain is sealed before its own archival. The final
-    # publisher receipt is separate: an archive cannot contain its own readback.
-    publication_journal=Journal(root/'publication-events.jsonl')
-    github.emit=publication_journal.emit
-    final_files={'events.jsonl':journal.path.read_bytes(),'result-before-publication.json':canonical(result)}
-    final_files['HASHES.json']=canonical({k:sha(v) for k,v in final_files.items()})
+    """Final publication stays inside memory enforcement; closure runs on ALL exits."""
+    github=launch.github;publication_journal=None;audit_raw=b''
     try:
+        journal.emit('result_before_final_publication',result);journal.close()
+        audit_raw=journal.path.read_bytes();verify_chain(audit_raw)
+        result['audit_chain_validated']=True
+        # No archive can contain its own publication acknowledgement or final
+        # memory closure. Those are in the authoritative local sealed receipt.
+        publication_journal=Journal(root/'publication-events.jsonl')
+        github.emit=publication_journal.emit
+        files={'events.jsonl':audit_raw,'result-before-publication.json':canonical(result)}
+        files['HASHES.json']=canonical({k:sha(v) for k,v in files.items()})
         if not launch.consumed or github.mutation_uncertain:raise Stop('FINAL_PUBLICATION_HELD')
-        launch.publish(final_files,'completed')
-        if sockets()-launch.baseline or __import__('psutil').Process().children(recursive=True):raise Stop('FINAL_PROCESS_CLOSURE')
+        launch.publish(files,'completed')
         result.update(final_publication='VERIFIED',evidence_commit=launch.expected)
     except BaseException:
         result.update(status='STOP_RECONCILE_NO_RETRY',final_publication='UNCERTAIN_OR_HELD')
-    publication_journal.close()
-    final_clean=False
-    try:
-        final_children=__import__('psutil').Process().children(recursive=True)
-        final_sockets=sockets()-launch.baseline
-        final_clean=not final_children and not final_sockets
-    except BaseException:pass
-    try:
-        result['owned_cleanup']=launch.memory.close()
-        launch.memory_closed=True
-        if not final_clean:raise Stop('FINAL_PROCESS_CLOSURE')
-        result.update(final_process_cleanup='CLOSED',process_cleanup='CLOSED',
-            cleanup='UNCERTAIN' if launch.source_cleanup_uncertain else 'CLOSED')
-    except BaseException:
-        result.update(status='STOP_RECONCILE_NO_RETRY',process_cleanup='UNCERTAIN',final_process_cleanup='UNCERTAIN',cleanup='UNCERTAIN')
-    if github.mutation_uncertain:result['cleanup']='UNCERTAIN'
+        if result.get('reason') is None:result['reason']='FINAL_EVIDENCE_OR_PUBLICATION_FAILURE'
+    finally:
+        for log in (journal,publication_journal):
+            if log is not None:
+                try:log.close()
+                except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',reason='JOURNAL_CLOSE_FAILURE')
+        final_clean=False
+        try:
+            children=__import__('psutil').Process().children(recursive=True)
+            new=sockets()-launch.baseline
+            result['final_process_readback']=dict(live_child_count=len(children),new_socket_count=len(new))
+            final_clean=not children and not new
+        except BaseException:pass
+        try:
+            result['owned_cleanup']=launch.memory.close();launch.memory_closed=True
+            if not final_clean:raise Stop('FINAL_PROCESS_CLOSURE')
+            result.update(final_process_cleanup='CLOSED',process_cleanup='CLOSED',
+                cleanup='UNCERTAIN' if launch.source_cleanup_uncertain else 'CLOSED')
+        except BaseException:
+            result.update(status='STOP_RECONCILE_NO_RETRY',process_cleanup='UNCERTAIN',final_process_cleanup='UNCERTAIN',cleanup='UNCERTAIN')
+        if github.mutation_uncertain:result['cleanup']='UNCERTAIN'
     result['accounting'].update(github_requests=github.requests,publication_requests=launch.publication_calls,
         attempted_exported_bytes=launch.exported,supervised_seconds=launch.clock()-launch.start)
     final_raw=canonical(result)
-    if len(final_raw)+launch.exported+publication_journal.path.stat().st_size>LIMITS['exported_bytes']:
+    receipt_bytes=publication_journal.path.stat().st_size if publication_journal is not None else 0
+    if len(final_raw)+launch.exported+receipt_bytes>LIMITS['exported_bytes']:
         result.update(status='STOP_RECONCILE_NO_RETRY',reason='FINAL_ENVELOPE_BOUND',cleanup='UNCERTAIN')
         final_raw=canonical(result)
-    write_new(root/'final-result.json',final_raw)
-    print(json.dumps(dict(status=result['status'],reason=result['reason'],cleanup=result['cleanup'],audit=str(journal.path),audit_sha256=sha(journal.path.read_bytes()),final_result=str(root/'final-result.json'),evidence_commit=result.get('evidence_commit'),accounting=result['accounting'],outcomes=[dict(council=x['scope']['council'],outcome=x['outcome']) for x in result['results']]),sort_keys=True),flush=True)
+    try:write_new(root/'final-result.json',final_raw)
+    except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',reason='FINAL_RESULT_UNWRITABLE')
+    summary=dict(status=result['status'],reason=result['reason'],cleanup=result['cleanup'],
+        audit=str(journal.path),audit_sha256=sha(audit_raw) if audit_raw else None,
+        final_result=str(root/'final-result.json'),evidence_commit=result.get('evidence_commit'),
+        accounting=result['accounting'],outcomes=[dict(council=x['scope']['council'],outcome=x['outcome']) for x in result['results']])
+    try:print(json.dumps(summary,sort_keys=True),flush=True)
+    except BaseException:return 1
     return 0 if result['status']=='FOUR_COMPLETE' and result['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':
