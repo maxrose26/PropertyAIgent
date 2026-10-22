@@ -19,6 +19,10 @@ on:
       - 'tests/test_discovery_ingestion_screening_v3_lifecycle_pg.py'
       - 'tests/test_ingestion_screening_v3_bounds.py'
       - 'tests/test_ingestion_screening_v3_rollback_doc.py'
+      - 'tests/test_ingestion_screening_v3_owner_tooling.py'
+      - 'docs/design/ingestion-screening-v3-activation-20261030/owner-run-policy.sh'
+      - 'docs/design/ingestion-screening-v3-activation-20261030/owner-run-screening.sh'
+      - 'docs/design/ingestion-screening-v3-activation-20261030/render_registration.py'
       - 'docs/design/ingestion-screening-v3-activation-20261030/ROLLBACK.md'
       - 'tests/screening_v3_rehearsal.py'
       - '.github/workflows/stage4-screening-v3-retained-once.yml'
@@ -108,7 +112,7 @@ jobs:
           timeout --kill-after=2s 180s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_unit_filter_digit_runs.py tests/test_ingestion_count_assessment.py -q -x -p no:cacheprovider
       - name: Screening rule v3, explicit selection, bound identity, code binding, retained-capture reconciliation, history, derived worker function, wiring and controller (offline, disposable database only)
         run: |
-          timeout --kill-after=2s 240s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_slice1.py tests/test_ingestion_retained_capture_reconciliation.py tests/test_ingestion_screening_v3_code_binding.py tests/test_ingestion_screening_history.py tests/test_ingestion_screening_v3_worker_sql.py tests/test_ingestion_screening_v3_wiring.py tests/test_ingestion_screening_v3_controller.py tests/test_ingestion_screening_v3_policy.py tests/test_ingestion_screening_v3_world.py tests/test_ingestion_screening_v3_activation_static.py tests/test_ingestion_screening_v3_bounds.py tests/test_ingestion_screening_v3_rollback_doc.py -q -p no:cacheprovider
+          timeout --kill-after=2s 900s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_ingestion_screening_v3_slice1.py tests/test_ingestion_retained_capture_reconciliation.py tests/test_ingestion_screening_v3_code_binding.py tests/test_ingestion_screening_history.py tests/test_ingestion_screening_v3_worker_sql.py tests/test_ingestion_screening_v3_wiring.py tests/test_ingestion_screening_v3_controller.py tests/test_ingestion_screening_v3_policy.py tests/test_ingestion_screening_v3_world.py tests/test_ingestion_screening_v3_activation_static.py tests/test_ingestion_screening_v3_bounds.py tests/test_ingestion_screening_v3_rollback_doc.py tests/test_ingestion_screening_v3_owner_tooling.py -q -p no:cacheprovider
       - name: Stable qualification module imports, builds its engine, negotiates TLS with a local server and is memory-limited under the workflow's enforced resource limits, no external network
         run: |
           set -euo pipefail
