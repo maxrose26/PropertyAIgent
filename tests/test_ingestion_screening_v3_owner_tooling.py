@@ -10,6 +10,7 @@ import select
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -40,8 +41,8 @@ def clone(tmp_path_factory):
     return target
 
 
-def render(clone, mode, minutes=25, extra=()):
-    args = [sys.executable, '-I', '-B', str(clone / 'docs/design/ingestion-screening-v3-activation-20261030/render_registration.py'), '--mode', mode, '--minutes', str(minutes), '--evidence-head', HEAD40, *extra]
+def render(clone, mode, minutes=None, extra=()):
+    args = [sys.executable, '-I', '-B', str(clone / 'docs/design/ingestion-screening-v3-activation-20261030/render_registration.py'), '--mode', mode, *(['--minutes', str(minutes)] if minutes else []), '--evidence-head', HEAD40, *extra]
     done = subprocess.run(args, cwd=clone, capture_output=True, text=True, timeout=120)
     return done
 
@@ -86,6 +87,10 @@ def test_the_mode_specific_fields_are_exactly_the_reviewed_ones(clone):
 
 
 def test_the_expiry_windows_are_the_validators_and_are_enforced(clone):
+    assert render(clone, 'screening', minutes=74, extra=('--policy-events-sha256', SHA64, '--policy-final-sha256', SHA64, '--control-sha256', SHA64)).returncode != 0      # shorter than the run itself
+    _, default, _ = render_ok(clone, 'screening')
+    left = (datetime.fromisoformat(default['expires_at']) - datetime.now(timezone.utc)).total_seconds()
+    assert 105 * 60 < left <= 110 * 60 and left > orr.SV3_BINDING['ready_wait_seconds'] + orr.SV3_BINDING['grant_lifetime_seconds'] + 600      # the default outlives READY wait + grant + closure
     assert render(clone, 'policy', minutes=31).returncode != 0      # the renderer refuses what the validator would refuse (policy: at most 30 minutes)
     assert render(clone, 'screening', minutes=121, extra=('--policy-events-sha256', SHA64, '--policy-final-sha256', SHA64, '--control-sha256', SHA64)).returncode != 0
     for mode, minutes in (('policy', 30), ('screening', 120)):
@@ -136,7 +141,8 @@ def test_the_scripts_have_valid_syntax_and_no_stale_names(kind):
     path = DIR / name
     assert subprocess.run(['bash', '-n', str(path)], capture_output=True, timeout=30).returncode == 0
     source = text(path)
-    assert 'BOLTON_%s' % mode.removeprefix('BOLTON_') in source and ('STATE_DIRECTORY=' + state) in source and registration in source
+    assert ('"$REGISTRATION" "$REGISTRATION_SHA256" ' + mode) in source      # the in-script validation asserts exactly this runner mode
+    assert ('STATE_DIRECTORY=' + state) in source and registration in source
     for stale in ('BOLTON_POLICY_WINDOW_ALLOWANCE', 'BOLTON_WINDOW_DEMONSTRATION', 'owner-run-window.sh', 'policy-v5 ceremony (Bolton', 'operational-bolton-window-demonstration-registration', 'POLICY V5.', 'capture allowance (source_calls=1)'):
         assert stale not in source, stale
     assert re.search(r'USAGE: %s <commit40> <tree40> <registration-sha256>' % re.escape(name), source) and 'docs/design/ingestion-screening-v3-activation-20261030/' + name in source

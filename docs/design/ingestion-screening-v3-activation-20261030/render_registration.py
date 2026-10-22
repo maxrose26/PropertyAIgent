@@ -15,16 +15,23 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# The screening registration must outlive the WHOLE run: preparation, up to 1800 s READY wait, the full 900 s grant and the closure reserve, all inside the 4200 s (70 minute) job deadline; the runner refuses to issue the grant
+# unless 900 s remain and denies further work once the expiry passes. Floor 75 minutes; default 110 (the validator allows at most 120).
+SCREENING_FLOOR_MINUTES = 75
+SCREENING_DEFAULT_MINUTES = 110
 BASE = HERE.parent / 'ingestion-window-demonstration-20261023' / 'base_constants.json'      # the carried non-secret constants (unchanged)
 
 
-def render(mode, root=None, minutes=25, evidence_head=None, policy_audit=None, control_sha256=None):
+def render(mode, root=None, minutes=None, evidence_head=None, policy_audit=None, control_sha256=None):
     root = Path(root or HERE.parents[2])
     sys.path.insert(0, str(root))
     from verification.ingestion_storage import operational_runner as runner
     from verification.ingestion_storage.tls_trust import PEM_SHA256
     if mode not in ('policy', 'screening'):
         raise ValueError('MODE')
+    minutes = minutes or (25 if mode == 'policy' else SCREENING_DEFAULT_MINUTES)
+    if mode == 'screening' and minutes < SCREENING_FLOOR_MINUTES:
+        raise ValueError('EXPIRY_TOO_SHORT_FOR_THE_SCREENING_RUN')      # the run checks the registration expiry while it runs
     if not re.fullmatch(r'[0-9a-f]{40}', evidence_head or ''):
         raise ValueError('EVIDENCE_HEAD_REQUIRED')
     manifest_file = root / runner.SV3_MANIFEST_PATH
@@ -62,13 +69,13 @@ def render(mode, root=None, minutes=25, evidence_head=None, policy_audit=None, c
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', required=True, choices=['policy', 'screening'])
-    parser.add_argument('--minutes', type=int, default=25)
+    parser.add_argument('--minutes', type=int, default=None, help='policy: 1-30 (default 25); screening: 75-120 (default 110)')
     parser.add_argument('--evidence-head', required=True)
     parser.add_argument('--policy-events-sha256')
     parser.add_argument('--policy-final-sha256')
     parser.add_argument('--control-sha256')
     args = parser.parse_args()
-    if not 1 <= args.minutes <= (30 if args.mode == 'policy' else 120):
+    if args.minutes is not None and not (1 if args.mode == 'policy' else SCREENING_FLOOR_MINUTES) <= args.minutes <= (30 if args.mode == 'policy' else 120):
         raise SystemExit('EXPIRY_MINUTES_OUT_OF_RANGE')
     audit = dict(events_sha256=args.policy_events_sha256, final_result_sha256=args.policy_final_sha256) if args.mode == 'screening' else None
     body = json.dumps(render(args.mode, minutes=args.minutes, evidence_head=args.evidence_head, policy_audit=audit, control_sha256=args.control_sha256), sort_keys=True, indent=1) + '\n'
