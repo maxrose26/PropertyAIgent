@@ -198,7 +198,10 @@ SV3_POLICY_AUTHORITY='AUTHORISE_INGESTION_POLICY_SCREENING_V3_ONCE_20261030'
 SV3_POLICY_STATE='operational-policy-screening-v3-once-20261030'
 SV3_MODE='BOLTON_SCREENING_V3_RETAINED'
 SV3_AUTHORITY=SV3_NAME[:-len('_SCREEN')]      # the ledger grant and the named exception are SV3_AUTHORITY + '_SCREEN' (the exact name policy v6 recognises); there is no _CAPTURE name
-SV3_STATE='operational-bolton-screening-v3-retained-once-20261030'
+SV3_ATTEMPT1_STATE='operational-bolton-screening-v3-retained-once-20261030'      # consumed by the interrupted first attempt: its audit is preserved and bound below; this namespace is never reused
+SV3_ATTEMPT1_AUDIT=dict(state_directory=SV3_ATTEMPT1_STATE,events_sha256='f3eb84a4c469e26af2d5bd173653c95f8213e74bd0f6860a43c241a489279f84',final_result_sha256='8c784e81b98c520f3306552b97908febbc36d1c58b8995aeb1c40f7947df77cd',
+                        outcome='STOPPED_IN_READY_WAIT_NO_AUTHORITY_ISSUED_NO_HOSTED_DISPATCH')
+SV3_STATE='operational-bolton-screening-v3-retained-successor-once-20261030'      # the successor's own single-use namespace (the database allowance name was never registered and is not replaced)
 SV3_EVIDENCE_DIRECTORY='docs/design/ingestion-operational-execution-bolton-screening-v3-retained-20261030'
 SV3_HOSTED_AUTHORITY='AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_HOSTED_ONCE_20261030'
 SV3_WORKFLOW='.github/workflows/stage4-screening-v3-retained-once.yml'
@@ -216,7 +219,46 @@ SV3_POLICY_OWNER_LIMITS=dict(connections=(4,5),commands=(44,52,60))      # provi
 SV3_OWNER_LIMITS=dict(connections=(10,12),commands=(96,116,132))      # provisional: readback 9 + retained read 5 + registration 11 + ledger read 5 + invalidation 12 + readback 9 + failure reserve; measured and fixed by the rehearsal
 SV3_POLICY_PREDECESSOR=dict(derived_stop=dict(GENERATION3_STOP),policy_window_allowance=dict(authority=WINDOW_POLICY_AUTHORITY,state_directory=WINDOW_POLICY_STATE,policy_file=str(GENERATION3_WINDOW_POLICY)),
                             consumed_window_names=[SV3_WINDOW_CAPTURE_NAME,SV3_WINDOW_SCREEN_NAME])
-SV3_PREDECESSOR=dict(SV3_POLICY_PREDECESSOR,policy_screening_v3=dict(authority=SV3_POLICY_AUTHORITY,state_directory=SV3_POLICY_STATE,policy_file=str(GENERATION3_SCREENING_V3_POLICY),worker_function=str(SV3_WORKER_INSTALL)))
+SV3_PREDECESSOR=dict(SV3_POLICY_PREDECESSOR,policy_screening_v3=dict(authority=SV3_POLICY_AUTHORITY,state_directory=SV3_POLICY_STATE,policy_file=str(GENERATION3_SCREENING_V3_POLICY),worker_function=str(SV3_WORKER_INSTALL)),interrupted_attempt=dict(SV3_ATTEMPT1_AUDIT))
+SV3_OPERATOR_TEXT=dict(
+    CREDENTIAL_ACCEPTED='[1/7] CREDENTIAL ACCEPTED: the route check passed. The credential is held in memory only and is never printed or saved.',
+    RETAINED_VERIFIED='[2/7] RETAINED RECORDS VERIFIED: the 30 retained Bolton records match the pinned evidence and the 29 new items are absent. Nothing has been issued.',
+    READY_FOR_DISPATCH=('[3/7] READY FOR HOSTED DISPATCH\n'
+                        '  The retained records are verified and nothing has been issued. Paste this whole message into the Claude chat: Claude will dispatch the hosted job ONCE.\n'
+                        '  Workflow : {workflow}\n'
+                        '  Inputs   : reviewed_sha={sha}  evidence_head={head}  authority={hosted_authority}\n'
+                        '  Then approve the run in GitHub: Actions > the new run > Review deployments > stage4-production-canary.\n'
+                        '  Waiting is expected: queueing and approval can take several minutes. This wait ends at {deadline} (at most {minutes} minutes from now) and is OUTSIDE the grant lifetime.\n'
+                        '  Ctrl-C ends this attempt safely (nothing is issued yet and cleanup runs) but the attempt is then spent.\n'
+                        '  Do not dispatch the workflow yourself unless Claude hands that to you.'),
+    WAITING_FOR_HOSTED='[4/7] WAITING FOR HOSTED READINESS until {deadline}. Keep this terminal open.',
+    WAITING_FOR_HOSTED_TICK='      still waiting for the hosted job (about {minutes} minutes left in this wait).',
+    AUTHORITY_REGISTERED=('[5/7] AUTHORITY REGISTERED - SCREENING UNDERWAY: the one named allowance is registered (source calls 0, writes 0) and the hosted job is screening the 24 records.\n'
+                          '      Execution deadline {deadline}; the grant ends {grant_until}. Ctrl-C now ends the attempt: the owner revokes the allowance before it exits.'),
+    REVOCATION_AND_CLEANUP='[6/7] REVOCATION AND CLEANUP UNDERWAY: ending the allowance, reading the revocation back, then publishing and sealing the result. Keep this terminal open.',
+    FINAL_RESULT=('[7/7] FINAL RESULT: status={status}; cleanup={cleanup}; allowance invalidation={invalidation}; screening={screening}.\n'
+                  '      Audit: {audit}. Paste the controller_exit_status line and these lines into the chat.'))
+
+
+def operator_print(text):
+    print(text,file=sys.stderr,flush=True)
+
+
+def announce(emit,out,stage,text):
+    """One secret-free operator message AND the journal event that proves it was printed at that stage (the text is fixed; only reviewed non-secret fields are formatted into it)."""
+    emit('operator_progress',dict(stage=stage));out(text)
+
+
+def clock_text(moment):
+    from zoneinfo import ZoneInfo
+    return moment.astimezone(timezone.utc).strftime('%H:%M:%S UTC')+' / '+moment.astimezone(ZoneInfo('Europe/London')).strftime('%H:%M:%S %Z')
+
+
+def final_result_text(result):
+    return SV3_OPERATOR_TEXT['FINAL_RESULT'].format(status=result.get('status'),cleanup=result.get('cleanup'),invalidation=result.get('authority_invalidation'),screening=result.get('screening','not started'),
+                                                    audit='~/.local/state/propertyaigent/'+SV3_STATE+'/ (events.jsonl and final-result.json)')
+
+
 INPUT_PRECHECKED_MODES=(OBSERVER_MODE,POLICY_MODE,PROBE_MODE,CAPTURE_POLICY_MODE,CAPTURE_MODE,WINDOW_POLICY_MODE,WINDOW_MODE,SV3_POLICY_MODE,SV3_MODE)      # every mode that needs the migration credential on this path validates the hidden input BEFORE the registration is consumed
 SETTLED_MODES={SETTLED_MODE:(SETTLED_AUTHORITY,SETTLED_STATE,SETTLED_PREDECESSOR),SETTLED_R2_MODE:(SETTLED_R2_AUTHORITY,SETTLED_R2_STATE,SETTLED_R2_PREDECESSOR)}
 # Finite diagnostic allowance. Administrative commands/connections are TOTAL ceilings including failure handling and teardown; deadlines replace the capture-run defaults.
@@ -606,6 +648,7 @@ class Runner:
                 invalidation='UNCERTAIN_RECONCILE' if self.owner.authorities else 'NOT_REQUIRED_NO_AUTHORITY'
                 raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
             if self.pipeline_mode:
+                if self.sv3_mode and self.owner.authorities:self.announce_revocation()
                 self.owner.diagnostic_mode=True      # the reserved failure allowance: ending an authority must never be refused for want of administrative capacity
                 invalidation=self.owner.invalidate_authorities()      # revocation-only: independent of every stop-state; credentials, memberships and secrets are untouched
                 if invalidation in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK'):access='AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED'
@@ -716,11 +759,23 @@ class Runner:
         if not isinstance(result,dict) or result.get('execution')!=self.pipeline_execution() or (require_capture and result.get('capture_sha256')!=digest(self.capture)):raise Uncertain('HOSTED_RESULT_BINDING')
         return raw,result
 
+    operator_output=staticmethod(operator_print)      # the owner's terminal (tests replace it)
+
+    def announce(self,stage,**fields):
+        announce(self.emit,self.operator_output,stage,SV3_OPERATOR_TEXT[stage].format(**fields))
+
+    def announce_revocation(self):
+        """The revocation message, once, at the first of: the normal end of the run or a failure that finds an authority registered. A terminal that cannot print never blocks the revocation."""
+        if getattr(self,'revocation_announced',False):return
+        self.revocation_announced=True
+        try:self.announce('REVOCATION_AND_CLEANUP')
+        except Exception:pass
+
     def await_any(self,relatives,seconds):
         """Bounded wait until one of `relatives` EXISTS in the evidence directory at the CURRENT head of the evidence branch (earlier entries take priority when several exist). Presence-based, never
         change-based: the restricted job publishes several commits within seconds and a poll at a coarse interval may see only the latest, which still contains every earlier file (a change-based wait would
         miss the one it is waiting for). Each distinct head is examined at most REPROBES times (on successive polls, so one transient 404 cannot hide a published file); the first examination is of the head as it stands. Timeout is a stop (no retry, no replay). Returns (head, relative, blob)."""
-        deadline=time.monotonic()+seconds;probes={}
+        deadline=time.monotonic()+seconds;probes={};tick=getattr(self,'wait_tick',None)
         while True:
             self.check();self.stop_requested()
             head=self.evidence_head_now()
@@ -730,6 +785,7 @@ class Runner:
                     blob=self.evidence_file(head,relative)
                     if blob is not None:return head,relative,blob
             if time.monotonic()>=deadline:raise Denied('HOSTED_PUBLICATION_WAIT_EXPIRED')
+            if tick:tick(max(0.0,deadline-time.monotonic()))
             getattr(self,'pipeline_sleep',time.sleep)(PIPELINE_BINDING['poll_seconds'])
 
     def await_file(self,relative,seconds):
@@ -1011,13 +1067,23 @@ class Runner:
         except WorldMismatch as exc:raise Uncertain(str(exc)) from None
         self.capture=receipt;self.capture_key=root['key'];self.plans=plans
         self.emit('sv3_retained_world_verified',dict(retained_rows=30,new_items=29,capture_sha256=CAPTURE_CHECKPOINT))
+        self.announce('RETAINED_VERIFIED')
         head=self.evidence_head_now()
         if head!=self.evidence_head:raise Uncertain('EVIDENCE_HEAD_MOVED')
         self.require_evidence_anchor(head)
         for relative in ('hosted-ready/ready.json','screening-authority/registered.json','completed/final-result.json'):
             if self.evidence_file(head,relative) is not None:raise Uncertain('EVIDENCE_DIRECTORY_NOT_FRESH')
         self.operation_phase='SV3_AWAIT_HOSTED_READY'      # the restricted job's queueing, protected-environment approval, start-up and qualification: bounded here, OUTSIDE the grant lifetime
-        head,_,blob=self.await_any(('hosted-ready/ready.json',),pb['ready_wait_seconds'])
+        wait_until=datetime.now(timezone.utc)+timedelta(seconds=pb['ready_wait_seconds'])
+        self.announce('READY_FOR_DISPATCH',workflow=SV3_WORKFLOW.rsplit('/',1)[-1],sha=self.r['revision'],head=self.r['evidence_head'],hosted_authority=SV3_HOSTED_AUTHORITY,deadline=clock_text(wait_until),minutes=pb['ready_wait_seconds']//60)      # printed ONLY here: after every check above succeeded, at entry to the wait
+        self.announce('WAITING_FOR_HOSTED',deadline=clock_text(wait_until));ticked=[0]
+        def wait_tick(remaining):
+            elapsed=pb['ready_wait_seconds']-remaining
+            if elapsed//300>ticked[0]:
+                ticked[0]=int(elapsed//300);self.announce('WAITING_FOR_HOSTED_TICK',minutes=int(remaining//60))
+        self.wait_tick=wait_tick
+        try:head,_,blob=self.await_any(('hosted-ready/ready.json',),pb['ready_wait_seconds'])
+        finally:self.wait_tick=None
         self.evidence_head=head
         try:ready=json.loads(blob_bytes(blob))
         except ValueError:raise Uncertain('HOSTED_READY_UNREADABLE') from None
@@ -1037,6 +1103,7 @@ class Runner:
         self.emit('sv3_screening_authority_registered',dict(batches=len(batches3),children_prepared=len(children3),bound_keys=len(self.batch_bindings),grant_expires_at=self.owner.grant_expiry.isoformat()))
         marker=dict(execution=self.pipeline_execution(),authority=self.authority+'_SCREEN',bindings_sha256=digest(self.batch_bindings),capture_sha256=digest(self.capture))
         self.evidence_head=self.github.publish({'registered.json':canonical(marker)},directory=self.r['evidence_directory']+'/screening-authority',expected_head=self.evidence_head)
+        self.announce('AUTHORITY_REGISTERED',deadline=clock_text(datetime.now(timezone.utc)+timedelta(seconds=pb['execution_deadline_seconds'])),grant_until=clock_text(self.owner.grant_expiry))
         self.operation_phase='SV3_AWAIT_SCREENING'
         remaining=max(1,int(pb['execution_deadline_seconds']-(time.monotonic()-registered_at)))
         head,blob=self.await_file('completed/final-result.json',remaining)
@@ -1046,6 +1113,7 @@ class Runner:
         done=self.owner.read_items([x['key'] for x in (*batches3,*children3)])
         incomplete=sorted(k for k in (x['key'] for x in (*batches3,*children3)) if done.get(k,(None,))[0]!='COMPLETE')
         self.emit('sv3_screening_state',dict(items=29,complete=29-len(incomplete),incomplete=incomplete,hosted=hosted_summary))
+        self.announce_revocation()
         self.operation_phase='SV3_INVALIDATION'
         self.owner.tearing_down=True      # the invalidation and the final readback run on the reserved end-of-run allowance
         invalidation=self.owner.invalidate_authorities()
@@ -1306,6 +1374,7 @@ def main():
     reader=secure_migration_input
     if held is not None:
         journal.emit('hidden_input_prechecked',dict(route_validated=True,password_present=True,seconds=precheck_seconds,value_exported=False))
+        if r['mode']==SV3_MODE:announce(journal.emit,operator_print,'CREDENTIAL_ACCEPTED',SV3_OPERATOR_TEXT['CREDENTIAL_ACCEPTED'])
         box=[held];held=None
         def reader():      # hands the already-validated value to the existing execution path exactly once, then forgets it
             value,box[0]=box[0],None
@@ -1315,6 +1384,7 @@ def main():
     baseline=owned_resources()
     prepare=lambda raw,started:prepare_runner(r,raw,started,journal=journal,memory=memory,progress=progress)
     result=session(journal,r['expires_at'],reader,prepare,memory=memory,progress=progress,baseline=baseline,**(dict(timing=POLICY_TIMING) if r['mode'] in (POLICY_MODE,CAPTURE_POLICY_MODE,WINDOW_POLICY_MODE,SV3_POLICY_MODE) else dict(timing=PIPELINE_TIMING) if r['mode'] in (CAPTURE_MODE,WINDOW_MODE,SV3_MODE) else dict(timing=PROBE_TIMING) if r['mode']==PROBE_MODE else dict(timing=OBSERVER_TIMING) if r['mode']==OBSERVER_MODE else dict(timing=PIPELINE_TIMING) if r['mode']==PIPELINE_MODE else dict(timing=MATRIX_TIMING) if r['mode'] in (MATRIX_MODE,DIRECT_MODE,*STABLE_MODES) else {}))
+    if r['mode']==SV3_MODE:operator_print(final_result_text(result))
     # A cleanly closed failure remains a failed execution; never signal success
     # or permit an owner to confuse cleanup with route qualification.
     raise SystemExit(exit_status(result))
