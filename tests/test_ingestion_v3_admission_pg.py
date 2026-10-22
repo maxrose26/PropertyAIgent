@@ -18,6 +18,7 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
+from sqlalchemy.exc import DBAPIError
 
 from app.config import get_council
 from app.db.models import Application, Base, Council, Site
@@ -51,11 +52,19 @@ def pg():
     names = ['provisioning_migrator', 'ingestion_worker_login', 'ingestion_storage_login', 'ingestion_effect_login', 'ingestion_recovery_login', 'ingestion_application_login']
     passwords = {name: secrets.token_urlsafe(48) for name in names}
     setup_started = time.monotonic()
-    with psycopg.connect(raw, autocommit=True, prepare_threshold=None) as boot:
+    fixture_costs = dict(connection_attempts=1, cursor_calls=0)
+    class FixtureCursor(psycopg.Cursor):
+        def execute(self, *args, **kwargs):
+            fixture_costs['cursor_calls'] += 1
+            return super().execute(*args, **kwargs)
+    with psycopg.connect(raw, autocommit=True, prepare_threshold=None, cursor_factory=FixtureCursor) as boot:
         assert boot.info.server_version >= 170000
-        app = create_engine(URL.create('postgresql+psycopg', **dict(username=info['user'], password=info['password'], host='127.0.0.1', port=5432, database=info['dbname'])), poolclass=NullPool)
+        app = create_engine(URL.create('postgresql+psycopg', **dict(username=info['user'], password=info['password'], host='127.0.0.1', port=5432, database=info['dbname'])), poolclass=NullPool, connect_args=dict(cursor_factory=FixtureCursor))
+        from sqlalchemy import event
+        event.listen(app, 'do_connect', lambda *args: fixture_costs.__setitem__('connection_attempts', fixture_costs['connection_attempts'] + 1))
         def connect(role):
-            return psycopg.connect(**{**info, 'user': role, 'password': passwords[role]}, autocommit=True, prepare_threshold=None)
+            fixture_costs['connection_attempts'] += 1
+            return psycopg.connect(**{**info, 'user': role, 'password': passwords[role]}, autocommit=True, prepare_threshold=None, cursor_factory=FixtureCursor)
         try:
             boot.execute(sql.SQL('CREATE ROLE provisioning_migrator LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Literal(passwords['provisioning_migrator'])))
             boot.execute('GRANT USAGE,CREATE ON SCHEMA public TO provisioning_migrator WITH GRANT OPTION')
@@ -86,7 +95,7 @@ def pg():
             control['manual_stop'] = None
             control['grants'] = {}
             urls = {role: URL.create('postgresql+psycopg', username=role, password=passwords[role], host='127.0.0.1', port=5432, database=info['dbname']).render_as_string(hide_password=False) for role in names[1:]}
-            yield dict(boot=boot, app=app, control=control, urls=urls, connect=connect, setup_seconds=time.monotonic() - setup_started, initial_control=initial_control)
+            yield dict(boot=boot, app=app, control=control, urls=urls, connect=connect, setup_seconds=time.monotonic() - setup_started, setup_costs=dict(fixture_costs), fixture_costs=fixture_costs, initial_control=initial_control)
         finally:
             app.dispose()
             boot.execute('DROP SCHEMA public CASCADE; CREATE SCHEMA public')
@@ -179,6 +188,7 @@ def test_runtime_permission_denials(pg):
 
 @pytest.mark.parametrize('case', ['exact', 'qualified', 'unknown', 'parent', 'forged_v1', 'known', 'race', 'unsupported', 'wrong_council', 'wrong_record', 'wrong_capture', 'wrong_config', 'wrong_code', 'wrong_fact', 'wrong_source_id', 'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'])
 def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
+    fixture_before = dict(pg['fixture_costs'])
     proposal = {'qualified': 'Erection of up to 20 residential dwellings', 'unknown': 'Residential development, number of dwellings unknown', 'forged_v1': 'Residential development, number of dwellings unknown', 'parent': 'Discharge of condition 3 attached to planning permission 01234/26'}.get(case, 'Erection of 20 residential dwellings')
     sc = scenario(pg, case, proposal)
     co, b, budget = sc['co'], sc['binding'], sc['budget']
@@ -284,7 +294,8 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
     result = None
     try:
         if case.startswith('wrong_') or case in {'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
-            with pytest.raises(BaseException) as exc:
+            expected_error = KeyboardInterrupt if case in {'before_effect', 'interrupt_after_commit'} else DBAPIError if case == 'expired' else UncertainPersistence if case in {'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack'} else Denied
+            with pytest.raises(expected_error) as exc:
                 execute(co, b, listing_reader=lambda _: pytest.fail('no listing refetch'), detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
             assert not isinstance(exc.value, (AssertionError, TypeError, KeyError, AttributeError)), type(exc.value).__name__
         else:
@@ -322,6 +333,10 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
             assert after == 0
         assert boot.execute('SELECT count(*) FROM sites').fetchone()[0] == 0
         assert boot.execute('SELECT count(*) FROM applications WHERE site_id IS NOT NULL OR estimated_unit_count IS NOT NULL OR opportunity_classification IS NOT NULL').fetchone()[0] == 0
+        actual = boot.execute('SELECT reference,status,decision,site_id,estimated_unit_count FROM applications ORDER BY id').fetchall()
+        record_property('effects', json.dumps(dict(case=case, identity_delta=after-before, rows=actual,
+            factual_delivery='ACKNOWLEDGED' if result and result.get('outcome') == 'SUPPORTED_FACTS_VERIFIED' else 'NOT_ACKNOWLEDGED',
+            identity_count=after, sites=0, unit_writes=0), sort_keys=True))
     finally:
         costs = budget.close([])
         assert costs['cleanup'] == 'CLOSED' and costs['connections_opened'] == costs['connections_closed_count']
@@ -330,5 +345,12 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
             assert sum(x['driver_statements'] for x in race_costs) + costs['driver_statements'] <= 120
             assert sum(x['connection_attempts'] for x in race_costs) + costs['connection_attempts'] <= 16
             assert all(x['cleanup'] == 'CLOSED' for x in race_costs)
-        record_property('measured', json.dumps(dict(case=case, admission=result and result.get('admission'), runtime=costs, screening=sc['screening_cost'], fixture_setup_seconds=pg['setup_seconds']), sort_keys=True))
-        print('V3_HANDOFF_MEASURED ' + json.dumps(dict(case=case, runtime=costs, screening=sc['screening_cost']), sort_keys=True))
+        child_costs = race_costs if case == 'race' else []
+        totals = {name: costs[name] + sum(x[name] for x in child_costs) for name in ('driver_statements', 'connection_attempts', 'returned_data_value_bytes', 'connection_active_seconds')}
+        # Parent elapsed includes the child wait; never add it a second time.
+        totals['supervised_seconds'] = costs['elapsed_seconds']
+        measured = dict(case=case, admission=result and result.get('admission'), runtime=costs, competing_delivery=child_costs, runtime_totals=totals,
+                        screening=sc['screening_cost'], fixture_setup_seconds=pg['setup_seconds'], fixture_setup=pg['setup_costs'],
+                        fixture_and_assertions={k: pg['fixture_costs'][k] - fixture_before[k] for k in fixture_before})
+        record_property('measured', json.dumps(measured, sort_keys=True))
+        print('V3_HANDOFF_MEASURED ' + json.dumps(measured, sort_keys=True))

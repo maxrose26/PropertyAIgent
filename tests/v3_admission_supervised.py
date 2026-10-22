@@ -24,7 +24,6 @@ def main():
 def race():
     """Competing disposable delivery: real restricted writer, no ledger access."""
     from sqlalchemy.engine import make_url
-    from dataclasses import fields
     from datetime import date, datetime
     from app.pipeline.discovery_contract import DiscoveryEnvelope, WindowEvidence
     from app.pipeline.discovery_admission import admit_identity
@@ -39,7 +38,9 @@ def race():
     value['window'] = WindowEvidence(**value['window'])
     value['discovered_at'] = datetime.fromisoformat(value['discovered_at'])
     value['displayed_references'] = tuple(value['displayed_references'])
-    value['fields'] = tuple(value['fields'])
+    if value['fields']:
+        raise ValueError('FIXTURE_EMPTY_LITERAL_ENVELOPE_ONLY')
+    value['fields'] = ()
     budget = DatabaseBudget()
     engine = budget.engine(raw)
     try:
