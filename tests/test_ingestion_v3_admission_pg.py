@@ -36,7 +36,7 @@ from verification.direct_reference.fixtures import summary
 from verification.discovery.idox_window import WindowConfig
 from verification.ingestion_storage import screening_v3_worker_sql
 from verification.ingestion_storage.new_identity_contract import accepted_idox_new_identity
-from verification.ingestion_storage.operational_controller import AcceptanceBinding, ControllerLedger, DatabaseBudget
+from verification.ingestion_storage.operational_controller import AcceptanceBinding, ControllerLedger, DatabaseBudget, execute
 from verification.ingestion_storage.retained_world import item
 from verification.ingestion_storage.v3_admission import V3AdmissionBinding, execute_retained_v3, factual_binding
 
@@ -104,9 +104,15 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
     cfg = WindowConfig(max_transport_retries=0)
     contract = IdoxListingContract('controller-idox', cfg, 'a' * 64)
     source = listing_audit(target)
+    if proposal != 'Erection of 20 residential dwellings':
+        from tests.test_discovery_idox_window import FORM, Response, page
+        from verification.discovery.idox_window import run
+        echo = FORM.replace(b'name="date(applicationReceivedStart)" value=""', b'name="date(applicationReceivedStart)" value="28/09/2026"').replace(b'name="date(applicationReceivedEnd)" value=""', b'name="date(applicationReceivedEnd)" value="04/10/2026"')
+        body = page(first=1, last=1, total=1, refs=(target['reference'],)).replace(b'keyVal=K0', ('keyVal='+target['source_identifier']).encode()).replace(b'Outline residential development, scale unknown', proposal.encode())
+        bodies = iter([FORM, body, body, echo])
+        source = run(lambda *args, **kwargs: Response(next(bodies)), cfg)
     capture = contract.project(source, outer(), DEFAULT_LIMITS)
     capture.pop('window')
-    capture['records'][0]['fields']['proposal']['value'] = proposal
     capture['durable_archive'] = dict(commit='a' * 40, path='docs/design/disposable.json', sha256=digest(source), bytes=len(json.dumps(source).encode()), readback_verified=True)
     rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
     record = capture['records'][0]
@@ -126,6 +132,7 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
     authority = 'INGESTION_TEST_v3_handoff'
     bindings = {r['key']: {k: r[k] for k in ('subject', 'task', 'contract', 'revision')} for r in [root, batch, screen, fact]}
     grant = dict(keys=list(bindings), contracts=[contract.name, 'listing-batch-v1', V3_CONTRACT, factual_contract.name], bindings=bindings, expires_at=time.time()+600, source_calls=1, writes=2, login='ingestion_worker_login', effect_login='ingestion_effect_login', workers=['one'], detail_source_keys=[fact['key']], screening_configs=[digest(rule.config())], completion_outcomes={'SCREENING': ['ADMIT_SCHEME', 'ADMIT_FOR_ASSESSMENT', 'ROUTE_COUNT_UNCONFIRMED', 'RETAIN_RELATED_TO_PARENT', 'RETAIN_NOT_RESIDENTIAL_SUPPLY', 'RETAIN_BELOW_THRESHOLD'], 'FACTUAL_REFRESH': ['SUPPORTED_FACTS_VERIFIED', 'ALREADY_KNOWN']})
+    grant['completion_outcomes']['LISTING_METADATA'] = ['BATCH_SCREENED']
     control['grants'][authority] = grant
     boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)", (json.dumps(control),))
     for row in [root, batch, fact]:
@@ -158,12 +165,33 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
     return dict(co=co, binding=binding, envelope=env, detail=detail, budget=budget, screening_cost=screening_cost, fact=fact, root=root, screen=screen, batch=batch, budgets=budgets, target=target)
 
 
-@pytest.mark.parametrize('case', ['exact', 'qualified', 'unknown', 'parent', 'known', 'unsupported', 'wrong_council', 'wrong_record', 'wrong_capture', 'wrong_config', 'wrong_code', 'wrong_fact', 'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'])
+def test_runtime_permission_denials(pg):
+    for role in ['ingestion_worker_login', 'ingestion_effect_login', 'ingestion_application_login']:
+        with pg['connect'](role) as c:
+            assert c.execute('SELECT rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=current_user').fetchone() == (False, False, False, False)
+            for capability in ['ingestion_storage_owner', 'ingestion_authority_issuer', 'ingestion_barrier_releaser']:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    c.execute('SET ROLE ' + capability)
+            for statement in ["UPDATE ingestion_work_items SET state='QUEUED'", 'DELETE FROM applications', 'UPDATE applications SET estimated_unit_count=20', 'UPDATE applications SET site_id=1', "UPDATE applications SET proposal='forged'", 'INSERT INTO sites DEFAULT VALUES']:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    c.execute(statement)
+
+
+@pytest.mark.parametrize('case', ['exact', 'qualified', 'unknown', 'parent', 'forged_v1', 'known', 'race', 'unsupported', 'wrong_council', 'wrong_record', 'wrong_capture', 'wrong_config', 'wrong_code', 'wrong_fact', 'wrong_source_id', 'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'])
 def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
-    proposal = {'qualified': 'Erection of up to 20 residential dwellings', 'unknown': 'Residential development, number of dwellings unknown', 'parent': 'Discharge of condition 3 attached to planning permission 01234/26'}.get(case, 'Erection of 20 residential dwellings')
+    proposal = {'qualified': 'Erection of up to 20 residential dwellings', 'unknown': 'Residential development, number of dwellings unknown', 'forged_v1': 'Residential development, number of dwellings unknown', 'parent': 'Discharge of condition 3 attached to planning permission 01234/26'}.get(case, 'Erection of 20 residential dwellings')
     sc = scenario(pg, case, proposal)
     co, b, budget = sc['co'], sc['binding'], sc['budget']
     boot, app = pg['boot'], pg['app']
+    # A separate already-authorised task must also be stopped by uncertainty.
+    other = dict(sc['fact'], key=digest(dict(other=case)), revision='other-' + case)
+    boot.execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)', (json.dumps(other),))
+    co.ledger.bindings[other['key']] = {k: other[k] for k in ('subject', 'task', 'contract', 'revision')}
+    ctl = boot.execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+    grant = ctl['grants'][co.ledger.authority]
+    grant['keys'].append(other['key'])
+    grant['bindings'][other['key']] = co.ledger.bindings[other['key']]
+    boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)", (json.dumps(ctl),))
     called = []
     def detail(_):
         called.append(1)
@@ -174,6 +202,14 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
             s.commit()
     if case == 'unsupported':
         _, sc['detail'], _ = projected(summary('01780/26', status='Awaiting decision', omit=('Decision', 'Decision Issued Date')))
+    if case == 'forged_v1':
+        row = boot.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s', (sc['screen']['key'],)).fetchone()[0]
+        row['disposition'] = 'SUPPORTED_PROCESSING_PRIORITY'
+        boot.execute('UPDATE ingestion_work_items SET checkpoint=%s::json WHERE key=%s', (json.dumps(row), sc['screen']['key']))
+    if case == 'wrong_source_id':
+        contract = co.contracts[b.factual_contract]
+        co.contracts[b.factual_contract] = replace(contract, row=dict(contract.row, source_identifier='OTHER'))
+        b = replace(b, factual_contract_sha256=factual_binding(co.contracts[b.factual_contract]))
     mutations = {'wrong_council': {'council': 'manchester'}, 'wrong_config': {'screening_config_sha256': '0'*64}, 'wrong_code': {'screening_code_sha256': '0'*64}, 'wrong_fact': {'factual_revision': 'other'}}
     if case in mutations:
         b = replace(b, **mutations[case])
@@ -195,12 +231,40 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
                 raise KeyboardInterrupt('disposable committed identity')
             raise RuntimeError('disposable committed identity')
         monkeypatch.setattr(admission, 'admit_identity', after)
+    if case == 'race':
+        # A second delivery wins between wrapper precheck and shared admission.
+        # Both deliveries use the real restricted application engine and writer;
+        # the one-connection contract deliberately serialises their DB effects.
+        import app.pipeline.discovery_admission as admission
+        from concurrent.futures import ThreadPoolExecutor
+        real = admission.admit_identity
+        def race(engine, envelope):
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                winner = pool.submit(real, engine, envelope).result(timeout=5)
+            assert winner['outcome'] == 'CREATED_PENDING'
+            return real(engine, envelope)
+        monkeypatch.setattr(admission, 'admit_identity', race)
     if case == 'b2_readback_failure':
         from sqlalchemy import event
         def reject_after_b2(connection, cursor, statement, parameters, context, many):
             if statement.lstrip().startswith('UPDATE applications'):
                 raise RuntimeError('disposable B2 failure')
         event.listen(co.ledger.engine, 'after_cursor_execute', reject_after_b2)
+    if case == 'committed_readback_failure':
+        committed = []
+        real_commit, real_scalar = Session.commit, Session.scalar
+        def commit(session):
+            b2 = session.bind is co.ledger.engine and any(isinstance(x, Application) and x.status is not None for x in session.dirty)
+            result = real_commit(session)
+            if b2:
+                committed.append(True)
+            return result
+        def scalar(session, *args, **kwargs):
+            if session.bind is co.ledger.engine and committed:
+                raise RuntimeError('disposable readback after acknowledged B2 commit')
+            return real_scalar(session, *args, **kwargs)
+        monkeypatch.setattr(Session, 'commit', commit)
+        monkeypatch.setattr(Session, 'scalar', scalar)
     if case == 'ledger_lost_ack':
         real_step = co.ledger._step
         def lost(op, *args, **kwargs):
@@ -212,12 +276,12 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
     before = boot.execute('SELECT count(*) FROM applications').fetchone()[0]
     result = None
     try:
-        if case.startswith('wrong_') or case in {'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
+        if case.startswith('wrong_') or case in {'forged_v1', 'missing_batch', 'expired', 'before_effect', 'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
             with pytest.raises(BaseException) as exc:
-                execute_retained_v3(co, b, detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
+                execute(co, b, listing_reader=lambda _: pytest.fail('no listing refetch'), detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
             assert not isinstance(exc.value, (AssertionError, TypeError, KeyError, AttributeError)), type(exc.value).__name__
         else:
-            result = execute_retained_v3(co, b, detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
+            result = execute(co, b, listing_reader=lambda _: pytest.fail('no listing refetch'), detail_reader=detail, envelope=sc['envelope'], council=get_council('bolton'), check=budget.check)
         after = boot.execute('SELECT count(*) FROM applications').fetchone()[0]
         if case in {'exact', 'qualified'}:
             assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED' and after == 1 and called == [1]
@@ -225,16 +289,23 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
         elif case == 'known':
             assert after == before == 1 and called == []
             assert boot.execute('SELECT status FROM applications').fetchone()[0] == 'PRESERVED'
+        elif case == 'race':
+            assert result['admission'] == 'EXISTING_IDENTITY_PRESERVED' and after == 1
+            assert boot.execute('SELECT status FROM applications').fetchone()[0] is None
         elif case in {'unknown', 'parent'}:
             assert result['admission'] == 'NOT_ATTEMPTED' and after == 0 and not called
         elif case == 'unsupported':
             assert result['factual']['identity'] == 'NOT_CREATED' and after == 0
-        elif case in {'after_admission', 'b2_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
+        elif case in {'after_admission', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack', 'interrupt_after_commit'}:
             assert after == 1
             phase = boot.execute('SELECT phase FROM ingestion_work_items WHERE key=%s', (sc['fact']['key'],)).fetchone()[0]
             assert phase == 'WRITE_INTENT'
             with pytest.raises(Exception):
                 co.ledger.claim(sc['fact']['key'])
+            with pytest.raises(Exception):
+                co.ledger.claim(other['key'])
+            if case in {'committed_readback_failure', 'ledger_lost_ack'}:
+                assert boot.execute('SELECT status FROM applications').fetchone()[0] == 'Decided'
             assert boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 1
         else:
             assert after == 0

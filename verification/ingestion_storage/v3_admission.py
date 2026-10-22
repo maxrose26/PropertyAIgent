@@ -12,7 +12,7 @@ from app.ingestion.ledger import Denied, digest
 from app.ingestion.listing_screening import RULE_V3, V3_CONTRACT, assessment_identity, code_binding, routing_of
 from app.ingestion.idox_adapter import IdoxListingContract
 from .new_identity_contract import accepted_idox_new_identity
-from .operational_controller import AcceptanceBinding, ControllerLedger, execute
+from .operational_controller import AcceptanceBinding, ControllerLedger, _execute
 
 
 @dataclass(frozen=True)
@@ -119,10 +119,10 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
             or factual['dependencies'] != [b.screening_key]
             or (factual['contract'], factual['revision']) != (binding.factual_contract, binding.factual_revision)
             or factual_binding(factual_contract) != binding.factual_contract_sha256
-            or (factual_contract.row['council'], factual_contract.row['reference'], factual_contract.row['source_url'])
-                != (binding.council, b.reference, b.source_url)):
+            or (factual_contract.row['council'], factual_contract.row['reference'], factual_contract.row['source_url'], factual_contract.row.get('source_identifier'))
+                != (binding.council, b.reference, b.source_url, b.source_record_id)):
         raise Denied('V3_FACTUAL_TASK_BINDING')
     def no_listing(_):
         raise Denied('V3_SOURCE_REFETCH_FORBIDDEN')
-    return execute(coordinator, b, listing_reader=no_listing, detail_reader=detail_reader,
+    return _execute(coordinator, b, listing_reader=no_listing, detail_reader=detail_reader,
                    envelope=envelope, council=council, check=check)

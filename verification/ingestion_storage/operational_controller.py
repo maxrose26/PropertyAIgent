@@ -278,6 +278,18 @@ class AcceptanceBinding:
 
 
 def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
+    # Real SQL v3 admission requires the complete retained nomination binding.
+    # Historical v1 and disposable Ledger callers keep their existing defaults.
+    from .v3_admission import V3AdmissionBinding,execute_retained_v3
+    if isinstance(binding,V3AdmissionBinding):
+        return execute_retained_v3(coordinator,binding,detail_reader=detail_reader,envelope=envelope,council=council,check=check)
+    from app.ingestion.listing_screening import RULE_V3
+    if isinstance(coordinator.ledger,ControllerLedger) and coordinator.screening_rule.rule_version==RULE_V3:
+        raise Denied('V3_RETAINED_NOMINATION_REQUIRED')
+    return _execute(coordinator,binding,listing_reader=listing_reader,detail_reader=detail_reader,envelope=envelope,council=council,check=check)
+
+
+def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
     """One observation, one nominated absent-DB identity, no substitution.
 
     All task bindings/allowances must already exist. No issue/grant/barrier API.
