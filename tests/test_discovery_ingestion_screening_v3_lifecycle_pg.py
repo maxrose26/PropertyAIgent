@@ -39,7 +39,7 @@ ROOT=Path(__file__).resolve().parents[1]
 G3=oo.GENERATION3_STOP
 NAME=orr.SV3_AUTHORITY+'_SCREEN'
 V3=ls.ScreeningRule(ls.RULE_V3,unit_threshold=10,link_related=False)
-FAULTS=['success','hosted_fails','hosted_publication_fails','authority_expires','owner_publication_fails','ready_wait_expires','altered_row','missing_row','wrong_revision','wrong_controller']
+FAULTS=['success','hosted_fails','hosted_publication_fails','authority_expires','owner_publication_fails','ready_wait_expires','altered_row','missing_row','wrong_revision','wrong_controller','interrupt_before_authority','interrupt_after_authority']      # the two interrupts are the operator's Ctrl-C (KeyboardInterrupt) before and after authority issuance
 EARLIER=('HISTORICAL_0','HISTORICAL_1',PROBE_NAME,OLDCAP,WINDOW_CAP,WINDOW_SCR)
 
 
@@ -132,6 +132,7 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
     github=GitHub(owner_journal.emit,lambda:holder['r'].check(),runner=counted_cli,bound=orr.PIPELINE_GITHUB_BOUND)
     orunner=Runner(registration,owner_journal,w.connector,source_reader=lambda row:(_ for _ in ()).throw(AssertionError('the owner never reads a source')),github=github,url_factory=w.uri,identity=w.role,memory=owner_scope);holder['r']=orunner
     orunner.pipeline_sleep=lambda s:time.sleep(min(s,1.0))
+    operator_lines=[];orunner.operator_output=operator_lines.append      # the owner's terminal messages, exactly as printed
     stop_codes=[];original_failed=orunner.failed
     def failed_with_code(exc):
         text=exc.args[0] if getattr(exc,'args',None) and isinstance(exc.args[0],str) else ''
@@ -147,8 +148,12 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
         subprocess.run(['sh','-c','"$0" -B -m tests.screening_v3_rehearsal "$1" >"$2" 2>&1 &',sys.executable,str(plan_path),str(tmp_path/'hosted.log')],env=env,check=True,timeout=20)
         spawned.append(True)
     original_await=orunner.await_any
+    awaits=[0]
     def await_any(relatives,seconds):      # the restricted job is dispatched only after the owner verified the retained world, exactly as the production sequence
+        awaits[0]+=1
+        if fault=='interrupt_before_authority':raise KeyboardInterrupt      # Ctrl-C at entry to the READY wait
         if not spawned and fault not in ('ready_wait_expires',):start_hosted()
+        if fault=='interrupt_after_authority' and awaits[0]==2:raise KeyboardInterrupt      # Ctrl-C once the allowance is registered and the owner waits for the result
         return original_await(relatives,seconds)
     orunner.await_any=await_any
     lines=[]
@@ -179,19 +184,33 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
     v3_count=w.boot.execute("SELECT count(*) FROM public.ingestion_work_items WHERE contract IN ('listing-screen-v3') OR (contract='listing-batch-v1' AND checkpoint::jsonb->'plan'->'screening' IS NOT NULL)").fetchone()[0]
     caps=orr.SV3_OWNER_LIMITS;ended_normally=result['status'].startswith('SCREENING_V3_RETAINED_COMPLETED')
     assert orunner.owner.opened==orunner.owner.closed and orunner.owner.connections<=(caps['connections'][0] if ended_normally else caps['connections'][1]) and orunner.owner.commands<=(caps['commands'][1] if ended_normally else caps['commands'][2]),summary
-    if fault in ('altered_row','missing_row','ready_wait_expires','wrong_revision','wrong_controller'):      # refused BEFORE any authority: nothing issued, nothing created
+    shown='\n'.join(operator_lines)      # the terminal messages: secret-free, and each only at its real stage
+    assert 'postgresql' not in shown and 'password' not in shown.lower() and 'secret' not in shown.lower()
+    stage=lambda n:shown.find('[%d/7]' % n);ready_at=shown.find('READY FOR HOSTED DISPATCH')
+    verified=fault not in ('altered_row','missing_row')
+    assert (stage(2)>=0)==verified and (ready_at>=0)==verified      # 'retained verified' and 'ready for dispatch' appear ONLY when the real verification and freshness checks passed
+    if verified:assert stage(2)<ready_at<stage(4) and 'Ctrl-C ends this attempt' in shown and 'Claude will dispatch' in shown and orr.SV3_HOSTED_AUTHORITY in shown
+    registered=fault in ('success','hosted_fails','hosted_publication_fails','authority_expires','owner_publication_fails','interrupt_after_authority')
+    assert (stage(5)>=0)==registered
+    if registered:assert stage(4)<stage(5)<stage(6)      # revocation is announced after registration, on the failure path too
+    else:assert stage(6)<0
+    final_text=orr.final_result_text(result);assert result['status'] in final_text and 'FINAL RESULT' in final_text
+    if fault in ('altered_row','missing_row','ready_wait_expires','wrong_revision','wrong_controller','interrupt_before_authority'):      # refused BEFORE any authority: nothing issued, nothing created
         assert result['status']=='STOP_RECONCILE_NO_RETRY' and not ours and v3_count==0 and w.boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()[0]==items_before
         assert result['authority_invalidation']=='NOT_REQUIRED_NO_AUTHORITY' and len(ctl_after['bolton_exceptions'])==6 and set(ctl_after['grants'])==set(ctl_before['grants'])
-        expected={'altered_row':'RETAINED_ASSESSMENT_ALTERED','missing_row':'RETAINED_ROW_MISSING','ready_wait_expires':'HOSTED_PUBLICATION_WAIT_EXPIRED','wrong_revision':'HOSTED_PUBLICATION_WAIT_EXPIRED','wrong_controller':'HOSTED_READY_BINDING'}[fault]
+        expected={'altered_row':'RETAINED_ASSESSMENT_ALTERED','missing_row':'RETAINED_ROW_MISSING','ready_wait_expires':'HOSTED_PUBLICATION_WAIT_EXPIRED','wrong_revision':'HOSTED_PUBLICATION_WAIT_EXPIRED','wrong_controller':'HOSTED_READY_BINDING','interrupt_before_authority':'NOT_A_FIXED_CODE'}[fault]
         assert stop_codes and stop_codes[0]['code']==expected,(stop_codes,hosted_log[-1200:])
-        assert (fault in ('ready_wait_expires','altered_row','missing_row')) == (not spawned)
+        if fault=='interrupt_before_authority':assert stop_codes[0]['exception']=='KeyboardInterrupt'
+        assert (fault in ('ready_wait_expires','altered_row','missing_row','interrupt_before_authority')) == (not spawned)
         return
     assert spawned and hosted_final is not None,hosted_log[-2500:]
     assert ours==[NAME] and ctl_after['bolton_exceptions'][NAME]['hard_stop_generation']==3 and len(ctl_after['bolton_exceptions'])==7 and ctl_after['grants'][NAME]['source_calls']==0 and ctl_after['grants'][NAME]['writes']==0      # the ONE name, registered through the named exemption only
     assert len(ctl_after['grants'][NAME]['keys'])==59 and ctl_after['grants'][NAME]['screening_configs']==[digest(V3.config())]
-    if fault in ('hosted_publication_fails','hosted_fails','authority_expires'):
+    if fault in ('hosted_publication_fails','hosted_fails','authority_expires','interrupt_after_authority'):
         assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') and result['cleanup']=='CLOSED'
-        if fault=='hosted_publication_fails':
+        if fault=='interrupt_after_authority':
+            assert result['status']=='STOP_RECONCILE_NO_RETRY' and stop_codes[0]['exception']=='KeyboardInterrupt'      # the operator's Ctrl-C after registration: the allowance is revoked (committed readback) before the owner exits
+        elif fault=='hosted_publication_fails':
             assert result['status']=='STOP_RECONCILE_NO_RETRY' and stop_codes[0]['code']=='HOSTED_PUBLICATION_WAIT_EXPIRED'
         else:
             assert hosted_final['status']=='STOP_RECONCILE_NO_RETRY' and result['status']=='SCREENING_V3_RETAINED_ENDED_INCOMPLETE_AUTHORITY_INVALIDATED' and result['screening']=='INCOMPLETE'

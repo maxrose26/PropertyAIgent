@@ -109,6 +109,8 @@ def test_every_binding_is_enforced_a_tampered_registration_is_refused(clone, mod
         'tree': (dict(r, tree='0' * 40), b'CLEAN_REVIEWED_CHECKOUT'),
         'authority': (dict(r, authority='AUTHORISE_SOMETHING_ELSE'), b'EXACT_OPERATIONAL_APPROVAL_REQUIRED'),
         'state': (dict(r, state_directory='another-state'), b'BINDING'),
+        'consumed_state': (dict(r, state_directory=orr.SV3_ATTEMPT1_STATE), b'BINDING'),      # the interrupted attempt's namespace can never be registered again
+        'predecessor_audit': (dict(r, predecessor=dict(r['predecessor'], interrupted_attempt={})), b'BINDING'),
         'limits': (dict(r, owner_limits=dict(connections=[99, 99], commands=[999, 999, 999])), b'BINDING'),
         'predecessor': (dict(r, predecessor={}), b'BINDING'),
         'hash': (dict(r, hashes=dict(r['hashes'], **{next(iter(r['hashes'])): '0' * 64})), b'REVIEWED_CONTENT_BINDING'),
@@ -132,7 +134,7 @@ def test_the_screening_registration_requires_the_installation_audit_and_control_
 
 # ------------------------------------------------------------------------------------------------ the owner scripts
 SCRIPTS = {'policy': ('owner-run-policy.sh', orr.SV3_POLICY_MODE, orr.SV3_POLICY_STATE, 'operational-bolton-policy-screening-v3-registration-20261030.json'),
-           'screening': ('owner-run-screening.sh', orr.SV3_MODE, orr.SV3_STATE, 'operational-bolton-screening-v3-retained-registration-20261030.json')}
+           'screening': ('owner-run-screening.sh', orr.SV3_MODE, orr.SV3_STATE, 'operational-bolton-screening-v3-retained-successor-registration-20261030.json')}
 
 
 @pytest.mark.parametrize('kind', SCRIPTS)

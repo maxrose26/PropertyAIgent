@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Owner-local SCREENING-V3 RETAINED-WINDOW run (PR #175). Run it in YOUR OWN visible WSL terminal, inside the validated PRIVATE GitHub session:
+# Owner-local SCREENING-V3 RETAINED-WINDOW run, SUCCESSOR ATTEMPT (PR #175 follow-up). ONE Ubuntu terminal (plus the GitHub approval page later), inside the validated PRIVATE GitHub session:
 #   bash docs/design/ingestion-screening-v3-activation-20261030/owner-run-screening.sh <commit> <tree> <registration-sha256>
 # One run per registration. The credential is entered ONLY at the hidden prompt, validated against the complete route BEFORE the registration is consumed.
-# It verifies the 30 retained rows and the absence of the 29 new items, waits for the restricted GitHub job's READY marker, registers the ONE named source-free screening allowance, waits for the job's result, then ENDS the
-# allowance (revocation-only invalidation with readback), publishes inside the enforced envelope, closes and seals. No credential, membership, role setting or secret is changed.
+# The controller prints seven numbered, secret-free progress messages from its actual stages (credential accepted, retained records verified, READY FOR HOSTED DISPATCH, waiting, authority registered, revocation and cleanup, final result).
+# It verifies the 30 retained rows and the absence of the 29 new items, waits for the restricted GitHub job's READY marker, registers the ONE named source-free screening allowance, waits for the result, then ENDS the allowance
+# (revocation-only invalidation with readback), publishes inside the enforced envelope, closes and seals. No credential, membership, role setting or secret is changed. Nothing here dispatches the hosted workflow.
+# Ctrl-C ENDS THE ATTEMPT (safely: before registration nothing is issued; afterwards the owner revokes the allowance before it exits) and the attempt is then spent.
 # ATTENDANCE is bounded by this mode's own deadlines: preparation, then up to 1800 s READY wait (queueing and protected-environment approval, outside the grant), then the 900 s grant (600 s execution + 300 s cleanup), all inside
 # the 4200 s job deadline (70 minutes). The 4600 s (about 77 minutes) systemd RuntimeMaxSec below is the INHERITED kernel outer limit, not this mode's deadline. KEEP THIS TERMINAL OPEN until controller_exit_status is printed.
 [[ $# = 3 && "$1" =~ ^[a-f0-9]{40}$ && "$2" =~ ^[a-f0-9]{40}$ && "$3" =~ ^[a-f0-9]{64}$ ]] || { echo 'USAGE: owner-run-screening.sh <commit40> <tree40> <registration-sha256>'; exit 2; }
 COMMIT=$1; TREE=$2; REGISTRATION_SHA256=$3
-REGISTRATION="$HOME/stage4-owner/operational-bolton-screening-v3-retained-registration-20261030.json"
-STATE_DIRECTORY=operational-bolton-screening-v3-retained-once-20261030
+REGISTRATION="$HOME/stage4-owner/operational-bolton-screening-v3-retained-successor-registration-20261030.json"
+STATE_DIRECTORY=operational-bolton-screening-v3-retained-successor-once-20261030
 set -euo pipefail
 umask 077
 STATE_ROOT="$HOME/.local/state/propertyaigent"
@@ -52,6 +54,10 @@ printf '%s  %s\n%s  %s\n%s  %s\n%s  %s\n' \
   b019c9642e0d865181363aff1b0e49238b468de286c758c69eeb637f536c73fe "$STATE_ROOT/operational-policy-window-allowance-once-20261023/final-result.json" \
   c84ee8b4edad66d224b978403d73800dba4683ddf5d9684a4afe69264fda83c2 "$STATE_ROOT/operational-bolton-window-demonstration-once-20261023/events.jsonl" \
   8f5ec37f94c78c7e004ebd4a6a1ca1b64aa20aa141750aa6522623f05b72085e "$STATE_ROOT/operational-bolton-window-demonstration-once-20261023/final-result.json" | sha256sum --check
+# The interrupted FIRST screening attempt (stopped in the READY wait, no authority issued, nothing dispatched) must be exactly as archived. It is preserved and never touched.
+printf '%s  %s\n%s  %s\n' \
+  f3eb84a4c469e26af2d5bd173653c95f8213e74bd0f6860a43c241a489279f84 "$STATE_ROOT/operational-bolton-screening-v3-retained-once-20261030/events.jsonl" \
+  8c784e81b98c520f3306552b97908febbc36d1c58b8995aeb1c40f7947df77cd "$STATE_ROOT/operational-bolton-screening-v3-retained-once-20261030/final-result.json" | sha256sum --check
 scope_state="$(timeout 10s systemctl --user show propertyaigent-operational-once.scope -p LoadState --value)" || { echo 'SCOPE_STATE_UNKNOWN: refusing to launch'; exit 3; }
 [[ "$scope_state" = not-found ]] || { echo "SCOPE_PRESENT_OR_UNKNOWN ($scope_state): refusing to launch"; exit 3; }
 # The screening-v3 installation ceremony this run depends on must be exactly as bound in the registration.
@@ -68,13 +74,17 @@ rm -f "$EVIDENCE_HEAD_FILE"
 printf 'owner_preparation_github_cli_invocations=2\n'
 
 printf '%s\n' \
-  'SCREENING-V3 RETAINED-WINDOW ASSESSMENT (the 24 retained Bolton RECEIVED applications, 28 September to 4 October 2026). Effects:' \
-  '  0. ONE bounded hidden prompt (120 seconds), validated against the complete exact route BEFORE the registration is consumed.' \
-  '  1. a READ-ONLY readback of the exact final inventory (policy v6 + v3 worker), the generation-3 stop state and the control record; the 30 retained rows are verified against the pinned evidence and the 29 new items must be absent. Any mismatch ends the run with nothing issued.' \
-  '  2. Claude dispatches the restricted GitHub job ONCE; you approve the protected environment in GitHub. Queueing and approval are outside the grant lifetime (up to 30 minutes of waiting).' \
-  '  3. after the job publishes its READY marker and this controller verifies it, ONE named source-free screening allowance + exception is registered (900-second grant, 600-second execution deadline, 300-second cleanup reserve, source_calls=0, writes=0).' \
-  '  4. the restricted job screens the 24 records; this controller then ENDS the allowance with committed readbacks, publishes inside the enforced envelope, closes and seals.' \
-  '  5. NO stop, credential, membership, role setting or secret is changed. Any stop or failure ends the allowance and retains diagnostics; nothing is retried or replaced.' \
+  'SCREENING-V3 RETAINED-WINDOW ASSESSMENT, SUCCESSOR ATTEMPT (the 24 retained Bolton RECEIVED applications, 28 September to 4 October 2026).' \
+  'ONE terminal: this window prints seven numbered progress messages. The only other thing you need is the GitHub approval page, later.' \
+  '  [1/7] hidden prompt (120 seconds), validated against the complete exact route BEFORE the registration is consumed.' \
+  '  [2/7] the 30 retained rows are verified against the pinned evidence and the 29 new items must be absent (read-only; nothing issued).' \
+  '  [3/7] READY FOR HOSTED DISPATCH: paste that message into the Claude chat. Claude dispatches the hosted workflow ONCE; you approve the run in GitHub (Review deployments).' \
+  '  [4/7] waiting for the hosted job to publish its READY marker (expected to take minutes; at most 30 minutes; outside the grant lifetime).' \
+  '  [5/7] the owner registers the ONE named source-free allowance (900-second grant, 600-second execution deadline, 300-second cleanup reserve, source_calls=0, writes=0) and the hosted job screens the 24 records.' \
+  '  [6/7] the owner ENDS the allowance with committed readbacks, publishes inside the enforced envelope, closes and seals.' \
+  '  [7/7] final result. NO stop, credential, membership, role setting or secret is changed.' \
+  'Ctrl-C ENDS THIS ATTEMPT. Until [5/7] appears nothing has been issued, except that the allowance may be in the middle of being registered, and the owner revokes it before exiting.' \
+  'If Ctrl-C lands at the very instant of registration the result can be marked uncertain: then do nothing further, report it, and the allowance expires by itself within 900 seconds. Either way the attempt is spent and nothing is retried or replaced.' \
   'Keep this terminal open until controller_exit_status is printed (at most about 70 minutes by this mode deadlines).'
 printf '%s\n' 'The 120-second hidden-input timer starts at the prompt below (you are asked once).'
 set +e
