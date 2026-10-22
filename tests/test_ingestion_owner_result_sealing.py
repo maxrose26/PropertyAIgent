@@ -104,8 +104,8 @@ def test_a_closure_failure_is_reported_as_uncertain_cleanup_while_the_publicatio
 
 def test_both_owner_tails_use_the_sealing_method_and_none_publishes_after_closing_the_scope():
     text=(ROOT/'verification/ingestion_storage/operational_runner.py').read_text()
-    assert text.count('return self.seal_owner_result(result,lambda pending:self.publish_owner(pending))')==2      # pipeline (stable, capture, window) and the form probe
-    assert text.count("self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',memory_close=False)")==2
+    assert text.count('return self.seal_owner_result(result,lambda pending:self.publish_owner(pending))')==3      # pipeline (stable, capture, window), the form probe and the screening-v3 retained-window tail
+    assert text.count("self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED',memory_close=False)")==3
     assert "self.closure('AUTHORITY_INVALIDATED_STANDING_CREDENTIALS_UNCHANGED')\n" not in text      # no tail closes the scope before publishing
     body=text[text.index('    def publish_owner'):text.index('    def seal_owner_result')]
     assert body.count('github.publish')==1      # the only owner publication is the one inside the reserve
