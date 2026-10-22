@@ -170,3 +170,10 @@ def test_current_combined_predicate_is_bolton_received_exact_and_null_safe():
             query="SELECT %s FROM (SELECT %%s::jsonb AS g) q,(SELECT %%s::json AS checkpoint,%%s::json AS subject) w" % guard
             result=conn.execute(query,(json.dumps(dict(observation_councils=enable)),json.dumps(dict(kind='LISTING_OBSERVATION_V1')),json.dumps(dict(council=council,semantics=semantics)))).fetchone()[0]
             assert result is not (council=='bolton' and semantics=='RECEIVED' and enable==['bolton'])
+
+
+def test_runtime_worker_body_pin_matches_the_mechanical_replacement():
+    import hashlib
+    from app.ingestion.observation_screening import OBSERVATION_WORKER_BODY_SHA256
+    body=re.search(r'AS \$fn\$(.*?)\$fn\$;',ow.installation_script(),re.S).group(1)
+    assert hashlib.sha256(body.encode()).hexdigest()==OBSERVATION_WORKER_BODY_SHA256

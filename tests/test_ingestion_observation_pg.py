@@ -70,7 +70,10 @@ def world(pg, request, record_property):
         co=Coordinator(ledger,{'controller-idox':contract()},screening_rules={(selected or rule).contract():selected or rule},observation_councils=('bolton',) if enabled else ())
         return co,budget
     def close(budget):
-        costs=budget.close([]);all_costs.append(costs)
+        costs=budget.close([])
+        prior=budget.previous or {}
+        increments={k:costs[k]-prior.get(k,0) for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds')}
+        all_costs.append(dict(receipt=costs,prior_receipt_sha256=digest(prior) if prior else None,incremental=increments))
         assert costs['cleanup']=='CLOSED' and costs['connections_opened']==costs['connections_closed_count']
         return costs
     def reader(_):reads.append(1);return audit,outer()
@@ -166,7 +169,7 @@ def test_partial_rejected_by_complete_admission_and_resume(world):
         with pytest.raises(Denied,match='V3_COMPLETE_IDOX_CAPTURE_REQUIRED'):execute(co,binding,listing_reader=lambda _:pytest.fail('refetch'),detail_reader=lambda _:pytest.fail('detail'),envelope=envelope(),council=get_council('bolton'))
         b.capture_checkpoint_sha256=digest(co.ledger.get(root['key'])['checkpoint'])
     finally:prior=w['close'](b)
-    co,b=w['client'](root['key'],previous=prior)
+    co,b=w['client'](p['key'],previous=prior)
     try:
         with pytest.raises(Denied,match='RETAINED_CAPTURE_BINDING'):resume_capture(co,root['key'],checkpoint_sha256=digest(obs),prior_accounting_sha256=digest(prior),screening_keys=[])
     finally:w['close'](b)
@@ -323,4 +326,17 @@ def test_committed_checkpoint_acknowledgement_loss_is_not_auto_resumed(world,mon
         ctl=w['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
         assert ctl['global_stop'] is not None
         assert w['reads']==[1]
+    finally:w['close'](b)
+
+
+def test_direct_shared_coordinator_is_disabled_by_rollback(world):
+    w=world;root=w['seed']()
+    with w['pg']['connect']('provisioning_migrator') as c:c.execute(ow.rollback_script())
+    co,b=w['client'](root['key'])
+    try:
+        claim=co.ledger.claim(root['key'])
+        with pytest.raises(Denied,match='OBSERVATION_WORKER_NOT_INSTALLED'):
+            co.idox_source(claim,w['reader'],materialize=False,archive=w['archive'])
+        assert co.ledger.get(root['key'])['phase']=='CLAIMED'
+        assert not w['reads']
     finally:w['close'](b)

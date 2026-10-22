@@ -153,6 +153,12 @@ class Coordinator:
         c=contract.config
         if row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}:raise Denied('IDOX_TASK_SCOPE')
         if row['checkpoint'] is not None:raise Denied('RESUME_CHECKPOINT_NO_SOURCE_REPLAY')
+        if self.observation_councils:
+            from .observation_screening import require_enabled,require_observation_worker
+            require_enabled(self.observation_councils,c.council)
+            if not contract.partial_observation:raise Denied('PARTIAL_OBSERVATION_NOT_ENABLED')
+            if self.screening_rule.rule_version!=RULE_V1 and self.screening_rule.link_related:raise Denied('BOUNDED_OBSERVATION_HISTORY_SELECTION_REQUIRED')
+            require_observation_worker(self.ledger)
         self.ledger.intent(claim,'source_calls')
         try:
             source,outer=supervised_reader(row)

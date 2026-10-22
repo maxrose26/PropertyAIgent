@@ -43,7 +43,8 @@ Complete-receipt and historical v1 task identities remain unchanged.
 - retain_observation is a real ControllerLedger/DatabaseBudget controller seam,
   not a disposable Ledger shortcut or a production CLI. The controller checks
   the exact installed worker body/owner/search path/security-definer profile
-  through the restricted connection before claim/source effects. Rollback
+  through the restricted connection before source intent/calls. A claim may
+  already exist and remains for explicit recovery if that gate refuses. Rollback
   disables this entrypoint before any observation can be stored. Source-free recovery
   requires a sealed prior receipt and separately authorised operator claim
   recovery; an unresolved source intent is never replayed. The fixture activates
