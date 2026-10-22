@@ -42,8 +42,8 @@ public-availability proof. No completed-through or watermark is advanced.
   journal, expected head, non-forced update, Git blob identity and committed-path
   readback. Publisher credentials are never passed to source processes.
 - Existing `OperationalMemory`: kernel 1 GiB source / 1.5 GiB aggregate containment,
-  256 MiB controller; final publication remains kernel limited to 256 MiB after
-  source/controller subgroups are positively removed. No RLIMIT_AS workaround.
+  256 MiB controller, kept active through final publication. Owned subgroups are
+  positively removed afterwards. No parent-limit permission or RLIMIT_AS workaround.
 
 Necessary integration correction: the Arcus supervisor previously admitted only
 hosted runners. An opt-in `four-council-owner-local` context is now admitted only
@@ -246,13 +246,16 @@ failure audit is published before stop-all. Malformed/unbound proof remains loca
 with a hash/path in the result; no unsafe body is exported to explain a failure.
 Unwritable or oversized output stops without truncating it or claiming COMPLETE.
 
-All source processes are closed on success AND failure. After positive group and
-socket/child checks, the memory subgroups are removed; aggregate kernel containment
-continues, narrowed to 256 MiB for final publication. Outer systemd scope removal
-on process exit is not retrospectively claimed. Final publication does not run
-after closing all memory enforcement.
+All source processes are closed on success AND failure. After positive source-group
+and socket/child checks, final publication occurs with the existing controller
+256 MiB and aggregate1.5 GiB limits still enforced. Then memory.close removes the
+owned subgroups exactly once on success or failure, with no subsequent API call.
+The parent memory.max is never changed. Outer systemd scope removal on process
+exit is not retrospectively claimed.
 
-The complete operational chain is sealed before final archival and hash-verified.
+The complete source/control/publication-prefix chain is sealed before final archival
+and hash-verified. Its cleanup is explicitly PENDING_MEMORY_SCOPE_CLOSURE; only the
+local sealed result after final publication and memory.close may say CLOSED.
 The final archive includes that exact `events.jsonl`, the before-publication result
 and `HASHES.json`. Its own publication intent/ack chain is necessarily separate:
 an archive cannot contain the acknowledgement of its own upload. The local sealed

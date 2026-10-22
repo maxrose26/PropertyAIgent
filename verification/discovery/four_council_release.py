@@ -221,9 +221,7 @@ class Launcher:
     def deadline(self):
         if self.clock()-self.start>=LIMITS['package_seconds']-10:raise Stop('PACKAGE_DEADLINE')
         if not stamp(self.r['issued_at'])<=self.wall()<stamp(self.r['expires_at']):raise Stop('REGISTRATION_EXPIRED_OR_FUTURE')
-        if self.memory_closed:
-            if self.memory.root.joinpath('memory.max').read_text().strip()!=str(256*1024**2) or self.memory.root.joinpath('memory.swap.max').read_text().strip()!='0':raise Stop('FINAL_MEMORY_ENFORCEMENT')
-        else:self.memory.snapshot()
+        self.memory.snapshot()
         if self.slot_deadline is not None and self.clock()>=self.slot_deadline:raise Stop('SLOT_JOB_DEADLINE')
     def poll(self,*,active=False):
         self.deadline()
@@ -336,11 +334,9 @@ class Launcher:
                 import psutil
                 children=psutil.Process().children(recursive=True)
                 new=sockets()-self.baseline
-                closure=self.memory.close()
-                self.memory.root.joinpath('memory.max').write_text(str(256*1024**2))
-                self.memory_closed=True
+                closure=dict(memory=self.memory.snapshot(),owned_groups_removed=False,owned_survivors=0)
                 if children or new:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
-                process='CLOSED'
+                process='PENDING_MEMORY_SCOPE_CLOSURE'
             except BaseException:process='UNCERTAIN'
         result=dict(version=VERSION,release_id=self.r['release_id'],
             status='FOUR_COMPLETE' if reason is None and len(self.results)==4 else 'STOP_RECONCILE_NO_RETRY',
@@ -352,9 +348,9 @@ class Launcher:
                 attempted_exported_bytes=self.exported,supervised_seconds=self.clock()-self.start),
             process_cleanup=process,owned_cleanup=closure,publication=publication,
             source_contract_cleanup='UNCERTAIN' if self.source_cleanup_uncertain else 'NO_UNRESOLVED_CLOSURE',
-            cleanup='CLOSED' if process=='CLOSED' and publication!='UNCERTAIN' and not self.source_cleanup_uncertain else 'UNCERTAIN',
+            cleanup='PENDING_MEMORY_SCOPE_CLOSURE' if process=='PENDING_MEMORY_SCOPE_CLOSURE' and publication!='UNCERTAIN' and not self.source_cleanup_uncertain else 'UNCERTAIN',
             database_connections=0,application_writes=0,coverage_advance=False,preserved_stops=PRESERVED)
-        if process!='CLOSED':result['status']='STOP_RECONCILE_NO_RETRY'
+        if process!='PENDING_MEMORY_SCOPE_CLOSURE':result['status']='STOP_RECONCILE_NO_RETRY'
         return result
 
 
@@ -443,11 +439,18 @@ def finish(launch,journal,result,root):
     except BaseException:
         result.update(status='STOP_RECONCILE_NO_RETRY',final_publication='UNCERTAIN_OR_HELD')
     publication_journal.close()
+    final_clean=False
     try:
         final_children=__import__('psutil').Process().children(recursive=True)
         final_sockets=sockets()-launch.baseline
-        if final_children or final_sockets:raise Stop('FINAL_PROCESS_CLOSURE')
-        result['final_process_cleanup']='CLOSED'
+        final_clean=not final_children and not final_sockets
+    except BaseException:pass
+    try:
+        result['owned_cleanup']=launch.memory.close()
+        launch.memory_closed=True
+        if not final_clean:raise Stop('FINAL_PROCESS_CLOSURE')
+        result.update(final_process_cleanup='CLOSED',process_cleanup='CLOSED',
+            cleanup='UNCERTAIN' if launch.source_cleanup_uncertain else 'CLOSED')
     except BaseException:
         result.update(status='STOP_RECONCILE_NO_RETRY',process_cleanup='UNCERTAIN',final_process_cleanup='UNCERTAIN',cleanup='UNCERTAIN')
     if github.mutation_uncertain:result['cleanup']='UNCERTAIN'

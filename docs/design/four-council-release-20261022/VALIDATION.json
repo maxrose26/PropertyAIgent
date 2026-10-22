@@ -2,30 +2,30 @@
   "baseline": "608aa07d496ff00ccd405dc77de31eb6bbfc6edd",
   "baseline_tree": "dab51f217310ef19b1e4a3d4c8e2de40df69e8ea",
   "scope": "OFFLINE_FIXTURES_NO_COUNCIL_OR_PRODUCTION",
-  "tests": 154,
-  "junit_sha256": "b6cda37801e5a757a8d9da247c29f4c53218b7b7abb26d92ae9ce03ae5aa22e4",
+  "tests": 155,
+  "junit_sha256": "b18b367cca27e810fce8cd21f840dfa5a8c2df037ce51b3d0561ac7eb3bd929c",
   "measurements": [
     {
       "case": "test_complete_reporting_and_archive[none]",
-      "test_seconds": "0.124",
+      "test_seconds": "0.120",
       "properties": {
-        "complete_active_seconds": "0.029791134009428788",
-        "complete_attempted_exported_bytes": "93922",
+        "complete_active_seconds": "0.028712512001220603",
+        "complete_attempted_exported_bytes": "94012",
         "complete_github_requests": "81",
         "complete_observed_mixed_source_bytes": "11856",
         "complete_observed_requests": "14",
         "complete_observed_worker_seconds": "0.037",
         "complete_publication_requests": "70",
         "complete_reservations": "[{\"bytes\": 3000000, \"index\": 0, \"requests\": 10}, {\"bytes\": 20971520, \"index\": 1, \"requests\": 80}, {\"bytes\": 3000000, \"index\": 2, \"requests\": 10}, {\"bytes\": 3000000, \"index\": 3, \"requests\": 10}]",
-        "complete_supervised_seconds": "0.11823606499820016"
+        "complete_supervised_seconds": "0.11245096300262958"
       }
     },
     {
       "case": "test_actual_complete_cli_with_fixture_boundaries[none]",
-      "test_seconds": "0.459",
+      "test_seconds": "0.540",
       "properties": {
         "fault": "none",
-        "accounting": "{\"active_seconds\": 0.0448799220030196, \"attempted_exported_bytes\": 97845, \"github_requests\": 85, \"observed_mixed_source_bytes\": 11856, \"observed_requests\": 14, \"observed_worker_seconds\": 0.046, \"publication_requests\": 70, \"reservations\": [{\"bytes\": 3000000, \"index\": 0, \"requests\": 10}, {\"bytes\": 20971520, \"index\": 1, \"requests\": 80}, {\"bytes\": 3000000, \"index\": 2, \"requests\": 10}, {\"bytes\": 3000000, \"index\": 3, \"requests\": 10}], \"supervised_seconds\": 0.1569632390019251}"
+        "accounting": "{\"active_seconds\": 0.04918530100258067, \"attempted_exported_bytes\": 97968, \"github_requests\": 85, \"observed_mixed_source_bytes\": 11856, \"observed_requests\": 14, \"observed_worker_seconds\": 0.049999999999999996, \"publication_requests\": 70, \"reservations\": [{\"bytes\": 3000000, \"index\": 0, \"requests\": 10}, {\"bytes\": 20971520, \"index\": 1, \"requests\": 80}, {\"bytes\": 3000000, \"index\": 2, \"requests\": 10}, {\"bytes\": 3000000, \"index\": 3, \"requests\": 10}], \"supervised_seconds\": 0.16308402999857208}"
       }
     }
   ],
@@ -37,5 +37,9 @@
     "actual readers, proof, classifier, launcher/main and publisher algorithms are reused",
     "local process closure uses contract double because host /proc PIDs differ; native cgroup rehearsal is hosted CI",
     "no inference about historical public availability or current council shape"
+  ],
+  "review_corrections": [
+    "final publication stays within existing controller256MiB; close once afterwards; never mutate parent memory.max",
+    "archive closure pending until authoritative local final readback"
   ]
 }

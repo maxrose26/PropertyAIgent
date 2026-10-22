@@ -133,8 +133,8 @@ def world(tmp_path,monkeypatch):
 
 def test_four_successful_scopes_in_order(world,record_property):
     reg,api,memory,source,launch=world;out=launch.execute()
-    assert out['status']=='FOUR_COMPLETE' and out['cleanup']=='CLOSED'
-    assert source.calls==[0,1,2,3] and memory.closed
+    assert out['status']=='FOUR_COMPLETE' and out['cleanup']=='PENDING_MEMORY_SCOPE_CLOSURE'
+    assert source.calls==[0,1,2,3] and not memory.closed
     assert out['database_connections']==out['application_writes']==0
     assert launch.github.requests<320 and launch.publication_calls<=80
     assert out['accounting']['observed_requests']==14
@@ -146,7 +146,7 @@ def test_bury_unknown_never_starts_other_council(world):
     *_,source,launch=world;source.unknown=True;out=launch.execute()
     assert source.calls==[0] and out['reason']=='STOP_ALL_NON_COMPLETE'
     assert out['results'][0]['outcome']=='UNKNOWN' and len(out['not_attempted'])==3
-    assert out['cleanup']=='CLOSED'
+    assert out['cleanup']=='PENDING_MEMORY_SCOPE_CLOSURE'
 
 @pytest.mark.parametrize('index',range(4))
 def test_source_failure_each_position(world,index):
@@ -215,10 +215,13 @@ def test_export_bound_prevents_publication(world,monkeypatch):
     out=launch.execute();assert not source.calls and out['reason']=='PUBLICATION_OR_EXPORT_BOUND'
 
 
-def test_cleanup_failure_not_closed(world):
+def test_cleanup_failure_not_closed(world,tmp_path):
     *_,source,launch=world
     launch.memory.close=lambda:(_ for _ in ()).throw(OSError())
-    out=launch.execute();assert out['cleanup']=='UNCERTAIN' and out['status']=='STOP_RECONCILE_NO_RETRY'
+    out=launch.execute();journal=r.Journal(tmp_path/'events.jsonl')
+    r.finish(launch,journal,out,tmp_path)
+    final=json.loads((tmp_path/'final-result.json').read_bytes())
+    assert final['cleanup']=='UNCERTAIN' and final['status']=='STOP_RECONCILE_NO_RETRY'
 
 
 def test_private_source_command_and_clean_environment(tmp_path,monkeypatch):
@@ -377,3 +380,19 @@ def test_actual_idox_cumulative_crossing_keeps_prior_rows_and_stops():
     assert len(calls)==5 and len(out['records'])==50 and out['enumeration_evidence']=='ROW_CAP'
     assert out['row_limit_exceeded']['previously_retained_rows']==50 and out['row_limit_exceeded']['observed_page_rows']==11
     assert out['resource']['requests_attempted']==5 and not out['resource']['budget_exhaustion']
+
+
+def test_final_publication_before_close_without_parent_limit_mutation(world,tmp_path):
+    reg,api,memory,source,launch=world
+    journal=r.Journal(tmp_path/'events.jsonl');launch.emit=journal.emit;launch.github.emit=journal.emit
+    out=launch.execute()
+    assert not memory.closed
+    # Final API checks must still use the original enforcing memory contract.
+    original=api.runner
+    def enforce(command,**kwargs):
+        assert not memory.closed
+        assert (memory.root/'memory.max').read_text()==str(1536*1024**2)
+        return original(command,**kwargs)
+    launch.github.runner=enforce
+    assert r.finish(launch,journal,out,tmp_path)==0 and memory.closed
+    assert (memory.root/'memory.max').read_text()==str(1536*1024**2)
