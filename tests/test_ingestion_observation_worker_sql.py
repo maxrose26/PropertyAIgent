@@ -151,3 +151,22 @@ def test_current_v3_reconciliation_is_reversible_and_single_function_only():
     # All non-worker definitions, including stop/exception/recovery, are exact.
     f=lambda s:re.sub(r'CREATE FUNCTION public.ingestion_worker_step\(.*?\$fn\$;', '',s,flags=re.S)
     assert f(combined)==f(current)
+
+
+def test_committed_install_and_rollback_text_match_the_mechanical_derivation():
+    from pathlib import Path
+    root=Path('docs/design/ingestion-partial-observation-20261022')
+    assert (root/'worker-step-observation.sql').read_text()==ow.installation_script()
+    assert (root/'worker-step-v3-rollback.sql').read_text()==ow.rollback_script()
+
+
+def test_current_combined_predicate_is_bolton_received_exact_and_null_safe():
+    # Evaluate the current predicate through PostgreSQL, separate from PR164's
+    # historical two-site matrix. No grant is issued and no ledger row changed.
+    guard=next(new for old,new in ow.combined_sites() if old==ow.SITE_CHECKPOINT[0]).split(ow.ANCHOR,1)[1]
+    assert guard.endswith(' IS DISTINCT FROM true')
+    with connection() as conn:
+        for council,semantics,enable in itertools.product(('bolton','bury',None),('RECEIVED','VALIDATED',None),([],['bolton'],['bury'],['bolton','bury'],None,'bolton')):
+            query="SELECT %s FROM (SELECT %%s::jsonb AS g) q,(SELECT %%s::json AS checkpoint,%%s::json AS subject) w" % guard
+            result=conn.execute(query,(json.dumps(dict(observation_councils=enable)),json.dumps(dict(kind='LISTING_OBSERVATION_V1')),json.dumps(dict(council=council,semantics=semantics)))).fetchone()[0]
+            assert result is not (council=='bolton' and semantics=='RECEIVED' and enable==['bolton'])

@@ -41,9 +41,13 @@ Complete-receipt and historical v1 task identities remain unchanged.
   Restricted callers select link_related=False; history is a separate bounded
   read, never a reason to supply an Application engine.
 - retain_observation is a real ControllerLedger/DatabaseBudget controller seam,
-  not a disposable Ledger shortcut or a production CLI. Source-free recovery
+  not a disposable Ledger shortcut or a production CLI. The controller checks
+  the exact installed worker body/owner/search path/security-definer profile
+  through the restricted connection before claim/source effects. Rollback
+  disables this entrypoint before any observation can be stored. Source-free recovery
   requires a sealed prior receipt and separately authorised operator claim
-  recovery; an unresolved source intent is never replayed.
+  recovery; an unresolved source intent is never replayed. The fixture activates
+  the already mapped restricted recovery login only in disposable PostgreSQL.
 - Existing observation_history is rebuilt over immutable explicitly named
   checkpoints. Exact duplicate evidence delivery is idempotent; distinct
   observations and assessments are preserved, with no current/supersedes state.

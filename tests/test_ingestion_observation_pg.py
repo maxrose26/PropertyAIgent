@@ -15,7 +15,7 @@ from tests.test_discovery_ingestion_ledger import outer
 from app.ingestion.ledger import Denied, digest
 from app.ingestion.batching import batch_plans, process_batch, capture_once
 from app.ingestion.coordinator import Coordinator
-from app.ingestion.listing_screening import ScreeningRule, RULE_V1, RULE_V3, V3_CONTRACT, assessment_identity, code_binding
+from app.ingestion.listing_screening import ScreeningRule, RULE_V1, RULE_V3, V3_CONTRACT, assessment_identity, code_binding, ROUTING_VOCABULARY
 from app.ingestion.observation_screening import retained_history
 from verification.ingestion_storage.observation_controller import retain_observation
 from app.ingestion.observation_history import empty_history, append
@@ -34,6 +34,7 @@ def world(pg, request, record_property):
     tmp_path.mkdir()
     before=dict(pg['fixture_costs'])
     boot=pg['boot']
+    boot.execute('ALTER ROLE ingestion_recovery_login LOGIN')  # existing mapped restricted capability, fixture only
     with pg['connect']('provisioning_migrator') as c:c.execute(ow.installation_script())
     boot.execute('DELETE FROM ingestion_work_attempts')
     boot.execute("DELETE FROM ingestion_work_items WHERE key<>repeat('0',64)")
@@ -58,6 +59,7 @@ def world(pg, request, record_property):
         save()
         return root
     def save():
+        grant['completion_outcomes']['SCREENING']=sorted(set(ROUTING_VOCABULARY[RULE_V1])|set(ROUTING_VOCABULARY[RULE_V3]))
         ctl=boot.execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
         ctl['grants']['INGESTION_TEST_observation']=grant
         boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
@@ -161,7 +163,7 @@ def test_partial_rejected_by_complete_admission_and_resume(world):
         with pytest.raises(Denied,match='RETAINED_CAPTURE_BINDING'):assessment_plan(co,root['key'],capture_sha256=digest(obs),batch_keys=[p['key']],preserved_keys=[root['key']])
         nominee=AcceptanceBinding(root['key'],'s'*64,'f'*64,obs['records'][0]['reference'],'url','key','0'*64,digest(obs),'0'*64,p['key'])
         binding=V3AdmissionBinding(nominee,'bolton','controller-idox','one',digest(w['rule'].config()),digest(code_binding()),'fact','one','0'*64)
-        with pytest.raises(Denied,match='V3_COMPLETE_IDOX_CAPTURE_REQUIRED'):execute(co,binding,detail_reader=lambda _:pytest.fail('detail'),envelope=envelope(),council=get_council('bolton'))
+        with pytest.raises(Denied,match='V3_COMPLETE_IDOX_CAPTURE_REQUIRED'):execute(co,binding,listing_reader=lambda _:pytest.fail('refetch'),detail_reader=lambda _:pytest.fail('detail'),envelope=envelope(),council=get_council('bolton'))
         b.capture_checkpoint_sha256=digest(co.ledger.get(root['key'])['checkpoint'])
     finally:prior=w['close'](b)
     co,b=w['client'](root['key'],previous=prior)
@@ -181,10 +183,16 @@ def test_function_rollback_and_runtime_install_denied(world):
         c.execute('ROLLBACK')
     with pg['connect']('provisioning_migrator') as c:c.execute(ow.rollback_script())
     reverted=flags();assert reverted[:3]==installed[:3]
+    import re
+    body=lambda script:re.search(r'AS \$fn\$(.*?)\$fn\$;',script,re.S).group(1)
+    assert installed[3]==body(ow.installation_script())
+    assert reverted[3]==body(ow.rollback_script())
     assert reverted[3]!=installed[3]
     assert boot.execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]==before
     root=w['seed']()
-    with pytest.raises(DBAPIError):retain(w,root)
+    with pytest.raises(Denied,match='OBSERVATION_WORKER_NOT_INSTALLED'):retain(w,root)
+    assert not w['reads']
+    assert boot.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s',(root['key'],)).fetchone()[0] is None
 
 
 def test_uncertain_resolution_does_not_replay(world,monkeypatch):

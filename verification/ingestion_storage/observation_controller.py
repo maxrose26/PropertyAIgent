@@ -11,7 +11,19 @@ def retain_observation(coordinator, key, reader, archive, *, check=lambda: None,
     """
     from .operational_controller import ControllerLedger
     if not isinstance(coordinator.ledger,ControllerLedger):raise Denied('ACCOUNTED_SQL_LEDGER_REQUIRED')
-    l=coordinator.ledger;check();row=l.get(key)
+    l=coordinator.ledger;check()
+    # The old broker accepts arbitrary closed source payloads. Refuse that
+    # installed state BEFORE claim/source effects; rollback must really disable
+    # this new controller, not merely fail a later batch.
+    from sqlalchemy import text
+    from . import observation_worker_sql as ow
+    import re
+    expected=re.search(r'AS \$fn\$(.*?)\$fn\$;',ow.installation_script(),re.S).group(1)
+    with l.worker_engine.connect() as connection:
+        actual=connection.execute(text("SELECT p.prosrc,r.rolname,p.proconfig,p.prosecdef FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_roles r ON r.oid=p.proowner WHERE p.oid=to_regprocedure('public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)')")).one_or_none()
+    if actual is None or tuple(actual)!=(expected,'ingestion_storage_owner',['search_path=pg_catalog'],True):
+        raise Denied('OBSERVATION_WORKER_NOT_INSTALLED')
+    row=l.get(key)
     require_enabled(coordinator.observation_councils,row['subject']['council'])
     from app.ingestion.listing_screening import RULE_V1
     if coordinator.screening_rule.rule_version!=RULE_V1 and coordinator.screening_rule.link_related:
