@@ -406,13 +406,10 @@ def resume_capture(coordinator,key,*,checkpoint_sha256,prior_accounting_sha256,s
     return dict(outcome='DISCOVERY_SCREENING_ONLY',checkpoint_sha256=checkpoint_sha256,children=children,screening=results,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED')
 
 
-def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys,check=lambda:None):
-    """Source-free v3 assessment of a retained, COMPLETE capture under an explicitly registered v3 rule (proposal section 2.4). No source client, no council, no application database, no identity.
-
-    Verifies the capture (state, kind, immutable archive, pinned checkpoint digest), recomputes the exact v3 batch plans from it and requires `batch_keys` to be exactly those, snapshots the rows that must not
-    change (the capture and `preserved_keys`, e.g. the earlier v1 assessments), screens each batch through the existing `process_batch`, then recomputes EVERY assessment in trusted memory and compares it with the
-    stored receipt (a forged or mismatched receipt stops the run), and finally proves the preserved rows are byte-identical. Admission, B2 and every factual check are not attempted here."""
-    from app.ingestion.batching import batch_plans,process_batch
+def assessment_plan(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys,check=lambda:None):
+    """Stage 1 of a retained v3 assessment: verify the explicit v3 rule, the named preserved rows, the COMPLETE capture and its pinned checkpoint digest, recompute the exact v3 batch plans and require `batch_keys` to be
+    exactly those, and snapshot the rows that must not change. Returns (receipt, plans, snapshot). Reads only."""
+    from app.ingestion.batching import batch_plans
     l=coordinator.ledger;rule=coordinator.screening_rule
     if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
     if rule.rule_version==RULE_V1:raise Denied('V3_RULE_REQUIRED')
@@ -422,12 +419,13 @@ def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserve
         or digest(receipt)!=capture_sha256 or not receipt.get('durable_archive')):raise Denied('RETAINED_CAPTURE_BINDING')
     plans=batch_plans(capture_key,receipt,rule)
     if len(set(batch_keys))!=len(batch_keys) or set(batch_keys)!={p['key'] for p in plans}:raise Denied('EXACT_SCREENING_BATCH')
-    snapshot=lambda:{k:digest(l.get(k)) for k in (capture_key,*preserved_keys)}
-    before=snapshot()
-    for plan in plans:
-        check();done=process_batch(coordinator,plan['key'],check=check)
-        if done['outcome'] not in {'BATCH_SCREENED','BATCH_ALREADY_COMPLETE'}:raise Denied('SCREENING_OUTCOME')
-    assessments=[]
+    return receipt,plans,{k:digest(l.get(k)) for k in (capture_key,*preserved_keys)}
+
+
+def verify_assessed(coordinator,capture_key,receipt,*,capture_sha256,preserved_keys,snapshot,check=lambda:None):
+    """Stage 3: recompute EVERY assessment in trusted memory and compare it (and the coordinator-added fields) with the stored receipt, then prove the capture and the named earlier rows byte-identical to `snapshot`.
+    A forged or mismatched receipt, or any changed earlier row, stops the run. Returns the per-record assessments. Reads only."""
+    l=coordinator.ledger;rule=coordinator.screening_rule;assessments=[]
     for record in receipt['records']:
         check();record_sha,config,config_sha,revision=assessment_identity(record,rule)
         key=digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':record['reference']},task='SCREENING',contract=coordinator.screening_contract,revision=revision))
@@ -439,5 +437,17 @@ def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserve
             or any(stored.get(k)!=v for k,v in expected.items()) or stored.get('capture_key')!=capture_key or stored.get('capture_checkpoint_sha256')!=capture_sha256
             or item['outcome']!=dict(outcome=expected['count_assessment']['admission'],retained=True)):raise Denied('FORGED_OR_MISMATCHED_ASSESSMENT')
         assessments.append(dict(reference=record['reference'],key=key,admission=expected['count_assessment']['admission'],eligible=identity_admission_eligible(stored,item)))
-    if snapshot()!=before:raise Denied('PRESERVED_ROWS_CHANGED')
+    if {k:digest(l.get(k)) for k in (capture_key,*preserved_keys)}!=snapshot:raise Denied('PRESERVED_ROWS_CHANGED')
+    return assessments
+
+
+def assess_retained(coordinator,capture_key,*,capture_sha256,batch_keys,preserved_keys,check=lambda:None):
+    """Source-free v3 assessment of a retained, COMPLETE capture under an explicitly registered v3 rule (proposal section 2.4): `assessment_plan`, then each batch through the existing `process_batch`, then
+    `verify_assessed`. No source client, no council, no application database, no identity. (The hosted run performs the same three stages with one accounted database slot per batch.)"""
+    from app.ingestion.batching import process_batch
+    receipt,plans,snapshot=assessment_plan(coordinator,capture_key,capture_sha256=capture_sha256,batch_keys=batch_keys,preserved_keys=preserved_keys,check=check)
+    for plan in plans:
+        check();done=process_batch(coordinator,plan['key'],check=check)
+        if done['outcome'] not in {'BATCH_SCREENED','BATCH_ALREADY_COMPLETE'}:raise Denied('SCREENING_OUTCOME')
+    assessments=verify_assessed(coordinator,capture_key,receipt,capture_sha256=capture_sha256,preserved_keys=preserved_keys,snapshot=snapshot,check=check)
     return dict(outcome='SCREENING_V3_ASSESSED',assessments=assessments,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',application_writes=0,source_calls=0)

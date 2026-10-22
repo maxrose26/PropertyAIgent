@@ -1,0 +1,71 @@
+# Restricted-runtime half of the Bolton SCREENING-V3 RETAINED-WINDOW assessment (PR #175; docs/design/ingestion-screening-v3-activation-20261030/): ONE source-free assessment of the 24 retained applications. Restricted credentials ONLY: no administrative
+# identity, no Owner and no credential change exist in this job, and it has no source client and makes no council request. Single use by run number. It publishes a READY marker, waits for the OWNER-registered allowance, then spends it; it never registers one.
+# The job token is write-capable for contents ONLY so the evidence publisher can publish the ready marker and the result on the evidence branch (fast-forward only, path allow-list, size bounds); that residual is disclosed, confined by code and tested statically.
+# It is dispatched by a human only after an explicit production decision; nothing triggers it automatically and there is no retry or replacement run.
+name: Stage4 Bolton screening-v3 retained assessment restricted job ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      evidence_head:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_HOSTED_ONCE_20261030]
+permissions:
+  contents: write
+concurrency:
+  group: stage4-bolton-screening-v3-retained
+  cancel-in-progress: false
+jobs:
+  screening:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Exact single-use screening-v3 authority
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WF: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          EVIDENCE_HEAD: ${{ inputs.evidence_head }}
+        run: |
+          set -euo pipefail
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WF" && "$PIN" == "$GITHUB_SHA" && "$EVIDENCE_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_INGESTION_BOLTON_SCREENING_V3_RETAINED_HOSTED_ONCE_20261030 ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Pinned dependencies without production credentials
+        run: timeout --kill-after=2s 120s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/sv3-venv"
+      - name: Source-free retained-window assessment (restricted credentials only; kernel-enforced actual memory)
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          WF: ${{ github.workflow_sha }}
+          EVIDENCE_HEAD: ${{ inputs.evidence_head }}
+          GH_TOKEN: ${{ github.token }}
+          INGESTION_WORKER_DATABASE_URL: ${{ secrets.INGESTION_WORKER_DATABASE_URL }}
+          INGESTION_EFFECT_DATABASE_URL: ${{ secrets.INGESTION_EFFECT_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/bolton-screening-v3-retained"
+          # Resource limits: no core files, 128 open files, 4 MiB maximum file size. ACTUAL memory is enforced by the kernel in a cgroup-v2 scope (1.5 GiB aggregate, 256 MiB controller, 1 GiB source,
+          # no swap, OOM-group kill) created by the one privileged helper below. There is deliberately NO address-space limit here: it is not an actual-memory ceiling and is not described as one.
+          ulimit -c 0; ulimit -n 128; ulimit -f 4096
+          # The job token and the two restricted URLs reach the process on STDIN only (printf is a shell builtin: they are in no argv and, after env -i, in no environment - a same-user child such as the source worker cannot read them from /proc).
+          printf '%s\n%s\n%s\n' "$GH_TOKEN" "$INGESTION_WORKER_DATABASE_URL" "$INGESTION_EFFECT_DATABASE_URL" | env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_SHA="$GITHUB_SHA" GITHUB_WORKFLOW_SHA="$WF" GITHUB_REF="$GITHUB_REF" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" PIPELINE_REVIEWED_SHA="$PIN" PIPELINE_AUTHORITY="$AUTHORITY" PIPELINE_EVIDENCE_HEAD="$EVIDENCE_HEAD" timeout --kill-after=15s 2100s sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" "$RUNNER_TEMP/sv3-venv/bin/python" -I -B -c 'import os,runpy,sys; sys.path.insert(0,os.getcwd()); runpy.run_module("verification.ingestion_storage.screening_v3_hosted",run_name="__main__")' --output "$RUNNER_TEMP/bolton-screening-v3-retained/out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bolton-screening-v3-retained-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/bolton-screening-v3-retained/out
+          if-no-files-found: warn
+          retention-days: 30

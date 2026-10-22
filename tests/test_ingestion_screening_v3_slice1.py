@@ -525,8 +525,10 @@ def test_switching_back_to_v1_keeps_every_v3_assessment_and_history_readable(led
 # Slice 1 allowed the disposable coordinator and the read-only projections. The offline production connection (PR #173 implementation) adds exactly these explicit, default-off consumers; the runner (which prepares and
 # registers real work) and the installed worker.sql (the original definition; the replacement exists only as derived text) still know nothing about v3.
 FILES_THAT_MAY_SELECT_OR_READ_V3 = {'app/ingestion/coordinator.py', 'app/ingestion/screening_projection.py', 'app/ingestion/sql_ledger.py', 'verification/ingestion_storage/operational_controller.py',
-                                    'verification/ingestion_storage/operational_owner.py', 'verification/ingestion_storage/screening_v3_grant.py', 'verification/ingestion_storage/screening_v3_worker_sql.py'}
-HELD = ['verification/ingestion_storage/operational_runner.py', 'docs/design/ingestion-operational-20261016/worker.sql']
+                                    'verification/ingestion_storage/operational_owner.py', 'verification/ingestion_storage/screening_v3_grant.py', 'verification/ingestion_storage/screening_v3_worker_sql.py',
+                                    'verification/ingestion_storage/policy_screening_v3.py', 'verification/ingestion_storage/operational_runner.py', 'verification/ingestion_storage/screening_v3_hosted.py',
+                                    'verification/ingestion_storage/retained_world.py'}
+HELD = ['verification/ingestion_storage/stable_pipeline.py', 'docs/design/ingestion-operational-20261016/worker.sql']
 
 
 def test_only_the_slice_one_files_reference_v3_and_every_held_production_path_is_untouched_by_it():
