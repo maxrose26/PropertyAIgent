@@ -340,3 +340,33 @@ def test_direct_shared_coordinator_is_disabled_by_rollback(world):
         assert co.ledger.get(root['key'])['phase']=='CLAIMED'
         assert not w['reads']
     finally:w['close'](b)
+
+
+def test_already_queued_v1_observation_screening_is_disabled_by_rollback(world):
+    w=world;root=w['seed']();obs=retain(w,root);rule=ScreeningRule(RULE_V1)
+    p=w['batches'](root,obs,selected=rule)[0];co,b=w['client'](p['key'],selected=rule)
+    try:
+        claim=co.ledger.claim(p['key'])
+        child,_=co.ledger.batch_row(claim,p['checkpoint']['plan'],obs,obs['records'][0])
+    finally:w['close'](b)
+    with w['pg']['connect']('provisioning_migrator') as c:c.execute(ow.rollback_script())
+    co,b=w['client'](p['key'],selected=rule)
+    try:
+        # Existing child identity was recorded in the exact fixture grant.
+        claim=co.ledger.claim(child)
+        with pytest.raises(Denied,match='OBSERVATION_WORKER_NOT_INSTALLED'):co.screening(claim)
+        assert co.ledger.get(child)['checkpoint'] is None
+    finally:w['close'](b)
+
+
+def test_explicit_v1_observation_uses_existing_qualifier(world):
+    w=world;root=w['seed']();obs=retain(w,root);rule=ScreeningRule(RULE_V1)
+    p=w['batches'](root,obs,selected=rule)[0];co,b=w['client'](p['key'],selected=rule)
+    try:
+        result=process_batch(co,p['key'],check=b.check)
+        for child in result['children']:
+            cp=co.ledger.get(child)['checkpoint']
+            assert cp['rule_version']==RULE_V1 and cp['window_claim']=='NONE'
+            assert cp['observation_digest']==digest(obs)
+            assert 'config_sha256' not in cp
+    finally:w['close'](b)

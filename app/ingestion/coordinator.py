@@ -237,8 +237,9 @@ class Coordinator:
         parent=self.ledger.get(row['dependencies'][0]);receipt=parent['checkpoint']
         observation=receipt.get('kind')=='LISTING_OBSERVATION_V1'
         if observation:
-            from .observation_screening import require_enabled,observation_revision
+            from .observation_screening import require_enabled,observation_revision,require_observation_worker
             require_enabled(self.observation_councils,receipt['council'])
+            require_observation_worker(self.ledger)
         records=[r for r in receipt['records'] if r['reference']==row['subject']['reference']]
         if len(records)!=1 or receipt['council']!=row['subject']['council']:raise Denied('SCREENING_IDENTITY')
         record=records[0]
