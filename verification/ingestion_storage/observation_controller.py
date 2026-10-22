@@ -13,6 +13,9 @@ def retain_observation(coordinator, key, reader, archive, *, check=lambda: None,
     if not isinstance(coordinator.ledger,ControllerLedger):raise Denied('ACCOUNTED_SQL_LEDGER_REQUIRED')
     l=coordinator.ledger;check();row=l.get(key)
     require_enabled(coordinator.observation_councils,row['subject']['council'])
+    from app.ingestion.listing_screening import RULE_V1
+    if coordinator.screening_rule.rule_version!=RULE_V1 and coordinator.screening_rule.link_related:
+        raise Denied('BOUNDED_OBSERVATION_HISTORY_SELECTION_REQUIRED')
     saved=row['checkpoint']
     if saved is None:
         if row['attempt_count'] or row['phase'] not in ('IDLE','RECOVERED'):

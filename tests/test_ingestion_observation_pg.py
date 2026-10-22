@@ -15,12 +15,12 @@ from tests.test_discovery_ingestion_ledger import outer
 from app.ingestion.ledger import Denied, digest
 from app.ingestion.batching import batch_plans, process_batch, capture_once
 from app.ingestion.coordinator import Coordinator
-from app.ingestion.listing_screening import ScreeningRule, RULE_V1, RULE_V3, V3_CONTRACT, assessment_identity
+from app.ingestion.listing_screening import ScreeningRule, RULE_V1, RULE_V3, V3_CONTRACT, assessment_identity, code_binding
 from app.ingestion.observation_screening import retained_history
 from verification.ingestion_storage.observation_controller import retain_observation
 from app.ingestion.observation_history import empty_history, append
 from verification.ingestion_storage import observation_worker_sql as ow, screening_v3_worker_sql as v3
-from verification.ingestion_storage.operational_controller import ControllerLedger, DatabaseBudget, AcceptanceBinding, execute, resume_capture
+from verification.ingestion_storage.operational_controller import ControllerLedger, DatabaseBudget, AcceptanceBinding, execute, resume_capture, assessment_plan
 from verification.ingestion_storage.retained_world import item
 from verification.ingestion_storage.v3_admission import V3AdmissionBinding
 from app.config import get_council
@@ -28,7 +28,10 @@ from tests.test_discovery_admission import envelope
 
 
 @pytest.fixture
-def world(pg, tmp_path, record_property):
+def world(pg, request, record_property):
+    import os
+    tmp_path=Path(os.environ['TMPDIR'])/('fixture-'+digest(request.node.nodeid)[:16])
+    tmp_path.mkdir()
     before=dict(pg['fixture_costs'])
     boot=pg['boot']
     with pg['connect']('provisioning_migrator') as c:c.execute(ow.installation_script())
@@ -155,10 +158,15 @@ def test_partial_rejected_by_complete_admission_and_resume(world):
     co,b=w['client'](p['key'])
     try:
         with pytest.raises(Denied):capture_once(co,root['key'],lambda _:pytest.fail('refetch'),w['archive'])
-        with pytest.raises(Denied):resume_capture(co,root['key'],checkpoint_sha256=digest(obs),prior_accounting_sha256='0'*64,screening_keys=[])
+        with pytest.raises(Denied,match='RETAINED_CAPTURE_BINDING'):assessment_plan(co,root['key'],capture_sha256=digest(obs),batch_keys=[p['key']],preserved_keys=[root['key']])
         nominee=AcceptanceBinding(root['key'],'s'*64,'f'*64,obs['records'][0]['reference'],'url','key','0'*64,digest(obs),'0'*64,p['key'])
-        binding=V3AdmissionBinding(nominee,'bolton','controller-idox','one',digest(w['rule'].config()),'0'*64,'fact','one','0'*64)
-        with pytest.raises(Denied):execute(co,binding,detail_reader=lambda _:pytest.fail('detail'),envelope=envelope(),council=get_council('bolton'))
+        binding=V3AdmissionBinding(nominee,'bolton','controller-idox','one',digest(w['rule'].config()),digest(code_binding()),'fact','one','0'*64)
+        with pytest.raises(Denied,match='V3_COMPLETE_IDOX_CAPTURE_REQUIRED'):execute(co,binding,detail_reader=lambda _:pytest.fail('detail'),envelope=envelope(),council=get_council('bolton'))
+        b.capture_checkpoint_sha256=digest(co.ledger.get(root['key'])['checkpoint'])
+    finally:prior=w['close'](b)
+    co,b=w['client'](root['key'],previous=prior)
+    try:
+        with pytest.raises(Denied,match='RETAINED_CAPTURE_BINDING'):resume_capture(co,root['key'],checkpoint_sha256=digest(obs),prior_accounting_sha256=digest(prior),screening_keys=[])
     finally:w['close'](b)
 
 
@@ -273,5 +281,38 @@ def test_batch_interruption_preserves_atomic_progress(world):
     try:
         process_batch(co,p['key'],check=b.check,prior_accounting_sha256=digest(prior))
         assert co.ledger.get(p['key'])['checkpoint']['children'].count(child)==1
+        assert w['reads']==[1]
+    finally:w['close'](b)
+
+
+@pytest.mark.parametrize('field',['window_claim','observed_at','observation_digest','source_kind'])
+def test_sql_screening_provenance_is_not_worker_assertion(world,field,monkeypatch):
+    w=world;root=w['seed']();obs=retain(w,root);p=w['batches'](root,obs)[0]
+    co,b=w['client'](p['key']);real=co.ledger.checkpoint
+    def forged(claim,receipt):
+        receipt=copy.deepcopy(receipt)
+        if field=='source_kind':receipt.pop(field)
+        else:receipt[field]='FORGED'
+        return real(claim,receipt)
+    monkeypatch.setattr(co.ledger,'checkpoint',forged)
+    try:
+        with pytest.raises(DBAPIError,match='OBSERVATION_SCREEN_BINDING|SCREENING_V3_RECEIPT'):
+            process_batch(co,p['key'],check=b.check)
+    finally:w['close'](b)
+
+
+def test_committed_checkpoint_acknowledgement_loss_is_not_auto_resumed(world,monkeypatch):
+    w=world;root=w['seed']();co,b=w['client'](root['key']);real=co.ledger.resolve_source
+    def lost(*a,**kw):
+        real(*a,**kw)  # real broker transaction committed; caller loses acknowledgement
+        raise RuntimeError('injected postcommit acknowledgement loss')
+    monkeypatch.setattr(co.ledger,'resolve_source',lost)
+    try:
+        with pytest.raises(RuntimeError):retain_observation(co,root['key'],w['reader'],w['archive'])
+        row=co.ledger.get(root['key']);assert row['phase']=='CHECKPOINTED' and row['state']=='CLAIMED'
+        assert row['checkpoint']['kind']=='LISTING_OBSERVATION_V1'
+        with pytest.raises(Denied):retain_observation(co,root['key'],lambda _:pytest.fail('refetch'),w['archive'])
+        ctl=w['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+        assert ctl['global_stop'] is not None
         assert w['reads']==[1]
     finally:w['close'](b)

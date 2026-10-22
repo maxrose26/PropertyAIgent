@@ -38,6 +38,8 @@ Complete-receipt and historical v1 task identities remain unchanged.
   observations only under the explicit selections. The result adds source kind,
   observation/record digests, timestamp, display label and window_claim NONE.
   v3 configuration/code binding and authoritative routing remain unchanged.
+  Restricted callers select link_related=False; history is a separate bounded
+  read, never a reason to supply an Application engine.
 - retain_observation is a real ControllerLedger/DatabaseBudget controller seam,
   not a disposable Ledger shortcut or a production CLI. Source-free recovery
   requires a sealed prior receipt and separately authorised operator claim
@@ -84,7 +86,7 @@ Disposable PG17 uses the actual restricted worker/effect/recovery logins and rea
 ControllerLedger/DatabaseBudget. Bootstrap only installs/asserts/constructs
 fixtures; operational effects use the restricted identities. Existing PR178
 restricted admission tests and complete/v1 regressions are retained.
-Injected crashes and acknowledgement loss are explicit simulation boundaries;
+Injected crashes and acknowledgement loss (before and after broker commit) are explicit simulation boundaries;
 recovery expires a fixture lease to avoid sleeping, then invokes the existing
 restricted recovery function. No source call or effect is replayed.
 

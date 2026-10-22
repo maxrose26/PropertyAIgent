@@ -268,7 +268,7 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             claim = obs['ledger'].claim(obs['batches'][0]['key'], lease_seconds=165)
             with pytest.raises(Exception) as e:
                 obs['ledger'].batch_row(claim, obs['plans'][0]['checkpoint']['plan'], obs['capture'], obs['capture']['records'][0])
-            assert 'CAPTURE_BINDING' in message(e) or 'BATCH_ROW_TYPES' in message(e)      # an observation parent never parents a v3 child
+            assert any(code in message(e) for code in ('CAPTURE_BINDING','BATCH_ROW_TYPES','OBSERVATION_PLAN_BINDING'))      # an observation parent never parents a v3 child
             assert count("task='SCREENING' AND contract='listing-screen-v3'") == 0
 
             # ------------------------------------------------------------------ phase 3b: the SQL's own defences, by direct calls with hand-built payloads (a consistent Python client never presents these)
@@ -327,12 +327,15 @@ def test_screening_v3_production_connection_rehearsal(record_property, tmp_path)
             obs_extra = {'observation_councils': ['bolton']}
             ov1 = scenario('obs034v1', 2, None, kind='LISTING_OBSERVATION_V1', extra_grant=obs_extra)
             cl = ov1['ledger'].claim(ov1['batches'][0]['key'], lease_seconds=165)
-            created, _ = ov1['ledger'].batch_row(cl, ov1['plans'][0]['checkpoint']['plan'], ov1['capture'], ov1['capture']['records'][0])
+            # Exercise the historical proposed SQL directly: the current client
+            # requires observation-scoped revisions absent from this prototype.
+            legacy=raw_batch_row(ov1['ledger'],cl,ov1['plans'][0]['checkpoint']['plan'],ov1['capture'],ov1['capture']['records'][0],'listing-screen-v1',digest(ov1['capture']['records'][0]))
+            created=legacy['checkpoint']['children'][0]
             assert rows("key=%s", created)[0]['contract'] == 'listing-screen-v1'      # control: with 034 applied an observation parent DOES parent a v1 child
             ov3 = scenario('obs034v3', 2, V3, kind='LISTING_OBSERVATION_V1', extra_grant=obs_extra)
             cl = ov3['ledger'].claim(ov3['batches'][0]['key'], lease_seconds=165)
             with pytest.raises(Exception) as e:
-                ov3['ledger'].batch_row(cl, ov3['plans'][0]['checkpoint']['plan'], ov3['capture'], ov3['capture']['records'][0])
+                raw_batch_row(ov3['ledger'],cl,ov3['plans'][0]['checkpoint']['plan'],ov3['capture'],ov3['capture']['records'][0],ls.V3_CONTRACT,ls.assessment_identity(ov3['capture']['records'][0],V3)[3])
             assert 'BATCH_ROW_TYPES' in message(e)      # and the same parent can never parent a v3 child
             with connect('provisioning_migrator') as m:
                 m.execute(sv3.installation_script())      # back to the v3 replacement alone
