@@ -34,6 +34,8 @@ class Memory:
     def snapshot(self):
         assert not self.closed
         return {'fixture':True}
+    def observe(self):
+        return dict(status='OBSERVED',fixture=True,execution_authority=False)
     def close(self):
         self.closed=True
         return dict(owned_groups_removed=True,owned_survivors=0,memory={'fixture':True})
