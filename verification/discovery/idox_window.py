@@ -30,8 +30,10 @@ class WindowConfig:
     start: date = START
     end: date = END
     max_transport_retries: int = 1
+    max_rows: int | None = None
 
     def __post_init__(self):
+        if self.max_rows is not None and (type(self.max_rows) is not int or self.max_rows!=60):raise ValueError('fixed row ceiling')
         if type(self.max_transport_retries) is not int or self.max_transport_retries not in (0,1):
             raise ValueError('retry policy')
         if self.council not in IDOX or self.semantics not in {'RECEIVED','VALIDATED'} or not self.start<=self.end or (self.end-self.start).days>27:
@@ -156,6 +158,10 @@ def run(dispatch, config=WindowConfig(), *, retain_proof=False):
             if p.total is not None:
                 if total is not None and total!=p.total: raise ListingError('changing source count')
                 total=p.total
+            if config.max_rows is not None and seen+len(p.rows)>config.max_rows:
+                out['row_limit_exceeded']=dict(limit=config.max_rows,previously_retained_rows=seen,
+                    observed_page_rows=len(p.rows),unretained_page_sha256=p.fingerprint)
+                out['capped']=True;out['completeness']='INCOMPLETE';break
             for r in p.rows:
                 if r.source_key in keys: raise ListingError('repeated source key across pages')
                 keys.add(r.source_key)
@@ -170,6 +176,10 @@ def run(dispatch, config=WindowConfig(), *, retain_proof=False):
                 # Contract candidate only: transport result never self-admits a source.
                 out['enumeration_evidence']='COUNT_RECONCILED' if p.terminal and total==seen else 'TOTAL_UNKNOWN'
                 break
+            if config.max_rows is not None and seen>=config.max_rows:
+                out['row_limit_exceeded']=dict(limit=config.max_rows,previously_retained_rows=seen,
+                    next_page_not_requested=True)
+                out['capped']=True;out['completeness']='INCOMPLETE';break
             if ordinal==MAX_PAGES:
                 out['capped']=True; out['completeness']='INCOMPLETE';break
             b.phase='PAGE';b.next_url=p.next_url
@@ -195,7 +205,7 @@ def run(dispatch, config=WindowConfig(), *, retain_proof=False):
             'request_ordinal':b.requests,
             'result_set_reenumerated':False,
             'publication_semantics':'UNKNOWN'}
-        if out['capped']:out['enumeration_evidence']='PAGE_CAP'
+        if out['capped']:out['enumeration_evidence']='ROW_CAP' if out.get('row_limit_exceeded') else 'PAGE_CAP'
     except (ListingError,BoundaryFailure,Failure) as e:
         from .source_diagnostics import shape,transport_facts
         # Only these fixed known messages retain their legacy spelling. Other
