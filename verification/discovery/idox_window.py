@@ -66,6 +66,7 @@ class WindowBoundary(Boundary):
         self.phase='FORM'
         self.response_provenance=[]
         self.last_response=None
+        self.proof_log=None
         physical=self.dispatch
         def recording(method,url,**kwargs):      # the shape of THIS request's response only (status, allow-listed media type, redirect disposition); nothing else is kept
             self.last_response=None
@@ -98,13 +99,22 @@ class WindowBoundary(Boundary):
             encoding=declared.group(1).upper()
             if encoding=='ISO-8859-1':data=data.decode('iso-8859-1',errors='strict').encode('utf-8')
             if len(data)>500_000:self.budget.reject('PARTIAL_RETRIEVAL','parser body bound')
+        if self.proof_log is not None:
+            self.proof_log.add(original,self.phase,transport=self.last_response)
         self.response_provenance.append({'source_encoding':encoding,'body_sha256':hashlib.sha256(original).hexdigest(),
             'parser_body_sha256':hashlib.sha256(data).hexdigest()})
         return data
 
 
-def run(dispatch, config=WindowConfig()):
+def run(dispatch, config=WindowConfig(), *, retain_proof=False):
+    proof=None
+    if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if retain_proof:
+        from .four_council_proof import ProofLog
+        if config.max_transport_retries!=0:raise ValueError('proof requires zero retries')
+        proof=ProofLog(config.council,config.semantics,config.start,config.end)
     b=WindowBoundary(dispatch,config)
+    b.proof_log=proof
     out={'council':config.council,'requested_interval':[config.start.isoformat(),config.end.isoformat()],
         'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
         'source_qualification':'CANDIDATE_CONTRACT','persistence':False,'pages':[],
@@ -196,12 +206,27 @@ def run(dispatch, config=WindowConfig()):
         out['failure']=type(e).__name__+':'+label
         out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code,transport_facts(b.last_response,e))
         out['completeness']='INCOMPLETE' if out['pages'] else 'FAILED'
-    except Exception:
+    except Exception as exc:
         from .source_diagnostics import shape,transport_facts
+        if proof is not None:
+            from .four_council_proof import ProofError
+            if isinstance(exc,ProofError):out['proof_retention_failure']='PROOF_RETENTION_FAILED'
         out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE',transport_facts(b.last_response,None))
         out['failure']='UNCLASSIFIED_FAILURE';out['completeness']='FAILED'
     finally:
         b.admitted_body=None; b.close()
+        if proof is not None:
+            from .four_council_proof import ProofError
+            try:
+                if out['failure']:
+                    from .source_diagnostics import transport_facts
+                    proof.add(None,diagnostic_stage,transport=b.last_response)
+                    proof.events[-1]['transport']=out.get('failure_diagnostic',{}).get('transport')
+                out['retained_proof']=proof.result()
+                out['proof_failure_operation']=diagnostic_stage if out['failure'] else None
+            except ProofError:
+                out['proof_retention_failure']='PROOF_RETENTION_FAILED'
+                out['failure']='PROOF_RETENTION_FAILED';out['completeness']='FAILED'
         out['resource']=b.audit(out['completeness']);out['cleanup']='BOUNDARY_CLOSED'
         out['response_provenance']=b.response_provenance
     return out
@@ -247,7 +272,7 @@ def form_probe(config=WindowConfig()):
     return result
 
 
-def live(config=WindowConfig()):
+def live(config=WindowConfig(), *, retain_proof=False):
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
@@ -259,7 +284,7 @@ def live(config=WindowConfig()):
             kwargs.pop('deadline',None)
             kwargs['timeout']=(3,8)
             return s.request(method,url,**kwargs)
-        result=run(dispatch,config)
+        result=run(dispatch,config,retain_proof=retain_proof)
     result['cleanup']='SESSION_BOUNDARY_CLOSED'
     return result
 

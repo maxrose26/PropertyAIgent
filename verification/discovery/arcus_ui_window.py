@@ -146,7 +146,12 @@ async def criteria_control(operation, action, audit):
         raise
 
 
-async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
+async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False):
+    proof=None
+    if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if retain_proof:
+        from .four_council_proof import ProofLog
+        proof=ProofLog(config.council,'VALIDATED',config.start,config.end)
     audit.update(listing_stage='CRITERIA',listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
                  source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT',enumeration_evidence=None)
     try:
@@ -218,4 +223,19 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
             expected_first=last+1
     except Exception as exc:
         audit['completeness']='INCOMPLETE' if audit['listing_segments'] else 'FAILED'
-        audit['listing_failure']=type(exc).__name__+(':'+str(exc)[:80] if isinstance(exc,ValueError) else '')
+        audit['listing_failure']=(type(exc).__name__ if retain_proof and type(exc).__name__ in {'TimeoutError','ValueError'} else 'UNCLASSIFIED_FAILURE' if retain_proof else type(exc).__name__+(':'+str(exc)[:80] if isinstance(exc,ValueError) else ''))
+
+    finally:
+        if proof is not None:
+            # Browser-local snapshot, no navigation/retry and no response-body claim.
+            try:
+                from .four_council_proof import capture_rochdale
+                snapshot=await capture_rochdale(page,config)
+                proof.add_rendered(snapshot,audit['listing_stage'])
+                audit['retained_proof']=proof.result()
+                if snapshot['availability']!='PRESENT':
+                    raise ValueError('PROOF_UNAVAILABLE')
+            except Exception:
+                audit['proof_retention_failure']='PROOF_RETENTION_FAILED'
+                audit['failure']='PROOF_RETENTION_FAILED'
+                audit['completeness']='FAILED'

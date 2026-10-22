@@ -267,7 +267,7 @@ def exact_guest_record(audit, reference):
             and fields['reference'].get('value') == reference)
 
 
-async def probe(case, window=None, metadata=False):
+async def probe(case, window=None, metadata=False, *, retain_proof=False):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
     ui_config=UI_CASES.get(case)
@@ -281,6 +281,11 @@ async def probe(case, window=None, metadata=False):
         if ui_config is None or window is None:raise ValueError('METADATA_LISTING_ONLY')
         from dataclasses import replace
         ui_config=replace(ui_config,capture_metadata=True)
+    if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if retain_proof:
+        from verification.discovery.four_council_proof import require_scope
+        if ui_config is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
+        require_scope(ui_config.council,'VALIDATED',ui_config.start,ui_config.end)
     allowed = origin(destination)
     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
                  persistence=False, requests=0, responses=0, redirects=0,
@@ -499,7 +504,7 @@ async def probe(case, window=None, metadata=False):
                 else:
                     await nav
                     if case in UI_CASES:
-                        await enumerate_ui(page,audit,stopped,ui_config)
+                        await enumerate_ui(page,audit,stopped,ui_config,**({"retain_proof":True} if retain_proof else {}))
                         classify_ui_enumeration(audit, fail)
                     else:
                         if case in DISCOVERY_CASES:
@@ -568,7 +573,12 @@ def bounded_worker_audit(path,case,metadata=False):
             else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
 
 
-def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False):
+def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False, *, retain_proof=False):
+    if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if retain_proof:
+        from verification.discovery.four_council_proof import require_scope
+        if case!='discovery_rochdale_ui_window' or window is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
+        require_scope('rochdale','VALIDATED',*window)
     if metadata and (window is None or case not in UI_CASES):raise ValueError('METADATA_LISTING_ONLY')
     if window is not None:
         from verification.discovery.arcus_ui_config import dated_config
@@ -595,7 +605,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                          else 'verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -647,9 +657,14 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         if result.get('source_contract_failure')=='SOURCE_LOCAL_CRITERIA_CONTROL_TIMEOUT':
             result['containment_accounting_verified']=(child.returncode==0 and not expired and not survivors)
             result['accounting_complete']=result['containment_accounting_verified']
+        if retain_proof and child.returncode!=0:
+            result['failure']='PROOF_WORKER_EXIT_NOT_CONFIRMED'
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
-        output.write_text(json.dumps(result, indent=2) + '\n')
+        if retain_proof:
+            from verification.discovery.four_council_proof import write_audit
+            write_audit(output,result)
+        else:output.write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result, sort_keys=True))
         return 0 if result.get('failure') is None else 1
 
@@ -660,7 +675,7 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--worker', action='store_true')
     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
-    p.add_argument('--window-start');p.add_argument('--window-end');p.add_argument('--metadata',action='store_true')
+    p.add_argument('--window-start');p.add_argument('--window-end');p.add_argument('--metadata',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true')
     a = p.parse_args()
     if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
     window=(a.window_start,a.window_end) if a.window_start else None
@@ -669,11 +684,14 @@ def main():
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata)),indent=2)+'\n'
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}))),indent=2)+'\n'
         if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
-        a.output.write_text(raw)
+        if a.retain_four_council_proof:
+            from verification.discovery.four_council_proof import write_audit
+            write_audit(a.output,json.loads(raw))
+        else:a.output.write_text(raw)
         return 0
-    return supervised(a.case, a.output, a.execution_mode,window,a.metadata)
+    return supervised(a.case, a.output, a.execution_mode,window,a.metadata,**({"retain_proof":True} if a.retain_four_council_proof else {}))
 
 
 if __name__ == '__main__':

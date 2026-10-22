@@ -1,0 +1,70 @@
+{
+  "baseline": "e08a316cc6473f9d0b172b359577821cadf29883",
+  "baseline_tree": "d8a78a1e055a87483a146ba70191a75bed58cb42",
+  "scope": "OFFLINE_SYNTHETIC_AND_RETAINED_ONLY",
+  "tests": 134,
+  "failures": 0,
+  "skips": 0,
+  "pytest_seconds": 1.82,
+  "junit_sha256": "d84ccbab18fb6794c8bd7ff41d96d5b1573a9ba5ef7af641570d881487774dd3",
+  "measurements": [
+    {
+      "case": "test_complete_reader_decision_and_limits_unchanged[scope0]",
+      "test_seconds_including_fixture_assertions": 0.027,
+      "audit_bytes": 8208,
+      "proof_bytes": 4738,
+      "fixture_requests": 4
+    },
+    {
+      "case": "test_complete_reader_decision_and_limits_unchanged[scope1]",
+      "test_seconds_including_fixture_assertions": 0.015,
+      "audit_bytes": 8137,
+      "proof_bytes": 4740,
+      "fixture_requests": 4
+    },
+    {
+      "case": "test_complete_reader_decision_and_limits_unchanged[scope2]",
+      "test_seconds_including_fixture_assertions": 0.016,
+      "audit_bytes": 8151,
+      "proof_bytes": 4742,
+      "fixture_requests": 4
+    },
+    {
+      "case": "test_rochdale_success_and_cap_have_same_decisions_and_no_extra_source_navigation[2]",
+      "test_seconds_including_fixture_assertions": 0.003,
+      "audit_bytes": 2315,
+      "proof_bytes": 1157,
+      "rows": 2
+    },
+    {
+      "case": "test_rochdale_success_and_cap_have_same_decisions_and_no_extra_source_navigation[73]",
+      "test_seconds_including_fixture_assertions": 0.065,
+      "audit_bytes": 23441,
+      "proof_bytes": 1165,
+      "rows": 60
+    }
+  ],
+  "measurement_limits": [
+    "No council requests or database connections",
+    "Fixture requests are simulated Requests boundary dispatches",
+    "Test durations include baseline comparison and assertions, not measured live worker duration",
+    "Rochdale60-row fixture is PAGE_CAP/INCOMPLETE, not source qualification",
+    "Memory/process hard limits reuse accepted evidence; not newly measured here"
+  ],
+  "failures_corrected": [
+    "First test harness omitted its required sqlite-only sentinel; no tests ran",
+    "Network-denied harness also denies AF_UNIX socketpair; test-only single-threaded timer loop removes wakeup socket without permitting network",
+    "Synthetic card positional argument incorrectly populated source key; corrected fixture keys/date",
+    "Independent review replaced light-DOM snapshot with piercing locators, fixed proof-mode error redaction and enclosing scope/hash-kind checks"
+  ],
+  "production_actions": 0,
+  "ci": "FINAL_HEAD_RESULTS_RECORDED_IN_DRAFT_PR",
+  "review": "FINAL_HEAD_REVIEW_REQUIRED_BEFORE_DELIVERY",
+  "consumer_validation": {
+    "passed": 172,
+    "skipped": 1,
+    "seconds": 2.92,
+    "skip_reason": "Existing namespace-dependent actual-process test; see CI for hosted result",
+    "overlaps_focused_suite": true
+  }
+}
