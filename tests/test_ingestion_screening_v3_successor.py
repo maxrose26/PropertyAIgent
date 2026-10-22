@@ -75,7 +75,7 @@ def test_the_messages_are_printed_at_the_real_stages_and_the_dispatch_message_on
     positions = [pipeline.index(x) for x in order]
     assert positions == sorted(positions) and pipeline.count("self.announce('READY_FOR_DISPATCH'") == 1 and pipeline.count("self.announce('RETAINED_VERIFIED')") == 1
     failed = RUNNER[RUNNER.index('    def failed(self,exc):'):RUNNER.index('    def failed(self,exc):') + 3000]
-    assert "if self.sv3_mode and self.owner.authorities:self.announce_revocation()" in failed and failed.index('announce_revocation') < failed.index('invalidate_authorities()')      # a failure that finds an authority announces its revocation too
+    assert "if getattr(self,'sv3_mode',False) and self.owner.authorities:self.announce_revocation()" in failed and failed.index('announce_revocation') < failed.index('invalidate_authorities()')      # a failure that finds an authority announces its revocation too
     main = RUNNER[RUNNER.index('def main():'):]
     assert main.index("journal.emit('hidden_input_prechecked'") < main.index("announce(journal.emit,operator_print,'CREDENTIAL_ACCEPTED'") < main.index('result=session(') < main.index('operator_print(final_result_text(result))') < main.index('raise SystemExit(exit_status(result))')
 
