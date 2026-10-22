@@ -14,11 +14,18 @@ test -z "$(git status --porcelain)"
 test "$(git rev-parse HEAD)" = "$reviewed_revision"
 test -x "$HOME/stage4-owner/storage-controller-venv/bin/python"
 printf '%s  %s\n' "$registration_hash" "$registration" | sha256sum --check
-printf '%s\n' 'One launch; four scopes maximum. Bury UNKNOWN stops all later scopes.' \
+package_seconds=$(PYTHONDONTWRITEBYTECODE=1 "$HOME/stage4-owner/storage-controller-venv/bin/python" - "$registration" <<'PY'
+import json,sys
+from verification.discovery.four_council_release import validate
+r=validate(json.load(open(sys.argv[1])))
+print(r['manifest']['limits']['package_seconds'])
+PY
+)
+printf '%s\n' 'One launch; only the exact registered scopes and continuation policy apply.' \
  'No database input. Ctrl+C cancels; never rerun after an uncertain result.'
 exec systemd-run --user --scope --unit=propertyaigent-operational-once \
  -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill \
- -p RuntimeMaxSec=1920s \
+ -p "RuntimeMaxSec=${package_seconds}s" \
  env PYTHONDONTWRITEBYTECODE=1 \
  "$HOME/stage4-owner/storage-controller-venv/bin/python" \
  -m verification.discovery.four_council_release run \
