@@ -47,7 +47,7 @@ def render(mode, root=None, minutes=25, evidence_head=None, policy_audit=None, c
                              cap='UNCHANGED_EXCEPT_FOR_THE_ONE_NAMED_ALLOWANCE'),
                  execution=dict(attempt=1, kind='OWNER_LOCAL', maximum_attempts=1, retry=False, state_directory=runner.SV3_POLICY_STATE), approval='OWNER_SCREENING_V3_INSTALLATION_20261030')
     else:
-        if not policy_audit:
+        if not isinstance(policy_audit, dict) or set(policy_audit) != {'events_sha256', 'final_result_sha256'} or not all(re.fullmatch(r'[0-9a-f]{64}', v or '') for v in policy_audit.values()):
             raise ValueError('POLICY_CEREMONY_AUDIT_REQUIRED')
         if not re.fullmatch(r'[0-9a-f]{64}', control_sha256 or ''):
             raise ValueError('CONTROL_SHA256_REQUIRED')
