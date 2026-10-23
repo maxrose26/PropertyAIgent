@@ -147,9 +147,10 @@ def test_active_deadline_reserves_finalisation_and_exports_complete_zeros(tmp_pa
     ('import os;os._exit(124)','DEADLINE_CHILD_EXIT_124'),        # hard deadline fired in the child
     ('import os;os._exit(0)','DEADLINE_CHILD_RECEIPT_MISSING'),    # clean exit without a receipt
     ('raise RuntimeError("x")','DEADLINE_CHILD_EXIT_1'),           # unexpected exception
-    ('import time;time.sleep(30)','DEADLINE_CHILD_TIMEOUT')])      # child never finishes
+    ('import time;time.sleep(30)','DEADLINE_CHILD_TIMEOUT'),       # child never finishes
+    ('import sys;sys.stderr.write("Traceback")','DEADLINE_CHILD_TRACEBACK')])  # exit 0 with a traceback
 def test_deadline_child_unexpected_termination_never_passes(tmp_path,ending,code):
-    with pytest.raises(pytest.fail.Exception,match=code):
+    with pytest.raises(pytest.fail.Exception,match=f'^{code}$'):
         deadline_child(tmp_path,'unexpected',ending,timeout=2)
 
 @pytest.mark.parametrize('provide_input',[True,False])
