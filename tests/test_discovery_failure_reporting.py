@@ -110,7 +110,7 @@ def kernel(tmp_path):
     m=OperationalMemory.__new__(OperationalMemory);m.root=tmp_path/'scope';m.controller=m.root/'controller';m.source=m.root/'source'
     for path,limit in [(m.root,1536*1024**2),(m.controller,256*1024**2),(m.source,1024**3)]:
         path.mkdir(parents=True,exist_ok=True)
-        fields={'memory.max':str(limit),'memory.swap.max':'0','memory.oom.group':'1','memory.current':'100','memory.peak':'200','memory.events':'low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n','cgroup.events':'populated 0\nfrozen 0\n','cgroup.procs':''}
+        fields={'memory.max':str(limit),'memory.swap.max':'0','memory.oom.group':'1','memory.current':'100','memory.peak':'200','memory.events':'low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n','memory.events.local':'low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n','memory.stat':'anon 10\nfile 60\nkernel 30\nsock 0\nshmem 0\nfile_mapped 5\nunlisted 7\n','cgroup.events':'populated 0\nfrozen 0\n','cgroup.procs':''}
         for name,value in fields.items():(path/name).write_text(value)
     return m
 
