@@ -31,7 +31,8 @@ Rochdale's real page footprint, its source outcome and usage remain unknown.
 
 ## Change
 
-* **Latch.** On a MEMORY failure whose source closure is certain, the launcher calls
+* **Latch.** On a `MEMORY_LIMIT_HIT` failure whose source closure is certain and whose
+  failing slot's outcome is still UNVERIFIED, the launcher calls
   `OperationalMemory.latch()`. It closes execution first and permanently
   (`snapshot()` then always raises `FINALISATION_ONLY`; `Source.run` refuses before
   any process start), then verifies exact limits, swap, group OOM, an empty source
@@ -95,9 +96,18 @@ A focused read-only re-review of the exact candidate `3d42404f` judged findings 
   requires the failing slot's outcome to be UNVERIFIED; otherwise the run stays held.
 * `enforcement()`/`identity()` readback errors now refuse with `MEMORY_FIELD_UNAVAILABLE`.
 * CI uploads the receipts of the new memory faults on failure.
-* Not changed (would need a paused memory-pressure rehearsal to validate): the
-  memory-survivor fixture's 120s survivor can hold the scope if the fixture is
-  SIGKILLed, which turns the next CI iteration red (not a false pass).
+* CI containment: the three-council native loop scope has `RuntimeMaxSec=80s` (below the
+  90s timeout); the memory-survivor process lives 60s and is killed via its recorded
+  source group. Because `systemd-run --scope` does not report a scope timeout in its exit
+  code, each iteration checks the scope `Result`; anything but `success` is reset and
+  fails the step, so a bounded-out iteration can never pass silently.
+
+A further focused review (exact `39dd77f2` and the CI commit) found the slot, receipt and
+no-execution properties holding, and raised: an unreported scope timeout (now checked),
+`close()` survivor pre-reads without fixed codes when latched (latched `close()` now goes
+straight to `finalisation_check()`), latching of non-limit MEMORY failures (now only
+`MEMORY_LIMIT_HIT`; lost enforcement and unclassified memory failures stay held), and test
+gaps (identity/usage readback, exact stages, slot-top failure) now covered.
 
 ## Held
 

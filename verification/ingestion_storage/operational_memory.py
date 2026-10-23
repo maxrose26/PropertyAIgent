@@ -165,9 +165,13 @@ class OperationalMemory:
         return result
 
     def close(self):
-        if values(self.source/'cgroup.events')['populated']:raise MemoryUnavailable('SOURCE_SURVIVORS')
-        if self.controller.joinpath('cgroup.procs').read_text().split()!=[str(os.getpid())]:raise MemoryUnavailable('CONTROLLER_OWNED_SURVIVORS')
-        evidence=self.finalisation_check() if self.finalisation_only else self.snapshot()
+        if self.finalisation_only:
+            # Same survivor/placement checks, with fixed codes, inside finalisation_check().
+            evidence=self.finalisation_check()
+        else:
+            if values(self.source/'cgroup.events')['populated']:raise MemoryUnavailable('SOURCE_SURVIVORS')
+            if self.controller.joinpath('cgroup.procs').read_text().split()!=[str(os.getpid())]:raise MemoryUnavailable('CONTROLLER_OWNED_SURVIVORS')
+            evidence=self.snapshot()
         self.source.rmdir()
         # Parent scope has a child controller group: remove its subtree memory
         # controller only after moving the sole process back to the root.

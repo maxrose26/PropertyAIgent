@@ -89,7 +89,7 @@ def test_populated_source_or_controller_survivor_refuses(tmp_path,monkeypatch):
     m=enforcing(tmp_path,monkeypatch);limit_event(m)
     m.source.joinpath('cgroup.events').write_text('populated 1\nfrozen 0\n')
     with pytest.raises(MemoryUnavailable,match='SOURCE_SURVIVORS'):m.latch()
-    with pytest.raises(MemoryUnavailable,match='SOURCE_SURVIVORS'):m.close()
+    with pytest.raises(MemoryUnavailable,match='FINALISATION_BASELINE_UNAVAILABLE'):m.close()
     m.source.joinpath('cgroup.events').write_text('populated 0\nfrozen 0\n')  # emptied later: still no baseline
     with pytest.raises(MemoryUnavailable,match='FINALISATION_BASELINE_UNAVAILABLE'):m.close()
     with pytest.raises(MemoryUnavailable,match='FINALISATION_ONLY'):m.snapshot()
@@ -314,8 +314,8 @@ def test_four_council_late_event_after_accepted_receipt_is_never_finalised(tmp_p
         value=original(index,check);limit_event(m);return value  # source exited; event recorded afterwards
     source.run=late
     out=launch.execute()
-    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and out['failure']['stage'] not in ('SOURCE_MEMORY_CHECK','SOURCE_CONTROL_CHECK')
-    assert out['results'] and out['finalisation']=={'state':'NOT_LATCHED'} and not m.finalisation_only
+    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and out['failure']['stage']=='SLOT_PUBLICATION'
+    assert [x['outcome'] for x in out['results']]==['COMPLETE'] and out['finalisation']=={'state':'NOT_LATCHED'} and not m.finalisation_only
     before=len(api.calls)
     assert r.finish(launch,journal,out,tmp_path)==1
     value=final(tmp_path)
@@ -331,9 +331,69 @@ def test_successor_late_event_is_caught_before_receipt_and_stays_unverified(kwor
         return audit(index),dict(source_group_closed=True,child_reaped=True,failures=[],supervised_seconds=.01)
     source.run=late
     out=launch.execute()
-    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and not out['results']
+    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and out['failure']['stage']=='SOURCE_ACCEPTANCE' and not out['results']
     assert out['finalisation']['state']=='FINALISATION_ONLY' and out['source_outcome']=='UNVERIFIED'
+    assert not any('slot-' in p for _,p in api.calls)
     assert r.finish(launch,journal,out,tmp_path)==1
     value=final(tmp_path)
     assert value['final_publication']=='VERIFIED' and value['owned_group_closure']=='CLOSED'
     assert value['source_outcome']=='UNVERIFIED' and value['accounting_status']=='PARTIAL_SOURCE_USAGE_UNKNOWN' and source.calls==[1]
+
+
+# --- Final focused-review follow-ups -----------------------------------------
+
+@pytest.mark.parametrize('fault',['stat','proc','peak','current'])
+def test_identity_and_usage_readback_failures_are_classified(tmp_path,monkeypatch,fault):
+    m,_=latched(tmp_path,monkeypatch)
+    if fault=='stat':
+        real=os.stat
+        monkeypatch.setattr(os,'stat',lambda p,*a,**k:(_ for _ in ()).throw(OSError('PRIVATE')) if Path(p)==m.source else real(p,*a,**k))
+    elif fault=='proc':
+        original=Path.read_text
+        monkeypatch.setattr(Path,'read_text',lambda p,*a,**k:(_ for _ in ()).throw(OSError('PRIVATE')) if str(p)=='/proc/self/cgroup' else original(p,*a,**k))
+    else:(m.source/f'memory.{fault}').write_text('garbage')
+    with pytest.raises(MemoryUnavailable,match='MEMORY_FIELD_UNAVAILABLE'):m.finalisation_check()
+    with pytest.raises(MemoryUnavailable,match='MEMORY_FIELD_UNAVAILABLE'):m.close()
+    monkeypatch.undo()
+    assert m.source.is_dir() and m.controller.is_dir()
+
+
+@pytest.mark.parametrize('target',['cgroup.events','cgroup.procs'])
+def test_latched_close_classifies_survivor_readback(tmp_path,monkeypatch,target):
+    m,_=latched(tmp_path,monkeypatch)
+    (m.source/'cgroup.events' if target=='cgroup.events' else m.controller/'cgroup.procs').unlink()
+    with pytest.raises(MemoryUnavailable,match='MEMORY_FIELD_UNAVAILABLE'):m.close()
+    assert m.source.is_dir() and m.controller.is_dir()
+
+
+@pytest.mark.parametrize('code',['MEMORY_ENFORCEMENT_LOST','EXACT_AGGREGATE_MEMORY_LIMIT','MEMORY_FAILURE_UNCLASSIFIED_X'])
+def test_only_a_recorded_limit_event_is_latched(kworld,tmp_path,code):
+    reg,api,m,source,launch,journal=kworld
+    def run(index,check):
+        source.calls.append(index)
+        raise r.SourceFailure(r.failure_detail(MemoryUnavailable(code),'SOURCE_MEMORY_CHECK'),dict(source_group_closed=True,child_reaped=True,failures=[]))
+    source.run=run;out=launch.execute()
+    assert out['failure']['kind']=='MEMORY' and out['failure']['code']!='MEMORY_LIMIT_HIT'
+    assert out['finalisation']=={'state':'NOT_LATCHED'} and not m.finalisation_only
+    assert r.finish(launch,journal,out,tmp_path)==1
+    value=final(tmp_path)
+    # Never finalisation: any export used the unchanged pre-existing snapshot() gate.
+    assert not launch.finalising and value['finalisation']=={'state':'NOT_LATCHED'} and 'finalisation' not in value['owned_cleanup']
+    assert value['source_outcome']=='UNVERIFIED' and value['cleanup']=='UNCERTAIN' and source.calls==[1]
+
+
+def test_slot_top_memory_failure_with_no_active_slot_is_never_latched(kworld,tmp_path):
+    reg,api,m,source,launch,journal=kworld
+    from tests.test_discovery_three_council_isolation import audit
+    def complete(index,check):
+        source.calls.append(index);check()
+        return audit(index),dict(source_group_closed=True,child_reaped=True,failures=[],supervised_seconds=.01)
+    source.run=complete
+    original=launch.next_budget
+    def budget(next_index):
+        original(next_index);limit_event(m)  # recorded after the accepted slot, before the next slot-top poll
+    launch.next_budget=budget
+    out=launch.execute()
+    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and source.calls==[1]
+    assert [x['outcome'] for x in out['results']]==['COMPLETE'] and out['finalisation']=={'state':'NOT_LATCHED'}
+    assert not m.finalisation_only and len(out['not_attempted'])==2

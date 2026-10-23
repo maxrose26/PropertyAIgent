@@ -544,7 +544,8 @@ class Launcher:
             if self.failure['kind']=='MEMORY' or self.failure['stage'] in {'SOURCE_MEMORY_CHECK','SOURCE_CONTAINMENT_CHECK'}:self.containment_uncertain=True
             # Only while the failing slot's outcome is still UNVERIFIED: a slot whose receipt
             # was already accepted is never exported under finalisation (stays held).
-            if (self.failure['kind']=='MEMORY' and not self.source_cleanup_uncertain and hasattr(self.memory,'latch')
+            # Only a recorded limit event; lost enforcement or unclassified memory failures stay held.
+            if (self.failure['code']=='MEMORY_LIMIT_HIT' and not self.source_cleanup_uncertain and hasattr(self.memory,'latch')
                 and active_slot is not None and len(self.results)<=active_slot):
                 # Latch after source closure: remaining slots stay stopped; only bounded
                 # finalisation (publication/removal) may follow, under finalisation_check.
