@@ -329,7 +329,9 @@ jobs:
       - name: Fixed three-council successor and exact isolation, real cgroups only
         run: |
           for fault in none local-all local-0 local-1 local-2 cancel cancel-startup unavailable memory-failure reporting-failure publication-failure memory-reclaim memory-enforcement-lost memory-survivor; do
-            timeout --kill-after=5s 90s sudo systemd-run --scope --unit=propertyaigent-operational-once -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill bash verification/ingestion_storage/operational_ci_scope.sh "$(id -u)" "$(id -g)" env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.four_council_release_fixture_cli --successor --native --root "$RUNNER_TEMP/three-council-$fault" --fault "$fault"
+            # RuntimeMaxSec (below the 90s timeout) makes systemd stop the whole scope, including
+            # any fixture survivor, before the next iteration reuses the unit name.
+            timeout --kill-after=5s 90s sudo systemd-run --scope --unit=propertyaigent-operational-once -p Delegate=memory -p MemoryMax=1610612736 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=80s bash verification/ingestion_storage/operational_ci_scope.sh "$(id -u)" "$(id -g)" env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/provisioning-venv/bin/python" -m tests.four_council_release_fixture_cli --successor --native --root "$RUNNER_TEMP/three-council-$fault" --fault "$fault"
           done
       - name: Revoke-only cleanup, restricted PG17 and real gh under256MiB
         run: |

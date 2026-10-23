@@ -91,6 +91,7 @@ def main():
             if b'result_before_final_publication' in raw:raise TimeoutError('synthetic lost publication acknowledgement')
         return original(command,**kwargs)
     original_source=r.Source;original_memory=r.OperationalMemory
+    survivor_group=[]  # exact source group that received the memory-survivor process
     class FixtureSource(original_source):
         def run(self,index,check):
             if a.fault=='memory-failure':
@@ -104,8 +105,10 @@ def main():
                     def attach():
                         with open(memory.source/'cgroup.procs','w') as stream:stream.write(str(os.getpid()))
                     # Detached (double fork): not a controller child, so the populated-source
-                    # check itself must refuse. Long-lived; killed via cgroup.kill after the run.
-                    subprocess.run([sys.executable,'-c','import os,time\nif os.fork()==0:\n    time.sleep(120)'],preexec_fn=attach,start_new_session=True,check=True)
+                    # check itself must refuse. Killed via the recorded group's cgroup.kill after
+                    # the run; its 60s lifetime stays below the scope's RuntimeMaxSec backstop.
+                    survivor_group.append(memory.source)
+                    subprocess.run([sys.executable,'-c','import os,time\nif os.fork()==0:\n    time.sleep(60)'],preexec_fn=attach,start_new_session=True,check=True)
                     return value
                 self.memory.latch=survivor_after_latch
             try:return super().run(index,check)
@@ -153,9 +156,7 @@ def main():
             finally:
                 state=a.root/'.local/state/propertyaigent'/reg['release_id']
                 (state/'reclaim.bin').unlink(missing_ok=True)
-                if a.native and a.fault=='memory-survivor':
-                    scope=Path('/sys/fs/cgroup')/Path('/proc/self/cgroup').read_text().strip()[3:].lstrip('/')
-                    (scope.parent/'source'/'cgroup.kill').write_text('1')
+                for group in survivor_group:(group/'cgroup.kill').write_text('1')
     final=a.root/'.local/state/propertyaigent'/reg['release_id']/'final-result.json'
     value=json.loads(final.read_bytes())
     assert value['database_connections']==value['application_writes']==0
