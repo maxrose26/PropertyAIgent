@@ -108,16 +108,49 @@ def test_finalisation_deadline_has_bounded_fallback_without_second_exception(tmp
         output=lambda line,**_:printed.append(json.loads(line)))
     assert result['reason']=='FINAL_EVIDENCE_OR_OUTPUT_UNCERTAIN' and len(printed)==1
 
+def deadline_child(tmp_path,name,script,timeout=10):
+    """Run a deadline-bearing session in a child, as the neighbouring tests do, so its hard deadline
+    (os._exit(124)) cannot terminate pytest. A timeout, any non-zero exit, a traceback or a missing
+    receipt fails the calling test; it is never treated as the session's result."""
+    import sys
+    try:
+        child=subprocess.run([sys.executable,'-B','-c',script,str(tmp_path/name)],capture_output=True,timeout=timeout)
+    except subprocess.TimeoutExpired:
+        pytest.fail('DEADLINE_CHILD_TIMEOUT')
+    if child.returncode!=0:pytest.fail(f'DEADLINE_CHILD_EXIT_{child.returncode}')
+    if b'Traceback' in child.stderr:pytest.fail('DEADLINE_CHILD_TRACEBACK')
+    receipt=tmp_path/name/'final-result.json'
+    if not receipt.is_file():pytest.fail('DEADLINE_CHILD_RECEIPT_MISSING')
+    return json.loads(child.stdout),json.loads(receipt.read_bytes())
+
+ACTIVE_DEADLINE_SESSION='''
+import json,sys,time
+from pathlib import Path
+from datetime import datetime,timezone,timedelta
+from verification.ingestion_storage.operational_cleanup import Journal,run_session
+printed=[]
+def prepare(*_):time.sleep(1)
+result=run_session(Journal(Path(sys.argv[1])),None,datetime.now(timezone.utc)+timedelta(minutes=1),
+    lambda:'fixture',prepare,timing=dict(credential_input_seconds=.1,active_seconds=.2,work_seconds=.03,outer_seconds=1),
+    output=lambda line,**_:printed.append(json.loads(line)))
+sys.stdout.write(json.dumps(dict(result=result,printed=printed)))
+'''
+
 def test_active_deadline_reserves_finalisation_and_exports_complete_zeros(tmp_path):
-    from datetime import datetime,timezone,timedelta
-    from verification.ingestion_storage.operational_cleanup import run_session
-    printed=[]
-    def prepare(*_):time.sleep(1)
-    result=run_session(Journal(tmp_path/'active-timeout'),None,datetime.now(timezone.utc)+timedelta(minutes=1),
-        lambda:'fixture',prepare,timing=dict(credential_input_seconds=.1,active_seconds=.2,work_seconds=.03,outer_seconds=1),
-        output=lambda line,**_:printed.append(json.loads(line)))
+    value,receipt=deadline_child(tmp_path,'active-timeout',ACTIVE_DEADLINE_SESSION)
+    result,printed=value['result'],value['printed']
     assert result['reason']=='ACTIVE_WORK_DEADLINE' and len(printed)==1
     assert result['accounting']['connections']==result['accounting']['commands']==0
+    assert receipt['reason']=='ACTIVE_WORK_DEADLINE'
+
+@pytest.mark.parametrize('ending,code',[
+    ('import os;os._exit(124)','DEADLINE_CHILD_EXIT_124'),        # hard deadline fired in the child
+    ('import os;os._exit(0)','DEADLINE_CHILD_RECEIPT_MISSING'),    # clean exit without a receipt
+    ('raise RuntimeError("x")','DEADLINE_CHILD_EXIT_1'),           # unexpected exception
+    ('import time;time.sleep(30)','DEADLINE_CHILD_TIMEOUT')])      # child never finishes
+def test_deadline_child_unexpected_termination_never_passes(tmp_path,ending,code):
+    with pytest.raises(pytest.fail.Exception,match=code):
+        deadline_child(tmp_path,'unexpected',ending,timeout=2)
 
 @pytest.mark.parametrize('provide_input',[True,False])
 def test_real_hidden_tty_delayed_input_and_timeout(tmp_path,provide_input):
