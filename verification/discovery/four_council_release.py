@@ -542,7 +542,10 @@ class Launcher:
                 self.source_closure=e.closure
                 if not e.closure['source_group_closed'] or not e.closure['child_reaped'] or e.closure['failures']:self.source_cleanup_uncertain=True
             if self.failure['kind']=='MEMORY' or self.failure['stage'] in {'SOURCE_MEMORY_CHECK','SOURCE_CONTAINMENT_CHECK'}:self.containment_uncertain=True
-            if self.failure['kind']=='MEMORY' and not self.source_cleanup_uncertain and hasattr(self.memory,'latch'):
+            # Only while the failing slot's outcome is still UNVERIFIED: a slot whose receipt
+            # was already accepted is never exported under finalisation (stays held).
+            if (self.failure['kind']=='MEMORY' and not self.source_cleanup_uncertain and hasattr(self.memory,'latch')
+                and active_slot is not None and len(self.results)<=active_slot):
                 # Latch after source closure: remaining slots stay stopped; only bounded
                 # finalisation (publication/removal) may follow, under finalisation_check.
                 try:self.memory_latch=self.memory.latch()

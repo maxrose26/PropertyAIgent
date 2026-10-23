@@ -88,6 +88,17 @@ pending cleanup, fixed codes for unreadable counters, a detached survivor fixtur
 asserting the kernel group check, a relaxed `memory.stat` precondition, no
 spurious latch failure for doubles, and self-removal of the reclaim fixture file.
 
+A focused read-only re-review of the exact candidate `3d42404f` judged findings 1, 2, 4,
+5, 6 and 7 fixed and 3 partially fixed, and found one new issue. Follow-ups:
+* New: on the four-council path a memory event first seen after a slot receipt was
+  accepted could be latched and exported with that COMPLETE receipt. The latch now
+  requires the failing slot's outcome to be UNVERIFIED; otherwise the run stays held.
+* `enforcement()`/`identity()` readback errors now refuse with `MEMORY_FIELD_UNAVAILABLE`.
+* CI uploads the receipts of the new memory faults on failure.
+* Not changed (would need a paused memory-pressure rehearsal to validate): the
+  memory-survivor fixture's 120s survivor can hold the scope if the fixture is
+  SIGKILLed, which turns the next CI iteration red (not a false pass).
+
 ## Held
 
 No merge, push, registration, permit or live execution. The fontconfig cache

@@ -274,3 +274,66 @@ def test_finalisation_publication_failure_cancel_or_expiry_never_retries(kworld,
     assert source.calls==[1] and value['cleanup']=='UNCERTAIN' and value['source_outcome']=='UNVERIFIED'
     # Group removal is independent of export, but still gated by finalisation_check.
     assert value['owned_group_closure']=='CLOSED'
+
+
+# --- Re-review follow-ups -----------------------------------------------------
+
+@pytest.mark.parametrize('target,content',[('cgroup.events',None),('cgroup.events','frozen 0\n'),('memory.max',None),('cgroup.procs',None)])
+def test_enforcement_readback_failures_are_classified(tmp_path,monkeypatch,target,content):
+    m,_=latched(tmp_path,monkeypatch)
+    group=m.controller if target=='cgroup.procs' else m.source
+    path_=group/target
+    if content is None:path_.unlink()
+    else:path_.write_text(content)
+    with pytest.raises(MemoryUnavailable,match='MEMORY_FIELD_UNAVAILABLE'):m.finalisation_check()
+
+
+def test_missing_local_aggregate_counters_refuse_latch(tmp_path,monkeypatch):
+    m=enforcing(tmp_path,monkeypatch);limit_event(m);m.root.joinpath('memory.events.local').unlink()
+    with pytest.raises(MemoryUnavailable,match='MEMORY_FIELD_UNAVAILABLE'):m.latch()
+    assert m.finalisation_only and m.latched is None
+
+
+def test_memory_stat_without_kernel_field_is_observed(tmp_path,monkeypatch):
+    m=enforcing(tmp_path,monkeypatch);m.source.joinpath('memory.stat').write_text('anon 1\nfile 2\nshmem 0\n')
+    value=m.observe();assert value['status']=='OBSERVED' and value['groups']['source']['memory.stat']==dict(anon=1,file=2,shmem=0)
+
+
+def test_four_council_late_event_after_accepted_receipt_is_never_finalised(tmp_path,monkeypatch):
+    """An event first seen after a slot receipt was accepted stays held (pre-change behaviour)."""
+    from tests import test_discovery_four_council_release as four
+    from verification.ingestion_storage.operational_publication import GitHub
+    reg=four.registration();api=four.API(reg);source=four.FixtureSource(api);holder={}
+    monkeypatch.setattr('psutil.Process',lambda:type('Process',(),{'children':lambda self,recursive:[]})())
+    github=GitHub(lambda *a:None,lambda:holder['l'].deadline(),runner=api.runner,bound=r.LIMITS['github_requests'])
+    m=enforcing(tmp_path/'kernel',monkeypatch)
+    launch=r.Launcher(reg,tmp_path,github=github,memory=m,source=source);holder['l']=launch
+    journal=journalled(launch,tmp_path)
+    original=source.run
+    def late(index,check):
+        value=original(index,check);limit_event(m);return value  # source exited; event recorded afterwards
+    source.run=late
+    out=launch.execute()
+    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and out['failure']['stage'] not in ('SOURCE_MEMORY_CHECK','SOURCE_CONTROL_CHECK')
+    assert out['results'] and out['finalisation']=={'state':'NOT_LATCHED'} and not m.finalisation_only
+    before=len(api.calls)
+    assert r.finish(launch,journal,out,tmp_path)==1
+    value=final(tmp_path)
+    assert value['final_publication']=='UNCERTAIN_OR_HELD' and not mutations(api,before)
+    assert value['owned_group_closure']=='NOT_VERIFIED' and value['cleanup']=='UNCERTAIN'
+
+
+def test_successor_late_event_is_caught_before_receipt_and_stays_unverified(kworld,tmp_path):
+    reg,api,m,source,launch,journal=kworld
+    def late(index,check):
+        source.calls.append(index);check();limit_event(m)
+        from tests.test_discovery_three_council_isolation import audit
+        return audit(index),dict(source_group_closed=True,child_reaped=True,failures=[],supervised_seconds=.01)
+    source.run=late
+    out=launch.execute()
+    assert out['failure']['code']=='MEMORY_LIMIT_HIT' and not out['results']
+    assert out['finalisation']['state']=='FINALISATION_ONLY' and out['source_outcome']=='UNVERIFIED'
+    assert r.finish(launch,journal,out,tmp_path)==1
+    value=final(tmp_path)
+    assert value['final_publication']=='VERIFIED' and value['owned_group_closure']=='CLOSED'
+    assert value['source_outcome']=='UNVERIFIED' and value['accounting_status']=='PARTIAL_SOURCE_USAGE_UNKNOWN' and source.calls==[1]

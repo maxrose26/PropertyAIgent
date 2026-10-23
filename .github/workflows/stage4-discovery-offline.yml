@@ -370,6 +370,11 @@ jobs:
             ${{ runner.temp }}/three-council-*-failure/**/result-before-publication.json
             ${{ runner.temp }}/three-council-*-failure/**/HASHES.json
             ${{ runner.temp }}/three-council-*-failure/**/final-result.json
+            ${{ runner.temp }}/three-council-memory-[ers]*/**/events.jsonl
+            ${{ runner.temp }}/three-council-memory-[ers]*/**/publication-events.jsonl
+            ${{ runner.temp }}/three-council-memory-[ers]*/**/result-before-publication.json
+            ${{ runner.temp }}/three-council-memory-[ers]*/**/HASHES.json
+            ${{ runner.temp }}/three-council-memory-[ers]*/**/final-result.json
             ${{ runner.temp }}/provisioning-rehearsal/**/practical-worker-*/*.json
           retention-days: 14
       - name: Kernel scope diagnostics (on failure only; observation, no assertion)

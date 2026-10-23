@@ -105,19 +105,25 @@ class OperationalMemory:
 
     def identity(self):
         result={}
-        for name,path,_ in self.groups():
-            if path.is_symlink():raise MemoryUnavailable('CGROUP_IDENTITY_CHANGED')
-            st=os.stat(path,follow_symlinks=False);result[name]=[st.st_dev,st.st_ino]
-        return dict(groups=result,own=Path('/proc/self/cgroup').read_text())
+        try:
+            for name,path,_ in self.groups():
+                if path.is_symlink():raise MemoryUnavailable('CGROUP_IDENTITY_CHANGED')
+                st=os.stat(path,follow_symlinks=False);result[name]=[st.st_dev,st.st_ino]
+            return dict(groups=result,own=Path('/proc/self/cgroup').read_text())
+        except (OSError,ValueError):raise MemoryUnavailable('MEMORY_FIELD_UNAVAILABLE') from None
 
     def enforcement(self):
         """Exact limits, swap and group-OOM policy; owned process placement."""
-        self.check_root()
-        for name,path,limit in self.groups()[1:]:
-            if (path.joinpath('memory.max').read_text().strip()!=str(limit) or path.joinpath('memory.swap.max').read_text().strip()!='0'
-                or path.joinpath('memory.oom.group').read_text().strip()!='1'):raise MemoryUnavailable('MEMORY_ENFORCEMENT_LOST')
-        if values(self.source/'cgroup.events')['populated']:raise MemoryUnavailable('SOURCE_SURVIVORS')
-        if self.controller.joinpath('cgroup.procs').read_text().split()!=[str(os.getpid())]:raise MemoryUnavailable('CONTROLLER_OWNED_SURVIVORS')
+        try:
+            self.check_root()
+            for name,path,limit in self.groups()[1:]:
+                if (path.joinpath('memory.max').read_text().strip()!=str(limit) or path.joinpath('memory.swap.max').read_text().strip()!='0'
+                    or path.joinpath('memory.oom.group').read_text().strip()!='1'):raise MemoryUnavailable('MEMORY_ENFORCEMENT_LOST')
+            populated=values(self.source/'cgroup.events')['populated']
+            procs=self.controller.joinpath('cgroup.procs').read_text().split()
+        except (OSError,ValueError,KeyError):raise MemoryUnavailable('MEMORY_FIELD_UNAVAILABLE') from None
+        if populated:raise MemoryUnavailable('SOURCE_SURVIVORS')
+        if procs!=[str(os.getpid())]:raise MemoryUnavailable('CONTROLLER_OWNED_SURVIVORS')
 
     def latch(self):
         """Enter finalisation-only state after a memory failure; irreversible.
