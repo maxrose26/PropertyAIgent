@@ -80,7 +80,9 @@ def fixed_reason(error):
 MEMORY_CODES=frozenset({'CGROUP_V2_REQUIRED','DEDICATED_OPERATIONAL_SCOPE',
     'EXCLUSIVE_OPERATIONAL_SCOPE','MEMORY_DELEGATION_REQUIRED',
     'EXACT_AGGREGATE_MEMORY_LIMIT','MEMORY_ENFORCEMENT_LOST','MEMORY_LIMIT_HIT',
-    'SOURCE_SURVIVORS','CONTROLLER_OWNED_SURVIVORS'})
+    'SOURCE_SURVIVORS','CONTROLLER_OWNED_SURVIVORS','FINALISATION_ONLY',
+    'FINALISATION_BASELINE_UNAVAILABLE','MEMORY_EVENT_AFTER_LATCH','CGROUP_IDENTITY_CHANGED',
+    'MEMORY_FIELD_UNAVAILABLE','CONTROLLER_OR_AGGREGATE_MEMORY_EVENT'})
 PUBLICATION_CODES=frozenset({'PUBLICATION_BLOB_IDENTITY','GITHUB_RESPONSE_UNCERTAIN',
     'EVIDENCE_HEAD_MOVED_RECONCILE','BLOB_IDENTITY','PUBLICATION_HEAD_READBACK',
     'PUBLICATION_BYTES_READBACK','PRIOR_GITHUB_MUTATION_UNCERTAIN'})
@@ -231,6 +233,7 @@ class Source:
         child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK'
         closure=dict(source_group_closed=False,child_reaped=False,failures=[])
         try:
+            if getattr(self.memory,'finalisation_only',False):raise Stop('FINALISATION_ONLY')
             if not (self.memory.source/'cgroup.kill').is_file():raise Stop('SOURCE_KILL_UNAVAILABLE')
             def attach_before_exec():
                 fd=os.open(self.memory.source/'cgroup.procs',os.O_WRONLY)
@@ -294,10 +297,14 @@ class Launcher:
         self.source_closure=None;self.stage='INITIAL_CONTROL'
         self.continued=[]
         self.baseline=sockets();self.control_checks=0;self.memory_closed=False;self.slot_deadline=None
+        # Set only after a memory failure is latched (source group empty); never re-enables execution.
+        self.memory_latch=None;self.finalising=False
     def deadline(self):
         if self.clock()-self.start>=self.limits['package_seconds']-10:raise Stop('PACKAGE_DEADLINE')
         if not stamp(self.r['issued_at'])<=self.wall()<stamp(self.r['expires_at']):raise Stop('REGISTRATION_EXPIRED_OR_FUTURE')
-        self.memory.snapshot()
+        # Finalisation may only publish/close; execution paths keep snapshot(), which refuses once latched.
+        if self.finalising:self.memory.finalisation_check()
+        else:self.memory.snapshot()
         if self.slot_deadline is not None and self.clock()>=self.slot_deadline:raise Stop('SLOT_JOB_DEADLINE')
     def poll(self,*,active=False):
         self.deadline()
@@ -535,6 +542,15 @@ class Launcher:
                 self.source_closure=e.closure
                 if not e.closure['source_group_closed'] or not e.closure['child_reaped'] or e.closure['failures']:self.source_cleanup_uncertain=True
             if self.failure['kind']=='MEMORY' or self.failure['stage'] in {'SOURCE_MEMORY_CHECK','SOURCE_CONTAINMENT_CHECK'}:self.containment_uncertain=True
+            # Only while the failing slot's outcome is still UNVERIFIED: a slot whose receipt
+            # was already accepted is never exported under finalisation (stays held).
+            # Only a recorded limit event; lost enforcement or unclassified memory failures stay held.
+            if (self.failure['code']=='MEMORY_LIMIT_HIT' and not self.source_cleanup_uncertain and hasattr(self.memory,'latch')
+                and active_slot is not None and len(self.results)<=active_slot):
+                # Latch after source closure: remaining slots stay stopped; only bounded
+                # finalisation (publication/removal) may follow, under finalisation_check.
+                try:self.memory_latch=self.memory.latch()
+                except BaseException as error:self.reporting_failures.append(failure_detail(error,'MEMORY_FAILURE_LATCH'))
             if active_slot is not None and len(self.results)<=active_slot:
                 self.accounting_complete=False
                 if active_started is not None:self.active_seconds+=max(0,self.clock()-active_started)
@@ -550,12 +566,13 @@ class Launcher:
                 if not children_known:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
             except BaseException as error:self.reporting_failures.append(failure_detail(error,'FINAL_CHILD_SOCKET_READBACK'))
             try:
-                closure['memory']=self.memory.snapshot();memory_known=True
+                closure['memory']=self.memory.finalisation_check() if self.memory_latch is not None else self.memory.snapshot();memory_known=True
             except BaseException as error:
                 self.containment_uncertain=True
                 self.reporting_failures.append(failure_detail(error,'FINAL_CONTAINMENT_CHECK'))
                 closure['observation']=memory_observation(self.memory)
-            if children_known and memory_known:process='PENDING_MEMORY_SCOPE_CLOSURE'
+            # A latched failure never reports pending/clean cleanup in the exported packet.
+            if children_known and memory_known and self.memory_latch is None:process='PENDING_MEMORY_SCOPE_CLOSURE'
         all_complete=reason is None and len(self.results)==len(self.rows) and all(x['outcome']=='COMPLETE' for x in self.results)
         result=dict(version=self.r['version'],release_id=self.r['release_id'],
             status=('THREE_COMPLETE' if self.successor else 'FOUR_COMPLETE') if all_complete else
@@ -572,6 +589,8 @@ class Launcher:
             containment_observation=memory_observation(self.memory),
             containment_status='UNCERTAIN' if self.containment_uncertain else 'CHECKS_PASSED',
             owned_group_closure='NOT_VERIFIED',outer_scope_observation='NOT_OBSERVED_FROM_INSIDE_SCOPE',
+            finalisation=dict(state='FINALISATION_ONLY',latched_failure=self.failure,latched_counters=self.memory_latch['events'])
+                if self.memory_latch is not None else dict(state='NOT_LATCHED'),
             accounting=dict(observed_requests=self.requests,observed_mixed_source_bytes=self.source_bytes,
                 observed_worker_seconds=self.source_seconds,active_seconds=self.active_seconds,
                 reservations=self.reserved,github_requests=self.github.requests,publication_requests=self.publication_calls,
@@ -693,6 +712,11 @@ def finish(launch,journal,result,root):
     try:
         publication_journal=Journal(root/'publication-events.jsonl');github.emit=publication_journal.emit
         if files is None or not launch.consumed or github.mutation_uncertain:raise Stop('FINAL_PUBLICATION_HELD')
+        if launch.memory_latch is not None:
+            # Finalisation-only export: required child/socket closure first, then the
+            # finalisation gate (exact limits, identity, unchanged counters) on every call.
+            if __import__('psutil').Process().children(recursive=True) or sockets()-launch.baseline:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
+            launch.finalising=True
         # No fallback check: the original expiry, deadline and memory.snapshot
         # guard is used for every API call, including after a containment error.
         # Persistent enforcement failure therefore keeps the packet local.
