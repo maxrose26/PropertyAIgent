@@ -27,7 +27,9 @@ def reclaim(root):
     chunk=b'\1'*(8*1024**2)
     with open(root/'reclaim.bin','wb') as stream:
         for _ in range(192):  # at most 1.5GiB written; stops at the first max event
-            stream.write(chunk)
+            # Synced chunks leave clean, immediately reclaimable page cache: the kernel event under
+            # test is reclaim at the limit, not writeback stalls (hosted run 39953419679 attempt 2).
+            stream.write(chunk);stream.flush();os.fdatasync(stream.fileno())
             if int(dict(line.split() for line in (group/'memory.events').read_text().splitlines())['max']):break
     time.sleep(30)  # the unchanged controller gate must detect the event and kill the group
 
