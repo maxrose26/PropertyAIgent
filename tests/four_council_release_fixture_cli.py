@@ -34,24 +34,69 @@ def reclaim(root):
     time.sleep(30)  # the unchanged controller gate must detect the event and kill the group
 
 
-def real_chromium():
-    """Council-free real Chromium: inline content only, every request aborted."""
+def real_chromium(selection=None,evidence=None):
+    """Council-free real Chromium: inline content only, every request aborted, no host resolvable.
+
+    Launch options come from the production browser_launch_options(), so a prepared font cache is
+    validated and read inside this (source-group) process."""
     import asyncio
     from playwright.async_api import async_playwright
+    from verification.direct_reference.instrumented_probe import browser_launch_options
     async def run():
         async with async_playwright() as playwright:
-            browser=await playwright.chromium.launch(headless=True)
+            browser=await playwright.chromium.launch(headless=True,args=['--host-resolver-rules=MAP * ~NOTFOUND','--no-proxy-server'],**browser_launch_options(selection))
             context=await browser.new_context(service_workers='block',accept_downloads=False)
             await context.route('**/*',lambda route:route.abort())
             page=await context.new_page()
             await page.set_content('<!doctype html><title>fixture</title><table>'+''.join(f'<tr><td>{i}</td><td>row {i}</td></tr>' for i in range(2000))+'</table>')
             rows=await page.evaluate('document.querySelectorAll("tr").length')
-            await browser.close();return rows
-    assert asyncio.run(run())==2000
+            mapped=set()
+            for pid in os.listdir('/proc'):
+                if pid.isdigit():
+                    try:
+                        if b'chrome' in Path(f'/proc/{pid}/cmdline').read_bytes():
+                            mapped.update(l.split()[-1] for l in Path(f'/proc/{pid}/maps').read_text().splitlines() if '.cache-11' in l)
+                    except OSError:pass
+            await browser.close();return rows,sorted(mapped)
+    rows,mapped=asyncio.run(run())
+    assert rows==2000
+    if evidence is not None:
+        home=Path(os.environ['HOME'])
+        evidence.write_text(json.dumps(dict(mode='prepared' if selection else 'default',mapped=mapped,
+            home_fontconfig=sorted(str(x.relative_to(home)) for x in home.rglob('*') if 'fontconfig' in x.parts))))
+
+
+def residency(sets):
+    """Read-only page-cache residency (mincore; no page is faulted in). Pre-registered classes:
+    COLD if every set is at most 2% resident, WARM if every set is at least 90%, else PARTIAL."""
+    import ctypes,mmap
+    libc=ctypes.CDLL(None,use_errno=True);page=os.sysconf('SC_PAGE_SIZE');result={}
+    for name,root in sets.items():
+        total=resident=0
+        files=[root] if root.is_file() else [Path(d)/f for d,_,fs in os.walk(root) for f in fs]
+        for path in files:
+            try:
+                size=path.stat().st_size
+                if size==0 or path.is_symlink():continue
+                with open(path,'rb') as stream:
+                    m=mmap.mmap(stream.fileno(),size,access=mmap.ACCESS_COPY)
+                    vec=(ctypes.c_ubyte*((size+page-1)//page))();c=ctypes.c_char.from_buffer(m)
+                    if libc.mincore(ctypes.c_void_p(ctypes.addressof(c)),ctypes.c_size_t(size),vec):raise OSError(ctypes.get_errno(),'mincore')
+                    resident+=sum(v&1 for v in vec)*page;del c;m.close()
+                total+=size
+            except OSError:continue
+        result[name]=dict(bytes=total,resident=min(resident,total),fraction=round(min(resident,total)/total,4) if total else None)
+    fractions=[v['fraction'] for v in result.values() if v['fraction'] is not None]
+    result['class']='COLD' if fractions and max(fractions)<=.02 else 'WARM' if fractions and min(fractions)>=.90 else 'PARTIAL'
+    return result
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--native',action='store_true');p.add_argument('--successor',action='store_true');p.add_argument('--fault',choices=['none','unknown','cancel','cancel-startup','unavailable','local-all','local-0','local-1','local-2','memory-failure','reporting-failure','publication-failure','real-chromium',*MEMORY_FAULTS],default='none');p.add_argument('--worker',type=int);p.add_argument('--browser-fixture',action='store_true');p.add_argument('--output',type=Path);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--native',action='store_true');p.add_argument('--successor',action='store_true');p.add_argument('--fault',choices=['none','unknown','cancel','cancel-startup','unavailable','local-all','local-0','local-1','local-2','memory-failure','reporting-failure','publication-failure','real-chromium',*MEMORY_FAULTS],default='none');p.add_argument('--worker',type=int);p.add_argument('--browser-fixture',action='store_true');p.add_argument('--output',type=Path)
+    p.add_argument('--prepared-font-cache');p.add_argument('--prepared-font-cache-sha256');a=p.parse_args()
+    assert (a.prepared_font_cache is None)==(a.prepared_font_cache_sha256 is None)
+    selection=(a.prepared_font_cache,a.prepared_font_cache_sha256) if a.prepared_font_cache else None
+    font_args=['--prepared-font-cache',a.prepared_font_cache,'--prepared-font-cache-sha256',a.prepared_font_cache_sha256] if selection else []
     def source_value(index):
         if a.successor and a.fault in ('local-all',f'local-{index-1}'):
             return local_audit(index,'selector' if index==3 else 'sort')
@@ -59,7 +104,7 @@ def main():
     if a.worker is not None:
         if a.native and not a.browser_fixture:r.owner_source_context()
         if a.native and a.fault in MEMORY_FAULTS and a.worker==1:reclaim(Path(os.environ['TMPDIR']))
-        if a.browser_fixture and a.fault=='real-chromium':real_chromium()
+        if a.browser_fixture and a.fault=='real-chromium':real_chromium(selection,a.root/'browser-evidence.json')
         if a.fault in ('cancel','cancel-startup','memory-failure'):
             nested=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'],start_new_session=True)
             (a.root/'nested.json').write_text(json.dumps(dict(pid=nested.pid)))
@@ -72,9 +117,11 @@ def main():
                 output=command[command.index('--output')+1]
                 replacement=[sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker','1','--output',output,'--browser-fixture']
                 if a.successor:replacement+=['--successor','--fault',a.fault]
+                if '--prepared-font-cache' in command:  # added by the production supervised() pass-through
+                    i=command.index('--prepared-font-cache');replacement+=command[i:i+4]
                 return original_popen(replacement,**kwargs)
             with patch.object(probe.subprocess,'Popen',fixture_browser):
-                probe.supervised('discovery_rochdale_ui_window',a.output,execution_mode='four-council-owner-local',window=('2026-10-08','2026-10-14'),retain_proof=True)
+                probe.supervised('discovery_rochdale_ui_window',a.output,execution_mode='four-council-owner-local',window=('2026-10-08','2026-10-14'),retain_proof=True,**({'prepared_font_cache':selection} if selection else {}))
             return 0
         value=source_value(a.worker)
         r.write_new(a.output,canonical(value));return 0
@@ -118,7 +165,7 @@ def main():
                 if a.fault=='memory-enforcement-lost':(self.memory.source/'memory.max').write_text(str(2*1024**3))
                 raise
         def command(self,index,out):
-            return [sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker',str(index),'--output',str(out),'--fault',a.fault]+(['--native'] if a.native else [])+(['--successor'] if a.successor else [])
+            return [sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker',str(index),'--output',str(out),'--fault',a.fault]+(['--native'] if a.native else [])+(['--successor'] if a.successor else [])+font_args
     class SyntheticSource:
         # Contract simulation for hosts with mismatched /proc. The native mode
         # below runs real Popen/preexec/cgroup cancellation, not this substitute.
@@ -134,6 +181,13 @@ def main():
         # Local browser package only; the fixture page is inline and every request is aborted.
         (a.root/'.cache').mkdir(exist_ok=True)
         (a.root/'.cache/ms-playwright').symlink_to(os.environ.get('PLAYWRIGHT_BROWSERS_PATH',str(Path.home()/'.cache/ms-playwright')))
+        # Residency before the measured run (read-only; nothing is warmed by measuring).
+        import playwright
+        from verification.direct_reference.prepared_font_cache import headless_shell_executable
+        sets=dict(browser=headless_shell_executable(str((a.root/'.cache/ms-playwright').resolve())).parent,
+                  driver=Path(playwright.__file__).parent/'driver',fonts=Path('/usr/share/fonts'),
+                  **({'prepared_cache':Path(selection[0])} if selection else {}))
+        (a.root/'residency-before.json').write_text(json.dumps(residency(sets)))
     os.environ['HOME']=str(a.root)
     for key in list(os.environ):
         if any(k in key.upper() for k in ('DATABASE','SUPABASE','OPENAI','ANTHROPIC')):os.environ.pop(key)
@@ -166,6 +220,13 @@ def main():
     source_memory=value['containment_observation'].get('groups',{}).get('source',{})
     if a.fault=='none' or (a.fault=='real-chromium' and not source_memory.get('memory.events',{}).get('max')):
         assert len(value['results'])==(3 if a.successor else 4) and value['cleanup']=='CLOSED'
+    browser_evidence=json.loads((a.root/'browser-evidence.json').read_text()) if a.fault=='real-chromium' and (a.root/'browser-evidence.json').exists() else None
+    if a.fault=='real-chromium' and not source_memory.get('memory.events',{}).get('max'):
+        assert browser_evidence is not None and browser_evidence['mode']==('prepared' if selection else 'default')
+        if selection:  # functional cache use inside the source group; nothing written to the per-run HOME
+            assert browser_evidence['mapped'] and all(m.startswith(selection[0]+'/') for m in browser_evidence['mapped'])
+            assert browser_evidence['home_fontconfig']==[]
+        else:assert browser_evidence['home_fontconfig'] and not browser_evidence['mapped']  # default rebuild
     if a.fault=='unknown':assert len(value['results'])==1 and len(value['not_attempted'])==(2 if a.successor else 3)
     if a.fault.startswith('local-'):
         assert a.successor and len(value['results'])==3 and not value['not_attempted']
@@ -210,7 +271,8 @@ def main():
     if a.native and a.fault not in ('memory-enforcement-lost','memory-survivor'):assert value['owned_cleanup']['owned_groups_removed'] and value['process_cleanup']=='CLOSED'
     (a.root/'rehearsal.json').write_bytes(canonical(value))
     print(json.dumps(dict(rehearsal='NATIVE_CGROUP_FIXTURE' if a.native else 'CONTRACT_SIMULATION',fault=a.fault,verified=True,
-        source_memory={k:source_memory.get(k) for k in ('memory.peak','memory.current','memory.events','memory.stat')})))
+        source_memory={k:source_memory.get(k) for k in ('memory.peak','memory.current','memory.events','memory.stat')},
+        **({'browser_evidence':browser_evidence,'residency_before':json.loads((a.root/'residency-before.json').read_text())} if a.fault=='real-chromium' else {}))))
     return 0
 
 if __name__=='__main__':sys.exit(main())
