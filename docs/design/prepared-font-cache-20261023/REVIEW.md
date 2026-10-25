@@ -45,7 +45,20 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
   `fonts.conf` with only its `<cachedir>` elements replaced by the read-only prepared directory,
   and the relative `conf.d` include made absolute. All rules are kept verbatim, and there is no
   writable cachedir.
-* **Preparation (`prepare()`) is for development and tests only.** It creates a new empty
+* **Structural refusals (INVALID).** The mode only covers what it fingerprints. It refuses when
+  any of the following holds:
+  * `conf.d` or `local.conf` adds a `<cachedir>` or an absolute `<dir>`;
+  * the absolute `<dir>` set in `fonts.conf` differs from the fingerprinted font directories;
+  * a per-run config already exists.
+  Without these refusals, a rescan of an unfingerprinted directory would be a silent fallback.
+  `verify()` also checks the exact derived-config bytes handed to the browser against the
+  manifest.
+* **No default-path dependency.** The new module is imported only in prepared mode. The Render
+  disposable job ships only `instrumented_probe.py` and `arcus_http_probe.py`, and default mode
+  must not need anything else.
+* **Preparation (`prepare()`) is for development and tests only.** It rescans every font, so it
+  warms the page cache outside any measured boundary; later runs are classified by measured
+  residency, never assumed cold. It creates a new empty
   directory, renders once, then seals and verifies it. There is no persistent owner-cache
   installation and no system-wide configuration.
 
@@ -54,7 +67,9 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
   council-free, skipped without a browser. Font selection is identical to default mode for 9
   representative samples (platform fonts, glyph counts, boxes). Prepared cache files are mapped
   from the prepared directory. An `FC_DEBUG=16` trace shows cache loads with no scan or write.
-  Nothing is written to the per-run HOME, while default mode rebuilds.
+  Nothing is written to the per-run HOME, while default mode rebuilds. A positive control shows
+  the same `FC_DEBUG=144` trace printing `FcDirCacheWriteDir` in default mode. The `/proc` maps
+  scan covers only the run's own browser processes.
 * **Memory evidence:** the native `real-chromium` fixture (real `Source.run` → worker → production
   `supervised()` pass-through → browser child using production `browser_launch_options()`), with
   read-only `mincore` residency classified before each run (COLD: every set ≤2% resident; WARM:

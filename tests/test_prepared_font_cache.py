@@ -14,7 +14,8 @@ from verification.direct_reference import instrumented_probe as probe_module
 
 FONTS_CONF = '''<?xml version="1.0"?>
 <fontconfig>
-	<dir>/usr/share/fonts</dir>
+	<dir>FONTS_DIR</dir>
+	<dir>ABSENT_DIR</dir>
 	<dir prefix="xdg">fonts</dir>
 	<match target="pattern"><test qual="any" name="family"><string>mono</string></test>
 		<edit name="family" mode="assign" binding="same"><string>monospace</string></edit></match>
@@ -33,10 +34,12 @@ CACHE_FILES = ('0bd3dc0958fa2205aaaa8ebb13e2872b-le64.cache-11', '3830d5c3ddfd5c
 def system(tmp_path, monkeypatch):
     etc = tmp_path / 'etc/fonts'; (etc / 'conf.d').mkdir(parents=True)
     avail = tmp_path / 'conf.avail'; avail.mkdir()
-    (etc / 'fonts.conf').write_text(FONTS_CONF)
+    fonts = tmp_path / 'fonts'
+    conf = FONTS_CONF.replace('FONTS_DIR', str(fonts)).replace('ABSENT_DIR', str(tmp_path / 'absent-fonts'))
+    (etc / 'fonts.conf').write_text(conf)
     (avail / '10-hinting.conf').write_text('<fontconfig/>')
     (etc / 'conf.d/10-hinting.conf').symlink_to(avail / '10-hinting.conf')
-    fonts = tmp_path / 'fonts'; (fonts / 'truetype').mkdir(parents=True)
+    (fonts / 'truetype').mkdir(parents=True)
     (fonts / 'truetype/a.ttf').write_bytes(b'font-a')
     exe = tmp_path / 'browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell'
     exe.parent.mkdir(parents=True); exe.write_bytes(b'browser')
@@ -44,7 +47,7 @@ def system(tmp_path, monkeypatch):
     monkeypatch.setattr(pfc, 'LOCAL_CONFIG', etc / 'local.conf')
     monkeypatch.setattr(pfc, 'CONF_D', etc / 'conf.d')
     monkeypatch.setattr(pfc, 'FONT_DIRS', (fonts, tmp_path / 'absent-fonts'))
-    return dict(tmp=tmp_path, etc=etc, fonts=fonts, exe=exe, avail=avail)
+    return dict(tmp=tmp_path, etc=etc, fonts=fonts, exe=exe, avail=avail, conf=conf)
 
 
 def sealed(system, name='prepared'):
@@ -74,16 +77,17 @@ def test_derived_config_replaces_only_cachedirs_and_keeps_rules(system):
     config = pfc.verify(cache_dir, digest, system['exe']).decode()
     assert config.count('<cachedir') == 1 and f'<cachedir>{cache_dir}</cachedir>' in config
     assert '<include ignore_missing="yes">/etc/fonts/conf.d</include>' in config and '>conf.d<' not in config
-    kept = [l for l in FONTS_CONF.splitlines() if '<cachedir' not in l and '>conf.d<' not in l]
+    kept = [l for l in system['conf'].splitlines() if '<cachedir' not in l and '>conf.d<' not in l]
     assert all(l in config.splitlines() for l in kept)  # every other line, incl. rules, verbatim
     assert Path(seen['FONTCONFIG_FILE']).name == 'prepare-fonts.conf' and set(seen) == {'FONTCONFIG_FILE'}
 
 
 @pytest.mark.parametrize('change', ['no_conf_d', 'two_conf_d', 'no_cachedir'])
 def test_unexpected_system_config_structure_is_invalid(system, change):
-    text = {'no_conf_d': FONTS_CONF.replace('<include ignore_missing="yes">conf.d</include>', ''),
-            'two_conf_d': FONTS_CONF.replace('</fontconfig>', '<include ignore_missing="yes">conf.d</include></fontconfig>'),
-            'no_cachedir': '\n'.join(l for l in FONTS_CONF.splitlines() if '<cachedir' not in l)}[change]
+    conf = system['conf']
+    text = {'no_conf_d': conf.replace('<include ignore_missing="yes">conf.d</include>', ''),
+            'two_conf_d': conf.replace('</fontconfig>', '<include ignore_missing="yes">conf.d</include></fontconfig>'),
+            'no_cachedir': '\n'.join(l for l in conf.splitlines() if '<cachedir' not in l)}[change]
     (system['etc'] / 'fonts.conf').write_text(text)
     with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_INVALID'):
         pfc.derived_config(system['tmp'] / 'x')
@@ -117,7 +121,7 @@ def test_changed_fonts_configuration_or_browser_is_stale(system, change):
     cache_dir, digest, _ = sealed(system)
     if change == 'font_added':(system['fonts'] / 'truetype/b.ttf').write_bytes(b'font-b')
     elif change == 'font_touched':os.utime(system['fonts'] / 'truetype/a.ttf', ns=(1, 1))
-    elif change == 'fonts_conf':(system['etc'] / 'fonts.conf').write_text(FONTS_CONF.replace('<int>30</int>', '<int>31</int>'))
+    elif change == 'fonts_conf':(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('<int>30</int>', '<int>31</int>'))
     elif change == 'conf_d_added':(system['etc'] / 'conf.d/99-extra.conf').write_text('<fontconfig/>')
     elif change == 'local_conf':(system['etc'] / 'local.conf').write_text('<fontconfig/>')
     else:system['exe'].write_bytes(b'browser-v2')
@@ -181,7 +185,7 @@ class FakeChromium:
 def run_probe(monkeypatch, executable, **kwargs):
     chromium = FakeChromium(executable)
     monkeypatch.setenv('PLAYWRIGHT_BROWSERS_PATH', str(Path(executable).parents[2]))
-    monkeypatch.setattr(probe_module, 'prepared_font_executable', lambda browsers: Path(executable))
+    monkeypatch.setattr(pfc, 'headless_shell_executable', lambda browsers: Path(executable))  # read at call time
     class Playwright:
         async def __aenter__(self):return type('P', (), {'chromium': chromium})()
         async def __aexit__(self, *_):return False
@@ -261,3 +265,53 @@ def test_supervised_selection_and_command(monkeypatch, tmp_path):
     assert '--prepared-font-cache' not in default and set(env1) == set(env2)
     assert {k: v for k, v in env1.items() if k not in fresh} == {k: v for k, v in env2.items() if k not in fresh}
     assert prepared == default + ['--prepared-font-cache', '/tmp/cache', '--prepared-font-cache-sha256', 'a' * 64]
+
+
+# --- review follow-ups ------------------------------------------------------------
+
+@pytest.mark.parametrize('change', ['conf_d_cachedir', 'conf_d_dir', 'local_cachedir', 'extra_font_dir', 'missing_font_dir'])
+def test_unfingerprinted_font_or_cache_locations_are_invalid(system, change):
+    cache_dir, digest, _ = sealed(system)
+    if change == 'conf_d_cachedir':(system['etc'] / 'conf.d/90-cache.conf').write_text('<fontconfig><cachedir>/tmp/x</cachedir></fontconfig>')
+    elif change == 'conf_d_dir':(system['etc'] / 'conf.d/90-dir.conf').write_text('<fontconfig><dir>/opt/fonts</dir></fontconfig>')
+    elif change == 'local_cachedir':(system['etc'] / 'local.conf').write_text('<fontconfig><cachedir>/tmp/x</cachedir></fontconfig>')
+    elif change == 'extra_font_dir':(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('<dir prefix="xdg">', '<dir>/opt/fonts</dir><dir prefix="xdg">'))
+    else:(system['etc'] / 'fonts.conf').write_text(system['conf'].replace(f"<dir>{system['fonts']}</dir>", ''))
+    refuses('INVALID', cache_dir, digest, system['exe'])
+
+
+def test_existing_per_run_config_is_never_reused(system):
+    cache_dir, digest, _ = sealed(system)
+    home = system['tmp'] / 'home'; home.mkdir(); (home / 'prepared-fonts.conf').write_text('stale')
+    with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_UNVERIFIED'):
+        pfc.launch_env(cache_dir, digest, system['exe'], home, {})
+
+
+@pytest.mark.parametrize('code', ['INVALID', 'UNVERIFIED'])
+def test_invalid_or_unverifiable_refuse_before_launch(monkeypatch, system, code):
+    cache_dir, digest, _ = sealed(system)
+    home = system['tmp'] / 'probe-home'; home.mkdir(); monkeypatch.setenv('HOME', str(home))
+    if code == 'INVALID':unseal(cache_dir)  # writable controlled directory
+    else:os.chmod(cache_dir / CACHE_FILES[0], 0o000)
+    audit, calls = run_probe(monkeypatch, system['exe'], prepared_font_cache=(str(cache_dir), digest))
+    assert calls == [] and audit['failure'] == 'PREPARED_FONT_CACHE_' + code and audit['cleanup'] == 'NOT_STARTED'
+
+
+def test_default_probe_does_not_depend_on_the_new_module(tmp_path):
+    """The Render disposable job ships only instrumented_probe.py and arcus_http_probe.py."""
+    import subprocess, sys
+    script = ("import sys;sys.modules['verification.direct_reference.prepared_font_cache']=None\n"
+              "from verification.direct_reference import instrumented_probe as p\n"
+              "assert p.browser_launch_options(None)=={}\n"
+              "try:\n p.browser_launch_options(('/tmp/x','0'*64))\nexcept ImportError:print('PREPARED_ONLY_IMPORT')")
+    run = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=60,
+                         cwd=Path(__file__).resolve().parents[1])
+    assert run.returncode == 0 and run.stdout.strip() == 'PREPARED_ONLY_IMPORT', run.stderr[-1500:]
+
+
+def test_selection_for_other_worker_modules_is_refused(tmp_path, monkeypatch):
+    case = next(c for c in probe_module.CASES if c in probe_module.IDOX_CASES)
+    monkeypatch.setattr(probe_module, 'execution_environment_allowed', lambda *a: True)
+    monkeypatch.setattr(probe_module.subprocess, 'Popen', lambda *a, **k: (_ for _ in ()).throw(AssertionError('started')))
+    with pytest.raises(ValueError, match='PREPARED_FONT_CACHE_UNSUPPORTED_CASE'):
+        probe_module.supervised(case, tmp_path / 'o.json', prepared_font_cache=('/tmp/cache', 'a' * 64))

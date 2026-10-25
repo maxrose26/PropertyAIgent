@@ -37,7 +37,7 @@ async def main():
     async with async_playwright() as p:
         options = browser_launch_options(selection)
         if os.environ.get('FONT_TRACE') == '1':
-            options = dict(env={**options.get('env', dict(os.environ)), 'FC_DEBUG': '16'})
+            options = dict(env={**options.get('env', dict(os.environ)), 'FC_DEBUG': '144'})  # cache + scan
         # Test-only isolation (production launch is unchanged): no host name resolves, no proxy.
         browser = await p.chromium.launch(headless=True, args=['--host-resolver-rules=MAP * ~NOTFOUND', '--no-proxy-server'], **options)
         context = await browser.new_context(service_workers='block', accept_downloads=False)
@@ -54,14 +54,13 @@ async def main():
             fonts = (await cdp.send('CSS.getPlatformFontsForNode', {'nodeId': node}))['fonts']
             box = await page.evaluate(f'(() => {{ const r = document.getElementById("{k}").getBoundingClientRect(); return [r.width, r.height]; }})()')
             result[k] = dict(fonts=sorted([f['familyName'], f.get('postScriptName', ''), f['glyphCount'], f['isCustomFont']] for f in fonts), box=box)
+        import psutil
         mapped = set()
-        for pid in os.listdir('/proc'):
-            if pid.isdigit():
-                try:
-                    if b'chrome' in Path(f'/proc/{pid}/cmdline').read_bytes():
-                        mapped.update(l.split()[-1] for l in Path(f'/proc/{pid}/maps').read_text().splitlines() if '.cache-11' in l)
-                except OSError:
-                    pass
+        for process in psutil.Process().children(recursive=True):  # this child's browser only
+            try:
+                mapped.update(l.split()[-1] for l in Path(f'/proc/{process.pid}/maps').read_text().splitlines() if '.cache-11' in l)
+            except OSError:
+                pass
         await browser.close()
     home = Path(os.environ['HOME'])
     out.write_text(json.dumps(dict(samples=result, mapped=sorted(mapped),
@@ -110,6 +109,7 @@ def test_prepared_cache_is_used_and_font_selection_is_unchanged(tmp_path, execut
     default, _ = child(tmp_path, 'default', 'default')
     prepared, _ = child(tmp_path, 'prepared', 'prepared', selection)
     traced, trace = child(tmp_path, 'traced', 'prepared', selection, trace=True)
+    _, default_trace = child(tmp_path, 'default-traced', 'default', trace=True)
 
     # Rendering compatibility: identical platform fonts, glyph counts and boxes for every sample.
     assert prepared['samples'] == default['samples'] == traced['samples']
@@ -117,7 +117,9 @@ def test_prepared_cache_is_used_and_font_selection_is_unchanged(tmp_path, execut
     assert prepared['mapped'] and all(m.startswith(str(cache_dir) + '/') for m in prepared['mapped'])
     # Direct cache-use evidence (2): the trace loads caches and shows no scan or cache write.
     loads = [l for l in trace.splitlines() if ' cache: ' in l and '.cache-11' in l]
-    assert loads and not any(w in trace for w in ('FcDirCacheWrite', 'FcDirScan', 'FcFileScan'))
+    assert loads and all(str(cache_dir) not in l or '.cache-11' in l for l in loads)
+    assert 'FcDirCacheWriteDir' in default_trace  # positive control: default mode rescans and writes
+    assert not any(w in trace for w in ('FcDirCacheWrite', 'FcDirScan', 'FcFileScan', 'Created CACHEDIR'))
     # Direct cache-use evidence (3): nothing written to the per-run HOME; default mode does rebuild.
     assert prepared['home_fontconfig'] == [] and traced['home_fontconfig'] == []
     assert default['home_fontconfig'] and not default['mapped']

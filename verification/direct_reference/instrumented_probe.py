@@ -12,8 +12,6 @@ import sys
 import tempfile
 import time
 from urllib.parse import parse_qs, urlsplit
-from verification.direct_reference.prepared_font_cache import (PreparedFontCacheError, launch_env as prepared_font_launch_env,
-    headless_shell_executable as prepared_font_executable)
 
 CASES = {
     'manchester': (688, '142419/FO/2025', 'https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOmFMAW?c__r=Arcus_BE_Public_Register'),
@@ -273,11 +271,14 @@ def browser_launch_options(prepared_font_cache):
     """Default: no options (unchanged launch). Explicit prepared mode: validated browser-only env."""
     if prepared_font_cache is None:
         return {}
+    # Imported only in prepared mode: the default path (and the Render disposable job, which ships
+    # only this file and arcus_http_probe.py) never depends on the new module.
+    from verification.direct_reference.prepared_font_cache import PreparedFontCacheError, headless_shell_executable, launch_env
     cache_dir, manifest_sha256 = prepared_font_cache
     if 'PLAYWRIGHT_BROWSERS_PATH' not in os.environ or 'HOME' not in os.environ:
         raise PreparedFontCacheError('UNVERIFIED')
-    executable = prepared_font_executable(os.environ['PLAYWRIGHT_BROWSERS_PATH'])
-    return dict(env=prepared_font_launch_env(cache_dir, manifest_sha256, executable, os.environ['HOME'], dict(os.environ)))
+    executable = headless_shell_executable(os.environ['PLAYWRIGHT_BROWSERS_PATH'])
+    return dict(env=launch_env(cache_dir, manifest_sha256, executable, os.environ['HOME'], dict(os.environ)))
 
 
 async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None):
@@ -569,10 +570,10 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                 if browser is not None:
                     await browser.close()
                 audit['cleanup'] = 'CONTEXT_BROWSER_CLOSED' if browser is not None else 'NOT_STARTED'
-    except PreparedFontCacheError as exc:
-        fail(exc.code)
     except Exception as exc:
-        fail('BROWSER_' + type(exc).__name__)
+        code = getattr(exc, 'code', None)  # fixed prepared-cache refusal code, prepared mode only
+        fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
+             else 'BROWSER_' + type(exc).__name__)
     audit['elapsed_seconds'] = round(time.monotonic() - started, 3)
     return audit
 

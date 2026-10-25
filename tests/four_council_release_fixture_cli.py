@@ -50,13 +50,11 @@ def real_chromium(selection=None,evidence=None):
             page=await context.new_page()
             await page.set_content('<!doctype html><title>fixture</title><table>'+''.join(f'<tr><td>{i}</td><td>row {i}</td></tr>' for i in range(2000))+'</table>')
             rows=await page.evaluate('document.querySelectorAll("tr").length')
+            import psutil
             mapped=set()
-            for pid in os.listdir('/proc'):
-                if pid.isdigit():
-                    try:
-                        if b'chrome' in Path(f'/proc/{pid}/cmdline').read_bytes():
-                            mapped.update(l.split()[-1] for l in Path(f'/proc/{pid}/maps').read_text().splitlines() if '.cache-11' in l)
-                    except OSError:pass
+            for process in psutil.Process().children(recursive=True):  # this run's browser only
+                try:mapped.update(l.split()[-1] for l in Path(f'/proc/{process.pid}/maps').read_text().splitlines() if '.cache-11' in l)
+                except OSError:pass
             await browser.close();return rows,sorted(mapped)
     rows,mapped=asyncio.run(run())
     assert rows==2000

@@ -32,6 +32,7 @@ CODES = ('MISSING', 'MANIFEST_MISMATCH', 'STALE', 'INVALID', 'UNVERIFIED')
 CACHE_NAME = re.compile(r'[0-9a-f]{32}-le64\.cache-11|CACHEDIR\.TAG')
 SAFE_PATH = re.compile(r'/[A-Za-z0-9_./-]{1,511}')
 CACHEDIR = re.compile(r'<cachedir[^>]*>[^<]*</cachedir>')
+ABSOLUTE_DIR = re.compile(r'<dir>(/[^<]*)</dir>')
 RELATIVE_CONF_D = '<include ignore_missing="yes">conf.d</include>'
 ABSOLUTE_CONF_D = '<include ignore_missing="yes">/etc/fonts/conf.d</include>'
 
@@ -149,11 +150,25 @@ def font_fingerprint():
 
 
 def config_fingerprint():
+    """Hashes of fonts.conf, local.conf and conf.d. Refuses (INVALID) structures this mode does not
+    fingerprint: a conf.d or local.conf cachedir or absolute font dir, or fonts.conf absolute font
+    dirs other than FONT_DIRS (a rescan of an unfingerprinted dir would be a silent fallback)."""
     names = sorted(os.listdir(CONF_D))
     if len(names) > LIMITS['conf_files']:
         raise PreparedFontCacheError('UNVERIFIED')
-    conf_d = [[name, os.readlink(CONF_D / name) if os.path.islink(CONF_D / name) else None,
-               _sha(_read(CONF_D / name, LIMITS['config_bytes']))] for name in names]
+    conf_d = []
+    for name in names:
+        raw = _read(CONF_D / name, LIMITS['config_bytes'])
+        if b'<cachedir' in raw or ABSOLUTE_DIR.search(raw.decode('utf-8', 'replace')):
+            raise PreparedFontCacheError('INVALID')
+        conf_d.append([name, os.readlink(CONF_D / name) if os.path.islink(CONF_D / name) else None, _sha(raw)])
+    system = _read(SYSTEM_CONFIG, LIMITS['config_bytes']).decode('utf-8')
+    if set(ABSOLUTE_DIR.findall(system)) != {str(d) for d in FONT_DIRS}:
+        raise PreparedFontCacheError('INVALID')
+    if os.path.lexists(LOCAL_CONFIG):
+        local_raw = _read(LOCAL_CONFIG, LIMITS['config_bytes'])
+        if b'<cachedir' in local_raw or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace')):
+            raise PreparedFontCacheError('INVALID')
     local = _sha(_read(LOCAL_CONFIG, LIMITS['config_bytes'])) if os.path.lexists(LOCAL_CONFIG) else None
     return dict(fonts_conf=_sha(_read(SYSTEM_CONFIG, LIMITS['config_bytes'])), local_conf=local,
                 conf_d=_sha(_canonical(conf_d)), conf_d_files=len(conf_d))
@@ -199,7 +214,10 @@ def verify(cache_dir, manifest_sha256, executable):
             raise PreparedFontCacheError('INVALID')
         if any(recorded.get(key) != current[key] for key in ('browser', 'fonts', 'config', 'derived_config_sha256')):
             raise PreparedFontCacheError('STALE')
-        return derived_config(cache_dir)
+        config = derived_config(cache_dir)
+        if _sha(config) != recorded['derived_config_sha256']:  # the exact bytes handed to the browser
+            raise PreparedFontCacheError('STALE')
+        return config
     except PreparedFontCacheError:
         raise
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
@@ -225,6 +243,8 @@ def prepare(cache_dir, executable, render):
     """Development/test only: build a cache in a new empty directory, seal it, return the manifest SHA256.
 
     `render(extra_env)` must launch this browser once with the extra environment and render text.
+    Preparation rescans every font, which warms the page cache outside any measured source group;
+    later runs must therefore be classified by measured residency, never assumed cold.
     """
     cache_dir = Path(cache_dir)
     _location(cache_dir, '0' * 64)
