@@ -32,7 +32,7 @@ CODES = ('MISSING', 'MANIFEST_MISMATCH', 'STALE', 'INVALID', 'UNVERIFIED')
 CACHE_NAME = re.compile(r'[0-9a-f]{32}-le64\.cache-11|CACHEDIR\.TAG')
 SAFE_PATH = re.compile(r'/[A-Za-z0-9_./-]{1,511}')
 CACHEDIR = re.compile(r'<cachedir[^>]*>[^<]*</cachedir>')
-ABSOLUTE_DIR = re.compile(r'<dir>(/[^<]*)</dir>')
+ABSOLUTE_DIR = re.compile(r'<dir\b[^>]*>\s*(/[^<]*?)\s*</dir>')
 RELATIVE_CONF_D = '<include ignore_missing="yes">conf.d</include>'
 ABSOLUTE_CONF_D = '<include ignore_missing="yes">/etc/fonts/conf.d</include>'
 
@@ -169,8 +169,8 @@ def config_fingerprint():
         local_raw = _read(LOCAL_CONFIG, LIMITS['config_bytes'])
         if b'<cachedir' in local_raw or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace')):
             raise PreparedFontCacheError('INVALID')
-    local = _sha(_read(LOCAL_CONFIG, LIMITS['config_bytes'])) if os.path.lexists(LOCAL_CONFIG) else None
-    return dict(fonts_conf=_sha(_read(SYSTEM_CONFIG, LIMITS['config_bytes'])), local_conf=local,
+    local = _sha(local_raw) if os.path.lexists(LOCAL_CONFIG) else None
+    return dict(fonts_conf=_sha(system.encode('utf-8')), local_conf=local,  # hashes of the bytes checked above
                 conf_d=_sha(_canonical(conf_d)), conf_d_files=len(conf_d))
 
 

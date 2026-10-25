@@ -269,13 +269,14 @@ def test_supervised_selection_and_command(monkeypatch, tmp_path):
 
 # --- review follow-ups ------------------------------------------------------------
 
-@pytest.mark.parametrize('change', ['conf_d_cachedir', 'conf_d_dir', 'local_cachedir', 'extra_font_dir', 'missing_font_dir'])
+@pytest.mark.parametrize('change', ['conf_d_cachedir', 'conf_d_dir', 'local_cachedir', 'extra_font_dir', 'missing_font_dir', 'prefixed_dir'])
 def test_unfingerprinted_font_or_cache_locations_are_invalid(system, change):
     cache_dir, digest, _ = sealed(system)
     if change == 'conf_d_cachedir':(system['etc'] / 'conf.d/90-cache.conf').write_text('<fontconfig><cachedir>/tmp/x</cachedir></fontconfig>')
-    elif change == 'conf_d_dir':(system['etc'] / 'conf.d/90-dir.conf').write_text('<fontconfig><dir>/opt/fonts</dir></fontconfig>')
+    elif change == 'conf_d_dir':(system['etc'] / 'conf.d/90-dir.conf').write_text('<fontconfig><dir salt="x"> /opt/fonts </dir></fontconfig>')
     elif change == 'local_cachedir':(system['etc'] / 'local.conf').write_text('<fontconfig><cachedir>/tmp/x</cachedir></fontconfig>')
     elif change == 'extra_font_dir':(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('<dir prefix="xdg">', '<dir>/opt/fonts</dir><dir prefix="xdg">'))
+    elif change == 'prefixed_dir':(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('<dir prefix="xdg">', '<dir prefix="default">/opt/fonts</dir><dir prefix="xdg">'))
     else:(system['etc'] / 'fonts.conf').write_text(system['conf'].replace(f"<dir>{system['fonts']}</dir>", ''))
     refuses('INVALID', cache_dir, digest, system['exe'])
 
