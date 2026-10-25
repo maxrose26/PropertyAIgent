@@ -4,13 +4,13 @@ File-backed fakes of the system font configuration, font directories and browser
 no browser is started. Real-browser compatibility is covered by
 tests/test_prepared_font_cache_browser.py (skipped where no browser is installed).
 """
-import asyncio
 import json
 import os
 from pathlib import Path
 import pytest
 from verification.direct_reference import prepared_font_cache as pfc
 from verification.direct_reference import instrumented_probe as probe_module
+from tests.test_discovery_four_council_proof import async_run
 
 FONTS_CONF = '''<?xml version="1.0"?>
 <fontconfig>
@@ -190,7 +190,7 @@ def run_probe(monkeypatch, executable, **kwargs):
         async def __aenter__(self):return type('P', (), {'chromium': chromium})()
         async def __aexit__(self, *_):return False
     monkeypatch.setattr('playwright.async_api.async_playwright', lambda: Playwright())
-    audit = asyncio.run(probe_module.probe('trafford', **kwargs))
+    audit = async_run(probe_module.probe('trafford', **kwargs))  # socket-free loop: CI denies even AF_UNIX
     return audit, chromium.calls
 
 
