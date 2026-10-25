@@ -165,11 +165,12 @@ def config_fingerprint():
     system = _read(SYSTEM_CONFIG, LIMITS['config_bytes']).decode('utf-8')
     if set(ABSOLUTE_DIR.findall(system)) != {str(d) for d in FONT_DIRS}:
         raise PreparedFontCacheError('INVALID')
+    local_raw = None
     if os.path.lexists(LOCAL_CONFIG):
         local_raw = _read(LOCAL_CONFIG, LIMITS['config_bytes'])
         if b'<cachedir' in local_raw or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace')):
             raise PreparedFontCacheError('INVALID')
-    local = _sha(local_raw) if os.path.lexists(LOCAL_CONFIG) else None
+    local = _sha(local_raw) if local_raw is not None else None  # one existence decision
     return dict(fonts_conf=_sha(system.encode('utf-8')), local_conf=local,  # hashes of the bytes checked above
                 conf_d=_sha(_canonical(conf_d)), conf_d_files=len(conf_d))
 
