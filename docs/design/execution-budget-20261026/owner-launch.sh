@@ -26,6 +26,9 @@ print(r['manifest']['limits']['package_seconds'], r['manifest']['limits']['aggre
 PY
 )
 test "$aggregate_bytes" = 2147483648
+# Council-free dependency check in the exact interpreter that will run the release (docs/design/real-worker-proof-20261026/SPEC.md).
+report=$(PYTHONDONTWRITEBYTECODE=1 "$HOME/stage4-owner/storage-controller-venv/bin/python" -m verification.discovery.four_council_release runtime-check --version THREE_COUNCIL_SOURCE_RELEASE_V2) || {
+    printf '%s\n' "$report" >&2; echo 'RUNTIME_DEPENDENCY_CHECK_FAILED: nothing was claimed or started' >&2; exit 1; }
 printf '%s\n' 'One launch; only the exact registered scopes and continuation policy apply.' \
  'No database input. Ctrl+C cancels; never rerun after an uncertain result.'
 exec systemd-run --user --scope --unit=propertyaigent-operational-once \
