@@ -33,8 +33,10 @@ def manifest(start,end,purpose):
             cursor=stop+timedelta(days=1)
     return dict(purpose=purpose,start=start,end=end,rule=RULE,limits=LIMITS.copy(),rows=rows)
 
-def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False):
+def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
     if type(no_transport_retry) is not bool or type(retain_proof) is not bool:raise ValueError('retry/proof policy')
+    # A named browser execution budget applies to the Arcus UI reader only.
+    if execution_budget is not None and (row['council'] not in ARCUS or not isinstance(execution_budget,str)):raise ValueError('execution budget')
     if type(fixed_four_rows) is not bool or (fixed_four_rows and (not retain_proof or not no_transport_retry)):raise ValueError('fixed row policy')
     if execution_mode is not None and (execution_mode!='four-council-owner-local' or not retain_proof or row['council']!='rochdale'):
         raise ValueError('proof execution context')
@@ -58,7 +60,7 @@ def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=No
     with tempfile.TemporaryDirectory(prefix='discovery-finite-') as td:
         path=Path(td)/'source.json'
         with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
-            supervised(case,path,**({'execution_mode':execution_mode} if execution_mode else {}),window=(row['start'],row['end']),**({'retain_proof':True} if retain_proof else {}))
+            supervised(case,path,**({'execution_mode':execution_mode} if execution_mode else {}),window=(row['start'],row['end']),**({'retain_proof':True} if retain_proof else {}),**({'execution_budget':execution_budget} if execution_budget is not None else {}))
         if not path.is_file() or path.stat().st_size>=65536:raise ValueError('bounded audit')
         value=json.loads(path.read_bytes())
         if retain_proof and 'retained_proof' in value:
@@ -66,7 +68,7 @@ def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=No
             validate_audit(value,(row['council'],row['semantics'],row['start'],row['end']))
         return retain_screening(value)
 
-def classify(row,a):
+def classify(row,a,*,execution_budget=None):
     """Qualify retained count/criteria evidence; never infer success from HTTP/exit."""
     if a.get('requested_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
     if row['council'] in ARCUS:
@@ -77,7 +79,7 @@ def classify(row,a):
     if a.get('capped') or a.get('completeness')=='INCOMPLETE' or a.get('enumeration_evidence')=='PAGE_CAP':return 'INCOMPLETE'
     if a.get('applied_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
     if row['council'] in ARCUS:
-        try:validate_arcus(a,dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end']))
+        try:validate_arcus(a,dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end']),**({'execution_budget':execution_budget} if execution_budget is not None else {}))
         except (ValueError,KeyError,TypeError):return 'UNKNOWN'
         return 'COMPLETE'
     if (a.get('cleanup')!='SESSION_BOUNDARY_CLOSED' or a.get('enumeration_evidence')!='COUNT_RECONCILED'

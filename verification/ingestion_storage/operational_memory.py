@@ -1,4 +1,7 @@
-"""Owner-local kernel limits:256MiB controller,1GiB source,1.5GiB total."""
+"""Owner-local kernel limits:256MiB controller,1GiB source,1.5GiB total (default).
+
+The only other accepted pair is the reviewed BROWSER_SOURCE_V2 envelope (1.5GiB source,
+2GiB total; docs/design/execution-budget-20261026/SPEC.md). Limits are ceilings, not reservations."""
 import os,time
 from pathlib import Path
 from .memory_enforcement import MemoryUnavailable,values
@@ -14,9 +17,13 @@ STAT_CATEGORIES=dict(disjoint=['anon','file','kernel','sock'],
     subset_of={'shmem':'file','file_mapped':'file','file_dirty':'file','slab_reclaimable':'kernel',
         'slab_unreclaimable':'kernel','kernel_stack':'kernel','pagetables':'kernel','percpu':'kernel'})
 
+# Exact (source, aggregate) pairs; anything else is refused before any group is created.
+LIMIT_PAIRS=((1024**3,1536*1024**2),(1536*1024**2,2048*1024**2))
+
 class OperationalMemory:
     # Finalisation-only state: entered once after a memory failure, never left.
     finalisation_only=False;latched=None
+    controller_bytes=256*1024**2;source_bytes=1024**3;aggregate_bytes=1536*1024**2
     def observe(self):
         """Bounded, read-only diagnostics, never permission to proceed or close.
 
@@ -64,7 +71,9 @@ class OperationalMemory:
         result['status']='PARTIAL' if result['failures'] else 'OBSERVED'
         return result
 
-    def __init__(self):
+    def __init__(self,*,source_bytes=1024**3,aggregate_bytes=1536*1024**2):
+        if (source_bytes,aggregate_bytes) not in LIMIT_PAIRS:raise MemoryUnavailable('MEMORY_LIMIT_SELECTION')
+        self.source_bytes=source_bytes;self.aggregate_bytes=aggregate_bytes
         lines=Path('/proc/self/cgroup').read_text().splitlines()
         if len(lines)!=1 or not lines[0].startswith('0::/'):raise MemoryUnavailable('CGROUP_V2_REQUIRED')
         relative=Path(lines[0][3:])
@@ -77,18 +86,18 @@ class OperationalMemory:
         self.controller.mkdir();self.controller.joinpath('cgroup.procs').write_text(str(os.getpid()))
         self.root.joinpath('cgroup.subtree_control').write_text('+memory')
         self.source.mkdir()
-        for path,limit in [(self.controller,256*1024**2),(self.source,1024**3)]:
+        for path,limit in [(self.controller,self.controller_bytes),(self.source,self.source_bytes)]:
             path.joinpath('memory.max').write_text(str(limit));path.joinpath('memory.swap.max').write_text('0');path.joinpath('memory.oom.group').write_text('1')
         self.snapshot()
 
     def check_root(self):
-        if self.root.joinpath('memory.max').read_text().strip()!=str(1536*1024**2) or self.root.joinpath('memory.swap.max').read_text().strip()!='0' or self.root.joinpath('memory.oom.group').read_text().strip()!='1':raise MemoryUnavailable('EXACT_AGGREGATE_MEMORY_LIMIT')
+        if self.root.joinpath('memory.max').read_text().strip()!=str(self.aggregate_bytes) or self.root.joinpath('memory.swap.max').read_text().strip()!='0' or self.root.joinpath('memory.oom.group').read_text().strip()!='1':raise MemoryUnavailable('EXACT_AGGREGATE_MEMORY_LIMIT')
 
     def snapshot(self):
         """Execution gate. Permanently closed once a memory failure is latched."""
         if self.finalisation_only:raise MemoryUnavailable('FINALISATION_ONLY')
         self.check_root();result={}
-        for name,path,limit in [('aggregate',self.root,1536*1024**2),('controller',self.controller,256*1024**2),('source',self.source,1024**3)]:
+        for name,path,limit in [('aggregate',self.root,self.aggregate_bytes),('controller',self.controller,self.controller_bytes),('source',self.source,self.source_bytes)]:
             if path.joinpath('memory.max').read_text().strip()!=str(limit) or path.joinpath('memory.swap.max').read_text().strip()!='0':raise MemoryUnavailable('MEMORY_ENFORCEMENT_LOST')
             events=values(path/'memory.events')
             result[name]=dict(peak_bytes=int(path.joinpath('memory.peak').read_text()),current_bytes=int(path.joinpath('memory.current').read_text()),events=events)
@@ -96,7 +105,7 @@ class OperationalMemory:
         return result
 
     def groups(self):
-        return [('aggregate',self.root,1536*1024**2),('controller',self.controller,256*1024**2),('source',self.source,1024**3)]
+        return [('aggregate',self.root,self.aggregate_bytes),('controller',self.controller,self.controller_bytes),('source',self.source,self.source_bytes)]
 
     def counters(self,path,field='memory.events'):
         try:

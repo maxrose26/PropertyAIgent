@@ -21,12 +21,18 @@ MEMORY_FAULTS=('memory-reclaim','memory-enforcement-lost','memory-survivor')
 
 
 def reclaim(root):
-    """Real kernel limit event, no OOM: reclaimable page cache written inside the 1GiB source group."""
+    """Real kernel limit event, no OOM: reclaimable page cache written inside the source group.
+
+    Hosted CI only (local pressure tests are paused). Writes are bounded at the group's own
+    memory.max + 512MiB (V1 1GiB: 192 chunks, unchanged; V2 1.5GiB: 256) and at 40s elapsed."""
     group=Path('/sys/fs/cgroup')/Path('/proc/self/cgroup').read_text().strip()[3:].lstrip('/')
     assert group.name=='source'
-    chunk=b'\1'*(8*1024**2)
+    limit=int((group/'memory.max').read_text())
+    assert limit in (1024**3,1536*1024**2)
+    chunk=b'\1'*(8*1024**2);started=time.monotonic()
     with open(root/'reclaim.bin','wb') as stream:
-        for _ in range(192):  # at most 1.5GiB written; stops at the first max event
+        for _ in range((limit+512*1024**2)//len(chunk)):  # stops at the first max event
+            if time.monotonic()-started>40:break  # no event by then: the fixture assertions fail
             # Synced chunks leave clean, immediately reclaimable page cache: the kernel event under
             # test is reclaim at the limit, not writeback stalls (hosted run 39953419679 attempt 2).
             stream.write(chunk);stream.flush();os.fdatasync(stream.fileno())
@@ -125,16 +131,23 @@ def residency(sets,measure=mincore_residency):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--native',action='store_true');p.add_argument('--successor',action='store_true');p.add_argument('--fault',choices=['none','unknown','cancel','cancel-startup','unavailable','local-all','local-0','local-1','local-2','memory-failure','reporting-failure','publication-failure','real-chromium',*MEMORY_FAULTS],default='none');p.add_argument('--worker',type=int);p.add_argument('--browser-fixture',action='store_true');p.add_argument('--output',type=Path)
-    p.add_argument('--prepared-font-cache');p.add_argument('--prepared-font-cache-sha256');a=p.parse_args()
+    p.add_argument('--prepared-font-cache');p.add_argument('--prepared-font-cache-sha256')
+    p.add_argument('--execution-budget-v2',action='store_true');a=p.parse_args()
+    assert a.successor or not a.execution_budget_v2
+    budget_name='BROWSER_SOURCE_V2' if a.execution_budget_v2 else None
+    budget_args=['--execution-budget-v2'] if a.execution_budget_v2 else []
     assert (a.prepared_font_cache is None)==(a.prepared_font_cache_sha256 is None)
     selection=(a.prepared_font_cache,a.prepared_font_cache_sha256) if a.prepared_font_cache else None
     font_args=['--prepared-font-cache',a.prepared_font_cache,'--prepared-font-cache-sha256',a.prepared_font_cache_sha256] if selection else []
     def source_value(index):
         if a.successor and a.fault in ('local-all',f'local-{index-1}'):
-            return local_audit(index,'selector' if index==3 else 'sort')
-        return audit(index,complete=not(a.fault=='unknown' and index==(1 if a.successor else 0)))
+            return local_audit(index,'selector' if index==3 else 'sort',**({'execution_budget':budget_name} if budget_name and index==1 else {}))
+        value=audit(index,complete=not(a.fault=='unknown' and index==(1 if a.successor else 0)))
+        if budget_name and index==1:  # the budgeted probe declares its budget and fixed stage timings
+            value.update(execution_budget=budget_name,stage_timings={'NAVIGATION':1200,'READY':900,'CRITERIA':400,'SEGMENT':[300]})
+        return value
     if a.worker is not None:
-        if a.native and not a.browser_fixture:r.owner_source_context()
+        if a.native and not a.browser_fixture:r.owner_source_context(budget_name)
         if a.native and a.fault in MEMORY_FAULTS and a.worker==1:reclaim(Path(os.environ['TMPDIR']))
         if a.browser_fixture and a.fault=='real-chromium':real_chromium(selection,a.root/'browser-evidence.json')
         if a.fault in ('cancel','cancel-startup','memory-failure'):
@@ -149,16 +162,20 @@ def main():
                 output=command[command.index('--output')+1]
                 replacement=[sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker','1','--output',output,'--browser-fixture']
                 if a.successor:replacement+=['--successor','--fault',a.fault]
+                if '--execution-budget' in command:  # added by the production supervised() pass-through
+                    assert command[command.index('--execution-budget')+1]==budget_name;replacement+=budget_args
                 if '--prepared-font-cache' in command:  # added by the production supervised() pass-through
                     i=command.index('--prepared-font-cache');replacement+=command[i:i+4]
                 return original_popen(replacement,**kwargs)
             with patch.object(probe.subprocess,'Popen',fixture_browser):
-                probe.supervised('discovery_rochdale_ui_window',a.output,execution_mode='four-council-owner-local',window=('2026-10-08','2026-10-14'),retain_proof=True,**({'prepared_font_cache':selection} if selection else {}))
+                probe.supervised('discovery_rochdale_ui_window',a.output,execution_mode='four-council-owner-local',window=('2026-10-08','2026-10-14'),retain_proof=True,**({'prepared_font_cache':selection} if selection else {}),**({'execution_budget':budget_name} if budget_name else {}))
             return 0
         value=source_value(a.worker)
         r.write_new(a.output,canonical(value));return 0
     a.root.mkdir(parents=True,exist_ok=True)
-    reg=(successor_registration() if a.successor else registration());reg.update(revision=r.git('rev-parse','HEAD'),tree=r.git('rev-parse','HEAD^{tree}'))
+    reg=(successor_registration() if a.successor else registration())
+    if budget_name:reg=r.render(reg['release_id'],reg['revision'],reg['tree'],reg['evidence_head'],reg['issued_at'],reg['expires_at'],released=True,version=r.SUCCESSOR_V2_VERSION)
+    reg.update(revision=r.git('rev-parse','HEAD'),tree=r.git('rev-parse','HEAD^{tree}'))
     api=API(reg);original=api.runner;head_reads=[0]
     def transport(command,**kwargs):
         if command[3]=='GET' and '/git/ref/' in command[4]:
@@ -197,7 +214,10 @@ def main():
                 if a.fault=='memory-enforcement-lost':(self.memory.source/'memory.max').write_text(str(2*1024**3))
                 raise
         def command(self,index,out):
-            return [sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker',str(index),'--output',str(out),'--fault',a.fault]+(['--native'] if a.native else [])+(['--successor'] if a.successor else [])+font_args
+            # The production command carries the budget; the fixture worker inherits it from there.
+            production=super().command(index,out)
+            assert ('--execution-budget' in production)==bool(budget_name)
+            return [sys.executable,'-m','tests.four_council_release_fixture_cli','--root',str(a.root),'--worker',str(index),'--output',str(out),'--fault',a.fault]+(['--native'] if a.native else [])+(['--successor'] if a.successor else [])+font_args+budget_args
     class SyntheticSource:
         # Contract simulation for hosts with mismatched /proc. The native mode
         # below runs real Popen/preexec/cgroup cancellation, not this substitute.
@@ -234,7 +254,10 @@ def main():
         value=original_read(path,*args,**kwargs)
         if str(path)=='/proc/self/stat' and not a.native:return str(os.getpid())+' '+value.split(' ',1)[1]
         return value
-    def memory():return original_memory() if a.native else Memory(a.root)
+    def memory(**limits):
+        # V1 keeps the unchanged no-argument call; V2 passes its exact keyword limits.
+        assert bool(limits)==bool(budget_name)
+        return original_memory(**limits) if a.native else Memory(a.root)
     def github(emit,check,**kwargs):return GitHub(emit,check,runner=transport,**kwargs)
     with patch.object(r.Journal,'emit',emit),patch.object(r,'Source',FixtureSource if a.native else SyntheticSource),patch.object(r,'OperationalMemory',memory),patch.object(r,'GitHub',github),patch.object(r,'validate',lambda value:original_validate(value,checkout=a.native)),patch.object(Path,'read_text',read):
         fake_process=type('Process',(),{'children':lambda self,recursive:[]})()
@@ -250,6 +273,12 @@ def main():
     assert value['database_connections']==value['application_writes']==0
     assert code==(0 if a.fault=='none' or (a.fault=='real-chromium' and not value['containment_observation'].get('groups',{}).get('source',{}).get('memory.events',{}).get('max')) else 1)
     source_memory=value['containment_observation'].get('groups',{}).get('source',{})
+    if a.native and 'memory.max' in source_memory:  # exact selected ceilings, whatever the outcome
+        groups=value['containment_observation']['groups']
+        expected=(1536*1024**2,2048*1024**2) if budget_name else (1024**3,1536*1024**2)
+        enforcement_lost=a.fault=='memory-enforcement-lost'  # this fault rewrites source memory.max
+        assert enforcement_lost or source_memory['memory.max']==expected[0]
+        assert groups['aggregate']['memory.max']==expected[1] and groups['controller']['memory.max']==256*1024**2
     if a.fault=='none' or (a.fault=='real-chromium' and not source_memory.get('memory.events',{}).get('max')):
         assert len(value['results'])==(3 if a.successor else 4) and value['cleanup']=='CLOSED'
     browser_evidence=json.loads((a.root/'browser-evidence.json').read_text()) if a.fault=='real-chromium' and (a.root/'browser-evidence.json').exists() else None

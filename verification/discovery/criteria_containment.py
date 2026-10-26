@@ -4,9 +4,12 @@ from .arcus_ui_window import LOCAL_TIMEOUT,CRITERIA_OPERATIONS
 from . import finite_acceptance as f
 
 
-def eligible(row,a):
+def eligible(row,a,*,execution_budget=None):
     from .r0_recovery_proposal import resources,identities
+    from .arcus_ui_audit import budget_bound
     if row['council'] not in f.ARCUS:return False
+    try:worker_bound=budget_bound(a,execution_budget)
+    except ValueError:return False
     config=f.dated_config(f.UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end'])
     origin='https://'+config.host;t=a.get('criteria_control_timeout',{})
     if not isinstance(t,dict):return False
@@ -23,6 +26,6 @@ def eligible(row,a):
         and a.get('blocked_posts')==0 and a.get('cleanup')=='CONTEXT_BROWSER_CLOSED'
         and a.get('process_cleanup')=='CLOSED' and type(a.get('live_owned_survivors'))is int and a['live_owned_survivors']==0
         and a.get('supervisor_limit_hit') is False and type(a.get('supervisor_seconds'))in(int,float)
-        and 0<=a['supervisor_seconds']<=45 and a.get('pages')==1 and type(a.get('navigations'))is int
+        and 0<=a['supervisor_seconds']<=worker_bound and a.get('pages')==1 and type(a.get('navigations'))is int
         and 1<=a['navigations']<=2 and type(a.get('public_ui_posts'))is int
         and 0<=a['public_ui_posts']<=a['requests'] and a.get('measured_public_ui_posts')==a['public_ui_posts'])

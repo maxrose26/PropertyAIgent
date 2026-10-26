@@ -6,7 +6,27 @@ from .arcus_ui_config import UI_CASES
 from .arcus_ui_transport import combined_bytes, MAX_BYTES
 
 
-def validate(a,config=None):
+def budget_bound(a,execution_budget=None):
+    """Worker-second bound of the caller-selected budget; the audit must declare exactly it.
+
+    None is the historical 45s envelope and refuses any audit that claims a budget."""
+    if execution_budget is None:
+        if 'execution_budget' in a or 'stage_timings' in a:raise ValueError('UI execution budget')
+        return 45
+    from .execution_budget import select,STAGES,MAX_SEGMENT_TIMINGS
+    budget=select(execution_budget)
+    timings=a.get('stage_timings')
+    if a.get('execution_budget')!=budget['name'] or not isinstance(timings,dict) or not set(timings)<=set(STAGES):
+        raise ValueError('UI execution budget')
+    for name,value in timings.items():
+        values=value if name=='SEGMENT' else [value]
+        if (name=='SEGMENT')!=isinstance(value,list) or not 1<=len(values)<=MAX_SEGMENT_TIMINGS or any(
+                type(v) is not int or not 0<=v<=budget['worker_seconds']*1000 for v in values):
+            raise ValueError('UI stage timings')
+    return budget['worker_seconds']
+
+
+def validate(a,config=None,*,execution_budget=None):
     config=UI_CASES.get(a.get('case')) if config is None else config
     if config is None:raise ValueError('unadmitted case')
     if (a.get('destination')!=config.destination or a.get('persistence') is not False
@@ -16,7 +36,7 @@ def validate(a,config=None):
         or a.get('enumeration_evidence')!='COUNT_RECONCILED' or a.get('listing_failure') is not None
         or a.get('completeness')!='UNKNOWN'
         or a.get('applied_interval')!=[config.start,config.end]): raise ValueError('UI window failed')
-    if not (1<=a['requests']<=80 and 0<=a['decoded_bytes']<=20*1024*1024 and 0<=a['supervisor_seconds']<=45):
+    if not (1<=a['requests']<=80 and 0<=a['decoded_bytes']<=20*1024*1024 and 0<=a['supervisor_seconds']<=budget_bound(a,execution_budget)):
         raise ValueError('UI resource bound')
     if not (0<=a['encoded_bytes']<=20*1024*1024 and a['pages']==1 and 1<=a['navigations']<=2):
         raise ValueError('UI navigation/wire bound')

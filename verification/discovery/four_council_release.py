@@ -22,15 +22,22 @@ from verification.ingestion_storage.operational_memory import OperationalMemory
 from verification.ingestion_storage.memory_enforcement import MemoryUnavailable
 from . import finite_acceptance as finite
 from . import four_council_proof as proof
+from . import execution_budget as budgets
 from .r0_recovery_proposal import resources, identities
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = 'FOUR_COUNCIL_SOURCE_RELEASE_V1'
 SUCCESSOR_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V1'
+# Same rows/allowlist/stop policy as V1 under the BROWSER_SOURCE_V2 execution budget
+# (docs/design/execution-budget-20261026/SPEC.md). V1 versions stay byte-identical.
+SUCCESSOR_V2_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V2'
+SUCCESSORS = (SUCCESSOR_VERSION, SUCCESSOR_V2_VERSION)
 BRANCH = 'stage4/narrow-continuation-evidence-20261016'
 REPO = 'repos/maxrose26/PropertyAIgent'
 PERMIT = 'OWNER_APPROVED_FIXED_FOUR_SOURCE_ONLY_STOP_TREATMENT'
 SUCCESSOR_PERMIT = 'OWNER_APPROVED_FIXED_THREE_SOURCE_ONLY_STOP_TREATMENT'
+SUCCESSOR_V2_PERMIT = 'OWNER_APPROVED_FIXED_THREE_SOURCE_ONLY_STOP_TREATMENT_V2'
+PERMITS = {VERSION: PERMIT, SUCCESSOR_VERSION: SUCCESSOR_PERMIT, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_PERMIT}
 PRESERVED = ['CONSUMED_SALFORD_GLOBAL_STOP:38884069913', 'STORAGE_TEST_STOP']
 ROWS = [dict(council=c, semantics=s, start=a, end=b) for c,s,a,b in [
     ('bury','RECEIVED','2026-10-08','2026-10-14'),
@@ -48,6 +55,11 @@ LIMITS = dict(observations=4, requests=110, mixed_source_bytes=29_971_520,
 SUCCESSOR_LIMITS = dict(LIMITS, observations=3, requests=100,
     mixed_source_bytes=26_971_520, worker_seconds=135, active_seconds=180,
     package_seconds=1440)
+# Ceilings, not reservations: 3 x 75s workers, 3 x 90s active; per-job/setup/package unchanged.
+SUCCESSOR_V2_LIMITS = dict(SUCCESSOR_LIMITS, worker_seconds=225, active_seconds=270,
+    slot_active_seconds=90, source_memory_bytes=1536*1024**2, aggregate_memory_bytes=2048*1024**2,
+    execution_budget='BROWSER_SOURCE_V2')
+VERSION_LIMITS = {VERSION: LIMITS, SUCCESSOR_VERSION: SUCCESSOR_LIMITS, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_LIMITS}
 LOCAL_OUTCOMES = ('ROCHDALE_RESULT_MARKER_TIMEOUT', 'IDOX_SEARCH_OR_SORT_TIMEOUT',
                   'OLDHAM_SORT_SELECTOR_ABSENT')
 PACKAGES = ('requests','beautifulsoup4','lxml','playwright','psutil','cryptography')
@@ -66,6 +78,23 @@ DEPENDENCIES = ('docs/design/four-council-release-20261022/manifest.json','verif
     'app/pipeline/discovery_screening.py')
 SUCCESSOR_DEPENDENCIES = ('docs/design/three-council-isolation-20261022/manifest.json',
     'verification/discovery/criteria_containment.py','verification/discovery/source_diagnostics.py')
+SUCCESSOR_V2_DEPENDENCIES = ('docs/design/execution-budget-20261026/manifest.json',
+    'docs/design/execution-budget-20261026/owner-launch.sh',
+    'verification/discovery/criteria_containment.py','verification/discovery/source_diagnostics.py',
+    'verification/discovery/execution_budget.py')
+VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES}
+
+def budget_of(version):
+    """Execution budget selected by the release version (historical for V1 versions)."""
+    return budgets.select(VERSION_LIMITS[version].get('execution_budget'))
+
+
+def memory_limits(version):
+    """Keyword limits for OperationalMemory; V1 versions keep the unchanged default call."""
+    limits=VERSION_LIMITS[version]
+    if (limits['source_memory_bytes'],limits['aggregate_memory_bytes'])==(1024**3,1536*1024**2):return {}
+    return dict(source_bytes=limits['source_memory_bytes'],aggregate_bytes=limits['aggregate_memory_bytes'])
+
 
 class Stop(RuntimeError):
     """Only fixed codes from this module may be exported."""
@@ -126,13 +155,21 @@ def stamp(value):
     if dt.utcoffset() != timedelta(0): raise Stop('UTC_REQUIRED')
     return dt
 
-def manifest(*, successor=False):
+def selected_version(successor=False, version=None):
+    """Explicit version wins; the historical boolean selects only the V1 pair."""
+    if version is None:return SUCCESSOR_VERSION if successor else VERSION
+    if version not in VERSION_LIMITS or (successor and version==VERSION):raise Stop('REGISTRATION_VERSION')
+    return version
+
+
+def manifest(*, successor=False, version=None):
     from app.pipeline.discovery_contract import SOURCE_ROOTS
+    version=selected_version(successor,version);successor=version in SUCCESSORS
     rows=ROWS[1:] if successor else ROWS
     routes={row['council']:('https://'+SOURCE_ROOTS[row['council']][0]+SOURCE_ROOTS[row['council']][1].rstrip('/')+'/search.do?action=advanced&searchType=Application') for row in rows if row['council']!='rochdale'}
     routes['rochdale']=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],'2026-10-08','2026-10-14').destination
-    value=dict(version=SUCCESSOR_VERSION if successor else VERSION, rows=rows, source_routes=routes,
-        limits=SUCCESSOR_LIMITS if successor else LIMITS, retain_proof=True,
+    value=dict(version=version, rows=rows, source_routes=routes,
+        limits=VERSION_LIMITS[version], retain_proof=True,
         no_transport_retry=True, persistence=False, coverage_advance=False,
         stop_policy='EXACT_SOURCE_LOCAL_ALLOWLIST' if successor else 'STOP_ALL_NON_COMPLETE', evidence_branch=BRANCH)
     if successor:value['continuation_allowlist']=list(LOCAL_OUTCOMES)
@@ -143,23 +180,25 @@ def git(*args):
     return subprocess.check_output(['git',*args],cwd=ROOT,text=True,timeout=5).strip()
 
 
-def dependencies(*, successor=False):
-    return {p:sha((ROOT/p).read_bytes()) for p in DEPENDENCIES+(SUCCESSOR_DEPENDENCIES if successor else ())}
+def dependencies(*, successor=False, version=None):
+    version=selected_version(successor,version)
+    return {p:sha((ROOT/p).read_bytes()) for p in DEPENDENCIES+VERSION_DEPENDENCIES[version]}
 def packages(): return {p:importlib.metadata.version(p) for p in PACKAGES}
 
 
-def render(release_id, revision, tree, evidence_head, issued, expires, *, released=False, successor=False):
+def render(release_id, revision, tree, evidence_head, issued, expires, *, released=False, successor=False, version=None):
     if not re.fullmatch(r'[a-z0-9-]{8,64}',release_id): raise Stop('RELEASE_ID')
     for v in (revision,tree,evidence_head):
         if not re.fullmatch('[0-9a-f]{40}',v): raise Stop('GIT_BINDING')
     if not 0 < (stamp(expires)-stamp(issued)).total_seconds() <= 86400: raise Stop('EXPIRY_INTERVAL')
-    value=manifest(successor=successor)
+    version=selected_version(successor,version)
+    value=manifest(version=version)
     return dict(version=value['version'], release_id=release_id, revision=revision, tree=tree,
         manifest=json.loads(canonical(value)), manifest_sha256=sha(canonical(value)),
-        dependencies=dependencies(successor=successor), packages=packages(), evidence_head=evidence_head,
+        dependencies=dependencies(version=version), packages=packages(), evidence_head=evidence_head,
         directory='docs/design/ingestion-operational-execution-'+release_id,
         issued_at=issued, expires_at=expires, released=released,
-        stop_treatment=(SUCCESSOR_PERMIT if successor else PERMIT) if released else 'INACTIVE', preserved_stops=PRESERVED,
+        stop_treatment=PERMITS[version] if released else 'INACTIVE', preserved_stops=PRESERVED,
         stop_evidence=dict(path='specifications/032-stage4-stable-credential-pipeline.md',
             baseline='608aa07d496ff00ccd405dc77de31eb6bbfc6edd', sha256=sha((ROOT/'specifications/032-stage4-stable-credential-pipeline.md').read_bytes()), database_synchronised=False))
 
@@ -170,7 +209,7 @@ def control(registration, *, enabled=False):
         expires_at=registration['expires_at'], preserved_stops=PRESERVED,
         stop_evidence=registration['stop_evidence'],
         registration_binding_sha256=sha(canonical({k:v for k,v in registration.items() if k!='evidence_head'})),
-        stop_treatment=(SUCCESSOR_PERMIT if registration['version']==SUCCESSOR_VERSION else PERMIT) if enabled else 'INACTIVE', cancelled=False)
+        stop_treatment=PERMITS[registration['version']] if enabled else 'INACTIVE', cancelled=False)
 
 
 def validate(r, *, clock=now, checkout=True):
@@ -178,9 +217,8 @@ def validate(r, *, clock=now, checkout=True):
         'dependencies','packages','evidence_head','directory','issued_at','expires_at',
         'released','stop_treatment','preserved_stops','stop_evidence'}
     if set(r)!=required: raise Stop('REGISTRATION_SCHEMA')
-    if r['version'] not in (VERSION,SUCCESSOR_VERSION):raise Stop('REGISTRATION_VERSION')
-    successor=r['version']==SUCCESSOR_VERSION
-    expected=render(r['release_id'],r['revision'],r['tree'],r['evidence_head'],r['issued_at'],r['expires_at'],released=r['released'],successor=successor)
+    if r['version'] not in VERSION_LIMITS:raise Stop('REGISTRATION_VERSION')
+    expected=render(r['release_id'],r['revision'],r['tree'],r['evidence_head'],r['issued_at'],r['expires_at'],released=r['released'],version=r['version'])
     if r != expected or r['released'] is not True: raise Stop('REGISTRATION_INACTIVE_OR_CHANGED')
     if not stamp(r['issued_at'])<=clock()<stamp(r['expires_at']): raise Stop('REGISTRATION_EXPIRED_OR_FUTURE')
     if checkout and (git('rev-parse','HEAD')!=r['revision'] or git('rev-parse','HEAD^{tree}')!=r['tree'] or git('status','--porcelain')):
@@ -227,9 +265,11 @@ class Source:
     def __init__(self,memory,registration,root,*,clock=time.monotonic,sleep=time.sleep):
         self.memory=memory;self.r=registration;self.root=root;self.clock=clock;self.sleep=sleep
     def command(self,index,out):
-        return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source)]+(['--three-council-successor'] if self.r['version']==SUCCESSOR_VERSION else [])
+        budget=VERSION_LIMITS[self.r['version']].get('execution_budget')
+        return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source)]+(['--three-council-successor'] if self.r['version'] in SUCCESSORS else [])+(['--execution-budget',budget] if budget else [])
     def run(self,index,check):
         out=self.root/f'source-{index}.json';started=self.clock();poll_at=started
+        outer=budget_of(self.r['version'])['source_outer_seconds']
         child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK'
         closure=dict(source_group_closed=False,child_reaped=False,failures=[])
         try:
@@ -246,7 +286,7 @@ class Source:
                 stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
             while child.poll() is None:
                 stage='SOURCE_MEMORY_CHECK';self.memory.snapshot()
-                if self.clock()-started>=49:raise Stop('SOURCE_OUTER_DEADLINE')
+                if self.clock()-started>=outer:raise Stop('SOURCE_OUTER_DEADLINE')
                 if self.clock()>=poll_at:
                     stage='SOURCE_CONTROL_CHECK';check();poll_at=self.clock()+LIMITS['control_interval_seconds']
                 stage='SOURCE_OUTPUT_BOUND'
@@ -284,10 +324,10 @@ class Source:
 class Launcher:
     def __init__(self,r,root,*,github,memory,source,clock=time.monotonic,wall=now,emit=None):
         self.r=r;self.root=Path(root);self.github=github;self.memory=memory;self.source=source
-        self.successor=r['version']==SUCCESSOR_VERSION
+        self.successor=r['version'] in SUCCESSORS
         self.rows=ROWS[1:] if self.successor else ROWS
         self.indices=(1,2,3) if self.successor else (0,1,2,3)
-        self.limits=SUCCESSOR_LIMITS if self.successor else LIMITS
+        self.limits=VERSION_LIMITS[r['version']];self.budget=budget_of(r['version'])
         self.clock=clock;self.wall=wall;self.emit=emit or (lambda *_:None)
         self.start=clock();self.expected=r['evidence_head'];self.next_control=0
         self.publication_calls=0;self.exported=0;self.requests=0;self.source_bytes=0
@@ -357,11 +397,13 @@ class Launcher:
             worker=a.get('resource',{}).get('elapsed_seconds')
         cost=resources(row,a)
         if cost is None or a.get('accounting_complete') is False:raise Stop('SOURCE_ACCOUNTING')
-        if type(worker) not in (int,float) or not math.isfinite(worker) or not 0<=worker<=45:raise Stop('SOURCE_TIME_ACCOUNTING')
+        # Browser (Rochdale) worker bound follows the selected budget; Idox readers keep 45s.
+        bound=self.budget['worker_seconds'] if index==1 else 45
+        if type(worker) not in (int,float) or not math.isfinite(worker) or not 0<=worker<=bound:raise Stop('SOURCE_TIME_ACCOUNTING')
         self.requests+=cost[0];self.source_bytes+=cost[1];self.source_seconds+=worker
         if self.requests>self.limits['requests'] or self.source_bytes>self.limits['mixed_source_bytes'] or self.source_seconds>self.limits['worker_seconds']:raise Stop('CUMULATIVE_SOURCE_BOUND')
         if not closed:raise Stop('SOURCE_CLEANUP_UNCERTAIN')
-        state=finite.classify(row,a)
+        state=finite.classify(row,a,**({'execution_budget':self.budget['name']} if index==1 and self.budget['name'] else {}))
         if self.successor and state=='COMPLETE' and a.get('completeness')=='FAILED':
             raise Stop('SOURCE_OUTCOME_CONFLICT')
         return state
@@ -380,7 +422,7 @@ class Launcher:
         p=a['retained_proof']['events']
         if index==1:
             from .criteria_containment import eligible
-            if (not eligible(ROWS[index],a) or a.get('listing_failure')!='TimeoutError'
+            if (not eligible(ROWS[index],a,**({'execution_budget':self.budget['name']} if self.budget['name'] else {})) or a.get('listing_failure')!='TimeoutError'
                 or a.get('criteria_control_timeout',{}).get('operation')!='RESULT_MARKER_VISIBLE'
                 or a.get('listing_records')!=[] or a.get('listing_segments')!=[]
                 or a.get('enumeration_evidence') is not None):return None
@@ -492,7 +534,7 @@ class Launcher:
                 a,owned=self.source.run(reader_index,lambda:self.poll(active=True))
                 self.source_closure=owned
                 used=self.clock()-active_started;self.active_seconds+=used;active_started=None
-                if used>60 or self.active_seconds>self.limits['active_seconds']:raise Stop('ACTIVE_ALLOCATION')
+                if used>self.budget['slot_active_seconds'] or self.active_seconds>self.limits['active_seconds']:raise Stop('ACTIVE_ALLOCATION')
                 raw=canonical(a)
                 if len(raw)>(65535 if reader_index==1 else 512000):raise Stop('RETURNED_AUDIT_BOUND')
                 local=self.root/f'returned-{i}.json';write_new(local,raw)
@@ -604,28 +646,34 @@ class Launcher:
         return result
 
 
-def owner_source_context():
-    """Exact memory-contained proof context; no hosted-environment impersonation."""
+def owner_source_context(execution_budget=None):
+    """Exact memory-contained proof context; no hosted-environment impersonation.
+
+    The source/aggregate limits must equal the selected budget exactly (historical: 1GiB/1.5GiB)."""
+    try:budget=budgets.select(execution_budget)
+    except ValueError:raise Stop('SOURCE_MEMORY_ENFORCEMENT') from None
     lines=Path('/proc/self/cgroup').read_text().splitlines()
     if len(lines)!=1 or not lines[0].startswith('0::/'):raise Stop('SOURCE_CGROUP_V2')
     relative=Path(lines[0][3:])
     if relative.name!='source' or relative.parent.name!='propertyaigent-operational-once.scope':raise Stop('SOURCE_CGROUP_IDENTITY')
     group=Path('/sys/fs/cgroup')/str(relative).lstrip('/')
-    for path,limit in ((group,1024**3),(group.parent,1536*1024**2)):
+    for path,limit in ((group,budget['source_memory_bytes']),(group.parent,budget['aggregate_memory_bytes'])):
         if path.joinpath('memory.max').read_text().strip()!=str(limit) or path.joinpath('memory.swap.max').read_text().strip()!='0' or path.joinpath('memory.oom.group').read_text().strip()!='1':raise Stop('SOURCE_MEMORY_ENFORCEMENT')
     allowed={'PATH','HOME','TMPDIR','PYTHONDONTWRITEBYTECODE','LC_CTYPE','PLAYWRIGHT_BROWSERS_PATH'}
     if set(os.environ)-allowed:raise Stop('SOURCE_OWNER_ENVIRONMENT')
     return True
 
 
-def worker(index,out,group,*,successor=False):
+def worker(index,out,group,*,successor=False,execution_budget=None):
     # Private child, deliberately no owner credentials/control API capability.
     if not (1<=index<4 if successor else 0<=index<4) or any(k not in {'PATH','HOME','TMPDIR','PYTHONDONTWRITEBYTECODE','LC_CTYPE','PLAYWRIGHT_BROWSERS_PATH'} for k in os.environ):raise Stop('CHILD_ENVIRONMENT')
+    if execution_budget is not None and (not successor or execution_budget!=SUCCESSOR_V2_LIMITS['execution_budget']):raise Stop('CHILD_EXECUTION_BUDGET')
     group=Path(group)
     if group.name!='source' or not group.is_dir():raise Stop('CHILD_GROUP')
     group.joinpath('cgroup.procs').write_text(str(os.getpid()))
     value=finite.read(ROWS[index],retain_proof=True,no_transport_retry=True,fixed_four_rows=True,
-        execution_mode='four-council-owner-local' if index==1 else None)
+        execution_mode='four-council-owner-local' if index==1 else None,
+        **({'execution_budget':execution_budget} if execution_budget is not None and index==1 else {}))
     raw=canonical(value)
     if len(raw)>(65535 if index==1 else 512000):raise Stop('WORKER_EXPORT_BOUND')
     write_new(out,raw)
@@ -634,14 +682,14 @@ def worker(index,out,group,*,successor=False):
 def main():
     entry_started=time.monotonic()
     p=argparse.ArgumentParser();sub=p.add_subparsers(dest='mode',required=True)
-    w=sub.add_parser('worker');w.add_argument('index',type=int);w.add_argument('out',type=Path);w.add_argument('group',type=Path);w.add_argument('--three-council-successor',action='store_true')
-    r=sub.add_parser('render');r.add_argument('--release-id',required=True);r.add_argument('--revision',required=True);r.add_argument('--tree',required=True);r.add_argument('--evidence-head',required=True);r.add_argument('--issued-at',required=True);r.add_argument('--expires-at',required=True);r.add_argument('--output',required=True,type=Path);r.add_argument('--propose-reviewed-stop-treatment',action='store_true');r.add_argument('--three-council-successor',action='store_true')
+    w=sub.add_parser('worker');w.add_argument('index',type=int);w.add_argument('out',type=Path);w.add_argument('group',type=Path);w.add_argument('--three-council-successor',action='store_true');w.add_argument('--execution-budget')
+    r=sub.add_parser('render');r.add_argument('--release-id',required=True);r.add_argument('--revision',required=True);r.add_argument('--tree',required=True);r.add_argument('--evidence-head',required=True);r.add_argument('--issued-at',required=True);r.add_argument('--expires-at',required=True);r.add_argument('--output',required=True,type=Path);r.add_argument('--propose-reviewed-stop-treatment',action='store_true');r.add_argument('--three-council-successor',action='store_true');r.add_argument('--version',choices=tuple(VERSION_LIMITS))
     # Rendering creates local proposals only, never authority or a remote control.
     a=sub.add_parser('run');a.add_argument('--registration',required=True,type=Path);a.add_argument('--registration-sha256',required=True);a.add_argument('--enable-reviewed-source-only-stop-treatment',action='store_true')
     args=p.parse_args()
-    if args.mode=='worker':return worker(args.index,args.out,args.group,successor=args.three_council_successor)
+    if args.mode=='worker':return worker(args.index,args.out,args.group,successor=args.three_council_successor,execution_budget=args.execution_budget)
     if args.mode=='render':
-        value=render(args.release_id,args.revision,args.tree,args.evidence_head,args.issued_at,args.expires_at,released=args.propose_reviewed_stop_treatment,successor=args.three_council_successor)
+        value=render(args.release_id,args.revision,args.tree,args.evidence_head,args.issued_at,args.expires_at,released=args.propose_reviewed_stop_treatment,successor=args.three_council_successor,version=args.version)
         write_new(args.output,canonical(value))
         write_new(args.output.with_suffix('.control.json'),canonical(control(value,enabled=args.propose_reviewed_stop_treatment)))
         print('PROPOSED_FILES_ONLY_NO_AUTHORITY' if args.propose_reviewed_stop_treatment else 'INACTIVE_REGISTRATION_RENDERED');return
@@ -654,7 +702,7 @@ def main():
     if int(Path('/proc/self/stat').read_text().split()[0])!=os.getpid():raise Stop('PROCESS_NAMESPACE_MISMATCH')
     root=Path.home()/'.local/state/propertyaigent'/r['release_id'];root.mkdir(parents=True,exist_ok=False)
     journal=Journal(root/'events.jsonl')
-    try:memory=OperationalMemory()
+    try:memory=OperationalMemory(**memory_limits(r['version']))
     except BaseException:
         early=dict(status='STOP_RECONCILE_NO_RETRY',reason='MEMORY_ENFORCEMENT_UNAVAILABLE',cleanup='UNCERTAIN',database_connections=0,source_slots_started=0)
         journal.emit('initialisation_failed',early);journal.close()
