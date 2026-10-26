@@ -33,6 +33,11 @@ CACHE_NAME = re.compile(r'[0-9a-f]{32}-le64\.cache-11|CACHEDIR\.TAG')
 SAFE_PATH = re.compile(r'/[A-Za-z0-9_./-]{1,511}')
 CACHEDIR = re.compile(r'<cachedir[^>]*>[^<]*</cachedir>')
 ABSOLUTE_DIR = re.compile(r'<dir\b[^>]*>\s*(/[^<]*?)\s*</dir>')
+INCLUDE = re.compile(r'<include\b([^>]*)>\s*([^<]*?)\s*</include>')
+# Per-user font and configuration locations fontconfig consults (fresh per-run HOME: must be absent).
+USER_PATHS = ('.fonts.conf.d', '.fonts.conf', '.config/fontconfig', '.fonts', '.local/share/fonts')
+# Variables that would redirect fontconfig away from the fingerprinted inputs.
+REDIRECTING_ENV = ('FONTCONFIG_PATH', 'FONTCONFIG_SYSROOT', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CONFIG_DIRS', 'XDG_DATA_DIRS')
 RELATIVE_CONF_D = '<include ignore_missing="yes">conf.d</include>'
 ABSOLUTE_CONF_D = '<include ignore_missing="yes">/etc/fonts/conf.d</include>'
 
@@ -133,20 +138,50 @@ def browser_identity(executable):
 
 
 def font_fingerprint():
+    """Every font directory and file fontconfig would read. A file symlink is recorded with its
+    link text, resolved path and the target's size and mtime, so a retargeted or replaced target
+    (e.g. via /etc/alternatives) is STALE. Symlinked directories are not supported (INVALID);
+    unreadable directories are UNVERIFIED."""
     entries = []
+    def unreadable(_error):
+        raise PreparedFontCacheError('UNVERIFIED')
     for root in FONT_DIRS:
         if not os.path.lexists(root):
             entries.append([str(root), 'ABSENT'])
             continue
-        for directory, dirnames, filenames in os.walk(root, followlinks=False):
+        if os.path.islink(root):
+            raise PreparedFontCacheError('INVALID')
+        for directory, dirnames, filenames in os.walk(root, followlinks=False, onerror=unreadable):
             dirnames.sort()
+            if any(os.path.islink(os.path.join(directory, d)) for d in dirnames):
+                raise PreparedFontCacheError('INVALID')
             entries.append([directory, 'D', os.lstat(directory).st_mtime_ns])
             for name in sorted(filenames):
-                st = os.lstat(os.path.join(directory, name))
-                entries.append([os.path.join(directory, name), 'F', st.st_size, st.st_mtime_ns])
+                path = os.path.join(directory, name)
+                st = os.lstat(path)
+                if stat.S_ISLNK(st.st_mode):
+                    try:
+                        target = os.stat(path)  # follows the whole chain
+                    except OSError:
+                        raise PreparedFontCacheError('UNVERIFIED') from None  # dangling or unreadable target
+                    if not stat.S_ISREG(target.st_mode):
+                        raise PreparedFontCacheError('INVALID')
+                    entries.append([path, 'L', os.readlink(path), os.path.realpath(path), target.st_size, target.st_mtime_ns])
+                else:
+                    entries.append([path, 'F', st.st_size, st.st_mtime_ns])
             if len(entries) > LIMITS['font_entries']:
                 raise PreparedFontCacheError('UNVERIFIED')
     return dict(entries=len(entries), sha256=_sha(_canonical(entries)))
+
+
+def _includes_supported(text, *, top_level):
+    """Only the include forms this mode accounts for: the top-level relative conf.d (fingerprinted),
+    relative local.conf (fingerprinted) and per-user forms (~/ or prefix="xdg"), which resolve into
+    the fresh per-run HOME and are checked absent at launch. Anything else is INVALID."""
+    for attributes, value in INCLUDE.findall(text):
+        user = value.startswith('~/') or 'prefix="xdg"' in attributes
+        if not (user or value == 'local.conf' or (top_level and value == 'conf.d')):
+            raise PreparedFontCacheError('INVALID')
 
 
 def config_fingerprint():
@@ -161,14 +196,17 @@ def config_fingerprint():
         raw = _read(CONF_D / name, LIMITS['config_bytes'])
         if b'<cachedir' in raw or ABSOLUTE_DIR.search(raw.decode('utf-8', 'replace')):
             raise PreparedFontCacheError('INVALID')
+        _includes_supported(raw.decode('utf-8', 'replace'), top_level=False)
         conf_d.append([name, os.readlink(CONF_D / name) if os.path.islink(CONF_D / name) else None, _sha(raw)])
     system = _read(SYSTEM_CONFIG, LIMITS['config_bytes']).decode('utf-8')
     if set(ABSOLUTE_DIR.findall(system)) != {str(d) for d in FONT_DIRS}:
         raise PreparedFontCacheError('INVALID')
+    _includes_supported(system, top_level=True)
     local_raw = None
     if os.path.lexists(LOCAL_CONFIG):
         local_raw = _read(LOCAL_CONFIG, LIMITS['config_bytes'])
-        if b'<cachedir' in local_raw or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace')):
+        if (b'<cachedir' in local_raw or b'<include' in local_raw
+                or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace'))):
             raise PreparedFontCacheError('INVALID')
     local = _sha(local_raw) if local_raw is not None else None  # one existence decision
     return dict(fonts_conf=_sha(system.encode('utf-8')), local_conf=local,  # hashes of the bytes checked above
@@ -228,7 +266,11 @@ def verify(cache_dir, manifest_sha256, executable):
 def launch_env(cache_dir, manifest_sha256, executable, home, environ):
     """Browser-only environment: the caller's environment plus FONTCONFIG_FILE, nothing else."""
     config = verify(cache_dir, manifest_sha256, executable)
+    if any(key in environ for key in REDIRECTING_ENV):
+        raise PreparedFontCacheError('INVALID')
     try:
+        if any(os.path.lexists(Path(home) / user) for user in USER_PATHS):
+            raise PreparedFontCacheError('INVALID')  # per-user fonts/config would be unfingerprinted
         path = Path(home) / 'prepared-fonts.conf'
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o400)
         try:

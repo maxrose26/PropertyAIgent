@@ -64,29 +64,60 @@ def real_chromium(selection=None,evidence=None):
             home_fontconfig=sorted(str(x.relative_to(home)) for x in home.rglob('*') if 'fontconfig' in x.parts))))
 
 
-def residency(sets):
-    """Read-only page-cache residency (mincore; no page is faulted in). Pre-registered classes:
-    COLD if every set is at most 2% resident, WARM if every set is at least 90%, else PARTIAL."""
+def mincore_residency(path):
+    """(bytes, resident bytes) of one file via mincore on a private mapping; no page is faulted in."""
     import ctypes,mmap
-    libc=ctypes.CDLL(None,use_errno=True);page=os.sysconf('SC_PAGE_SIZE');result={}
-    for name,root in sets.items():
-        total=resident=0
-        files=[root] if root.is_file() else [Path(d)/f for d,_,fs in os.walk(root) for f in fs]
-        for path in files:
+    size=os.stat(path).st_size
+    if size==0:return 0,0
+    libc=ctypes.CDLL(None,use_errno=True);page=os.sysconf('SC_PAGE_SIZE')
+    with open(path,'rb') as stream:
+        m=mmap.mmap(stream.fileno(),size,access=mmap.ACCESS_COPY)
+        try:
+            vec=(ctypes.c_ubyte*((size+page-1)//page))();c=ctypes.c_char.from_buffer(m)
             try:
-                size=path.stat().st_size
-                if size==0 or path.is_symlink():continue
-                with open(path,'rb') as stream:
-                    m=mmap.mmap(stream.fileno(),size,access=mmap.ACCESS_COPY)
-                    vec=(ctypes.c_ubyte*((size+page-1)//page))();c=ctypes.c_char.from_buffer(m)
-                    if libc.mincore(ctypes.c_void_p(ctypes.addressof(c)),ctypes.c_size_t(size),vec):raise OSError(ctypes.get_errno(),'mincore')
-                    resident+=sum(v&1 for v in vec)*page;del c;m.close()
-                total+=size
-            except OSError:continue
-        result[name]=dict(bytes=total,resident=min(resident,total),fraction=round(min(resident,total)/total,4) if total else None)
+                if libc.mincore(ctypes.c_void_p(ctypes.addressof(c)),ctypes.c_size_t(size),vec):raise OSError(ctypes.get_errno(),'mincore')
+                return size,min(size,sum(v&1 for v in vec)*page)
+            finally:del c
+        finally:m.close()
+
+
+def residency(sets,measure=mincore_residency):
+    """Read-only page-cache residency with explicit coverage. Pre-registered classes:
+    COLD: every set completely measured and at most 2% resident; WARM: completely measured and
+    every set at least 90%; PARTIAL: completely measured otherwise; INCOMPLETE: any missing root,
+    empty set, walk error, unreadable file or failed measurement (never COLD or WARM).
+    File symlinks are measured once at their resolved target."""
+    result={}
+    for name,root in sets.items():
+        entry=dict(files=0,measured=0,failed=0,bytes=0,resident=0,errors=[])
+        result[name]=entry
+        files=[] if not root.exists() else [root] if root.is_file() else []
+        if not root.exists():entry['errors'].append('ROOT_MISSING')
+        elif not files:
+            for directory,_,names in os.walk(root,onerror=lambda e:entry['errors'].append('WALK_ERROR')):
+                files.extend(Path(directory)/n for n in names)
+        seen=set()
+        for path in files:
+            entry['files']+=1
+            try:
+                real=os.path.realpath(path)
+                if real in seen:entry['measured']+=1;continue
+                size,resident=measure(Path(real));seen.add(real)
+                entry['measured']+=1;entry['bytes']+=size;entry['resident']+=resident
+            except OSError as error:
+                entry['failed']+=1
+                if len(entry['errors'])<8:entry['errors'].append(type(error).__name__)
+        if entry['files']==0:entry['errors'].append('EMPTY')
+        entry['coverage']=round(entry['measured']/entry['files'],4) if entry['files'] else 0.0
+        entry['fraction']=round(entry['resident']/entry['bytes'],4) if entry['bytes'] else None
+        entry['complete']=not entry['errors'] and entry['failed']==0 and entry['measured']==entry['files']>0 and entry['bytes']>0
+    complete=bool(result) and all(v['complete'] for v in result.values())
     fractions=[v['fraction'] for v in result.values() if v['fraction'] is not None]
-    result['class']='COLD' if fractions and max(fractions)<=.02 else 'WARM' if fractions and min(fractions)>=.90 else 'PARTIAL'
-    return result
+    if not complete or len(fractions)!=len(result):cls='INCOMPLETE'
+    elif max(fractions)<=.02:cls='COLD'
+    elif min(fractions)>=.90:cls='WARM'
+    else:cls='PARTIAL'
+    return dict(sets=result,complete=complete,**{'class':cls})
 
 
 def main():

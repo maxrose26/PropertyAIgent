@@ -53,6 +53,19 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
   Without these refusals, a rescan of an unfingerprinted directory would be a silent fallback.
   `verify()` also checks the exact derived-config bytes handed to the browser against the
   manifest.
+* **Dependency coverage (no general configuration framework).**
+  * **Font file symlinks** (15 on the reference host, some through `/etc/alternatives`) are
+    recorded with link text, resolved path and the target's size and mtime, so a retargeted or
+    replaced target is STALE. Symlinked font directories are INVALID. Unreadable directories and
+    dangling links are UNVERIFIED.
+  * **Includes:** only the forms the mode accounts for are allowed: the top-level relative
+    `conf.d`, relative `local.conf` (both content-hashed, so an included file changing under an
+    unchanged parent is STALE), and per-user forms (`~/…` or `prefix="xdg"`). Any other include,
+    or any include in `local.conf`, is INVALID.
+  * **Per-user locations:** these resolve into the fresh per-run HOME. At launch, prepared mode
+    refuses (INVALID) if any per-user font or config path exists there, or if an environment
+    variable that redirects fontconfig (`FONTCONFIG_PATH`/`SYSROOT`, `XDG_*`) is set.
+    `supervised()` sets none of them.
 * **No default-path dependency.** The new module is imported only in prepared mode. The Render
   disposable job ships only `instrumented_probe.py` and `arcus_http_probe.py`, and default mode
   must not need anything else.
@@ -72,9 +85,28 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
   scan covers only the run's own browser processes.
 * **Memory evidence:** the native `real-chromium` fixture (real `Source.run` → worker → production
   `supervised()` pass-through → browser child using production `browser_launch_options()`), with
-  read-only `mincore` residency classified before each run (COLD: every set ≤2% resident; WARM:
-  every set ≥90%; otherwise PARTIAL). Without qualified COLD pairs the numerical saving stays
-  unproven.
+  read-only `mincore` residency taken before each run, with explicit coverage (files, measured,
+  failed, coverage and errors per set). The classes are:
+  * COLD: every set completely measured and at most 2% resident;
+  * WARM: completely measured and every set at least 90%;
+  * PARTIAL: completely measured otherwise;
+  * INCOMPLETE: any missing root, empty set, walk error, unreadable file or failed measurement.
+  INCOMPLETE is never COLD. Without qualified COLD pairs the numerical saving stays unproven.
+
+## Readers sharing this launch path
+Only `instrumented_probe.probe()` uses it. It is reached through `supervised()` for 87 cases on
+four Arcus/Salesforce-style portals: Manchester (38), Salford (25), Rochdale (23) and Trafford (1).
+These include the Arcus UI-window listing cases reached via `finite_acceptance.read()`. Prepared
+mode is available there only by passing `prepared_font_cache=` to `supervised()`. Plumbing it
+through `finite.read()` and the source-release launcher, and binding it to a registration, is
+deferred and needs separate review.
+
+Not on this path:
+* Idox readers (Bury, Tameside, Oldham), `narrow_oldham_source`, `r0_bolton53`, `r0_fixed80` and
+  `material_qualification` use no browser.
+* The production weekly pipeline (`app/pipeline/run_weekly.py`) and standalone checks
+  (`verification/stage1_*`, `spec028`, `b21`) have their own launches and would need separate
+  wiring and qualification.
 
 ## Held
 No merge, registration, permit, live execution, deployment, system-wide or persistent cache, or

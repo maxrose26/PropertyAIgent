@@ -184,6 +184,7 @@ class FakeChromium:
 
 def run_probe(monkeypatch, executable, **kwargs):
     chromium = FakeChromium(executable)
+    for key in pfc.REDIRECTING_ENV:monkeypatch.delenv(key, raising=False)  # as in supervised()'s minimal env
     monkeypatch.setenv('PLAYWRIGHT_BROWSERS_PATH', str(Path(executable).parents[2]))
     monkeypatch.setattr(pfc, 'headless_shell_executable', lambda browsers: Path(executable))  # read at call time
     class Playwright:
@@ -316,3 +317,99 @@ def test_selection_for_other_worker_modules_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(probe_module.subprocess, 'Popen', lambda *a, **k: (_ for _ in ()).throw(AssertionError('started')))
     with pytest.raises(ValueError, match='PREPARED_FONT_CACHE_UNSUPPORTED_CASE'):
         probe_module.supervised(case, tmp_path / 'o.json', prepared_font_cache=('/tmp/cache', 'a' * 64))
+
+
+# --- dependency coverage: linked fonts and nested configuration -------------------
+
+def test_changed_font_symlink_target_is_stale(system):
+    real_a = system['fonts'] / 'truetype/a.ttf'; real_b = system['fonts'] / 'truetype/b-real.ttf'
+    real_b.write_bytes(b'font-b')
+    alternative = system['tmp'] / 'alternatives'; alternative.mkdir()
+    (alternative / 'font.ttf').symlink_to(real_a)                         # like /etc/alternatives
+    (system['fonts'] / 'truetype/linked.ttf').symlink_to(alternative / 'font.ttf')
+    cache_dir, digest, _ = sealed(system)
+    # Retarget only the alternative: the font-directory symlink itself is unchanged.
+    (alternative / 'font.ttf').unlink(); (alternative / 'font.ttf').symlink_to(real_b)
+    refuses('STALE', cache_dir, digest, system['exe'])
+
+
+def test_changed_font_symlink_target_content_is_stale(system):
+    target = system['tmp'] / 'outside.ttf'; target.write_bytes(b'v1')
+    (system['fonts'] / 'truetype/linked.ttf').symlink_to(target)
+    cache_dir, digest, _ = sealed(system)
+    target.write_bytes(b'version-2')  # link and directory unchanged; target size/mtime change
+    refuses('STALE', cache_dir, digest, system['exe'])
+
+
+@pytest.mark.parametrize('kind', ['directory_symlink', 'dangling', 'unreadable_dir'])
+def test_unsupported_or_unreadable_font_structures_refuse(system, kind):
+    if kind == 'directory_symlink':
+        other = system['tmp'] / 'other-fonts'; other.mkdir()
+        (system['fonts'] / 'linked-dir').symlink_to(other)
+        code = 'INVALID'
+    elif kind == 'dangling':
+        (system['fonts'] / 'truetype/gone.ttf').symlink_to(system['tmp'] / 'missing.ttf'); code = 'UNVERIFIED'
+    else:
+        locked = system['fonts'] / 'locked'; locked.mkdir(); code = 'UNVERIFIED'
+    if kind == 'unreadable_dir':
+        cache_dir, digest, _ = sealed(system); os.chmod(locked, 0o000)
+        try:refuses(code, cache_dir, digest, system['exe'])
+        finally:os.chmod(locked, 0o755)
+        return
+    with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_' + code):
+        sealed(system)
+
+
+def test_included_configuration_change_with_unchanged_parent_is_stale(system):
+    # conf.d/51-local.conf includes local.conf; only the included file changes.
+    (system['avail'] / '51-local.conf').write_text('<fontconfig><include ignore_missing="yes">local.conf</include></fontconfig>')
+    (system['etc'] / 'conf.d/51-local.conf').symlink_to(system['avail'] / '51-local.conf')
+    (system['etc'] / 'local.conf').write_text('<fontconfig><alias><family>a</family></alias></fontconfig>')
+    cache_dir, digest, _ = sealed(system)
+    parent = (system['etc'] / 'conf.d/51-local.conf').read_bytes()
+    (system['etc'] / 'local.conf').write_text('<fontconfig><alias><family>b</family></alias></fontconfig>')
+    assert (system['etc'] / 'conf.d/51-local.conf').read_bytes() == parent
+    refuses('STALE', cache_dir, digest, system['exe'])
+
+
+def test_conf_d_link_target_content_change_is_stale(system):
+    cache_dir, digest, _ = sealed(system)
+    link = system['etc'] / 'conf.d/10-hinting.conf'; before = os.readlink(link)
+    (system['avail'] / '10-hinting.conf').write_text('<fontconfig><match/></fontconfig>')
+    assert os.readlink(link) == before
+    refuses('STALE', cache_dir, digest, system['exe'])
+
+
+@pytest.mark.parametrize('where,include', [
+    ('conf.d', '<include>/opt/extra.conf</include>'),
+    ('conf.d', '<include ignore_missing="yes">other.conf</include>'),
+    ('conf.d', '<include>conf.d</include>'),            # only the top-level file may include conf.d
+    ('local', '<include>~/.fonts.conf</include>'),       # local.conf may include nothing
+])
+def test_unsupported_includes_are_invalid(system, where, include):
+    cache_dir, digest, _ = sealed(system)
+    if where == 'conf.d':(system['etc'] / 'conf.d/90-include.conf').write_text(f'<fontconfig>{include}</fontconfig>')
+    else:(system['etc'] / 'local.conf').write_text(f'<fontconfig>{include}</fontconfig>')
+    refuses('INVALID', cache_dir, digest, system['exe'])
+
+
+def test_user_includes_are_supported_but_must_be_absent_at_launch(system):
+    (system['etc'] / 'conf.d/50-user.conf').write_text(
+        '<fontconfig><include ignore_missing="yes" prefix="xdg">fontconfig/conf.d</include>'
+        '<include ignore_missing="yes" deprecated="yes">~/.fonts.conf</include></fontconfig>')
+    cache_dir, digest, _ = sealed(system)
+    for user in pfc.USER_PATHS:
+        home = system['tmp'] / ('home-' + user.replace('/', '_')); (home / user).parent.mkdir(parents=True, exist_ok=True)
+        (home / user).write_text('x') if user.endswith('.conf') else (home / user).mkdir()
+        with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_INVALID'):
+            pfc.launch_env(cache_dir, digest, system['exe'], home, {})
+    clean = system['tmp'] / 'home-clean'; clean.mkdir()
+    assert 'FONTCONFIG_FILE' in pfc.launch_env(cache_dir, digest, system['exe'], clean, {})
+
+
+@pytest.mark.parametrize('key', ['FONTCONFIG_PATH', 'FONTCONFIG_SYSROOT', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME'])
+def test_redirecting_environment_is_invalid(system, key):
+    cache_dir, digest, _ = sealed(system)
+    home = system['tmp'] / 'home'; home.mkdir()
+    with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_INVALID'):
+        pfc.launch_env(cache_dir, digest, system['exe'], home, {key: '/elsewhere'})
