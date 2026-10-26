@@ -413,3 +413,30 @@ def test_redirecting_environment_is_invalid(system, key):
     home = system['tmp'] / 'home'; home.mkdir()
     with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_INVALID'):
         pfc.launch_env(cache_dir, digest, system['exe'], home, {key: '/elsewhere'})
+
+
+# --- include/dir escapes: only exact whole elements are accepted -----------------
+
+@pytest.mark.parametrize('where,element', [
+    ('conf.d', '<include>~/../../opt/x.conf</include>'),                                   # ~ escaping HOME
+    ('conf.d', '<include ignore_missing="yes" prefix="xdg">../../../../opt/x.conf</include>'),  # xdg escaping
+    ('conf.d', """<include ignore_missing='prefix="xdg"'>/opt/x.conf</include>"""),           # forged attribute
+    ('conf.d', '<include><![CDATA[/opt/x.conf]]></include>'),                              # CDATA value
+    ('conf.d', '<include>/opt/x<!---->.conf</include>'),                                   # comment-split value
+    ('conf.d', '<include>/opt/x&#46;conf</include>'),                                      # character reference
+    ('conf.d', '<!DOCTYPE fontconfig [<!ENTITY e "x">]><include>&e;</include>'),             # entity declaration
+    ('conf.d', '<dir><![CDATA[/opt/fonts]]></dir>'),                                       # CDATA font dir
+    ('conf.d', '<dir>fonts</dir>'),                                                        # relative font dir
+    ('conf.d', '<dir prefix="xdg">other</dir>'),                                           # other per-user dir
+    ('top', '<include ignore_missing="yes">local.conf</include>'),                         # relative to derived file
+    ('top', '<dir>~/../../opt/fonts</dir>'),
+])
+def test_include_and_dir_escapes_are_invalid(system, where, element):
+    cache_dir, digest, _ = sealed(system)
+    if where == 'conf.d':(system['etc'] / 'conf.d/90-escape.conf').write_text(f'<fontconfig>{element}</fontconfig>')
+    else:(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('</fontconfig>', element + '</fontconfig>'))
+    refuses('INVALID', cache_dir, digest, system['exe'])
+
+
+def test_top_level_include_is_exactly_the_relative_conf_d():
+    assert pfc.TOP_INCLUDES == (pfc.RELATIVE_CONF_D,)

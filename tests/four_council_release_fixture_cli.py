@@ -94,7 +94,9 @@ def residency(sets,measure=mincore_residency):
         files=[] if not root.exists() else [root] if root.is_file() else []
         if not root.exists():entry['errors'].append('ROOT_MISSING')
         elif not files:
-            for directory,_,names in os.walk(root,onerror=lambda e:entry['errors'].append('WALK_ERROR')):
+            for directory,dirnames,names in os.walk(root,onerror=lambda e:entry['errors'].append('WALK_ERROR')):
+                if any(os.path.islink(os.path.join(directory,d)) for d in dirnames):
+                    entry['errors'].append('SYMLINKED_DIR')  # its files would be silently uncovered
                 files.extend(Path(directory)/n for n in names)
         seen=set()
         for path in files:
@@ -104,10 +106,11 @@ def residency(sets,measure=mincore_residency):
                 if real in seen:entry['measured']+=1;continue
                 size,resident=measure(Path(real));seen.add(real)
                 entry['measured']+=1;entry['bytes']+=size;entry['resident']+=resident
-            except OSError as error:
+            except (OSError,ValueError) as error:  # ValueError: e.g. file truncated before mmap
                 entry['failed']+=1
                 if len(entry['errors'])<8:entry['errors'].append(type(error).__name__)
         if entry['files']==0:entry['errors'].append('EMPTY')
+        entry['errors']=entry['errors'][:8]
         entry['coverage']=round(entry['measured']/entry['files'],4) if entry['files'] else 0.0
         entry['fraction']=round(entry['resident']/entry['bytes'],4) if entry['bytes'] else None
         entry['complete']=not entry['errors'] and entry['failed']==0 and entry['measured']==entry['files']>0 and entry['bytes']>0

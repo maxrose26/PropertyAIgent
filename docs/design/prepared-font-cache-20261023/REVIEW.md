@@ -58,10 +58,16 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
     recorded with link text, resolved path and the target's size and mtime, so a retargeted or
     replaced target is STALE. Symlinked font directories are INVALID. Unreadable directories and
     dangling links are UNVERIFIED.
-  * **Includes:** only the forms the mode accounts for are allowed: the top-level relative
-    `conf.d`, relative `local.conf` (both content-hashed, so an included file changing under an
-    unchanged parent is STALE), and per-user forms (`~/…` or `prefix="xdg"`). Any other include,
-    or any include in `local.conf`, is INVALID.
+  * **Includes and font dirs are an exact whole-element allowlist:**
+    * `fonts.conf`: only the relative `conf.d` include, plus the fingerprinted absolute font
+      dirs and the two per-user dirs (`prefix="xdg"` fonts, `~/.fonts`).
+    * `conf.d`: only the five reference-host includes (`local.conf` and four per-user forms),
+      and no `<dir>`.
+    * `local.conf`: no include and no dir.
+    Every `<include` and `<dir` occurrence must be one of these exact elements. Any CDATA or
+    entity declaration is refused. So `..` escapes, forged attributes, and CDATA, comment-split
+    or entity-built values are INVALID. `conf.d` and `local.conf` are content-hashed, so an
+    included file changing under an unchanged parent is STALE.
   * **Per-user locations:** these resolve into the fresh per-run HOME. At launch, prepared mode
     refuses (INVALID) if any per-user font or config path exists there, or if an environment
     variable that redirects fontconfig (`FONTCONFIG_PATH`/`SYSROOT`, `XDG_*`) is set.
@@ -104,9 +110,12 @@ deferred and needs separate review.
 Not on this path:
 * Idox readers (Bury, Tameside, Oldham), `narrow_oldham_source`, `r0_bolton53`, `r0_fixed80` and
   `material_qualification` use no browser.
-* The production weekly pipeline (`app/pipeline/run_weekly.py`) and standalone checks
-  (`verification/stage1_*`, `spec028`, `b21`) have their own launches and would need separate
-  wiring and qualification.
+* The production weekly pipeline (`app/pipeline/run_weekly.py`, whose pages `app/scrapers/*` and
+  `app/ingestion/listing_screening.py` use) launches its own browser, as do the standalone
+  checks: `verification/stage1_*`, `spec028`, `b21`, `scripts/diagnose_browser_memory.py` and
+  `scripts/verify_browser_runtime.py`. Each would need separate wiring and qualification.
+* `render_disposable_job.py` calls `supervised('trafford')` in default mode only. On master it
+  already cannot import the probe from its two-file payload; that is pre-existing.
 
 ## Held
 No merge, registration, permit, live execution, deployment, system-wide or persistent cache, or

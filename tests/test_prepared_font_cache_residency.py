@@ -68,3 +68,18 @@ def test_symlinked_file_is_measured_once_at_its_target(tmp_path):
     calls = []
     value = residency({'s': root}, measure=lambda p: (calls.append(p) or (100, 0)))
     assert len(calls) == 1 and value['sets']['s']['files'] == 2 and value['class'] == 'COLD'
+
+
+def test_symlinked_subdirectory_is_incomplete(tmp_path):
+    root = tree(tmp_path); other = tmp_path / 'elsewhere'; other.mkdir(); (other / 'f').write_bytes(b'x')
+    (root / 'linked').symlink_to(other, target_is_directory=True)
+    value = residency({'s': root}, measure=cold)
+    assert value['class'] == 'INCOMPLETE' and 'SYMLINKED_DIR' in value['sets']['s']['errors']
+
+
+def test_value_error_during_measurement_is_incomplete(tmp_path):
+    root = tree(tmp_path)
+    def measure(path):
+        if path.name == 'a':raise ValueError('cannot mmap a truncated file')
+        return 100, 0
+    assert residency({'s': root}, measure=measure)['class'] == 'INCOMPLETE'

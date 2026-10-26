@@ -33,7 +33,16 @@ CACHE_NAME = re.compile(r'[0-9a-f]{32}-le64\.cache-11|CACHEDIR\.TAG')
 SAFE_PATH = re.compile(r'/[A-Za-z0-9_./-]{1,511}')
 CACHEDIR = re.compile(r'<cachedir[^>]*>[^<]*</cachedir>')
 ABSOLUTE_DIR = re.compile(r'<dir\b[^>]*>\s*(/[^<]*?)\s*</dir>')
-INCLUDE = re.compile(r'<include\b([^>]*)>\s*([^<]*?)\s*</include>')
+# Exact whole elements this mode accounts for. Every <include / <dir occurrence must be one of
+# them (so CDATA, comment-split, entity-built, '..' or attribute-forged forms are refused).
+TOP_INCLUDES = ('<include ignore_missing="yes">conf.d</include>',)  # == RELATIVE_CONF_D
+CONF_D_INCLUDES = ('<include ignore_missing="yes">local.conf</include>',
+                   '<include ignore_missing="yes" prefix="xdg">fontconfig/conf.d</include>',
+                   '<include ignore_missing="yes" prefix="xdg">fontconfig/fonts.conf</include>',
+                   '<include ignore_missing="yes" deprecated="yes">~/.fonts.conf.d</include>',
+                   '<include ignore_missing="yes" deprecated="yes">~/.fonts.conf</include>')
+USER_DIRS = ('<dir prefix="xdg">fonts</dir>', '<dir>~/.fonts</dir>')
+UNSUPPORTED_XML = ('<![CDATA[', '<!ENTITY')
 # Per-user font and configuration locations fontconfig consults (fresh per-run HOME: must be absent).
 USER_PATHS = ('.fonts.conf.d', '.fonts.conf', '.config/fontconfig', '.fonts', '.local/share/fonts')
 # Variables that would redirect fontconfig away from the fingerprinted inputs.
@@ -174,14 +183,13 @@ def font_fingerprint():
     return dict(entries=len(entries), sha256=_sha(_canonical(entries)))
 
 
-def _includes_supported(text, *, top_level):
-    """Only the include forms this mode accounts for: the top-level relative conf.d (fingerprinted),
-    relative local.conf (fingerprinted) and per-user forms (~/ or prefix="xdg"), which resolve into
-    the fresh per-run HOME and are checked absent at launch. Anything else is INVALID."""
-    for attributes, value in INCLUDE.findall(text):
-        user = value.startswith('~/') or 'prefix="xdg"' in attributes
-        if not (user or value == 'local.conf' or (top_level and value == 'conf.d')):
-            raise PreparedFontCacheError('INVALID')
+def _only_elements(text, *, includes, dirs):
+    """Every <include and <dir occurrence must be one of the exact allowed elements; CDATA and
+    entity declarations are refused outright. INVALID otherwise."""
+    if (any(marker in text for marker in UNSUPPORTED_XML)
+            or text.count('<include') != sum(text.count(e) for e in includes)
+            or text.count('<dir') != sum(text.count(e) for e in dirs)):
+        raise PreparedFontCacheError('INVALID')
 
 
 def config_fingerprint():
@@ -194,20 +202,20 @@ def config_fingerprint():
     conf_d = []
     for name in names:
         raw = _read(CONF_D / name, LIMITS['config_bytes'])
-        if b'<cachedir' in raw or ABSOLUTE_DIR.search(raw.decode('utf-8', 'replace')):
+        if b'<cachedir' in raw:
             raise PreparedFontCacheError('INVALID')
-        _includes_supported(raw.decode('utf-8', 'replace'), top_level=False)
+        _only_elements(raw.decode('utf-8', 'replace'), includes=CONF_D_INCLUDES, dirs=())
         conf_d.append([name, os.readlink(CONF_D / name) if os.path.islink(CONF_D / name) else None, _sha(raw)])
     system = _read(SYSTEM_CONFIG, LIMITS['config_bytes']).decode('utf-8')
     if set(ABSOLUTE_DIR.findall(system)) != {str(d) for d in FONT_DIRS}:
         raise PreparedFontCacheError('INVALID')
-    _includes_supported(system, top_level=True)
+    _only_elements(system, includes=TOP_INCLUDES, dirs=tuple(f'<dir>{d}</dir>' for d in FONT_DIRS) + USER_DIRS)
     local_raw = None
     if os.path.lexists(LOCAL_CONFIG):
         local_raw = _read(LOCAL_CONFIG, LIMITS['config_bytes'])
-        if (b'<cachedir' in local_raw or b'<include' in local_raw
-                or ABSOLUTE_DIR.search(local_raw.decode('utf-8', 'replace'))):
+        if b'<cachedir' in local_raw:
             raise PreparedFontCacheError('INVALID')
+        _only_elements(local_raw.decode('utf-8', 'replace'), includes=(), dirs=())
     local = _sha(local_raw) if local_raw is not None else None  # one existence decision
     return dict(fonts_conf=_sha(system.encode('utf-8')), local_conf=local,  # hashes of the bytes checked above
                 conf_d=_sha(_canonical(conf_d)), conf_d_files=len(conf_d))
