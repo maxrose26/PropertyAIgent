@@ -23,15 +23,24 @@ def registration():
         issued.isoformat(),(issued+timedelta(hours=2)).isoformat(),released=True,successor=True)
 
 
-def local_audit(index,kind=None):
-    """Actual source parsing/timeout classification; no real council markup."""
+def local_audit(index,kind=None,*,execution_budget=None):
+    """Actual source parsing/timeout classification; no real council markup.
+
+    execution_budget: run the budgeted reader (fresh observation deadline) and declare it as the
+    probe does; the untruncated result-marker timeout must remain the typed local timeout."""
     if index==1:
         value=audit(1)
         from verification.discovery import arcus_ui_window as ui
         from verification.discovery.arcus_ui_config import ROCHDALE,dated_config
         from verification.direct_reference.instrumented_probe import classify_ui_enumeration
         cfg=dated_config(ROCHDALE,'2026-10-08','2026-10-14')
-        async_run(ui.enumerate_ui(RenderedPage(cfg),value,asyncio.Event(),cfg,retain_proof=True))
+        budgeted={}
+        if execution_budget is not None:
+            from verification.discovery.execution_budget import Deadline,select
+            budget=select(execution_budget)
+            budgeted=dict(budget=budget,deadline=Deadline(budget['worker_seconds']-budget['finalisation_reserve_seconds']))
+            value.update(execution_budget=execution_budget,stage_timings={'NAVIGATION':1000})
+        async_run(ui.enumerate_ui(RenderedPage(cfg),value,asyncio.Event(),cfg,retain_proof=True,**budgeted))
         classify_ui_enumeration(value,lambda reason:(_ for _ in ()).throw(AssertionError(reason)))
         value.update(containment_accounting_verified=True,requested_origins=['https://'+cfg.host],
             navigated_origins=['https://'+cfg.host],navigation_mismatch=None,

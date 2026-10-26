@@ -237,6 +237,10 @@ def classify_ui_enumeration(audit, fail):
             and audit.get('safety_events') == []):
         audit['listing_outcome'] = 'BOUNDED_PAGE_CAP'
         return
+    if audit.get('observation_deadline') is True:
+        # Budgeted runs only: fixed code, never the allowlisted source-local timeout.
+        fail('OBSERVATION_DEADLINE')
+        return
     from verification.discovery.arcus_ui_window import LOCAL_TIMEOUT,CRITERIA_OPERATIONS
     typed=audit.get('criteria_control_timeout',{})
     if (typed.get('code')==LOCAL_TIMEOUT and typed.get('operation') in CRITERIA_OPERATIONS
@@ -281,8 +285,21 @@ def browser_launch_options(prepared_font_cache):
     return dict(env=launch_env(cache_dir, manifest_sha256, executable, os.environ['HOME'], dict(os.environ)))
 
 
-async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None):
+def budget_selection(execution_budget, case):
+    """None: historical envelope (no import). A named budget: Arcus UI listing cases only."""
+    if execution_budget is None:
+        return None
+    from verification.discovery.execution_budget import select
+    if not isinstance(execution_budget, str) or case not in UI_CASES:
+        raise ValueError('EXECUTION_BUDGET_SELECTION')
+    return select(execution_budget)
+
+
+async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None, execution_budget=None, deadline_origin=None):
     from playwright.async_api import async_playwright
+    budget = budget_selection(execution_budget, case)
+    if (budget is None) != (deadline_origin is None):
+        raise ValueError('EXECUTION_BUDGET_SELECTION')
     app_id, reference, destination = CASES[case]
     ui_config=UI_CASES.get(case)
     if ui_config is not None and ui_config.assessment_metadata and window!=(ui_config.start,ui_config.end):
@@ -317,6 +334,14 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
             post_body_cdp_reads=0,largest_observed_post_bytes=0,completeness='UNKNOWN',
                      requested_interval=[ui_config.start,ui_config.end],date_semantics='VALIDATED')
     started = time.monotonic()
+    deadline = None
+    if budget is not None:
+        # One observation deadline from the supervisor's start (CLOCK_MONOTONIC is system-wide), so
+        # worker start-up is charged to it; the reserve covers browser close and export.
+        from verification.discovery.execution_budget import Deadline
+        deadline = Deadline(budget['worker_seconds'] - budget['finalisation_reserve_seconds'], started=deadline_origin)
+        audit.update(execution_budget=budget['name'], stage_timings={},
+                     deadline_ms=int((budget['worker_seconds'] - budget['finalisation_reserve_seconds']) * 1000))
     browser = context = None
     stopped = asyncio.Event()
 
@@ -510,7 +535,12 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                         await page.goto('https://pa.trafford.gov.uk/online-applications/', wait_until='domcontentloaded', timeout=12000)
                         if stopped.is_set():
                             return
-                    await page.goto(destination, wait_until='domcontentloaded', timeout=25000)
+                    if deadline is None:
+                        await page.goto(destination, wait_until='domcontentloaded', timeout=25000)
+                    else:
+                        navigation_started = time.monotonic()
+                        await page.goto(destination, wait_until='domcontentloaded', timeout=deadline.cap_ms(budget['navigation_seconds']))
+                        audit['stage_timings']['NAVIGATION'] = int((time.monotonic() - navigation_started) * 1000)
                 nav = asyncio.create_task(navigate())
                 stop = asyncio.create_task(stopped.wait())
                 done, _ = await asyncio.wait((nav, stop), return_when=asyncio.FIRST_COMPLETED)
@@ -520,7 +550,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                 else:
                     await nav
                     if case in UI_CASES:
-                        await enumerate_ui(page,audit,stopped,ui_config,**({"retain_proof":True} if retain_proof else {}))
+                        await enumerate_ui(page,audit,stopped,ui_config,**({"retain_proof":True} if retain_proof else {}),**({'budget':budget,'deadline':deadline} if deadline is not None else {}))
                         classify_ui_enumeration(audit, fail)
                     else:
                         if case in DISCOVERY_CASES:
@@ -575,6 +605,8 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
         fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
              else 'BROWSER_' + type(exc).__name__)
     audit['elapsed_seconds'] = round(time.monotonic() - started, 3)
+    if deadline is not None:
+        audit['remaining_ms'] = int(deadline.remaining() * 1000)
     return audit
 
 
@@ -591,8 +623,12 @@ def bounded_worker_audit(path,case,metadata=False):
             else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
 
 
-def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None):
+def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None, execution_budget=None):
     if type(retain_proof) is not bool:raise ValueError('proof selection')
+    budget = budget_selection(execution_budget, case)
+    # Historical envelope literals stay exact when no budget is named.
+    max_seconds = MAX_SECONDS if budget is None else budget['worker_seconds']
+    rss_ceiling = 1024**3 if budget is None else budget['rss_ceiling_bytes']
     if prepared_font_cache is not None and (not isinstance(prepared_font_cache, tuple) or len(prepared_font_cache) != 2
             or not all(isinstance(x, str) for x in prepared_font_cache)):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
     if retain_proof:
@@ -610,7 +646,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         # Exact opt-in proof scope was checked above. This is kernel containment,
         # not a caller's claim to be a hosted runner or a new source qualification.
         from verification.discovery.four_council_release import owner_source_context
-        owner_source_context()
+        owner_source_context(execution_budget)
         owner_proof=True
     if not owner_proof and not execution_environment_allowed(case, execution_mode, os.environ):
         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
@@ -633,8 +669,10 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                          else 'verification.direct_reference.instrumented_probe')
         if prepared_font_cache is not None and worker_module != 'verification.direct_reference.instrumented_probe':
             raise ValueError('PREPARED_FONT_CACHE_UNSUPPORTED_CASE')
+        if budget is not None and worker_module != 'verification.direct_reference.instrumented_probe':
+            raise ValueError('EXECUTION_BUDGET_SELECTION')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else [])+(['--execution-budget', budget['name'], '--deadline-origin', repr(start)] if budget is not None else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -651,7 +689,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                     except psutil.NoSuchProcess:
                         pass
                 peak = max(peak, rss)
-                if time.monotonic() - start > MAX_SECONDS or rss > 1024**3:
+                if time.monotonic() - start > max_seconds or rss > rss_ceiling:
                     expired = True
                     break
                 time.sleep(.1)
@@ -688,6 +726,9 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
             result['accounting_complete']=result['containment_accounting_verified']
         if retain_proof and child.returncode!=0:
             result['failure']='PROOF_WORKER_EXIT_NOT_CONFIRMED'
+        if budget is not None and result.get('execution_budget') != budget['name']:
+            # A worker audit that does not declare the selected budget is never accepted under it.
+            result['failure'] = result.get('failure') or 'EXECUTION_BUDGET_MISMATCH'
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
         if retain_proof:
@@ -706,17 +747,21 @@ def main():
     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
     p.add_argument('--window-start');p.add_argument('--window-end');p.add_argument('--metadata',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true')
     p.add_argument('--prepared-font-cache');p.add_argument('--prepared-font-cache-sha256')
+    p.add_argument('--execution-budget');p.add_argument('--deadline-origin', type=float)
     a = p.parse_args()
     if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
     if (a.prepared_font_cache is None)!=(a.prepared_font_cache_sha256 is None):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
     fonts={'prepared_font_cache':(a.prepared_font_cache,a.prepared_font_cache_sha256)} if a.prepared_font_cache is not None else {}
     window=(a.window_start,a.window_end) if a.window_start else None
+    if (a.execution_budget is None) != (a.deadline_origin is None) or (a.deadline_origin is not None and not a.worker):
+        raise ValueError('EXECUTION_BUDGET_SELECTION')
+    if a.execution_budget is not None:fonts['execution_budget']=a.execution_budget
     if any(name in os.environ for name in ('DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_FREE_ONLY')
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts)),indent=2)+'\n'
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),indent=2)+'\n'
         if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
         if a.retain_four_council_proof:
             from verification.discovery.four_council_proof import write_audit

@@ -146,9 +146,30 @@ async def criteria_control(operation, action, audit):
         raise
 
 
-async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False):
+async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False,budget=None,deadline=None):
+    """budget/deadline None: historical waits (unchanged literals). With an execution budget
+    (docs/design/execution-budget-20261026/SPEC.md) every wait is min(step cap, remaining) of the
+    single observation deadline; a truncated wait that expires is ObservationDeadline."""
     proof=None
     if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if (budget is None)!=(deadline is None):raise ValueError('budget selection')
+    # Imported only when budgeted: the default path never depends on the new module.
+    ObservationDeadline=None
+    if deadline is not None:from .execution_budget import ObservationDeadline
+    truncated=[False]
+    def wait_ms(default_ms,step_seconds=None,scope_end=None):
+        # Default: the historical literal. Budgeted: min(step, scope remaining, observation remaining).
+        if deadline is None:return default_ms
+        step=default_ms/1000 if step_seconds is None else step_seconds
+        if scope_end is not None:
+            scope_left=scope_end-deadline.clock()
+            if scope_left<=0:raise ObservationDeadline('OBSERVATION_DEADLINE')
+            step_cut=min(step,scope_left);cut=step_cut<step
+        else:step_cut=step;cut=False
+        value=deadline.cap_ms(step_cut)
+        truncated[0]=cut or deadline.truncated
+        return value
+    timings={} if deadline is not None else None
     if retain_proof:
         from .four_council_proof import ProofLog
         proof=ProofLog(config.council,'VALIDATED',config.start,config.end)
@@ -161,23 +182,33 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False
         # Only Manchester has retained source evidence for this zero shape.
         zero_supported=config.council=='manchester'
         result_selector='p.pr-pagination__results, p:text-is("No results found")' if zero_supported else 'p.pr-pagination__results'
-        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator(result_selector).wait_for(state='visible',timeout=10000),audit)
+        ready_started=time.monotonic()
+        ready_ms=wait_ms(10000,budget['ready_seconds'] if budget else None)
+        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator(result_selector).wait_for(state='visible',timeout=ready_ms),audit)
+        criteria_started=time.monotonic()
+        if timings is not None:timings['READY']=int((criteria_started-ready_started)*1000)
+        criteria_end=deadline.clock()+budget['criteria_seconds'] if deadline is not None else None
         # An ordinary disclosure toggle exposes the source's retained filters.
-        await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000),audit)
+        disclosure_ms=wait_ms(3000,scope_end=criteria_end)
+        await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=disclosure_ms),audit)
         expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
         for label,value in expected.items():
             operation='VALID_FROM' if label=='Valid date from' else 'VALID_TO' if label=='Valid date to' else 'BLANK_INPUT'
-            if await criteria_control(operation,lambda:page.get_by_label(label,exact=True).input_value(timeout=1500),audit)!=value: raise ValueError('applied filter mismatch')
+            control_ms=wait_ms(1500,scope_end=criteria_end)
+            if await criteria_control(operation,lambda:page.get_by_label(label,exact=True).input_value(timeout=control_ms),audit)!=value: raise ValueError('applied filter mismatch')
         for label in config.blank_combos:
-            if (await criteria_control('BLANK_COMBO',lambda:page.get_by_role('combobox',name=label,exact=True).inner_text(timeout=1500),audit)).strip()!='Select an option':
+            control_ms=wait_ms(1500,scope_end=criteria_end)
+            if (await criteria_control('BLANK_COMBO',lambda:page.get_by_role('combobox',name=label,exact=True).inner_text(timeout=control_ms),audit)).strip()!='Select an option':
                 raise ValueError('hidden filter')
-        if (await criteria_control('CATEGORY',lambda:page.get_by_role('combobox',name='Category',exact=True).inner_text(timeout=1500),audit)).strip()!='Planning Applications':
+        control_ms=wait_ms(1500,scope_end=criteria_end)
+        if (await criteria_control('CATEGORY',lambda:page.get_by_role('combobox',name='Category',exact=True).inner_text(timeout=control_ms),audit)).strip()!='Planning Applications':
             raise ValueError('category')
+        if timings is not None:timings['CRITERIA']=int((time.monotonic()-criteria_started)*1000)
         audit['applied_interval']=[config.start,config.end]
         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
         zero=page.locator('p:text-is("No results found")')
         if zero_supported and await zero.count():
-            if (await zero.count()!=1 or await zero.inner_text(timeout=1500)!='No results found'
+            if (await zero.count()!=1 or await zero.inner_text(timeout=wait_ms(1500))!='No results found'
                 or await page.locator('div[role="list"].slds-box').count()!=0
                 or await page.locator('p.pr-pagination__results').count()!=0
                 or await page.locator('a.pr-pagination__link').filter(has_text='Next').count()!=0):
@@ -190,15 +221,33 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False
         expected_first=1; total=None; seen_refs=set();seen_keys=set()
         for ordinal in range(1,MAX_SEGMENTS+1):
             if stopped.is_set(): raise ValueError('resource stop')
-            until=time.monotonic()+5
+            segment_started=time.monotonic()
+            if deadline is None:until=time.monotonic()+5
+            else:
+                # The poll window is fixed once; whether the deadline cut it is decided here.
+                until=time.monotonic()+wait_ms(8000,budget['segment_poll_seconds'])/1000;poll_truncated=truncated[0]
             while True:
                 audit['listing_stage']='PAGE_MARKER'
-                marker=' '.join((await page.locator('p.pr-pagination__results').inner_text()).split())
+                if deadline is None:marker=' '.join((await page.locator('p.pr-pagination__results').inner_text()).split())
+                else:
+                    left=until-time.monotonic()
+                    if left<=0:
+                        if poll_truncated:raise ObservationDeadline('OBSERVATION_DEADLINE')
+                        raise ValueError('pagination did not advance')
+                    try:marker=' '.join((await page.locator('p.pr-pagination__results').inner_text(timeout=max(1,int(left*1000)))).split())
+                    except Exception as exc:
+                        if type(exc).__name__!='TimeoutError':raise
+                        marker=''  # an absent marker within the window is "not advanced", decided below
                 if re.match(r'Showing\s+'+str(expected_first)+r'\s+to\s+',marker): break
-                if time.monotonic()>until or stopped.is_set(): raise ValueError('pagination did not advance')
+                if time.monotonic()>until or stopped.is_set():
+                    if deadline is not None and poll_truncated and not stopped.is_set():raise ObservationDeadline('OBSERVATION_DEADLINE')
+                    raise ValueError('pagination did not advance')
                 await asyncio.sleep(.1)
             audit['listing_stage']='ROW_LOCATORS'
-            cards=await read_cards(page,config)
+            if deadline is None:cards=await read_cards(page,config)
+            else:
+                try:cards=await asyncio.wait_for(read_cards(page,config),timeout=deadline.cap(deadline.remaining() or .001))
+                except asyncio.TimeoutError:raise ObservationDeadline('OBSERVATION_DEADLINE') from None
             audit['listing_stage']='ROW_QUALIFICATION'
             first,last,total,rows=qualify_segment(marker,cards,expected_first,total,config)
             for r in rows:
@@ -207,6 +256,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False
             audit['listing_records'].extend(rows)
             audit['listing_segments'].append({'ordinal':ordinal,'first':first,'last':last,'total':total,
                 'evidence_sha256':hashlib.sha256(json.dumps(rows,sort_keys=True).encode()).hexdigest()})
+            if timings is not None:timings.setdefault('SEGMENT',[]).append(int((time.monotonic()-segment_started)*1000))
             audit['listing_stage']='NEXT_CONTROL'
             next_link=page.locator('a.pr-pagination__link').filter(has_text='Next')
             count=await next_link.count()
@@ -219,13 +269,22 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False
             # Empty href was observed; disallow a link to any business/detail route.
             href=await next_link.get_attribute('href')
             if href not in ('',None,'#'): raise ValueError('unexpected next destination')
-            await next_link.click(timeout=3000)
+            await next_link.click(timeout=wait_ms(3000,budget['segment_click_seconds'] if budget else None))
             expected_first=last+1
     except Exception as exc:
         audit['completeness']='INCOMPLETE' if audit['listing_segments'] else 'FAILED'
-        audit['listing_failure']=(type(exc).__name__ if retain_proof and type(exc).__name__ in {'TimeoutError','ValueError'} else 'UNCLASSIFIED_FAILURE' if retain_proof else type(exc).__name__+(':'+str(exc)[:80] if isinstance(exc,ValueError) else ''))
+        if deadline is not None and (isinstance(exc,ObservationDeadline) or (type(exc).__name__=='TimeoutError' and truncated[0])):
+            # Budget expiry, including a deadline-truncated wait: never the allowlisted TimeoutError.
+            audit['listing_failure']='ObservationDeadline';audit['observation_deadline']=True
+            # A truncated control timeout is budget expiry, never the typed source-local timeout.
+            truncated_control=audit.pop('criteria_control_timeout',None)
+            if truncated_control is not None:audit['deadline_truncated_operation']=truncated_control.get('operation')
+        else:
+            audit['listing_failure']=(type(exc).__name__ if retain_proof and type(exc).__name__ in {'TimeoutError','ValueError'} else 'UNCLASSIFIED_FAILURE' if retain_proof else type(exc).__name__+(':'+str(exc)[:80] if isinstance(exc,ValueError) else ''))
 
     finally:
+        if timings is not None:
+            audit.setdefault('stage_timings',{}).update({k:(v[:6] if isinstance(v,list) else v) for k,v in timings.items()})
         if proof is not None:
             # Browser-local snapshot, no navigation/retry and no response-body claim.
             try:
