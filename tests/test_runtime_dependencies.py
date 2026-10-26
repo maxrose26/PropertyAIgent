@@ -128,6 +128,17 @@ def test_scan_models_what_loads(tmp_path):
     assert third['lazy_third'] == 'verification.discovery.bound'
 
 
+@pytest.mark.parametrize('handler,optional', [
+    ('except ImportError:\n    x = None', True), ('except Exception:\n    x = None', True), ('except:\n    x = None', True),
+    ('except ImportError:\n    raise RuntimeError("needed")', False),                       # re-raising: the import is required
+    ('except ImportError as e:\n    raise', False), ('except ValueError:\n    x = None', False)])
+def test_only_a_non_raising_import_guard_makes_an_import_optional(tmp_path, handler, optional):
+    body = 'try:\n    import guarded_third\n' + handler + '\n'
+    tree(tmp_path, {'verification/__init__.py': '', 'verification/discovery/__init__.py': '', 'verification/discovery/bound.py': body})
+    _, third = rd.scan(['verification/discovery/bound.py'], root=tmp_path)
+    assert ('guarded_third' not in third) is optional
+
+
 def test_scan_never_executes_the_code_it_reads(tmp_path):
     marker = tmp_path / 'executed'
     tree(tmp_path, {'verification/__init__.py': '', 'verification/discovery/__init__.py': '',
@@ -175,11 +186,15 @@ def test_check_fails_for_a_missing_or_different_distribution(tmp_path, installed
     assert report['ok'] is False and report['distributions']['dep']['state'] == state
 
 
-def test_an_unpinned_distribution_needs_only_to_be_present(tmp_path):
+def test_a_bound_distribution_without_an_exact_pin_fails(tmp_path):
     project(tmp_path, 'import json\n')
     with patch.object(rd, 'ROOT', tmp_path), patch.object(importlib.metadata, 'version', fake_version({'free': '0.1'})):
         report = rd.check(['verification/discovery/bound.py'], ['free'], lock=lock(tmp_path, ''), root=tmp_path)
-    assert report['ok'] and report['distributions']['free']['pinned'] is None
+    assert report['ok'] is False and report['distributions']['free'] == dict(installed='0.1', pinned=None, state='UNPINNED')
+
+
+def test_a_lock_line_with_extras_pins_the_base_distribution(tmp_path):
+    assert rd.lock_pins(lock(tmp_path, 'Foo_Bar[extra,other]==2.0\nplain==1\n')) == {'foo-bar': '2.0', 'plain': '1'}
 
 
 def test_a_missing_third_party_module_and_a_blocked_finder_both_fail(tmp_path):

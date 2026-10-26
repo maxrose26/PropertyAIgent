@@ -24,15 +24,22 @@ version of each is recorded in the registration) and the files `verification/ah_
 
 **Runtime check** (`verification/discovery/runtime_dependencies.py`, council-free, no database side effects). Run by the launcher and by
 `four_council_release run` before any claim, in the interpreter that will execute the release:
-1. every bound distribution is installed at exactly the version pinned in `requirements.lock` (names absent from the lock need only be present);
+1. every bound distribution is installed at exactly the version pinned in `requirements.lock`; a bound distribution with no exact pin fails
+   (`UNPINNED`), and a lock line with extras (`name[extra]==x`) pins `name`;
 2. a static scan (`ast`, nothing executed) models what actually loads: the eager imports of the bound modules, plus the lazy
    (function-level) imports of the BOUND modules themselves (one hop, e.g. `site_linking`), each expanded by its own eager imports;
-   imports guarded by `try/except ImportError` and `TYPE_CHECKING` are optional; lazy imports of other modules are not followed
+   imports guarded by a `try/except ImportError` handler that does not itself raise, and `TYPE_CHECKING` imports, are optional; lazy imports of other modules are not followed
    (reachability is not statically knowable; the runtime proof in section 4 covers them). Every third-party top-level name found must
    be resolvable (`find_spec`; a blocked or broken finder counts as missing);
 3. that first-party set (except `app.db.session`) is imported in a child interpreter with a minimal scrubbed environment,
    a 60 s timeout and bounded output. Importing `app.db.models` only declares ORM classes; no engine is created.
 Failures are reported as module/distribution names and exception class names only, then `Stop('RUNTIME_DEPENDENCY_CHECK')`.
+**Scope of the verdict:** it is a verdict about the *interpreter* (its installed distributions and importable modules), not about the
+worker's environment: the in-process metadata and `find_spec` checks use the caller's own `HOME`/user site, and the import child uses a
+scrubbed environment (temporary `HOME`, `PYTHONNOUSERSITE=1`), which differs from the worker's. A mismatch fails closed (the child cannot
+see user-site packages). `ok: true` therefore means "bound distributions pinned and the bound imports load in this interpreter", and the
+real-chain proof in section 4 is what covers the actual worker environment. A failed V2 gate prints two JSON lines (the report, then the
+worker guard's fixed line); read the first.
 Rendering a V2 registration records the installed version of every bound distribution and refuses (`PackageNotFoundError`) on an
 interpreter that lacks one, so a registration cannot be produced against an incomplete environment; the V2 launcher and
 `four_council_release run` run the check, in the launch interpreter, before any claim. Historical versions are not gated.
@@ -48,7 +55,11 @@ virtualenv is not modified by this workstream.
   `reason` that is a member of the fixed allowlist `WORKER_EXIT_REASONS`. Anything else is `MALFORMED`, an unlisted code is
   `UNRECOGNISED`, no output is `ABSENT`; the raw text is never stored, exported or executed. The primary failure
   (`SOURCE_CHILD_FAILURE`) is unchanged in every case.
-* **Worker guard:** `ImportError` now prints the fixed reason `DEPENDENCY_UNAVAILABLE` instead of the generic `PREPARATION_FAILURE`.
+* **Worker guard:** `ImportError` now prints the fixed reason `DEPENDENCY_UNAVAILABLE` (meaning *an import failed*: a missing package, but also
+  a broken import in code) instead of the generic `PREPARATION_FAILURE`. `reason_state=VALIDATED` means well-formed and allowlisted, **not
+  authentic**: the worker asserts its own reason and a hostile or buggy worker could print any allowlisted code.
+* **Shared path:** `Source.run` is shared, so V1 failure and closure receipts also gain `worker_exit` and descendant identity and the worker's
+  stdout is a bounded pipe. V1 *bindings* (manifests, `PACKAGES`, dependency tuples) are unchanged; gating and accounting are unchanged for every version.
 * **Descendant identity** at both closure readbacks, only when children are seen: at most 8 entries of `pid`, `ppid`, `name` (a
   restricted character set, 32 characters), `status`, `age_seconds` and a coarse `group` (`SOURCE`/`CONTROLLER`/`OTHER`/`UNAVAILABLE`);
   never a command line, environment or path. Unreadable fields are explicit `UNAVAILABLE`; clean receipts are byte-stable.

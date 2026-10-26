@@ -156,6 +156,7 @@ def failure_detail(error,stage):
 
 # Fixed reasons a failed worker may print (the Stop codes raised on its path plus the guard's two generic ones).
 # Child output is untrusted: only membership in this set is ever recorded (docs/design/real-worker-proof-20261026/SPEC.md).
+# `reason_state=VALIDATED` means well-formed and allowlisted, not authentic: the worker asserts its own reason.
 WORKER_EXIT_REASONS=frozenset({'CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
     'SOURCE_CGROUP_V2','SOURCE_CGROUP_IDENTITY','SOURCE_MEMORY_ENFORCEMENT','SOURCE_OWNER_ENVIRONMENT',
     'UNCLASSIFIED_STOP','DEPENDENCY_UNAVAILABLE','PREPARATION_FAILURE'})
@@ -397,6 +398,7 @@ class Source:
                 raise Stop('SOURCE_CHILD_FAILURE')
         except BaseException as error:primary=failure_detail(error,stage)
         finally:
+          try:
             # Always attempt owned termination/readback; never replace the first
             # source failure with an exception raised by cleanup.
             try:
@@ -411,7 +413,7 @@ class Source:
                 if child is not None:child.wait(timeout=1)
                 closure['child_reaped']=True
             except BaseException as error:closure['failures'].append(failure_detail(error,'SOURCE_CHILD_REAP'))
-            pipe.close()
+          finally:pipe.close()
         if not closure['source_group_closed'] or not closure['child_reaped'] or closure['failures']:
             if primary is None:primary=failure_detail(Stop('SOURCE_CLEANUP_UNCERTAIN'),'SOURCE_CLOSURE')
         if primary is not None:raise SourceFailure(primary,closure)

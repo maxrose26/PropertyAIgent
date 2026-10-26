@@ -44,7 +44,7 @@ def lock_pins(path=LOCK):
         line = line.split('#', 1)[0].strip()
         if '==' in line:
             name, version = line.split('==', 1)
-            pins[normalise(name.strip())] = version.strip()
+            pins[normalise(name.split('[', 1)[0].strip())] = version.strip()      # `name[extra]==x` pins `name`
     return pins
 
 
@@ -79,15 +79,18 @@ class _Imports(ast.NodeVisitor):
     visit_FunctionDef = visit_AsyncFunctionDef = visit_Lambda = _function
 
     def visit_Try(self, node):
-        guarded = any(handler.type is None or any(
+        guarded = any((handler.type is None or any(
             getattr(n, 'id', getattr(n, 'attr', '')) in {'ImportError', 'ModuleNotFoundError', 'Exception', 'BaseException'}
-            for n in ast.walk(handler.type)) for handler in node.handlers)
+            for n in ast.walk(handler.type))) and not any(isinstance(n, ast.Raise) for n in ast.walk(handler))
+            for handler in node.handlers)        # a handler that raises again does not make the import optional
         self.optional += guarded
         for child in node.body:
             self.visit(child)
         self.optional -= guarded
         for child in node.handlers + node.orelse + node.finalbody:
             self.visit(child)
+
+    visit_TryStar = visit_Try
 
     def visit_If(self, node):
         if any(getattr(n, 'id', getattr(n, 'attr', '')) == 'TYPE_CHECKING' for n in ast.walk(node.test)):
@@ -179,7 +182,7 @@ def _distribution_state(name, pinned):
         installed = importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
         return dict(installed=None, pinned=pinned, state='MISSING')
-    state = 'OK' if pinned is None or installed == pinned else 'VERSION_MISMATCH'
+    state = 'UNPINNED' if pinned is None else 'OK' if installed == pinned else 'VERSION_MISMATCH'   # every bound package has an exact pin
     return dict(installed=installed, pinned=pinned, state=state)
 
 

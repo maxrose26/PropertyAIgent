@@ -290,6 +290,25 @@ def test_the_group_is_a_coarse_class_not_a_path(tmp_path, monkeypatch):
     assert r.descendant_identity([Proc(os.getpid())], object())['descendants'][0]['group'] == 'UNAVAILABLE'
 
 
+def test_identity_works_on_genuine_psutil_processes_and_never_exports_the_command_line(tmp_path):
+    import subprocess
+    import sys
+    import psutil
+    secret = 'DO_NOT_EXPORT_THIS_ARGUMENT'
+    child = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(30)', secret], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        seen = r.descendant_identity(psutil.Process().children(recursive=True), fake_memory(tmp_path))
+    finally:
+        child.kill()
+        child.wait()
+    entry = next(item for item in seen['descendants'] if item.get('pid') == child.pid)
+    assert entry['ppid'] == os.getpid() and entry['name'].startswith('python') and entry['status'] in {'sleeping', 'running', 'disk-sleep'}
+    assert entry['group'] in {'OTHER', 'SOURCE', 'CONTROLLER'} and entry['age_seconds'] >= 0
+    assert set(entry) == {'pid', 'ppid', 'name', 'status', 'age_seconds', 'group'}
+    assert secret not in json.dumps(seen)
+
+
 def test_closure_receipts_carry_identity_only_when_children_are_seen(world, monkeypatch):
     reg, api, memory, source, launch = world
     monkeypatch.setattr('psutil.Process', lambda: type('P', (), {'children': lambda self, recursive: [Proc(777, name='chrome')]})())
