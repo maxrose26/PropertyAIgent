@@ -22,7 +22,6 @@ from verification.ingestion_storage.operational_memory import OperationalMemory
 from verification.ingestion_storage.memory_enforcement import MemoryUnavailable
 from . import finite_acceptance as finite
 from . import four_council_proof as proof
-from . import execution_budget as budgets
 from .r0_recovery_proposal import resources, identities
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +85,7 @@ VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, 
 
 def budget_of(version):
     """Execution budget selected by the release version (historical for V1 versions)."""
+    from . import execution_budget as budgets
     return budgets.select(VERSION_LIMITS[version].get('execution_budget'))
 
 
@@ -650,6 +650,7 @@ def owner_source_context(execution_budget=None):
     """Exact memory-contained proof context; no hosted-environment impersonation.
 
     The source/aggregate limits must equal the selected budget exactly (historical: 1GiB/1.5GiB)."""
+    from . import execution_budget as budgets
     try:budget=budgets.select(execution_budget)
     except ValueError:raise Stop('SOURCE_MEMORY_ENFORCEMENT') from None
     lines=Path('/proc/self/cgroup').read_text().splitlines()

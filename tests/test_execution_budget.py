@@ -72,7 +72,12 @@ def test_budget_is_internally_consistent():
     assert r.SUCCESSOR_V2_LIMITS['worker_seconds'] == 3 * v2['worker_seconds']
     assert r.SUCCESSOR_V2_LIMITS['active_seconds'] == 3 * v2['slot_active_seconds']
     assert r.SUCCESSOR_V2_LIMITS['slot_active_seconds'] == v2['slot_active_seconds']
-    assert v2['slot_active_seconds'] + 160 + 10 < r.SUCCESSOR_V2_LIMITS['per_job_seconds']  # + publication + margin
+    # Per-job 480s (less 10s margin) covers the actual active slot and closure publication; like V1
+    # it relies on real setup being far below the 260s setup cap (V1: 260+60+160 also exceeds 470).
+    limits = r.SUCCESSOR_V2_LIMITS
+    assert v2['slot_active_seconds'] + limits['closure_publication_seconds'] < limits['per_job_seconds'] - 10
+    assert limits['setup_seconds'] + v2['slot_active_seconds'] + limits['closure_publication_seconds'] - (
+        r.SUCCESSOR_LIMITS['setup_seconds'] + 60 + r.SUCCESSOR_LIMITS['closure_publication_seconds']) == 30
 
 
 @pytest.mark.parametrize('now,step,expected,truncated', [
@@ -372,7 +377,8 @@ def test_supervisor_passes_budget_and_requires_the_declaration(hosted, tmp_path)
     base = dict(case='discovery_rochdale_ui_window', failure=None, persistence=False)
     popen = child_writing(dict(base, execution_budget=V2, stage_timings={}))
     value = supervise(tmp_path, popen, execution_budget=V2)
-    assert popen.commands[0][-2:] == ['--execution-budget', V2]
+    command = popen.commands[0]
+    assert command[-4:-1] == ['--execution-budget', V2, '--deadline-origin'] and 0 < float(command[-1])
     assert value['failure'] is None and value['supervisor_limit_hit'] is False and value['process_cleanup'] == 'CLOSED'
     (tmp_path / 'b').mkdir();(tmp_path / 'c').mkdir()
     popen = child_writing(base)
@@ -590,3 +596,89 @@ def test_v2_launcher_script_is_v2_only_and_derives_the_ceiling():
     assert 'test "$aggregate_bytes" = 2147483648' in script and '-p MemorySwapMax=0 -p OOMPolicy=kill' in script
     assert 'MemoryMax=1610612736' not in script
     subprocess.run(['bash', '-n', str(ROOT / 'docs/design/execution-budget-20261026/owner-launch.sh')], check=True)
+
+
+# ---------------------------------------------------------------- review follow-ups
+
+def test_deadline_origin_charges_start_up_and_is_bounded():
+    clock = Clock(100.0)
+    d = eb.Deadline(70, clock, started=95.0)
+    assert d.remaining() == pytest.approx(65)
+    for bad in (100.5, 29.0, 95, '95.0'):
+        with pytest.raises(ValueError, match='deadline origin'):eb.Deadline(70, clock, started=bad)
+
+
+def test_probe_requires_origin_with_budget():
+    for kw in ({'execution_budget': V2}, {'deadline_origin': 1.0}):
+        with pytest.raises(ValueError, match='EXECUTION_BUDGET_SELECTION'):
+            async_run(probe.probe('discovery_rochdale_ui_window', ('2026-10-08', '2026-10-14'), **kw))
+
+
+class StuckPage(Page):
+    """Pagination marker never advances past the first segment."""
+    def locator(self, selector):
+        inner = super().locator(selector);page = self
+
+        class Locator:
+            def __getattr__(self, name):return getattr(inner, name)
+
+            async def inner_text(self, **kw):
+                page.record('MARKER', kw)
+                return f'Showing 1 to 10 of {page.total} results'
+
+            async def click(self, **kw):page.record('NEXT', kw)  # click does not advance
+        return Locator()
+
+
+def test_untruncated_pagination_window_is_not_advanced():
+    page = StuckPage(CONFIG)
+    a = run(page, **budgeted())
+    assert a['listing_failure'].startswith('ValueError') and 'observation_deadline' not in a
+    assert a['completeness'] == 'INCOMPLETE' and len(a['listing_segments']) == 1
+    markers = [t for n, t in page.calls if n == 'MARKER']
+    assert all(0 < t <= 8000 for t in markers)
+
+
+def test_deadline_cut_pagination_window_is_budget_expiry():
+    clock = Clock(0);d = _deadline_at(clock, 70, 0)
+
+    class Late(StuckPage):
+        def record(self, name, kw):
+            super().record(name, kw)
+            if name == 'NEXT':clock.now = 69.7  # 0.3s of the observation left for the poll
+    page = Late(CONFIG)
+    a = run(page, budget=eb.select(V2), deadline=d)
+    assert a['listing_failure'] == 'ObservationDeadline' and a['observation_deadline'] is True
+    markers = [t for n, t in page.calls if n == 'MARKER'][1:]
+    assert markers and all(0 < t <= 300 for t in markers)
+
+
+def test_next_click_is_capped_by_the_remaining_deadline():
+    clock = Clock(0);d = _deadline_at(clock, 70, 0)
+
+    class Late(Page):
+        def record(self, name, kw):
+            if name == 'MARKER' and self.segment == 0:clock.now = 68.8
+            super().record(name, kw)
+    page = Late(CONFIG)
+    a = run(page, budget=eb.select(V2), deadline=d)
+    assert ('NEXT', 1200) in page.calls and a['enumeration_evidence'] == 'COUNT_RECONCILED'
+
+
+def test_row_reading_is_bounded_by_the_deadline():
+    page = Page(CONFIG);audit_value = {}
+
+    async def slow_cards(page, config):
+        await asyncio.sleep(5)
+    real = eb.Deadline(70)
+    real.end = real.clock() + 0.2  # 0.2s of real time left for reading rows
+    with patch('verification.discovery.arcus_ui_window.read_cards', slow_cards):
+        async_run(enumerate_ui(page, audit_value, asyncio.Event(), CONFIG, budget=eb.select(V2), deadline=real))
+    assert audit_value['listing_failure'] == 'ObservationDeadline' and audit_value['listing_stage'] == 'ROW_LOCATORS'
+
+
+def test_release_controller_imports_the_budget_lazily():
+    code = ('import sys\nfrom verification.discovery import four_council_release as r\n'
+            'assert "verification.discovery.execution_budget" not in sys.modules\n'
+            'r.budget_of(r.SUCCESSOR_VERSION)\nassert "verification.discovery.execution_budget" in sys.modules\n')
+    subprocess.run([sys.executable, '-c', code], cwd=ROOT, check=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))

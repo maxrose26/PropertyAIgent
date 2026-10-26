@@ -24,7 +24,8 @@ def reclaim(root):
     """Real kernel limit event, no OOM: reclaimable page cache written inside the source group.
 
     Hosted CI only (local pressure tests are paused). Writes are bounded at the group's own
-    memory.max + 512MiB (V1 1GiB: 192 chunks, unchanged; V2 1.5GiB: 256) and at 40s elapsed."""
+    memory.max + 512MiB (V1 1GiB: 192 chunks, unchanged; V2 1.5GiB: 256); V2 also stops at 40s
+    elapsed. The V1 profile's behaviour is unchanged."""
     group=Path('/sys/fs/cgroup')/Path('/proc/self/cgroup').read_text().strip()[3:].lstrip('/')
     assert group.name=='source'
     limit=int((group/'memory.max').read_text())
@@ -32,7 +33,7 @@ def reclaim(root):
     chunk=b'\1'*(8*1024**2);started=time.monotonic()
     with open(root/'reclaim.bin','wb') as stream:
         for _ in range((limit+512*1024**2)//len(chunk)):  # stops at the first max event
-            if time.monotonic()-started>40:break  # no event by then: the fixture assertions fail
+            if limit!=1024**3 and time.monotonic()-started>40:break  # V2 only; no event: the assertions fail
             # Synced chunks leave clean, immediately reclaimable page cache: the kernel event under
             # test is reclaim at the limit, not writeback stalls (hosted run 39953419679 attempt 2).
             stream.write(chunk);stream.flush();os.fdatasync(stream.fileno())

@@ -57,9 +57,12 @@ wait, because background traffic would consume the 80-request cap.
 | Successor worker / active totals | 135s / 180s | 225s / 270s |
 | Per-job, setup, package | 480s, 260s, 1440s | unchanged |
 
-**One observation deadline:** it starts when the probe worker starts and lasts 70s (75s worker
-minus a 5s finalisation reserve for closing and export). Every V2 wait uses
-`min(step cap, remaining)`.
+**One observation deadline:** it starts at the supervisor's own start (passed to the worker as
+`--deadline-origin` on the system-wide monotonic clock, so worker start-up is charged to it) and
+lasts 70s (75s worker minus a 5s finalisation reserve for closing and export). Every V2 wait uses
+`min(step cap, remaining)`. The pagination poll window is fixed once per segment; only a window cut
+by the deadline ends as budget expiry, otherwise "pagination did not advance". Browser close is not
+deadline-bound: if it overruns, the supervisor's 75s limit fails closed (`SUPERVISOR_BOUND_OR_CLEANUP`).
 
 **Budget expiry:**
 * With no observation time left (or no criteria-total time left), the reader stops with
@@ -96,7 +99,7 @@ Request (80), byte (20MiB), row (60) and segment (6) caps are unchanged.
 | `operational_memory.OperationalMemory` | keyword limits, defaults unchanged |
 | `docs/design/execution-budget-20261026/owner-launch.sh` (new) | V2 registrations only; scope `MemoryMax` taken from the validated manifest (2147483648). The V1 launcher is unchanged |
 | `operational_ci_scope.sh` | optional exact `--aggregate-bytes 2147483648`; default still requires 1610612736 |
-| Fixture CLI and offline CI | `--execution-budget-v2` profile (successor only) under a 2GiB scope on hosted CI; reclaim writes bounded at the group's own `memory.max` + 512MiB (V1 unchanged at 192 × 8MiB) and 40s elapsed |
+| Fixture CLI and offline CI | `--execution-budget-v2` profile (successor only) under a 2GiB scope on hosted CI; reclaim writes bounded at the group's own `memory.max` + 512MiB (V1 unchanged at 192 × 8MiB, no time bound) and, for V2 only, 40s elapsed |
 
 Callers that keep the historical envelope with no change in behaviour (no budget argument):
 `finite_acceptance.execute` and its readers (`completion_source`, `metadata_rollout`,
@@ -112,3 +115,9 @@ reboots, any live observation, registration, release or council/database request
 Consumed authorities are immutable and are never replayed. A fresh observation of the unresolved
 8–14 October window may be considered later only under new approval; another week is not selected
 merely because an earlier authority was consumed.
+
+## Review
+Focused independent review of `e6c70652`: no blockers. Addressed before the draft PR: deadline
+origin at supervisor start; a pagination window cut by the deadline is classified as budget expiry;
+lazy budget import in the release controller; the V1 reclaim fixture's behaviour restored; the
+per-job arithmetic stated honestly; tests for pagination, Next click and row-read truncation.

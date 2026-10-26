@@ -37,11 +37,15 @@ class ObservationDeadline(Exception):
 class Deadline:
     """One observation deadline; every wait is capped at min(step, remaining)."""
 
-    def __init__(self, seconds, clock=time.monotonic):
+    def __init__(self, seconds, clock=time.monotonic, started=None):
+        """started: an earlier origin on the same clock (the supervisor's start), never later."""
         if not 0 < seconds <= 600:
             raise ValueError('deadline seconds')
         self.clock = clock
-        self.started = clock()
+        now = clock()
+        if started is not None and not (type(started) is float and now - seconds <= started <= now):
+            raise ValueError('deadline origin')
+        self.started = now if started is None else started
         self.end = self.started + seconds
         self.truncated = False  # the most recent cap was shortened by the deadline
 

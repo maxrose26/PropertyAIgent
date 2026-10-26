@@ -222,14 +222,25 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER,*,retain_proof=False
         for ordinal in range(1,MAX_SEGMENTS+1):
             if stopped.is_set(): raise ValueError('resource stop')
             segment_started=time.monotonic()
-            until=time.monotonic()+(5 if deadline is None else wait_ms(8000,budget['segment_poll_seconds'])/1000)
+            if deadline is None:until=time.monotonic()+5
+            else:
+                # The poll window is fixed once; whether the deadline cut it is decided here.
+                until=time.monotonic()+wait_ms(8000,budget['segment_poll_seconds'])/1000;poll_truncated=truncated[0]
             while True:
                 audit['listing_stage']='PAGE_MARKER'
-                marker_kwargs={} if deadline is None else {'timeout':wait_ms(8000,max(.001,until-time.monotonic()))}
-                marker=' '.join((await page.locator('p.pr-pagination__results').inner_text(**marker_kwargs)).split())
+                if deadline is None:marker=' '.join((await page.locator('p.pr-pagination__results').inner_text()).split())
+                else:
+                    left=until-time.monotonic()
+                    if left<=0:
+                        if poll_truncated:raise ObservationDeadline('OBSERVATION_DEADLINE')
+                        raise ValueError('pagination did not advance')
+                    try:marker=' '.join((await page.locator('p.pr-pagination__results').inner_text(timeout=max(1,int(left*1000)))).split())
+                    except Exception as exc:
+                        if type(exc).__name__!='TimeoutError':raise
+                        marker=''  # an absent marker within the window is "not advanced", decided below
                 if re.match(r'Showing\s+'+str(expected_first)+r'\s+to\s+',marker): break
                 if time.monotonic()>until or stopped.is_set():
-                    if deadline is not None and truncated[0]:raise ObservationDeadline('OBSERVATION_DEADLINE')
+                    if deadline is not None and poll_truncated and not stopped.is_set():raise ObservationDeadline('OBSERVATION_DEADLINE')
                     raise ValueError('pagination did not advance')
                 await asyncio.sleep(.1)
             audit['listing_stage']='ROW_LOCATORS'
