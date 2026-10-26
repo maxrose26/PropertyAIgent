@@ -465,3 +465,14 @@ def test_allowed_elements_never_overlap():
     for a in allowed:
         assert a.count('<include') + a.count('<dir') == 1
         assert not any(a != b and a in b for b in allowed)
+
+
+@pytest.mark.parametrize('element', ['<cachedir>/var/cache/fontconfig<!---->x</cachedir>', '<cachedir >/tmp/x</cachedir >'])
+def test_cachedir_that_survives_substitution_is_invalid(system, element):
+    (system['etc'] / 'fonts.conf').write_text(system['conf'].replace('</fontconfig>', element + '</fontconfig>'))
+    with pytest.raises(pfc.PreparedFontCacheError, match='PREPARED_FONT_CACHE_INVALID'):
+        pfc.derived_config(system['tmp'] / 'x')
+    derived = None
+    try:derived = pfc.derived_config(system['tmp'] / 'x')
+    except pfc.PreparedFontCacheError:pass
+    assert derived is None

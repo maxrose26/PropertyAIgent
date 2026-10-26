@@ -231,6 +231,8 @@ def derived_config(cache_dir):
     if text.count(RELATIVE_CONF_D) != 1 or text.count('</fontconfig>') != 1 or not CACHEDIR.search(text):
         raise PreparedFontCacheError('INVALID')
     text = CACHEDIR.sub('', text).replace(RELATIVE_CONF_D, ABSOLUTE_CONF_D)
+    if '<cachedir' in text:  # a malformed or comment-split cachedir survived: never pass it on
+        raise PreparedFontCacheError('INVALID')
     return text.replace('</fontconfig>', f'\t<cachedir>{cache_dir}</cachedir>\n</fontconfig>').encode()
 
 
