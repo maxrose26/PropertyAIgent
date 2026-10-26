@@ -83,10 +83,22 @@ SUCCESSOR_V2_DEPENDENCIES = ('docs/design/execution-budget-20261026/manifest.jso
     'verification/discovery/execution_budget.py')
 VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES}
 
+# Historical envelope, held here so V1 execution never imports or depends on execution_budget
+# (absent from the V1 dependency bindings). Must equal execution_budget.HISTORICAL (tested).
+HISTORICAL_BUDGET = dict(name=None, worker_seconds=45, source_outer_seconds=49, slot_active_seconds=60,
+    source_memory_bytes=1024**3, aggregate_memory_bytes=1536*1024**2)
+
+
+def select_budget(name):
+    """None: the historical envelope with no import. A named budget loads the bound V2 module."""
+    if name is None:return HISTORICAL_BUDGET
+    from . import execution_budget as budgets
+    return budgets.select(name)
+
+
 def budget_of(version):
     """Execution budget selected by the release version (historical for V1 versions)."""
-    from . import execution_budget as budgets
-    return budgets.select(VERSION_LIMITS[version].get('execution_budget'))
+    return select_budget(VERSION_LIMITS[version].get('execution_budget'))
 
 
 def memory_limits(version):
@@ -650,8 +662,7 @@ def owner_source_context(execution_budget=None):
     """Exact memory-contained proof context; no hosted-environment impersonation.
 
     The source/aggregate limits must equal the selected budget exactly (historical: 1GiB/1.5GiB)."""
-    from . import execution_budget as budgets
-    try:budget=budgets.select(execution_budget)
+    try:budget=select_budget(execution_budget)
     except ValueError:raise Stop('SOURCE_MEMORY_ENFORCEMENT') from None
     lines=Path('/proc/self/cgroup').read_text().splitlines()
     if len(lines)!=1 or not lines[0].startswith('0::/'):raise Stop('SOURCE_CGROUP_V2')

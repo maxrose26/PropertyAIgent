@@ -7,6 +7,7 @@ Limits are kernel/supervisor ceilings, not reserved resources or a guarantee of 
 import time
 
 MiB = 1024 ** 2
+# Mirrors four_council_release.HISTORICAL_BUDGET plus the supervisor keys; tests keep them equal.
 HISTORICAL = dict(name=None, worker_seconds=45, source_outer_seconds=49, slot_active_seconds=60,
                   source_memory_bytes=1024 ** 3, aggregate_memory_bytes=1536 * MiB,
                   controller_memory_bytes=256 * MiB, rss_ceiling_bytes=1024 ** 3)

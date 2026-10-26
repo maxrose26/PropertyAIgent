@@ -486,7 +486,7 @@ def test_historical_manifests_and_bindings_are_byte_identical():
     assert set(r.dependencies(successor=True)) == set(r.DEPENDENCIES + r.SUCCESSOR_DEPENDENCIES)
     assert set(r.dependencies()) == set(r.DEPENDENCIES)
     assert r.memory_limits(r.VERSION) == r.memory_limits(r.SUCCESSOR_VERSION) == {}
-    assert r.budget_of(r.SUCCESSOR_VERSION) is eb.HISTORICAL
+    assert r.budget_of(r.SUCCESSOR_VERSION) is r.HISTORICAL_BUDGET
     v1_launcher = (ROOT / 'docs/design/four-council-release-20261022/owner-launch.sh').read_text()
     assert '-p MemoryMax=1610612736 ' in v1_launcher and 'aggregate_bytes' not in v1_launcher
 
@@ -573,7 +573,7 @@ def test_v2_launcher_slot_and_worker_bounds(tmp_path):
     (tmp_path / 'v1').mkdir()
     historical = r.Launcher(v1_registration(), tmp_path / 'v1', github=None, memory=Memory(tmp_path / 'v1'), source=None)
     with pytest.raises(r.Stop, match='SOURCE_TIME_ACCOUNTING'):historical.accept(1, complete(supervisor_seconds=46))
-    assert historical.budget is eb.HISTORICAL
+    assert historical.budget is r.HISTORICAL_BUDGET
 
 
 def test_next_allocation_reserves_the_v2_slot_allowance(tmp_path):
@@ -677,8 +677,92 @@ def test_row_reading_is_bounded_by_the_deadline():
     assert audit_value['listing_failure'] == 'ObservationDeadline' and audit_value['listing_stage'] == 'ROW_LOCATORS'
 
 
+@pytest.fixture
+def budget_module_unavailable(monkeypatch):
+    """The new module is genuinely unimportable (not merely unloaded): the cached module, the
+    package attribute that `from . import x` consults first, and the import machinery are blocked."""
+    import verification.discovery as package
+    name = 'verification.discovery.execution_budget'
+    monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.delattr(package, 'execution_budget', raising=False)
+    monkeypatch.setitem(sys.modules, name, None)
+    with pytest.raises(ImportError):
+        from verification.discovery import execution_budget  # noqa: F401  (self-check of the block)
+
+
+def test_historical_budget_mirrors_the_module_and_the_manifest_values():
+    shared = ('name', 'worker_seconds', 'source_outer_seconds', 'slot_active_seconds',
+              'source_memory_bytes', 'aggregate_memory_bytes')
+    assert {k: eb.HISTORICAL[k] for k in shared} == r.HISTORICAL_BUDGET
+    assert r.HISTORICAL_BUDGET['source_memory_bytes'] == r.LIMITS['source_memory_bytes']
+    assert r.HISTORICAL_BUDGET['aggregate_memory_bytes'] == r.LIMITS['aggregate_memory_bytes']
+    assert r.HISTORICAL_BUDGET['slot_active_seconds'] == r.LIMITS['slot_active_seconds']
+    assert r.budget_of(r.VERSION) is r.HISTORICAL_BUDGET is r.budget_of(r.SUCCESSOR_VERSION)
+
+
+def test_v1_paths_run_without_the_budget_module(budget_module_unavailable, tmp_path, monkeypatch):
+    from tests.test_discovery_three_council_isolation import registration as v1_successor
+    from tests.test_discovery_four_council_release import registration as v1_four
+    assert r.budget_of(r.VERSION)['worker_seconds'] == 45 and r.budget_of(r.SUCCESSOR_VERSION)['source_outer_seconds'] == 49
+    assert r.memory_limits(r.VERSION) == r.memory_limits(r.SUCCESSOR_VERSION) == {}
+    assert owner_context(monkeypatch, 1024 ** 3, 1536 * MiB, None) is True
+    for registration, version in ((v1_four(), r.VERSION), (v1_successor(), r.SUCCESSOR_VERSION)):
+        directory = tmp_path / version
+        directory.mkdir()
+        launch = r.Launcher(registration, directory, github=None, memory=Memory(directory), source=None)
+        assert launch.budget is r.HISTORICAL_BUDGET and launch.limits is r.VERSION_LIMITS[version]
+        assert launch.limits['slot_active_seconds'] == 60
+    # The historical worker bound (45s) and slot/outer values come from the original literals.
+    with pytest.raises(r.Stop, match='SOURCE_TIME_ACCOUNTING'):launch.accept(1, complete(supervisor_seconds=46))
+    assert launch.accept(1, complete(supervisor_seconds=45)) == 'COMPLETE'
+    class Fake:source = tmp_path / 'source'
+    source = r.Source(Fake(), v1_successor(), tmp_path)
+    assert '--execution-budget' not in source.command(1, tmp_path / 'o')
+    from verification.discovery import finite_acceptance as finite_module
+    assert finite_module.classify(r.ROWS[1], complete()) == 'COMPLETE'
+    assert 'verification.discovery.execution_budget' not in [k for k, v in sys.modules.items() if v is not None]
+
+
+def test_v1_source_run_never_needs_the_budget_module(budget_module_unavailable, tmp_path):
+    """Source.run reads its outer deadline through budget_of: exercise it for a historical version."""
+    from tests.test_discovery_three_council_isolation import registration as v1_successor
+    clock = Clock(0)
+    (tmp_path / 'source').mkdir()
+    for name, value in {'cgroup.kill': '', 'cgroup.events': 'populated 0\n'}.items():(tmp_path / 'source' / name).write_text(value)
+
+    class Memory_:
+        source = tmp_path / 'source';finalisation_only = False
+        def snapshot(self):clock.now += 10
+
+    class Child:
+        returncode = None
+        def poll(self):return None
+        def wait(self, timeout=None):self.returncode = -9
+
+    source = r.Source(Memory_(), v1_successor(), tmp_path, clock=clock, sleep=lambda s: None)
+    with patch.object(r.subprocess, 'Popen', lambda *a, **k: Child()):
+        with pytest.raises(r.SourceFailure) as raised:source.run(1, lambda: None)
+    assert raised.value.primary['code'] == 'SOURCE_OUTER_DEADLINE' and 49 <= clock.now < 60  # historical 49s
+
+
+def test_named_v2_requires_and_uses_the_bound_module(budget_module_unavailable, monkeypatch, tmp_path):
+    """Selection of V2 is explicit: with the module unavailable it fails, never silently historical."""
+    with pytest.raises(ImportError):r.budget_of(r.SUCCESSOR_V2_VERSION)
+    with pytest.raises(ImportError):owner_context(monkeypatch, 1536 * MiB, 2048 * MiB, V2)
+    with pytest.raises(ImportError):
+        r.Launcher(v2_registration(), tmp_path, github=None, memory=Memory(tmp_path), source=None)
+
+
+def test_v2_selection_still_loads_the_bound_module_and_limits():
+    assert r.budget_of(r.SUCCESSOR_V2_VERSION) is eb.BROWSER_SOURCE_V2
+    assert r.select_budget(V2)['worker_seconds'] == 75 and r.select_budget(None) is r.HISTORICAL_BUDGET
+    with pytest.raises(ValueError, match='EXECUTION_BUDGET'):r.select_budget('unknown')
+
+
 def test_release_controller_imports_the_budget_lazily():
     code = ('import sys\nfrom verification.discovery import four_council_release as r\n'
             'assert "verification.discovery.execution_budget" not in sys.modules\n'
-            'r.budget_of(r.SUCCESSOR_VERSION)\nassert "verification.discovery.execution_budget" in sys.modules\n')
+            'r.budget_of(r.SUCCESSOR_VERSION);r.select_budget(None)\n'
+            'assert "verification.discovery.execution_budget" not in sys.modules\n'
+            'r.budget_of(r.SUCCESSOR_V2_VERSION)\nassert "verification.discovery.execution_budget" in sys.modules\n')
     subprocess.run([sys.executable, '-c', code], cwd=ROOT, check=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
