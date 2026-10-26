@@ -65,7 +65,9 @@ files. On a cold page cache that charged about 173MiB of file cache to the 1GiB 
       and no `<dir>`.
     * `local.conf`: no include and no dir.
     Every `<include` and `<dir` occurrence must be one of these exact elements. Any CDATA or
-    entity declaration is refused. So `..` escapes, forged attributes, and CDATA, comment-split
+    entity declaration, any `<remap-dir>` (adds a font directory) or `<reset-dirs>`, and any
+    configuration file that is not plain UTF-8 (NUL bytes, a byte-order mark, invalid bytes) is
+    refused. So `..` escapes, forged attributes, and CDATA, comment-split
     or entity-built values are INVALID. `conf.d` and `local.conf` are content-hashed, so an
     included file changing under an unchanged parent is STALE.
   * **Per-user locations:** these resolve into the fresh per-run HOME. At launch, prepared mode

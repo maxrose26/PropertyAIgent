@@ -42,7 +42,8 @@ CONF_D_INCLUDES = ('<include ignore_missing="yes">local.conf</include>',
                    '<include ignore_missing="yes" deprecated="yes">~/.fonts.conf.d</include>',
                    '<include ignore_missing="yes" deprecated="yes">~/.fonts.conf</include>')
 USER_DIRS = ('<dir prefix="xdg">fonts</dir>', '<dir>~/.fonts</dir>')
-UNSUPPORTED_XML = ('<![CDATA[', '<!ENTITY')
+# CDATA/entities could hide values; <remap-dir> adds and <reset-dirs> changes font directories.
+UNSUPPORTED_XML = ('<![CDATA[', '<!ENTITY', '<remap-dir', '<reset-dirs')
 # Per-user font and configuration locations fontconfig consults (fresh per-run HOME: must be absent).
 USER_PATHS = ('.fonts.conf.d', '.fonts.conf', '.config/fontconfig', '.fonts', '.local/share/fonts')
 # Variables that would redirect fontconfig away from the fingerprinted inputs.
@@ -186,7 +187,10 @@ def font_fingerprint():
 def _only_elements(text, *, includes, dirs):
     """Every <include and <dir occurrence must be one of the exact allowed elements; CDATA and
     entity declarations are refused outright. INVALID otherwise."""
-    if (any(marker in text for marker in UNSUPPORTED_XML)
+    # Only plain UTF-8 text is analysed: NUL bytes (e.g. UTF-16), a byte-order mark or invalid
+    # UTF-8 (decoded as U+FFFD) could make occurrence counting see nothing.
+    if ('\x00' in text or '\ufeff' in text or '\ufffd' in text
+            or any(marker in text for marker in UNSUPPORTED_XML)
             or text.count('<include') != sum(text.count(e) for e in includes)
             or text.count('<dir') != sum(text.count(e) for e in dirs)):
         raise PreparedFontCacheError('INVALID')

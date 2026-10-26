@@ -440,3 +440,28 @@ def test_include_and_dir_escapes_are_invalid(system, where, element):
 
 def test_top_level_include_is_exactly_the_relative_conf_d():
     assert pfc.TOP_INCLUDES == (pfc.RELATIVE_CONF_D,)
+
+
+@pytest.mark.parametrize('where,raw', [
+    ('conf.d', '<fontconfig><remap-dir as-path="/usr/share/fonts">/opt/fonts</remap-dir></fontconfig>'.encode()),
+    ('conf.d', b'<fontconfig><reset-dirs/></fontconfig>'),
+    ('top_remap', None),
+    ('conf.d', '<fontconfig><include>/opt/x.conf</include></fontconfig>'.encode('utf-16')),   # UTF-16 with BOM
+    ('conf.d', '<fontconfig><include>/opt/x.conf</include></fontconfig>'.encode('utf-16-le')),  # UTF-16, no BOM
+    ('local', '﻿<fontconfig/>'.encode('utf-8')),                                           # UTF-8 BOM
+    ('local', b'<fontconfig>\xff\xfe</fontconfig>'),                                            # invalid UTF-8
+])
+def test_dir_changing_elements_and_non_utf8_configuration_are_invalid(system, where, raw):
+    cache_dir, digest, _ = sealed(system)
+    if where == 'conf.d':(system['etc'] / 'conf.d/90-other.conf').write_bytes(raw)
+    elif where == 'local':(system['etc'] / 'local.conf').write_bytes(raw)
+    else:(system['etc'] / 'fonts.conf').write_text(system['conf'].replace('</fontconfig>', '<remap-dir>/opt/fonts</remap-dir></fontconfig>'))
+    refuses('INVALID', cache_dir, digest, system['exe'])
+
+
+def test_allowed_elements_never_overlap():
+    """Occurrence counting is sound only while no allowed element contains another or a second opening."""
+    allowed = pfc.TOP_INCLUDES + pfc.CONF_D_INCLUDES + pfc.USER_DIRS + ('<dir>/usr/share/fonts</dir>', '<dir>/usr/local/share/fonts</dir>')
+    for a in allowed:
+        assert a.count('<include') + a.count('<dir') == 1
+        assert not any(a != b and a in b for b in allowed)
