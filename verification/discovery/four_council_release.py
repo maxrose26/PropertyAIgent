@@ -80,8 +80,13 @@ SUCCESSOR_DEPENDENCIES = ('docs/design/three-council-isolation-20261022/manifest
 SUCCESSOR_V2_DEPENDENCIES = ('docs/design/execution-budget-20261026/manifest.json',
     'docs/design/execution-budget-20261026/owner-launch.sh',
     'verification/discovery/criteria_containment.py','verification/discovery/source_diagnostics.py',
-    'verification/discovery/execution_budget.py')
+    'verification/discovery/execution_budget.py',
+    'verification/ah_pg/requirements.lock','verification/discovery/runtime_dependencies.py')
 VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES}
+# V2 also binds what the real worker path imports lazily (app.pipeline.site_linking: rapidfuzz, SQLAlchemy); exact pins are
+# those of verification/ah_pg/requirements.lock (docs/design/real-worker-proof-20261026/SPEC.md). V1 bindings are unchanged.
+V2_PACKAGES = PACKAGES + ('rapidfuzz','SQLAlchemy')
+VERSION_PACKAGES = {VERSION: PACKAGES, SUCCESSOR_VERSION: PACKAGES, SUCCESSOR_V2_VERSION: V2_PACKAGES}
 
 # Historical envelope, held here so V1 execution never imports or depends on execution_budget
 # (absent from the V1 dependency bindings). Must equal execution_budget.HISTORICAL (tested).
@@ -149,6 +154,80 @@ def failure_detail(error,stage):
     return dict(stage=stage,code=code,kind=kind,message_exported=False)
 
 
+# Fixed reasons a failed worker may print (the Stop codes raised on its path plus the guard's two generic ones).
+# Child output is untrusted: only membership in this set is ever recorded (docs/design/real-worker-proof-20261026/SPEC.md).
+# `reason_state=VALIDATED` means well-formed and allowlisted, not authentic: the worker asserts its own reason.
+WORKER_EXIT_REASONS=frozenset({'CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
+    'SOURCE_CGROUP_V2','SOURCE_CGROUP_IDENTITY','SOURCE_MEMORY_ENFORCEMENT','SOURCE_OWNER_ENVIRONMENT',
+    'UNCLASSIFIED_STOP','DEPENDENCY_UNAVAILABLE','PREPARATION_FAILURE'})
+WORKER_OUTPUT_BOUND=4096
+
+
+class BoundedPipe:
+    """Non-blocking, size-bounded view of a child's stdout. Surplus is drained and discarded; EOF is never awaited."""
+    def __init__(self):self.stream=None;self.fd=None;self.data=b'';self.discarded=0
+    def attach(self,child):
+        stream=getattr(child,'stdout',None)
+        try:
+            self.fd=stream.fileno();os.set_blocking(self.fd,False);self.stream=stream
+        except (AttributeError,OSError,ValueError):self.fd=None
+    def drain(self):
+        for _ in range(16):
+            if self.fd is None:return
+            try:chunk=os.read(self.fd,65536)
+            except BlockingIOError:return
+            except OSError:self.fd=None;return
+            if not chunk:self.fd=None;return
+            room=max(0,WORKER_OUTPUT_BOUND-len(self.data));self.data+=chunk[:room];self.discarded+=len(chunk)-min(len(chunk),room)
+    def close(self):
+        try:
+            if self.stream is not None:self.stream.close()
+        except (OSError,ValueError):pass
+        self.fd=None
+
+
+def worker_exit_evidence(returncode,data,discarded):
+    """Return code or signal, plus a fixed, validated reason where available. Never stores or executes child text."""
+    ok=type(returncode) is int and -128<=returncode<=255
+    evidence=dict(returncode=returncode if ok and returncode>=0 else None,signal=-returncode if ok and returncode<0 else None,
+        reason=None,reason_state='ABSENT')
+    if not data and not discarded:return evidence
+    evidence['reason_state']='MALFORMED'
+    try:
+        if discarded or len(data)>WORKER_OUTPUT_BOUND:return evidence
+        text=data.decode('ascii').strip()
+        if '\n' in text or '\r' in text:return evidence
+        def pairs(items):
+            keys=[k for k,_ in items]
+            if len(set(keys))!=len(keys):raise ValueError('duplicate')
+            return dict(items)
+        value=json.loads(text,object_pairs_hook=pairs)
+        if (not isinstance(value,dict) or set(value)!={'status','reason','cleanup'} or value['status']!='STOP_RECONCILE_NO_RETRY'
+                or value['cleanup']!='UNCERTAIN' or not isinstance(value['reason'],str)):return evidence
+        if value['reason'] in WORKER_EXIT_REASONS:evidence.update(reason=value['reason'],reason_state='VALIDATED')
+        else:evidence['reason_state']='UNRECOGNISED'
+    except (UnicodeDecodeError,ValueError,RecursionError):pass
+    return evidence
+
+
+def descendant_identity(children,memory,limit=8):
+    """Bounded identity of descendants seen at closure: no command line, environment or path. Unreadable is explicit."""
+    def group_of(pid):
+        try:
+            name=Path(f'/proc/{pid}/cgroup').read_text().strip().rsplit('/',1)[-1]
+            return 'SOURCE' if name==memory.source.name else 'CONTROLLER' if name==memory.controller.name else 'OTHER'
+        except (OSError,AttributeError,ValueError):return 'UNAVAILABLE'
+    listed=[]
+    for child in list(children)[:limit]:
+        try:
+            name=str(child.name())
+            listed.append(dict(pid=int(child.pid),ppid=int(child.ppid()),
+                name=name[:32] if re.fullmatch(r'[A-Za-z0-9_.+:-]{1,32}',name[:32]) else 'UNPRINTABLE',
+                status=str(child.status())[:16],age_seconds=round(max(0.0,time.time()-child.create_time()),1),group=group_of(int(child.pid))))
+        except BaseException:listed.append(dict(identity='UNAVAILABLE'))
+    return dict(descendants=listed,descendants_omitted=max(0,len(list(children))-limit)) if listed else {}
+
+
 class SourceFailure(Stop):
     def __init__(self,primary,closure):
         super().__init__(primary['code']);self.primary=primary;self.closure=closure
@@ -195,7 +274,14 @@ def git(*args):
 def dependencies(*, successor=False, version=None):
     version=selected_version(successor,version)
     return {p:sha((ROOT/p).read_bytes()) for p in DEPENDENCIES+VERSION_DEPENDENCIES[version]}
-def packages(): return {p:importlib.metadata.version(p) for p in PACKAGES}
+def packages(version=None): return {p:importlib.metadata.version(p) for p in VERSION_PACKAGES[VERSION if version is None else version]}
+
+
+def runtime_check(version, **kwargs):
+    """Council-free dependency verdict for the interpreter running this call (see runtime_dependencies)."""
+    from . import runtime_dependencies
+    paths=[p for p in DEPENDENCIES+VERSION_DEPENDENCIES[version] if p.endswith('.py')]
+    return runtime_dependencies.check(paths,VERSION_PACKAGES[version],**kwargs)
 
 
 def render(release_id, revision, tree, evidence_head, issued, expires, *, released=False, successor=False, version=None):
@@ -207,7 +293,7 @@ def render(release_id, revision, tree, evidence_head, issued, expires, *, releas
     value=manifest(version=version)
     return dict(version=value['version'], release_id=release_id, revision=revision, tree=tree,
         manifest=json.loads(canonical(value)), manifest_sha256=sha(canonical(value)),
-        dependencies=dependencies(version=version), packages=packages(), evidence_head=evidence_head,
+        dependencies=dependencies(version=version), packages=packages(version), evidence_head=evidence_head,
         directory='docs/design/ingestion-operational-execution-'+release_id,
         issued_at=issued, expires_at=expires, released=released,
         stop_treatment=PERMITS[version] if released else 'INACTIVE', preserved_stops=PRESERVED,
@@ -282,7 +368,7 @@ class Source:
     def run(self,index,check):
         out=self.root/f'source-{index}.json';started=self.clock();poll_at=started
         outer=budget_of(self.r['version'])['source_outer_seconds']
-        child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK'
+        child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK';pipe=BoundedPipe()
         closure=dict(source_group_closed=False,child_reaped=False,failures=[])
         try:
             if getattr(self.memory,'finalisation_only',False):raise Stop('FINALISATION_ONLY')
@@ -295,8 +381,10 @@ class Source:
             child=subprocess.Popen(self.command(index,out),cwd=ROOT,preexec_fn=attach_before_exec,
                 env=dict(PATH='/usr/bin:/bin',HOME=str(self.root),TMPDIR=str(self.root),PYTHONDONTWRITEBYTECODE='1',
                     PLAYWRIGHT_BROWSERS_PATH=str(Path.home()/'.cache/ms-playwright')),
-                stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+                stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
+            pipe.attach(child)
             while child.poll() is None:
+                pipe.drain()
                 stage='SOURCE_MEMORY_CHECK';self.memory.snapshot()
                 if self.clock()-started>=outer:raise Stop('SOURCE_OUTER_DEADLINE')
                 if self.clock()>=poll_at:
@@ -304,10 +392,13 @@ class Source:
                 stage='SOURCE_OUTPUT_BOUND'
                 if out.exists() and out.stat().st_size>512000:raise Stop('SOURCE_OUTPUT_BOUND')
                 self.sleep(.05)
-            stage='SOURCE_PROCESS_EXIT'
-            if child.returncode:raise Stop('SOURCE_CHILD_FAILURE')
+            stage='SOURCE_PROCESS_EXIT';pipe.drain()
+            if child.returncode:
+                closure['worker_exit']=worker_exit_evidence(child.returncode,pipe.data,pipe.discarded)
+                raise Stop('SOURCE_CHILD_FAILURE')
         except BaseException as error:primary=failure_detail(error,stage)
         finally:
+          try:
             # Always attempt owned termination/readback; never replace the first
             # source failure with an exception raised by cleanup.
             try:
@@ -322,6 +413,7 @@ class Source:
                 if child is not None:child.wait(timeout=1)
                 closure['child_reaped']=True
             except BaseException as error:closure['failures'].append(failure_detail(error,'SOURCE_CHILD_REAP'))
+          finally:pipe.close()
         if not closure['source_group_closed'] or not closure['child_reaped'] or closure['failures']:
             if primary is None:primary=failure_detail(Stop('SOURCE_CLEANUP_UNCERTAIN'),'SOURCE_CLOSURE')
         if primary is not None:raise SourceFailure(primary,closure)
@@ -615,7 +707,7 @@ class Launcher:
                 import psutil
                 children=psutil.Process().children(recursive=True)
                 new=sockets()-self.baseline
-                closure.update(live_child_count=len(children),new_socket_count=len(new),owned_groups_removed=False)
+                closure.update(live_child_count=len(children),new_socket_count=len(new),owned_groups_removed=False,**descendant_identity(children,self.memory))
                 children_known=not children and not new
                 if not children_known:raise Stop('PROCESS_OR_SOCKET_CLOSURE')
             except BaseException as error:self.reporting_failures.append(failure_detail(error,'FINAL_CHILD_SOCKET_READBACK'))
@@ -697,8 +789,11 @@ def main():
     w=sub.add_parser('worker');w.add_argument('index',type=int);w.add_argument('out',type=Path);w.add_argument('group',type=Path);w.add_argument('--three-council-successor',action='store_true');w.add_argument('--execution-budget')
     r=sub.add_parser('render');r.add_argument('--release-id',required=True);r.add_argument('--revision',required=True);r.add_argument('--tree',required=True);r.add_argument('--evidence-head',required=True);r.add_argument('--issued-at',required=True);r.add_argument('--expires-at',required=True);r.add_argument('--output',required=True,type=Path);r.add_argument('--propose-reviewed-stop-treatment',action='store_true');r.add_argument('--three-council-successor',action='store_true');r.add_argument('--version',choices=tuple(VERSION_LIMITS))
     # Rendering creates local proposals only, never authority or a remote control.
+    c=sub.add_parser('runtime-check');c.add_argument('--version',required=True,choices=tuple(VERSION_LIMITS))
     a=sub.add_parser('run');a.add_argument('--registration',required=True,type=Path);a.add_argument('--registration-sha256',required=True);a.add_argument('--enable-reviewed-source-only-stop-treatment',action='store_true')
     args=p.parse_args()
+    if args.mode=='runtime-check':
+        report=runtime_check(args.version);print(json.dumps(report,sort_keys=True),flush=True);return 0 if report['ok'] else 1
     if args.mode=='worker':return worker(args.index,args.out,args.group,successor=args.three_council_successor,execution_budget=args.execution_budget)
     if args.mode=='render':
         value=render(args.release_id,args.revision,args.tree,args.evidence_head,args.issued_at,args.expires_at,released=args.propose_reviewed_stop_treatment,successor=args.three_council_successor,version=args.version)
@@ -711,6 +806,12 @@ def main():
     if os.environ.get('GH_HOST','github.com')!='github.com':raise Stop('GITHUB_DESTINATION')
     if not args.enable_reviewed_source_only_stop_treatment:raise Stop('STOP_TREATMENT_NOT_ENABLED')
     if any(any(s in k.upper() for s in ('DATABASE','SUPABASE','OPENAI','ANTHROPIC')) for k in os.environ):raise Stop('OWNER_CREDENTIAL_CONTEXT')
+    if r['version']==SUCCESSOR_V2_VERSION:
+        # Before any claim, in the interpreter that will run the worker: names and exception classes only are reported.
+        report=runtime_check(r['version'])
+        if not report['ok']:
+            print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',reason='RUNTIME_DEPENDENCY_CHECK',cleanup='NOT_STARTED',report=report),sort_keys=True),flush=True)
+            raise Stop('RUNTIME_DEPENDENCY_CHECK')
     if int(Path('/proc/self/stat').read_text().split()[0])!=os.getpid():raise Stop('PROCESS_NAMESPACE_MISMATCH')
     root=Path.home()/'.local/state/propertyaigent'/r['release_id'];root.mkdir(parents=True,exist_ok=False)
     journal=Journal(root/'events.jsonl')
@@ -796,7 +897,7 @@ def finish(launch,journal,result,root):
         try:
             children=__import__('psutil').Process().children(recursive=True)
             new=sockets()-launch.baseline
-            result['final_process_readback']=dict(live_child_count=len(children),new_socket_count=len(new))
+            result['final_process_readback']=dict(live_child_count=len(children),new_socket_count=len(new),**descendant_identity(children,launch.memory))
             final_clean=not children and not new
             result['child_socket_closure']='CLOSED' if final_clean else 'UNCERTAIN'
         except BaseException as error:
@@ -840,5 +941,5 @@ if __name__=='__main__':
     try:sys.exit(main())
     except BaseException as e:
         if isinstance(e,SystemExit):raise
-        print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',reason=fixed_reason(e) if isinstance(e,Stop) else 'PREPARATION_FAILURE',cleanup='UNCERTAIN')),flush=True)
+        print(json.dumps(dict(status='STOP_RECONCILE_NO_RETRY',reason=fixed_reason(e) if isinstance(e,Stop) else 'DEPENDENCY_UNAVAILABLE' if isinstance(e,ImportError) else 'PREPARATION_FAILURE',cleanup='UNCERTAIN')),flush=True)
         sys.exit(1)
