@@ -267,7 +267,21 @@ def exact_guest_record(audit, reference):
             and fields['reference'].get('value') == reference)
 
 
-async def probe(case, window=None, metadata=False, *, retain_proof=False):
+def browser_launch_options(prepared_font_cache):
+    """Default: no options (unchanged launch). Explicit prepared mode: validated browser-only env."""
+    if prepared_font_cache is None:
+        return {}
+    # Imported only in prepared mode: the default path (and the Render disposable job, which ships
+    # only this file and arcus_http_probe.py) never depends on the new module.
+    from verification.direct_reference.prepared_font_cache import PreparedFontCacheError, headless_shell_executable, launch_env
+    cache_dir, manifest_sha256 = prepared_font_cache
+    if 'PLAYWRIGHT_BROWSERS_PATH' not in os.environ or 'HOME' not in os.environ:
+        raise PreparedFontCacheError('UNVERIFIED')
+    executable = headless_shell_executable(os.environ['PLAYWRIGHT_BROWSERS_PATH'])
+    return dict(env=launch_env(cache_dir, manifest_sha256, executable, os.environ['HOME'], dict(os.environ)))
+
+
+async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
     ui_config=UI_CASES.get(case)
@@ -474,7 +488,9 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False):
     try:
         async with async_playwright() as playwright:
             try:
-                browser = await playwright.chromium.launch(headless=True)
+                # Prepared-cache validation happens here, before launch and so before navigation.
+                launch_options = browser_launch_options(prepared_font_cache)
+                browser = await playwright.chromium.launch(headless=True, **launch_options)
                 context = await browser.new_context(service_workers='block', accept_downloads=False)
                 await context.route_web_socket('**/*', lambda ws: fail('WEBSOCKET_DENIED'))
                 context.on('page', lambda _: (audit.update(pages=audit['pages'] + 1),
@@ -555,7 +571,9 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False):
                     await browser.close()
                 audit['cleanup'] = 'CONTEXT_BROWSER_CLOSED' if browser is not None else 'NOT_STARTED'
     except Exception as exc:
-        fail('BROWSER_' + type(exc).__name__)
+        code = getattr(exc, 'code', None)  # fixed prepared-cache refusal code, prepared mode only
+        fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
+             else 'BROWSER_' + type(exc).__name__)
     audit['elapsed_seconds'] = round(time.monotonic() - started, 3)
     return audit
 
@@ -573,8 +591,10 @@ def bounded_worker_audit(path,case,metadata=False):
             else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
 
 
-def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False, *, retain_proof=False):
+def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None):
     if type(retain_proof) is not bool:raise ValueError('proof selection')
+    if prepared_font_cache is not None and (not isinstance(prepared_font_cache, tuple) or len(prepared_font_cache) != 2
+            or not all(isinstance(x, str) for x in prepared_font_cache)):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
     if retain_proof:
         from verification.discovery.four_council_proof import require_scope
         if case!='discovery_rochdale_ui_window' or window is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
@@ -611,8 +631,10 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                          else 'verification.discovery.r0_fixed80_qualification' if case in FIXED80_CASES
                          else 'verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')
+        if prepared_font_cache is not None and worker_module != 'verification.direct_reference.instrumented_probe':
+            raise ValueError('PREPARED_FONT_CACHE_UNSUPPORTED_CASE')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -683,22 +705,25 @@ def main():
     p.add_argument('--worker', action='store_true')
     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
     p.add_argument('--window-start');p.add_argument('--window-end');p.add_argument('--metadata',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true')
+    p.add_argument('--prepared-font-cache');p.add_argument('--prepared-font-cache-sha256')
     a = p.parse_args()
     if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
+    if (a.prepared_font_cache is None)!=(a.prepared_font_cache_sha256 is None):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
+    fonts={'prepared_font_cache':(a.prepared_font_cache,a.prepared_font_cache_sha256)} if a.prepared_font_cache is not None else {}
     window=(a.window_start,a.window_end) if a.window_start else None
     if any(name in os.environ for name in ('DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_FREE_ONLY')
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}))),indent=2)+'\n'
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts)),indent=2)+'\n'
         if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
         if a.retain_four_council_proof:
             from verification.discovery.four_council_proof import write_audit
             write_audit(a.output,json.loads(raw))
         else:a.output.write_text(raw)
         return 0
-    return supervised(a.case, a.output, a.execution_mode,window,a.metadata,**({"retain_proof":True} if a.retain_four_council_proof else {}))
+    return supervised(a.case, a.output, a.execution_mode,window,a.metadata,**({"retain_proof":True} if a.retain_four_council_proof else {}),**fonts)
 
 
 if __name__ == '__main__':
