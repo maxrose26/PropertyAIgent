@@ -40,7 +40,16 @@ def select_rows(plan,expected_hash,councils):
     if not wanted or len(set(wanted))!=len(wanted) or any(c not in COUNCILS for c in wanted):raise ValueError('council selection')
     return [dict(row) for row in plan['rows'] if row['council'] in wanted]
 
-def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
+def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, campaign_scope=None):
+    if campaign_scope is not None:
+        from .four_council_proof import manifest_scope
+        if row!=campaign_scope or not retain_proof or not no_transport_retry or not fixed_four_rows:raise ValueError('CAMPAIGN_READER_BINDING')
+        with manifest_scope(campaign_scope):
+            return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
+    return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
+
+
+def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
     if type(no_transport_retry) is not bool or type(retain_proof) is not bool:raise ValueError('retry/proof policy')
     # A named browser execution budget applies to the Arcus UI reader only.
     if execution_budget is not None and (row['council'] not in ARCUS or not isinstance(execution_budget,str)):raise ValueError('execution budget')
@@ -51,11 +60,13 @@ def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=No
         from .four_council_proof import require_scope
         require_scope(row['council'],row['semantics'],row['start'],row['end'])
         if not no_transport_retry:raise ValueError('proof requires zero retry')
+    from .four_council_proof import current_manifest_scope
+    selected=current_manifest_scope()
     if row['council'] not in ARCUS:
         with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
             path=Path(td)/'source.json'
             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
-            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+['--output',str(path)],env=env,deadline=50)
+            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+(['--campaign-scope',json.dumps(selected,sort_keys=True)] if selected is not None else [])+['--output',str(path)],env=env,deadline=50)
             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
             value=json.loads(path.read_bytes())
             if retain_proof and 'retained_proof' in value:
@@ -137,16 +148,22 @@ def main():
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--no-transport-retry',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true');p.add_argument('--fixed-four-row-limit',action='store_true')
+    p.add_argument('--campaign-scope')
     a=p.parse_args();c,start,end=a.idox_worker
     if a.fixed_four_row_limit and (not a.retain_four_council_proof or not a.no_transport_retry):raise ValueError('fixed row selection')
     if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
     if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
-    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
-    raw=json.dumps(result,sort_keys=True).encode()
-    if len(raw)>512000:raise ValueError('bounded child audit')
-    if a.retain_four_council_proof:
-        from .four_council_proof import write_audit
-        write_audit(a.output,result)
-    else:a.output.write_bytes(raw)
+    from .four_council_proof import manifest_scope
+    selected=json.loads(a.campaign_scope) if a.campaign_scope else None
+    if selected is not None and (selected!=dict(council=c,semantics=SEMANTICS[c],start=start,end=end) or not a.fixed_four_row_limit):raise ValueError('CAMPAIGN_READER_BINDING')
+    with manifest_scope(selected) if selected is not None else contextlib.nullcontext():
+        result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
+        raw=json.dumps(result,sort_keys=True).encode()
+        if len(raw)>512000:raise ValueError('bounded child audit')
+        if a.retain_four_council_proof:
+            from .four_council_proof import write_audit
+            write_audit(a.output,result)
+        else:a.output.write_bytes(raw)
+    return
 
 if __name__=='__main__':main()

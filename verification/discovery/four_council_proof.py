@@ -4,6 +4,8 @@ The projection is structural, not a source qualification or a stored response.
 Hidden values and arbitrary source/exception text never enter its output.
 """
 from datetime import datetime, timezone
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 from pathlib import Path
@@ -34,9 +36,29 @@ def encoded(value):
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
+_manifest_scope=ContextVar('manifest_proof_scope',default=None)
+
+
+def current_manifest_scope():
+    row=_manifest_scope.get()
+    return dict(row) if row is not None else None
+
+
+@contextmanager
+def manifest_scope(row):
+    from .campaign_manifest import require_row
+    row=dict(require_row(row))
+    token=_manifest_scope.set(row)
+    try:yield
+    finally:_manifest_scope.reset(token)
+
+
 def require_scope(council,semantics,start,end):
     scope=(council,semantics,str(start),str(end))
-    if scope not in TARGETS:raise ProofError('PROOF_SCOPE_REJECTED')
+    selected=current_manifest_scope()
+    if selected is not None:
+        if scope!=tuple(selected[k] for k in ('council','semantics','start','end')):raise ProofError('PROOF_SCOPE_REJECTED')
+    elif scope not in TARGETS:raise ProofError('PROOF_SCOPE_REJECTED')
     return scope
 
 def _count(n):
