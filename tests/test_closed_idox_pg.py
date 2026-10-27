@@ -130,3 +130,26 @@ def test_substituted_nominee_refuses_before_prepare_or_source(world,tmp_path,fie
  with pytest.raises(Denied,match='CLOSED_IDOX_NOMINEE_BINDING'):chain.caller.prepare(replace(ns.nominees[0],**{field:value}))
  assert application(world['boot'],'bury',ns.nominees[0].reference) is None
  assert_closed(world,chain)
+
+@pytest.mark.parametrize('c',COUNCILS)
+@pytest.mark.parametrize('kind',('identity_only','partial'))
+def test_complete_caller_refuses_non_metadata_or_partial_sources(world,tmp_path,c,kind):
+ from app.ingestion.ledger import digest
+ from verification.discovery.source_profiles import profile
+ chain=Chain(world,tmp_path,'idox','badcapture-'+kind+c,council=c).owner_reset().owner_registers_capture()
+ source,_=chain.supervised_source();source=json.loads(json.dumps(source))
+ if kind=='identity_only':source['collection_profile']=profile(dict(council=c,semantics=chain.binding.semantics,start=chain.contract.scope()['start'],end=chain.contract.scope()['end']),'IDENTITY_ONLY')
+ else:source['enumeration_evidence']='TOTAL_UNKNOWN'
+ with pytest.raises(Denied):chain.capture(source=source,expected=digest(source))
+ assert chain.publisher.calls==[] and world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+ assert_closed(world,chain)
+
+@pytest.mark.parametrize('c',COUNCILS)
+@pytest.mark.parametrize('field',('qualification_sha256','outer_supervisor','kind'))
+def test_saved_capture_binding_refused_through_restricted_readback(world,tmp_path,c,field):
+ chain=Chain(world,tmp_path,'idox','saved-'+field+c,council=c).owner_reset().owner_registers_capture()
+ chain.capture()
+ chain.tamper(chain.root['key'],[field],None)
+ with pytest.raises(Denied):chain.read_capture()
+ assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+ assert_closed(world,chain)
