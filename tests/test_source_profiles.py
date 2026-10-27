@@ -165,6 +165,7 @@ def test_positive_supervised_command_to_real_probe_config(council,mode,tmp_path,
     import asyncio,os,sys
     import psutil
     from verification.direct_reference import instrumented_probe as probe
+    from tests.test_discovery_four_council_proof import async_run
     row=next(x for x in ROWS if x['council']==council);profile=p.profile(row,mode)
     expected=audit(row,mode);seen=[]
     class AtBrowserEntry(BaseException):pass
@@ -188,7 +189,7 @@ def test_positive_supervised_command_to_real_probe_config(council,mode,tmp_path,
         assert '--metadata' not in command
         # Real main() consumes the same arguments the actual subprocess would receive.
         args=command[command.index('--worker'):]
-        with patch.dict(os.environ,kwargs['env'],clear=True),patch.object(sys,'argv',['probe',*args]),patch('playwright.async_api.async_playwright',entry),patch.object(p,'config',config):
+        with patch.dict(os.environ,kwargs['env'],clear=True),patch.object(sys,'argv',['probe',*args]),patch('playwright.async_api.async_playwright',entry),patch.object(p,'config',config),patch.object(probe.asyncio,'run',async_run):
             with pytest.raises(AtBrowserEntry):probe.main()
         Path(command[command.index('--output')+1]).write_bytes(canonical(expected))
         return Child()
