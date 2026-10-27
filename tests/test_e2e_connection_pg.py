@@ -158,16 +158,15 @@ def test_unusable_metadata_follows_the_frozen_table_and_writes_nothing(world, tm
     chain.capture(), chain.read_capture()
     nominees = chain.nominees()
     assert nominees.nominees == ()
-    # Even a forged nomination of an unusable record cannot reach a detail call, an identity or B2: the stored screening decides.
+    # A forged nomination of an unusable record is refused by the owner's own preparation, before any row or authority exists.
     record = chain.capture_receipt['records'][0]
     forged = Nominee(chain.council, record['reference'], record['source_url'], record['source_record_id'], digest(record), '0' * 64, digest(chain.capture_receipt), 'ADMIT_SCHEME')
-    chain.owner_registers_chain([forged])
+    with pytest.raises(Denied, match='CHAIN_NOMINEES_NOT_DERIVED'):
+        chain.owner_registers_chain([forged])
+    chain.owner_registers_chain([])
     chain.screen()
     before = snapshot(boot)
     assert {ref: chain.screening_outcome(ref) for ref in UNUSABLE_OUTCOMES[family]} == UNUSABLE_OUTCOMES[family]
-    adm = chain.prepare(forged)
-    result = chain.admit(adm)
-    assert result['outcome'] == 'RETAINED_INVESTIGATION_OR_EXCLUSION' and result['admission'] == 'NOT_ATTEMPTED' and result['b2'] == 'NOT_ATTEMPTED' and adm.detail_calls == []
     assert boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 0
     assert_confined(world, family, before, admitted=False)
     assert_closed(world, chain)
@@ -231,7 +230,8 @@ def test_conflicting_observations_are_withheld_and_never_admitted(world, tmp_pat
     assert [c['reference'] for c in both.conflicts] == ['E2E/1/26'] and len(both.conflicts[0]['observations']) == 2
     assert [n.reference for n in both.nominees] == ['E2E/2/26']      # the identical observation still nominates, bound to one capture
     owner = a if both.nominees[0].capture_sha256 == digest(a.capture_receipt) else b
-    owner.owner_registers_chain(both.nominees)
+    other = b if owner is a else a
+    owner.owner_registers_chain(both.nominees, others=[other.capture_receipt])
     owner.screen()
     before = snapshot(boot)
     r = owner.admit(owner.prepare(both.nominees[0]))
@@ -380,7 +380,7 @@ def test_insufficient_authority_for_the_effect_is_refused(world, tmp_path, famil
     chain = Chain(world, tmp_path, family, f'insufficient-{limit}-{family}').owner_reset().owner_registers_capture()
     chain.capture(), chain.read_capture()
     nominees = chain.nominees()
-    chain.owner_registers_chain(nominees.nominees[:1], **({'writes': 1} if limit == 'writes' else {'source_calls': 0}))
+    chain.owner_registers_chain(nominees.nominees, **({'writes': 1} if limit == 'writes' else {'source_calls': 0}))
     chain.screen()
     adm = chain.prepare(nominees.nominees[0])
     with pytest.raises((DBAPIError, Denied, UncertainPersistence)) as exc:
@@ -478,14 +478,16 @@ def test_accounting_is_complete_and_bounded_for_the_whole_chain(world, tmp_path,
 
 
 # ------------------------------------------------------------------------------------------------------------ date basis in SQL
-def test_stockport_validated_scope_batches_through_the_sql_ledger(world, tmp_path):
+def test_stockport_validated_scope_batches_through_the_sql_ledger(world, tmp_path, monkeypatch):
     """Before the correction a VALIDATED council's batch identity named RECEIVED, so the SQL batch binding (batch subject == root subject) refused it. The restricted worker now batches and screens it."""
+    from verification.ingestion_storage import scope_binding
+    monkeypatch.setitem(scope_binding.CHAIN_BINDINGS, 'stockport', scope_binding.ScopeBinding('stockport', 'idox', 'VALIDATED', 'IDOX_REQUESTS', None, 'accepted_idox_new_identity'))
     boot = world['boot']
     chain = Chain(world, tmp_path, 'idox', 'stockport', council='stockport').owner_reset().owner_registers_capture()
     chain.capture(), chain.read_capture()
     assert chain.capture_receipt['date_semantics'] == 'VALIDATED' and chain.contract.scope()['semantics'] == 'VALIDATED'
     nominees = chain.nominees()
-    chain.owner_registers_chain(())
+    chain.owner_registers_chain(nominees.nominees)
     chain.screen()
     assert {ref: chain.screening_outcome(ref) for ref in EXPECTED} == EXPECTED
     # the pre-correction identity (a receipt that names no basis defaults to RECEIVED) is exactly what the SQL refuses

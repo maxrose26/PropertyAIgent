@@ -91,6 +91,9 @@ on:
       - 'tests/test_stage4_batch_registration.py'
       - 'tests/test_oldham_production_registration.py'
       - 'tests/test_e2e_connection_*.py'
+      - 'tests/test_owner_caller_*.py'
+      - 'docs/design/owner-caller-20261027/**'
+      - 'verification/discovery/outer_evidence.py'
       - 'tests/e2e_*.py'
       - 'docs/design/e2e-connection-20261027/**'
   push:
@@ -128,7 +131,7 @@ jobs:
           path: ${{ runner.temp }}/v3-admission/
   e2e-connection-pg:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     services:
       postgres:
         image: postgres:17
@@ -146,10 +149,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/e2e-venv"
-      - name: Bounded end-to-end connection, Idox and Arcus, restricted disposable roles, local fixtures and test publisher only
+      - name: Bounded end-to-end connection and owner-side preparation, Idox and Arcus, restricted disposable roles, local fixtures and test publisher only
         run: |
           mkdir -p "$RUNNER_TEMP/e2e-connection"
-          timeout --kill-after=2s 420s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
+          timeout --kill-after=2s 540s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py tests/test_owner_caller_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -166,7 +169,7 @@ jobs:
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
       - name: End-to-end connection units, Idox and Arcus, date basis for all nine councils, network denied
         run: |
-          timeout --kill-after=2s 300s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_e2e_connection_units.py
+          timeout --kill-after=2s 300s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_e2e_connection_units.py tests/test_owner_caller_units.py
       - name: Pure discovery and pagination regressions, network denied
         run: |
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_ingestion_batching.py tests/test_discovery_ingestion_acceptance.py tests/test_discovery_ingestion_operational.py tests/test_discovery_ingestion_worker_interface.py tests/test_discovery_ingestion_credential_mapping.py tests/test_discovery_ingestion_storage_controller.py tests/test_discovery_ingestion_storage_access.py tests/test_discovery_ingestion_ledger.py tests/test_discovery_screening_assessment.py tests/test_discovery_metadata_rollout.py tests/test_l1_registration_request_safety.py tests/test_discovery_narrow_continuation.py tests/test_discovery_completion_blockers.py tests/test_discovery_four_council_proof.py tests/test_discovery_four_council_release.py tests/test_discovery_three_council_isolation.py tests/test_discovery_failure_reporting.py tests/test_discovery_completion.py tests/test_discovery_autonomous_mandate.py tests/test_discovery_parent_registration.py tests/test_discovery_exact9_registration.py tests/test_discovery_parent_controls.py tests/test_discovery_bolton53_admission.py tests/test_discovery_criteria_containment.py tests/test_discovery_capped_criteria_screening.py tests/test_discovery_exact9_parent_preparation.py tests/test_discovery_exact16_registration.py tests/test_discovery_exact16_proposal.py tests/test_discovery_bolton53_registration.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py tests/test_discovery_page_cap_transport.py tests/test_discovery_fixed80_qualification.py tests/test_discovery_finite_acceptance.py tests/test_discovery_r0_proposal.py tests/test_discovery_r0_recovery_proposal.py tests/test_discovery_r0_executable_proposals.py tests/test_discovery_r0_registration.py tests/test_discovery_contract.py tests/test_discovery_acceptance.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py tests/test_prepared_font_cache.py tests/test_execution_budget.py tests/test_runtime_dependencies.py tests/test_worker_exit_evidence.py tests/test_prepared_font_cache_residency.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
