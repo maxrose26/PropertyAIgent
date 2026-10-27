@@ -72,7 +72,7 @@ def test_shared_budget_reserves_bytes_deadline_and_latches_uncertain_close(monke
  caller=object.__new__(a.FiniteCaller);caller.allocation=allocation
  b=caller._budget()
  assert seen['returned_bytes']==a.CAPS['returned_bytes']-a.RESERVE['returned_bytes']-100
- assert b.hard_stop_at==allocation.started+290
+ assert b.hard_stop_at==allocation.started+270
  b.close([])
  with pytest.raises(Denied,match='RECONCILE'):allocation.check()
 
@@ -103,3 +103,12 @@ def test_short_lifetime_refuses_before_capture_effects():
  o,b,c,source,out,args,reg,evidence=inputs();o.expiry=datetime.now(timezone.utc)+timedelta(seconds=10)
  with pytest.raises(Denied,match='INSUFFICIENT_LIFETIME'):o.issue(reg,b,c,source=source,outer=out,evidence=evidence,**args)
  assert o.connections==0
+
+def test_shared_owner_outer_deadline_is_not_restarted(monkeypatch):
+ from verification.ingestion_storage import oldham_allocation as a
+ clock=[100.];monkeypatch.setattr(a.time,'monotonic',lambda:clock[0])
+ package_start=clock[0];clock[0]+=200
+ allocation=a.Allocation(package_started=package_start)
+ assert allocation.deadline==550 #450s package reserve, earlier than runtime570
+ clock[0]=550
+ with pytest.raises(Denied,match='OUTER_CLOSURE_RESERVE'):allocation.check()

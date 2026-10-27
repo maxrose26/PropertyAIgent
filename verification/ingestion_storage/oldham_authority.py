@@ -45,9 +45,14 @@ class OldhamOwner(Owner):
         def check():
             original()
             active=self.admin_elapsed+(time.monotonic()-self.admin_live if self.admin_live is not None else 0)
-            if active >= (240 if self.tearing_down else 230):raise Denied('OLDHAM_ADMIN_DEADLINE')
-            if time.monotonic()-self.package_started >= (480 if self.tearing_down else 470):raise Denied('OLDHAM_OUTER_DEADLINE')
+            if active >= (240 if self.tearing_down else 210):raise Denied('OLDHAM_ADMIN_DEADLINE')
+            if time.monotonic()-self.package_started >= (475 if self.tearing_down else 450):raise Denied('OLDHAM_OUTER_DEADLINE')
         self.check=check
+
+    def caller(self,*args,**kw):
+        from .oldham_allocation import Allocation,FiniteCaller
+        if not hasattr(self,'_allocation'):self._allocation=Allocation(package_started=self.package_started)
+        return FiniteCaller(*args,allocation=self._allocation,**kw)
 
     @contextmanager
     def admin_phase(self):

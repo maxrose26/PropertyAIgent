@@ -3,7 +3,7 @@ import time
 from app.ingestion.ledger import Denied
 from .chain_caller import ChainCaller
 CAPS=dict(commands=1040,connections=40,returned_bytes=4*1024**2,seconds=300)
-RESERVE=dict(commands=32,connections=2,returned_bytes=64*1024,seconds=10)
+RESERVE=dict(commands=32,connections=2,returned_bytes=64*1024,seconds=30)
 
 def capacity(records,nominees):
     """Conservative closed-caller reservation incl. per-record readbacks. Not a promise of completion.
@@ -19,11 +19,15 @@ def capacity(records,nominees):
     return need
 
 class Allocation:
-    def __init__(self):self.started=time.monotonic();self.budgets=[];self.failed=False
+    def __init__(self,*,package_started=None):
+        self.started=time.monotonic();self.package_started=self.started if package_started is None else package_started;self.budgets=[];self.failed=False
+    @property
+    def deadline(self):return min(self.started+CAPS['seconds']-RESERVE['seconds'],self.package_started+450)
     def totals(self):
         return dict(commands=sum(b.statements-b.previous.get('driver_statements',0) for b in self.budgets),connections=sum(b.attempts-b.previous.get('connection_attempts',0) for b in self.budgets),returned_bytes=sum(b.returned_bytes-b.previous.get('returned_data_value_bytes',0) for b in self.budgets),seconds=time.monotonic()-self.started)
     def check(self):
         if self.failed:raise Denied('OLDHAM_ALLOCATION_RECONCILE')
+        if time.monotonic()>=self.deadline:self.failed=True;raise Denied('OLDHAM_OUTER_CLOSURE_RESERVE')
         if any(v>=CAPS[k]-RESERVE[k] for k,v in self.totals().items()):
             self.failed=True;raise Denied('OLDHAM_AGGREGATE_EXHAUSTED')
 
@@ -38,7 +42,7 @@ class FiniteCaller(ChainCaller):
         kw['returned_bytes']=min(4*1024**2,CAPS['returned_bytes']-RESERVE['returned_bytes']-totals['returned_bytes']+prior.get('returned_data_value_bytes',0))
         kw['cancel_used']=sum(sum(e.get('cancel_attempts',0) for e in x.hard_deadline_events) for x in self.allocation.budgets)
         b=super()._budget(**kw);self.allocation.budgets.append(b)
-        b.hard_stop_at=self.allocation.started+CAPS['seconds']-RESERVE['seconds']
+        b.hard_stop_at=self.allocation.deadline
         original_close=b.close
         def close(*a,**k):
             try:
@@ -52,3 +56,11 @@ class FiniteCaller(ChainCaller):
         def check():self.allocation.check();original()
         b.check=check
         return b
+
+    def closed_idox_detail(self,adm,**kw):
+        reader=super().closed_idox_detail(adm,**kw)
+        def bounded(row):
+            self.allocation.check()
+            if time.monotonic()+45>=self.allocation.deadline:raise Denied('OLDHAM_DETAIL_DEADLINE_RESERVE')
+            return reader(row)
+        return bounded

@@ -59,10 +59,9 @@ def setup(w,tmp,entries=None,configure=None):
  for r in RESTRICTED:w['boot'].execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(r)))
  ch.supervised_source();o=owner(w,ch);reg=issue(o,ch)
  ch.root=reg.rows[0];ch.capture_registration=reg
- allocation=Allocation()
  # Same production caller with its one cumulative accounted budget, not a mocked effect.
  old=ch.caller
- ch.caller=FiniteCaller(old.sb,old.contract,old.rule,old.urls,revision=old.revision,bindings=old.bindings,capture_authority=old.capture_authority,chain_authority=old.chain_authority,allow_test_evidence=True,allocation=allocation)
+ ch.caller=o.caller(old.sb,old.contract,old.rule,old.urls,revision=old.revision,bindings=old.bindings,capture_authority=old.capture_authority,chain_authority=old.chain_authority,allow_test_evidence=True)
  gh=GitHub();life=Lifecycle(o,gh)
  def url_factory(role,password):
   from sqlalchemy.engine import make_url
@@ -137,7 +136,7 @@ def test_new_authority_zero_and_existing_preserve(world,tmp_path,mode):
    session.add(Application(council_code='oldham',reference=first.reference,unit_confirmation_status='discovery_pending'));session.commit()
   before=application(world['boot'],'oldham',first.reference)
   result,_,_=admit_fixture(ch,first,tmp_path)
-  assert result['outcome']=='ALREADY_KNOWN' and application(world['boot'],'oldham',first.reference)==before
+  assert result['outcome']=='DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN' and application(world['boot'],'oldham',first.reference)==before
  life.teardown()
 
 @pytest.mark.parametrize('fault',('persistence','write_intent','deferred'))
@@ -249,3 +248,16 @@ def test_third_login_activation_commit_uncertainty_stops(world,tmp_path):
  before=o.commands
  with pytest.raises(Denied):life.teardown()
  assert o.commands==before
+
+
+def test_six_record_capacity_through_shared_owner_caller(world,tmp_path):
+ from tests.e2e_connection_support import entry,SCHEME
+ entries=[entry('SYNTHETIC/CAPACITY/'+str(i),SCHEME) for i in range(6)]
+ ch,o,life,gh=setup(world,tmp_path,entries);ns=stage(ch,o);before=snapshot(world['boot'])
+ assert len(ns.nominees)==6 and ch.caller.allocation.package_started==o.package_started
+ for n in ns.nominees:
+  result,calls,_=admit_fixture(ch,n,tmp_path)
+  assert result['outcome']=='SUPPORTED_FACTS_VERIFIED' and calls==[1]
+ assert_confined(world,'idox',before,admitted=True);assert_closed(world,ch)
+ life.teardown()
+ COSTS.append(dict(case='six_eligible',admin=o.accounting(),admin_supervised_seconds=o.admin_elapsed,runtime=ch.caller.allocation.totals(),identities=6,factual_deliveries=6,credential_teardown=life.state))
