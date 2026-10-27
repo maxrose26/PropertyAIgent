@@ -1,10 +1,11 @@
 """Dormant, owner-only Oldham issuance. No CLI, credential lookup or automatic source work."""
 from copy import deepcopy
+from contextlib import contextmanager
 from datetime import date
 import json
 import time
 
-from app.ingestion.ledger import Denied,digest
+from app.ingestion.ledger import Denied,digest,bounded
 from .chain_registration import capture_registration,chain_registration
 from .operational_owner import Owner,STOP,GENERATION3_STOP
 from .scope_binding import binding_for
@@ -29,6 +30,10 @@ def registration_value(reg):
 
 def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False):
     scope_check(binding,contract)
+    if root is not None:
+        from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+        frozen=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
+        if rule is None or rule.config()!=frozen.config():raise Denied('OLDHAM_FROZEN_SCREENING')
     if root is None:return capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
     return chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
 
@@ -36,20 +41,47 @@ class OldhamOwner(Owner):
     """Separate entrypoint: historical Owner.register is never called or modified."""
     def __init__(self,*a,**kw):
         super().__init__(*a,**kw)
-        self.admin_started=time.monotonic();original=self.check
+        self.awaiting_verification=False;self.package_started=time.monotonic();self.admin_elapsed=0.;self.admin_depth=0;self.admin_live=None;original=self.check
         def check():
             original()
-            if time.monotonic()-self.admin_started >= (240 if self.tearing_down else 230):raise Denied('OLDHAM_ADMIN_DEADLINE')
+            active=self.admin_elapsed+(time.monotonic()-self.admin_live if self.admin_live is not None else 0)
+            if active >= (240 if self.tearing_down else 230):raise Denied('OLDHAM_ADMIN_DEADLINE')
+            if time.monotonic()-self.package_started >= (480 if self.tearing_down else 470):raise Denied('OLDHAM_OUTER_DEADLINE')
         self.check=check
 
-    def issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None):
+    @contextmanager
+    def admin_phase(self):
+        if self.admin_depth==0:self.admin_live=time.monotonic()
+        self.admin_depth+=1
+        try:yield
+        finally:
+            self.admin_depth-=1
+            if self.admin_depth==0:
+                self.admin_elapsed+=time.monotonic()-self.admin_live;self.admin_live=None
+
+    @contextmanager
+    def connection(self):
+        with self.admin_phase():
+            with super().connection() as c:yield c
+
+    def issue(self,*args,**kw):
+        try:return self._issue(*args,**kw)
+        except BaseException:
+            if self.awaiting_verification:self.effect_uncertain=True
+            raise
+
+    def _issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None):
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
         if revision!=self.bindings.get('revision') or len(revision)!=40 or any(c not in '0123456789abcdef' for c in revision):raise Denied('OLDHAM_CODE_BINDING')
         if source is None or outer is None:raise Denied('OLDHAM_CAPTURE_INPUTS_REQUIRED')
         projected=contract.project(source,outer,item_limits,source_bytes_limit=512*1024)
         from .oldham_allocation import capacity
         capacity(len(projected['records']),len(projected['records']) if root is None else len(nominees))
+        from .limit_reconciliation import grant_problems
+        lifetime=(self.grant_expiry or self.expiry).timestamp()-time.time()
+        if grant_problems(binding,lifetime,batches=(len(projected['records'])+4)//5,nominees=len(projected['records']) if root is None else len(nominees)):raise Denied('OLDHAM_INSUFFICIENT_LIFETIME')
         expected=derive(self,binding,contract,revision=revision,item_limits=item_limits,root=root,receipt=receipt,nominees=nominees,rule=rule,detail_targets=detail_targets,allow_test_evidence=allow_test_evidence)
+        bounded(registration_value(expected))
         if registration_value(expected)!=registration_value(prepared):raise Denied('OLDHAM_ALTERED_REGISTRATION')
         if set(evidence)!={'source_sha256','qualification_sha256','outer_sha256','registration_sha256'} or any(not isinstance(v,str) or len(v)!=64 or any(c not in '0123456789abcdef' for c in v) for v in evidence.values()):raise Denied('OLDHAM_EVIDENCE_BINDING')
         if evidence['source_sha256']!=digest(source) or evidence['outer_sha256']!=digest(outer):raise Denied('OLDHAM_EVIDENCE_BINDING')
@@ -75,6 +107,7 @@ class OldhamOwner(Owner):
                 grant=deepcopy(expected.grant)
                 allowance=dict(grant_binding={k:v for k,v in grant.items() if k not in ('source_calls','writes')},source_cap=grant['source_calls'],write_cap=grant['writes'],revoked=False,expires_at=grant['expires_at'],stop_sha256=sid,scope=scope_check(binding,contract),evidence=evidence,targets={k:dict(v.row) for k,v in expected.factual_contracts.items()})
                 package=dict(authority=expected.authority,registration=registration_value(expected),scope=allowance['scope'],stop=STOP_STATE,evidence=evidence,targets=allowance['targets'])
+                bounded(package)
                 package_sha=self.q(c,"SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",(json.dumps(package),))[0][0]
                 grant['oldham_package_sha256']=package_sha
                 allowance.update(package=package,package_sha256=package_sha,grant_binding={k:v for k,v in grant.items() if k not in ('source_calls','writes')})
@@ -83,7 +116,7 @@ class OldhamOwner(Owner):
                 self.authorities.append(expected.authority);self.invalidation='REQUIRED'
                 self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
                 self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
-                self.q(c,'COMMIT',effect=True)
+                self.q(c,'COMMIT',effect=True);self.awaiting_verification=True
             except BaseException:
                 if not self.effect_uncertain:self.q(c,'ROLLBACK',effect=True)
                 raise
@@ -100,9 +133,16 @@ class OldhamOwner(Owner):
         except BaseException:
             self.effect_uncertain=True;raise
         self.emit('oldham_authority_committed',dict(authority=expected.authority,registration_sha256=evidence['registration_sha256'],stop_sha256=sid))
+        self.awaiting_verification=False
         return expected
 
     def revoke(self):
+        try:return self._revoke()
+        except BaseException:
+            if self.awaiting_verification:self.effect_uncertain=True
+            raise
+
+    def _revoke(self):
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
@@ -113,7 +153,7 @@ class OldhamOwner(Owner):
                 ctl['grants'][a]['expires_at']=0;ctl['oldham_allowances'][a]['revoked']=True
             self.q(c,"UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),),effect=True)
             self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
-            self.q(c,'COMMIT',effect=True)
+            self.q(c,'COMMIT',effect=True);self.awaiting_verification=True
         with self.connection() as c:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
@@ -122,4 +162,4 @@ class OldhamOwner(Owner):
             self.q(c,'ROLLBACK',effect=True)
             if not ok:
                 self.effect_uncertain=True;raise Denied('OLDHAM_REVOCATION_UNCERTAIN')
-        self.invalidation='VERIFIED'
+        self.invalidation='VERIFIED';self.awaiting_verification=False

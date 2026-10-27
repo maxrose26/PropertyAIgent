@@ -167,7 +167,7 @@ jobs:
       - name: Bounded end-to-end connection and owner-side preparation, Idox and Arcus, restricted disposable roles, local fixtures and test publisher only
         run: |
           mkdir -p "$RUNNER_TEMP/e2e-connection"
-          timeout --kill-after=2s 540s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test CLOSED_IDOX_COST_PATH="$RUNNER_TEMP/e2e-connection/closed-idox-costs.json" "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py tests/test_owner_caller_pg.py tests/test_closed_idox_pg.py tests/test_oldham_authority_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
+          timeout --kill-after=2s 540s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test CLOSED_IDOX_COST_PATH="$RUNNER_TEMP/e2e-connection/closed-idox-costs.json" OLDHAM_AUTHORITY_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-authority-costs.json" "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py tests/test_owner_caller_pg.py tests/test_closed_idox_pg.py tests/test_oldham_authority_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

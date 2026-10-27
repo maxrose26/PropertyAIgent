@@ -1,7 +1,8 @@
 """Actual owner issuance and restricted caller; fixtures never represent live authority."""
 from copy import deepcopy
 from datetime import datetime,timedelta,timezone
-import json,time
+import json,time,os
+from pathlib import Path
 import pytest
 from psycopg import sql
 from app.ingestion.ledger import Denied,digest
@@ -13,6 +14,8 @@ from verification.ingestion_storage import oldham_policy
 from verification.ingestion_storage.oldham_authority import OldhamOwner,STOP_STATE,derive,registration_value
 from verification.ingestion_storage.oldham_lifecycle import Lifecycle
 from verification.ingestion_storage.oldham_allocation import Allocation,FiniteCaller
+
+COSTS=[]
 
 @pytest.fixture(scope='module')
 def world():
@@ -27,6 +30,7 @@ def world():
  w['boot'].execute('GRANT pg_read_all_stats TO provisioning_migrator WITH INHERIT TRUE, SET FALSE')
  yield w
  with pytest.raises(StopIteration):next(gen)
+ if os.environ.get('OLDHAM_AUTHORITY_COST_PATH'):Path(os.environ['OLDHAM_AUTHORITY_COST_PATH']).write_text(json.dumps(dict(cases=COSTS,sources='SYNTHETIC',database='RESTRICTED_PG17',production_authority=False),default=str,sort_keys=True))
 
 class GitHub:
  def __init__(self):self.present={'DATABASE_URL'};self.calls=[]
@@ -49,7 +53,7 @@ def issue(o,ch,*,root=None,nominees=()):
  ch.bindings.update(reg.bindings)
  return reg
 
-def setup(w,tmp,entries=None):
+def setup(w,tmp,entries=None,configure=None):
  ch=Chain(w,tmp,'idox','a'*40,entries,council='oldham').owner_reset()
  ctl=ch._control();ctl.update(deepcopy(STOP_STATE));ch._write_control(ctl)
  for r in RESTRICTED:w['boot'].execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(r)))
@@ -63,6 +67,7 @@ def setup(w,tmp,entries=None):
  def url_factory(role,password):
   from sqlalchemy.engine import make_url
   return make_url(w['urls'][role]).set(password=password).render_as_string(hide_password=False)
+ if configure:configure(ch,o,life,gh,url_factory)
  ch.caller.urls=life.activate(url_factory=url_factory)
  return ch,o,life,gh
 
@@ -80,7 +85,7 @@ def test_actual_issue_chain_three_login_teardown(world,tmp_path):
  assert_confined(world,'idox',before,admitted=True);assert_closed(world,ch)
  life.teardown();assert life.state=='CLOSED' and o.invalidation=='VERIFIED' and gh.present=={'DATABASE_URL'}
  assert o.opened==o.closed and not o.effect_uncertain
- print('OLDHAM_ACTUAL_OWNER_CHAIN',json.dumps(dict(admin=o.accounting(),runtime=ch.caller.allocation.totals(),identities=2,factual_deliveries=2,credential_teardown=life.state),default=str))
+ COSTS.append(dict(admin=o.accounting(),admin_supervised_seconds=o.admin_elapsed,runtime=ch.caller.allocation.totals(),identities=2,factual_deliveries=2,credential_teardown=life.state))
 
 @pytest.mark.parametrize('change',[('global_stop',None),('manual_stop','OTHER'),('hard_stop_generation',4),('last_hard_stop','OTHER')])
 def test_sql_stop_changes_invalidate_even_when_global_stop_cleared(world,tmp_path,change):
@@ -126,7 +131,10 @@ def test_new_authority_zero_and_existing_preserve(world,tmp_path,mode):
  if mode=='zero':assert ns.nominees==()
  else:
   first=ns.nominees[0]
-  world['boot'].execute("INSERT INTO applications(council_code,reference,unit_confirmation_status) VALUES('oldham',%s,'discovery_pending')",(first.reference,))
+  from sqlalchemy.orm import Session
+  from app.db.models import Application
+  with Session(world['app']) as session:
+   session.add(Application(council_code='oldham',reference=first.reference,unit_confirmation_status='discovery_pending'));session.commit()
   before=application(world['boot'],'oldham',first.reference)
   result,_,_=admit_fixture(ch,first,tmp_path)
   assert result['outcome']=='ALREADY_KNOWN' and application(world['boot'],'oldham',first.reference)==before
@@ -171,3 +179,73 @@ def test_lost_issuance_commit_ack_latches_without_replay(world,tmp_path):
  with pytest.raises(Denied):issue(o,ch,root=root,nominees=ns.nominees)
  with pytest.raises(Denied):life.teardown()
  assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+
+@pytest.mark.parametrize('operation',('put','delete'))
+def test_secret_uncertainty_stops_subsequent_mutations(world,tmp_path,operation):
+ from verification.ingestion_storage.operational_publication import Uncertain
+ if operation=='delete':
+  ch,o,life,gh=setup(world,tmp_path);original=gh.call
+  def lost(method,path):original(method,path);raise Uncertain('SYNTHETIC_SECRET_ACK_LOSS')
+  gh.call=lost
+  with pytest.raises(Uncertain):life.teardown()
+  assert len([c for c in gh.calls if isinstance(c,tuple) and c[0]=='DELETE'])==1
+ else:
+  held=[]
+  def configure(ch,o,life,gh,factory):
+   held.extend((ch,o,life,gh));original=gh.put_secret
+   def lost(name,value):original(name,value);raise Uncertain('SYNTHETIC_SECRET_ACK_LOSS')
+   gh.put_secret=lost
+  with pytest.raises(Uncertain):setup(world,tmp_path,configure=configure)
+  ch,o,life,gh=held
+  assert len([c for c in gh.calls if isinstance(c,tuple) and c[0]=='PUT'])==1
+ before=o.commands
+ with pytest.raises(Denied):life.teardown()
+ assert o.commands==before and life.state=='UNCERTAIN'
+
+
+def test_surviving_application_session_never_reports_closed(world,tmp_path):
+ from sqlalchemy.engine import make_url
+ import psycopg
+ from verification.ingestion_storage.operational_publication import Uncertain
+ ch,o,life,gh=setup(world,tmp_path);u=make_url(life.urls['ingestion_application_login'])
+ held=psycopg.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,autocommit=True)
+ try:
+  with pytest.raises(Uncertain,match='SESSIONS_REMAIN'):life.teardown()
+  assert life.state=='UNCERTAIN' and gh.present=={'DATABASE_URL'}
+  rows=world['boot'].execute('SELECT r.rolcanlogin,a.rolpassword IS NULL FROM pg_roles r JOIN pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s)',(RESTRICTED,)).fetchall()
+  assert len(rows)==3 and all(r==(False,True) for r in rows)
+ finally:held.close()
+
+
+def test_postcommit_readback_failure_latches_owner(world,tmp_path):
+ ch,o,life,gh=setup(world,tmp_path);ch.capture();ch.read_capture();ns=ch.nominees();q=o.q
+ def fail(c,statement,params=None,**kw):
+  if o.awaiting_verification and isinstance(statement,str) and statement.startswith('SELECT pg_has_role'):raise ConnectionError('SYNTHETIC_READBACK_FAILURE')
+  return q(c,statement,params,**kw)
+ o.q=fail
+ root=world['boot'].execute('SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',(ch.root['key'],)).fetchone()[0]
+ with pytest.raises(ConnectionError):issue(o,ch,root=root,nominees=ns.nominees)
+ assert o.effect_uncertain and ch.auth_chain in ch._control()['grants']
+ with pytest.raises(Denied):o.revoke()
+
+
+def test_third_login_activation_commit_uncertainty_stops(world,tmp_path):
+ from verification.ingestion_storage.operational_publication import Uncertain
+ held=[]
+ def configure(ch,o,life,gh,factory):
+  held.extend((ch,o,life,gh));original=o.connector;armed=[];lost=[]
+  class Proxy:
+   def __init__(self,c):self.c=c
+   def __getattr__(self,n):return getattr(self.c,n)
+   def execute(self,q,params=None):
+    result=self.c.execute(q,params)
+    if isinstance(q,sql.Composed) and q.as_string(self.c)=='ALTER ROLE "ingestion_application_login" LOGIN':armed.append(True)
+    if q=='COMMIT' and armed and not lost:lost.append(True);raise ConnectionError('SYNTHETIC_THIRD_LOGIN_ACK_LOSS')
+    return result
+  o.connector=lambda:Proxy(original())
+ with pytest.raises(Uncertain):setup(world,tmp_path,configure=configure)
+ ch,o,life,gh=held
+ assert o.effect_uncertain and life.state=='UNCERTAIN'
+ before=o.commands
+ with pytest.raises(Denied):life.teardown()
+ assert o.commands==before

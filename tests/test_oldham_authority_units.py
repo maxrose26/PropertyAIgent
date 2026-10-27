@@ -85,3 +85,21 @@ def test_documented_installation_and_rollback_are_mechanically_exact():
  root=Path('docs/design/oldham-finite-authority-20261027')
  assert (root/'installation.sql').read_text()==policy.installation_script()
  assert (root/'rollback.sql').read_text()==policy.rollback_script()
+
+def test_runtime_does_not_exhaust_separate_admin_cleanup_clock(monkeypatch):
+ from verification.ingestion_storage import oldham_authority as a
+ clock=[100.];monkeypatch.setattr(a.time,'monotonic',lambda:clock[0])
+ o,*_=inputs()
+ with o.admin_phase():clock[0]+=5
+ assert o.admin_elapsed==5
+ clock[0]+=250 # runtime, not administrative work
+ o.tearing_down=True;o.check()
+ with o.admin_phase():clock[0]+=5;o.check()
+ assert o.admin_elapsed==10
+ clock[0]=581
+ with pytest.raises(Denied,match='OUTER'):o.check()
+
+def test_short_lifetime_refuses_before_capture_effects():
+ o,b,c,source,out,args,reg,evidence=inputs();o.expiry=datetime.now(timezone.utc)+timedelta(seconds=10)
+ with pytest.raises(Denied,match='INSUFFICIENT_LIFETIME'):o.issue(reg,b,c,source=source,outer=out,evidence=evidence,**args)
+ assert o.connections==0

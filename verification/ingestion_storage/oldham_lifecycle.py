@@ -34,9 +34,12 @@ class Lifecycle:
         members=o.q(c,"SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[]) ORDER BY 1,2",(list(ROLES),))
         sessions=o.q(c,'SELECT pid,usename,state,backend_start FROM pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid',(list(ROLES),))
         return dict(roles=roles,memberships=members,sessions=sessions)
-    def activate(self,*,url_factory):
+    def activate(self,*,url_factory,ssl=None,route=None):
+        with self.owner.admin_phase():return self._activate(url_factory=url_factory,ssl=ssl,route=route)
+    def _activate(self,*,url_factory,ssl=None,route=None):
         self.safe();o=self.owner
         if self.state!='UNUSED':raise Denied('OLDHAM_LIFECYCLE_USED')
+        if not o.authorities or o.invalidation!='REQUIRED' or o.awaiting_verification:raise Denied('OLDHAM_ISSUED_AUTHORITY_REQUIRED')
         expiry=o.valid_until or o.expiry;remaining=expiry.timestamp()-time.time()
         if not 0<remaining<=86400:raise Denied('OLDHAM_CREDENTIAL_EXPIRY')
         names=self.github.names()
@@ -44,6 +47,15 @@ class Lifecycle:
         try:
             with o.connection() as c:
                 verify_inventory(o,c)
+                o.q(c,'BEGIN',effect=True)
+                o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+                ctl=o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0][0]
+                from .oldham_authority import stop_identity
+                stop_identity(ctl)
+                for a in o.authorities:
+                    e=ctl.get('oldham_allowances',{}).get(a,{})
+                    if e.get('revoked') is not False or e.get('expires_at',0)<=time.time():raise Denied('OLDHAM_ISSUED_AUTHORITY_REQUIRED')
+                o.q(c,'ROLLBACK',effect=True)
                 before=self.observed(c)
                 if len(before['roles'])!=3 or before['sessions'] or any(r[1] or not r[2] or any(r[4:9]) or r[9]!=1 for r in before['roles']):raise Denied('OLDHAM_INITIAL_ACCESS')
                 # Only already-reviewed capabilities may be restored; unexpected memberships refuse.
@@ -59,7 +71,11 @@ class Lifecycle:
                     o.q(c,'BEGIN',effect=True)
                     o.q(c,sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(verifier),sql.Literal(expiry.isoformat())),effect=True)
                     o.q(c,'COMMIT',effect=True)
-                    url=url_factory(role,password);self.github.put_secret(name,url);self.urls[role]=url
+                    url=url_factory(role,password)
+                    from .operational_controller import runtime_principal
+                    parsed,found=runtime_principal(url,ssl or {},route)
+                    if found!=role:raise Denied('OLDHAM_CREDENTIAL_ROLE')
+                    self.github.put_secret(name,url);self.urls[role]=url
                     del password,verifier,url
                 o.q(c,'BEGIN',effect=True)
                 for role in ROLES:o.q(c,sql.SQL('ALTER ROLE {} LOGIN').format(sql.Identifier(role)),effect=True)
@@ -72,6 +88,8 @@ class Lifecycle:
         except BaseException:
             self.state='UNCERTAIN';raise
     def teardown(self):
+        with self.owner.admin_phase():return self._teardown()
+    def _teardown(self):
         # No automatic compensation after uncertain mutations. Caller must reconcile first.
         self.safe();o=self.owner;o.tearing_down=True
         try:
