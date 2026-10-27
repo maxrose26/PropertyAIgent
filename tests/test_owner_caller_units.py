@@ -454,3 +454,16 @@ def test_listing_budget_is_selected_by_contract_not_self_declared_by_audit():
     audit.pop('execution_budget')
     with pytest.raises(ValueError, match='UI execution budget'):
         arcus_contract('manchester', START, END, budget='BROWSER_SOURCE_V2')._listing().validate(audit)
+
+
+
+def test_reader_and_capture_share_one_exact_budget_registry_without_verification_imports():
+    from app.ingestion import source_budget
+    from verification.discovery import execution_budget
+    assert source_budget.select is execution_budget.select
+    assert source_budget.HISTORICAL is execution_budget.HISTORICAL
+    assert source_budget.BROWSER_SOURCE_V2 is execution_budget.BROWSER_SOURCE_V2
+    from verification.discovery import four_council_release as release
+    assert 'app/ingestion/source_budget.py' in release.SUCCESSOR_V2_DEPENDENCIES
+    assert 'app/ingestion/source_budget.py' not in release.DEPENDENCIES
+    assert 'app/ingestion/source_budget.py' not in release.SUCCESSOR_DEPENDENCIES

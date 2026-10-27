@@ -6,30 +6,11 @@ Limits are kernel/supervisor ceilings, not reserved resources or a guarantee of 
 """
 import time
 
-MiB = 1024 ** 2
-# Mirrors four_council_release.HISTORICAL_BUDGET plus the supervisor keys; tests keep them equal.
-HISTORICAL = dict(name=None, worker_seconds=45, source_outer_seconds=49, slot_active_seconds=60,
-                  source_memory_bytes=1024 ** 3, aggregate_memory_bytes=1536 * MiB,
-                  controller_memory_bytes=256 * MiB, rss_ceiling_bytes=1024 ** 3)
-BROWSER_SOURCE_V2 = dict(name='BROWSER_SOURCE_V2', navigation_seconds=25, ready_seconds=20,
-                         criteria_seconds=10, segment_poll_seconds=8, segment_click_seconds=3,
-                         worker_seconds=75, finalisation_reserve_seconds=5, source_outer_seconds=80,
-                         slot_active_seconds=90, source_memory_bytes=1536 * MiB,
-                         aggregate_memory_bytes=2048 * MiB, controller_memory_bytes=256 * MiB,
-                         rss_ceiling_bytes=1536 * MiB)
-BUDGETS = {'BROWSER_SOURCE_V2': BROWSER_SOURCE_V2}
+# Public names stay byte-for-byte equivalent; application code owns the pure registry.
+from app.ingestion.source_budget import MiB, HISTORICAL, BROWSER_SOURCE_V2, BUDGETS, select
+
 STAGES = ('NAVIGATION', 'READY', 'CRITERIA', 'SEGMENT')
 MAX_SEGMENT_TIMINGS = 6
-
-
-def select(name):
-    """Budget for an explicit name; None selects the historical envelope."""
-    if name is None:
-        return HISTORICAL
-    if name not in BUDGETS:
-        raise ValueError('EXECUTION_BUDGET')
-    return BUDGETS[name]
-
 
 class ObservationDeadline(Exception):
     """The single observation deadline left no (or too little) time for a wait."""

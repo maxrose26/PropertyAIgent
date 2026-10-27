@@ -80,7 +80,7 @@ SUCCESSOR_DEPENDENCIES = ('docs/design/three-council-isolation-20261022/manifest
 SUCCESSOR_V2_DEPENDENCIES = ('docs/design/execution-budget-20261026/manifest.json',
     'docs/design/execution-budget-20261026/owner-launch.sh',
     'verification/discovery/criteria_containment.py','verification/discovery/source_diagnostics.py',
-    'verification/discovery/execution_budget.py','verification/discovery/outer_evidence.py',
+    'verification/discovery/execution_budget.py','app/ingestion/source_budget.py','verification/discovery/outer_evidence.py',
     'verification/ah_pg/requirements.lock','verification/discovery/runtime_dependencies.py')
 VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES}
 # V2 also binds what the real worker path imports lazily (app.pipeline.site_linking: rapidfuzz, SQLAlchemy); exact pins are
