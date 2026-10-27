@@ -31,7 +31,9 @@ SUCCESSOR_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V1'
 # (docs/design/execution-budget-20261026/SPEC.md). V1 versions stay byte-identical.
 SUCCESSOR_V2_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V2'
 CAMPAIGN_VERSION = 'FINITE_MANIFEST_SOURCE_RELEASE_V1'
-SUCCESSORS = (SUCCESSOR_VERSION, SUCCESSOR_V2_VERSION, CAMPAIGN_VERSION)
+PROFILED_CAMPAIGN_VERSION = 'FINITE_MANIFEST_SOURCE_RELEASE_V2'
+CAMPAIGN_VERSIONS = (CAMPAIGN_VERSION, PROFILED_CAMPAIGN_VERSION)
+SUCCESSORS = (SUCCESSOR_VERSION, SUCCESSOR_V2_VERSION, *CAMPAIGN_VERSIONS)
 BRANCH = 'stage4/narrow-continuation-evidence-20261016'
 REPO = 'repos/maxrose26/PropertyAIgent'
 PERMIT = 'OWNER_APPROVED_FIXED_FOUR_SOURCE_ONLY_STOP_TREATMENT'
@@ -88,6 +90,16 @@ VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, 
 # those of verification/ah_pg/requirements.lock (docs/design/real-worker-proof-20261026/SPEC.md). V1 bindings are unchanged.
 V2_PACKAGES = PACKAGES + ('rapidfuzz','SQLAlchemy')
 VERSION_PACKAGES = {VERSION: PACKAGES, SUCCESSOR_VERSION: PACKAGES, SUCCESSOR_V2_VERSION: V2_PACKAGES, CAMPAIGN_VERSION: V2_PACKAGES}
+
+VERSION_LIMITS[PROFILED_CAMPAIGN_VERSION]=SUCCESSOR_V2_LIMITS.copy()
+PERMITS[PROFILED_CAMPAIGN_VERSION]='OWNER_APPROVED_PROFILED_MANIFEST_SOURCE_ONLY_STOP_TREATMENT'
+VERSION_DEPENDENCIES[PROFILED_CAMPAIGN_VERSION]=VERSION_DEPENDENCIES[CAMPAIGN_VERSION]+(
+    'verification/discovery/source_profiles.py','app/ingestion/collection_mode.py',
+    'app/ingestion/listing_screening.py','app/ingestion/coordinator.py',
+    'app/ingestion/ledger.py','app/ingestion/schema.py','app/ingestion/resource_accounting.py',
+    'verification/discovery/screening_capture.py',
+    'docs/design/nine-council-source-profiles-20261027/SPEC.md')
+VERSION_PACKAGES[PROFILED_CAMPAIGN_VERSION]=V2_PACKAGES
 
 # Historical envelope, held here so V1 execution never imports or depends on execution_budget
 # (absent from the V1 dependency bindings). Must equal execution_budget.HISTORICAL (tested).
@@ -257,17 +269,21 @@ def selected_version(successor=False, version=None):
 def manifest(*, successor=False, version=None, campaign=None):
     from app.pipeline.discovery_contract import SOURCE_ROOTS
     version=selected_version(successor,version);successor=version in SUCCESSORS
-    if version==CAMPAIGN_VERSION:
+    if version in CAMPAIGN_VERSIONS:
         from .campaign_manifest import select,capacity
         try:
-            rows=select(campaign);capacity(rows,VERSION_LIMITS[version])
+            rows=select(campaign,profiled=version==PROFILED_CAMPAIGN_VERSION);capacity(rows,VERSION_LIMITS[version],profiled=version==PROFILED_CAMPAIGN_VERSION)
         except (ValueError,KeyError,TypeError,OverflowError):raise Stop('CAMPAIGN_MANIFEST_OR_CAPACITY') from None
     else:
         if campaign is not None:raise Stop('CAMPAIGN_VERSION_REQUIRED')
         rows=ROWS[1:] if successor else ROWS
-    routes={row['council']:('https://'+SOURCE_ROOTS[row['council']][0]+SOURCE_ROOTS[row['council']][1].rstrip('/')+'/search.do?action=advanced&searchType=Application') for row in rows if row['council']!='rochdale'}
-    if version!=CAMPAIGN_VERSION:routes['rochdale']=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],'2026-10-08','2026-10-14').destination
-    else:
+    if version==PROFILED_CAMPAIGN_VERSION:
+        from .source_profiles import profile
+        profiles=[profile(row,campaign['collection_mode']) for row in rows]
+        routes=[p['destination'] for p in profiles]
+    else:routes={row['council']:('https://'+SOURCE_ROOTS[row['council']][0]+SOURCE_ROOTS[row['council']][1].rstrip('/')+'/search.do?action=advanced&searchType=Application') for row in rows if row['council']!='rochdale'}
+    if version not in CAMPAIGN_VERSIONS:routes['rochdale']=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],'2026-10-08','2026-10-14').destination
+    elif version==CAMPAIGN_VERSION:
         # Per-slot routes (including repeated council windows), never supplied URLs.
         routes=[finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],row['start'],row['end']).destination if row['council']=='rochdale' else routes[row['council']] for row in rows]
     value=dict(version=version, rows=rows, source_routes=routes,
@@ -275,7 +291,8 @@ def manifest(*, successor=False, version=None, campaign=None):
         no_transport_retry=True, persistence=False, coverage_advance=False,
         stop_policy='EXACT_SOURCE_LOCAL_ALLOWLIST' if successor else 'STOP_ALL_NON_COMPLETE', evidence_branch=BRANCH)
     if successor:value['continuation_allowlist']=list(LOCAL_OUTCOMES)
-    if version==CAMPAIGN_VERSION:value.update(json.loads(canonical(campaign)))
+    if version in CAMPAIGN_VERSIONS:value.update(json.loads(canonical(campaign)))
+    if version==PROFILED_CAMPAIGN_VERSION:value['source_profiles']=profiles
     return value
 
 
@@ -329,11 +346,11 @@ def validate(r, *, clock=now, checkout=True):
     if set(r)!=required: raise Stop('REGISTRATION_SCHEMA')
     if r['version'] not in VERSION_LIMITS:raise Stop('REGISTRATION_VERSION')
     campaign={}
-    if r['version']==CAMPAIGN_VERSION:
-        try:campaign={'campaign':{k:r['manifest'][k] for k in ('finite_manifest','finite_manifest_sha256','selected_ordinals')}}
+    if r['version'] in CAMPAIGN_VERSIONS:
+        try:campaign={'campaign':{k:r['manifest'][k] for k in (('finite_manifest','finite_manifest_sha256','selected_ordinals','collection_mode') if r['version']==PROFILED_CAMPAIGN_VERSION else ('finite_manifest','finite_manifest_sha256','selected_ordinals'))}}
         except (KeyError,TypeError):raise Stop('CAMPAIGN_INPUT_SCHEMA') from None
     expected=render(r['release_id'],r['revision'],r['tree'],r['evidence_head'],r['issued_at'],r['expires_at'],released=r['released'],version=r['version'],**campaign)
-    if r != expected or r['released'] is not True or (r['version']==CAMPAIGN_VERSION and canonical(r)!=canonical(expected)): raise Stop('REGISTRATION_INACTIVE_OR_CHANGED')
+    if r != expected or r['released'] is not True or (r['version'] in CAMPAIGN_VERSIONS and canonical(r)!=canonical(expected)): raise Stop('REGISTRATION_INACTIVE_OR_CHANGED')
     if not stamp(r['issued_at'])<=clock()<stamp(r['expires_at']): raise Stop('REGISTRATION_EXPIRED_OR_FUTURE')
     if checkout and (git('rev-parse','HEAD')!=r['revision'] or git('rev-parse','HEAD^{tree}')!=r['tree'] or git('status','--porcelain')):
         raise Stop('CHECKOUT_BINDING')
@@ -375,7 +392,7 @@ def verify_chain(raw):
 
 
 def source_row(registration,index):
-    rows=registration['manifest']['rows'] if registration['version']==CAMPAIGN_VERSION else ROWS
+    rows=registration['manifest']['rows'] if registration['version'] in CAMPAIGN_VERSIONS else ROWS
     if type(index) is not int or not 0<=index<len(rows):raise Stop('SOURCE_SLOT')
     return rows[index]
 
@@ -390,7 +407,7 @@ class Source:
         self.memory=memory;self.r=registration;self.root=root;self.clock=clock;self.sleep=sleep
     def command(self,index,out):
         budget=VERSION_LIMITS[self.r['version']].get('execution_budget')
-        if self.r['version']==CAMPAIGN_VERSION:
+        if self.r['version'] in CAMPAIGN_VERSIONS:
             validate(self.r,checkout=False)
             path=self.root/'campaign-registration.json';raw=canonical(self.r)
             if not path.exists():write_new(path,raw)
@@ -467,10 +484,10 @@ class Launcher:
     def __init__(self,r,root,*,github,memory,source,clock=time.monotonic,wall=now,emit=None):
         self.r=r;self.root=Path(root);self.github=github;self.memory=memory;self.source=source
         self.successor=r['version'] in SUCCESSORS
-        self.campaign=r['version']==CAMPAIGN_VERSION
+        self.campaign=r['version'] in CAMPAIGN_VERSIONS
         if self.campaign:
             from .campaign_manifest import input_from_manifest
-            if canonical(r['manifest'])!=canonical(manifest(version=CAMPAIGN_VERSION,campaign=input_from_manifest(r['manifest']))):raise Stop('CAMPAIGN_MANIFEST_BINDING')
+            if canonical(r['manifest'])!=canonical(manifest(version=r['version'],campaign=input_from_manifest(r['manifest']))):raise Stop('CAMPAIGN_MANIFEST_BINDING')
         self.rows=r['manifest']['rows'] if self.campaign else ROWS[1:] if self.successor else ROWS
         self.indices=tuple(range(len(self.rows))) if self.campaign else (1,2,3) if self.successor else (0,1,2,3)
         self.limits=VERSION_LIMITS[r['version']];self.budget=budget_of(r['version'])
@@ -523,10 +540,14 @@ class Launcher:
     def proof_check(self,index,a):
         from contextlib import nullcontext
         row=self.row(index)
-        with proof.manifest_scope(row) if self.campaign else nullcontext():
+        with proof.manifest_scope(row,self.r['manifest']['source_profiles'][index] if self.r['version']==PROFILED_CAMPAIGN_VERSION else None) if self.campaign else nullcontext():
             return proof.validate_audit(a,tuple(row[k] for k in ('council','semantics','start','end')))
     def accept(self,index,a):
         row=self.row(index);self.proof_check(index,a)
+        if self.r['version']==PROFILED_CAMPAIGN_VERSION:
+            from .source_profiles import validate_audit
+            try:validate_audit(self.r['manifest']['source_profiles'][index],a)
+            except (ValueError,KeyError,TypeError):raise Stop('SOURCE_PROFILE_BINDING') from None
         if (a.get('requested_interval')!=[row['start'],row['end']] or a.get('date_semantics')!=row['semantics'] or
             a.get('persistence') is not False or not identities(row,a)):raise Stop('SOURCE_IDENTITY_OR_EFFECT')
         source_rows=a.get('listing_records' if self.arcus(index) else 'records',[])
@@ -540,8 +561,9 @@ class Launcher:
             if not self.arcus(index) and a.get('resource',{}).get('budget_exhaustion') is not False:
                 raise Stop('SOURCE_ACCOUNTING')
         if self.arcus(index):
-            expected=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],row['start'],row['end']).destination
-            if a.get('destination')!=expected or a.get('case')!='discovery_rochdale_ui_window':raise Stop('SOURCE_DESTINATION')
+            case='discovery_'+row['council']+'_ui_window' if self.r['version']==PROFILED_CAMPAIGN_VERSION else 'discovery_rochdale_ui_window'
+            expected=finite.dated_config(finite.UI_CASES[case],row['start'],row['end']).destination
+            if a.get('destination')!=expected or a.get('case')!=case:raise Stop('SOURCE_DESTINATION')
             closed=a.get('cleanup')=='CONTEXT_BROWSER_CLOSED' and a.get('process_cleanup')=='CLOSED' and a.get('live_owned_survivors')==0
             worker=a.get('supervisor_seconds')
         else:
@@ -556,7 +578,8 @@ class Launcher:
         self.requests+=cost[0];self.source_bytes+=cost[1];self.source_seconds+=worker
         if self.requests>self.limits['requests'] or self.source_bytes>self.limits['mixed_source_bytes'] or self.source_seconds>self.limits['worker_seconds']:raise Stop('CUMULATIVE_SOURCE_BOUND')
         if not closed:raise Stop('SOURCE_CLEANUP_UNCERTAIN')
-        state=finite.classify(row,a,**({'execution_budget':self.budget['name']} if self.arcus(index) and self.budget['name'] else {}))
+        state=finite.classify(row,a,**({'execution_budget':self.budget['name']} if self.arcus(index) and self.budget['name'] else {}),
+            **({'collection_profile':self.r['manifest']['source_profiles'][index]} if self.r['version']==PROFILED_CAMPAIGN_VERSION else {}))
         if self.successor and state=='COMPLETE' and a.get('completeness')=='FAILED':
             raise Stop('SOURCE_OUTCOME_CONFLICT')
         return state
@@ -574,6 +597,7 @@ class Launcher:
         if a.get('applied_interval') is not None:return None
         p=a['retained_proof']['events']
         if self.arcus(index):
+            if self.row(index)['council']!='rochdale':return None
             from .criteria_containment import eligible
             if (not eligible(self.row(index),a,**({'execution_budget':self.budget['name']} if self.budget['name'] else {})) or a.get('listing_failure')!='TimeoutError'
                 or a.get('criteria_control_timeout',{}).get('operation')!='RESULT_MARKER_VISIBLE'
@@ -709,6 +733,13 @@ class Launcher:
                 if self.successor:self.slot_closure(owned)
                 local_code=self.local_outcome(reader_index,a,state) if rejection is None else None
                 receipt=dict(index=i,scope=row,outcome=state,rejection=rejection,source_sha256=sha(raw),owned_cleanup=owned)
+                if self.r['version']==PROFILED_CAMPAIGN_VERSION:
+                    from .outer_evidence import outer_from_slot_receipt
+                    from app.ingestion.coordinator import validate_outer
+                    try:
+                        observed=outer_from_slot_receipt(dict(source_sha256=sha(raw),outer_supervisor=getattr(self.source,'last_outer',None)),a)
+                        validate_outer(observed,dict(aggregate_rss=self.limits['source_memory_bytes'],outer_seconds=self.budget['source_outer_seconds']))
+                    except (ValueError,KeyError,TypeError,AttributeError):raise Stop('SOURCE_OUTER_EVIDENCE') from None
                 if getattr(self.source,'last_outer',None) is not None:receipt['outer_supervisor']=self.source.last_outer      # execution-budget registrations only; historical receipts carry no such key
                 self.results.append(receipt)
                 if self.successor:
@@ -828,17 +859,20 @@ def worker(index,out,group,*,successor=False,execution_budget=None,campaign_regi
         raw=path.read_bytes()
         if sha(raw)!=campaign_registration_sha256:raise Stop('CAMPAIGN_CHILD_BINDING')
         registration=validate(json.loads(raw),checkout=False)
-        if registration['version']!=CAMPAIGN_VERSION:raise Stop('CAMPAIGN_CHILD_BINDING')
+        if registration['version'] not in CAMPAIGN_VERSIONS:raise Stop('CAMPAIGN_CHILD_BINDING')
         row=source_row(registration,index)
         group=Path(group)
         if group.name!='source' or not group.is_dir():raise Stop('CHILD_GROUP')
         group.joinpath('cgroup.procs').write_text(str(os.getpid()))
         owner_source_context('BROWSER_SOURCE_V2')
+        profiled=registration['version']==PROFILED_CAMPAIGN_VERSION
+        arc=row['council'] in finite.ARCUS if profiled else row['council']=='rochdale'
         value=finite.read(row,retain_proof=True,no_transport_retry=True,fixed_four_rows=True,
-            execution_mode='four-council-owner-local' if row['council']=='rochdale' else None,
-            execution_budget='BROWSER_SOURCE_V2' if row['council']=='rochdale' else None,campaign_scope=row)
+            execution_mode='four-council-owner-local' if arc else None,
+            execution_budget='BROWSER_SOURCE_V2' if arc else None,campaign_scope=row,
+            **({'collection_profile':registration['manifest']['source_profiles'][index]} if profiled else {}))
         raw=canonical(value)
-        if len(raw)>(65535 if row['council']=='rochdale' else 512000):raise Stop('WORKER_EXPORT_BOUND')
+        if len(raw)>(65535 if arc else 512000):raise Stop('WORKER_EXPORT_BOUND')
         write_new(out,raw);return
     if campaign_registration_sha256 is not None:raise Stop('CAMPAIGN_CHILD_BINDING')
     # Private child, deliberately no owner credentials/control API capability.
@@ -878,7 +912,7 @@ def main():
     if os.environ.get('GH_HOST','github.com')!='github.com':raise Stop('GITHUB_DESTINATION')
     if not args.enable_reviewed_source_only_stop_treatment:raise Stop('STOP_TREATMENT_NOT_ENABLED')
     if any(any(s in k.upper() for s in ('DATABASE','SUPABASE','OPENAI','ANTHROPIC')) for k in os.environ):raise Stop('OWNER_CREDENTIAL_CONTEXT')
-    if r['version'] in (SUCCESSOR_V2_VERSION,CAMPAIGN_VERSION):
+    if r['version'] in (SUCCESSOR_V2_VERSION,*CAMPAIGN_VERSIONS):
         # Before any claim, in the interpreter that will run the worker: names and exception classes only are reported.
         report=runtime_check(r['version'])
         if not report['ok']:

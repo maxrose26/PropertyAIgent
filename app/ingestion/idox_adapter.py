@@ -61,6 +61,8 @@ class IdoxListingContract:
         return url,key,fields
 
     def project(self, source, outer, limits,*,source_bytes_limit=128*1024):
+        from .collection_mode import require_screening_mode
+        require_screening_mode(source,self.config.council)
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
         validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
@@ -117,6 +119,8 @@ class IdoxListingContract:
     def observe(self,source,outer,limits,*,observed_at,source_bytes_limit=128*1024):
         """The partial observation: verified records from ONE results page whose total is unknown, with NO window claim. Only for an explicitly enabled council, only when EVERY condition holds; anything else stops exactly as
         `project` does. Admission does not infer completeness from the short page: it records that a bounded set of valid records was observed."""
+        from .collection_mode import require_screening_mode
+        require_screening_mode(source,self.config.council)
         c=self.config
         if not self.partial_observation or c.council not in OBSERVATION_COUNCILS or c.semantics!='RECEIVED':raise Denied('PARTIAL_OBSERVATION_NOT_ENABLED')
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")

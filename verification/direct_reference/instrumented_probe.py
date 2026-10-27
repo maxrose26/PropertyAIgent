@@ -317,6 +317,14 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
         from verification.discovery.four_council_proof import require_scope
         if ui_config is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
         require_scope(ui_config.council,'VALIDATED',ui_config.start,ui_config.end)
+    collection_profile=None
+    if retain_proof:
+        from verification.discovery.four_council_proof import current_collection_profile
+        collection_profile=current_collection_profile()
+        if collection_profile is not None:
+            from verification.discovery.source_profiles import config as profile_config
+            if metadata or case!=collection_profile['case'] or list(window or ())!=collection_profile['interval'] or execution_budget!=collection_profile['execution_budget']:raise ValueError('PROFILE_PROBE_BINDING')
+            ui_config=profile_config(collection_profile);destination=ui_config.destination
     allowed = origin(destination)
     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
                  persistence=False, requests=0, responses=0, redirects=0,
@@ -607,6 +615,9 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
     audit['elapsed_seconds'] = round(time.monotonic() - started, 3)
     if deadline is not None:
         audit['remaining_ms'] = int(deadline.remaining() * 1000)
+    if collection_profile is not None:
+        from verification.discovery.source_profiles import bind_audit
+        audit=bind_audit(collection_profile,audit)
     return audit
 
 
@@ -631,12 +642,19 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
     rss_ceiling = 1024**3 if budget is None else budget['rss_ceiling_bytes']
     if prepared_font_cache is not None and (not isinstance(prepared_font_cache, tuple) or len(prepared_font_cache) != 2
             or not all(isinstance(x, str) for x in prepared_font_cache)):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
-    campaign_scope=None
+    campaign_scope=None;collection_profile=None
     if retain_proof:
-        from verification.discovery.four_council_proof import require_scope,current_manifest_scope
+        from verification.discovery.four_council_proof import require_scope,current_manifest_scope,current_collection_profile
         campaign_scope=current_manifest_scope()
-        if case!='discovery_rochdale_ui_window' or window is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
-        require_scope('rochdale','VALIDATED',*window)
+        collection_profile=current_collection_profile()
+        if collection_profile is None:
+            if case!='discovery_rochdale_ui_window' or window is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
+            require_scope('rochdale','VALIDATED',*window)
+        else:
+            from verification.discovery.source_profiles import validate
+            validate(collection_profile,campaign_scope)
+            if case!=collection_profile['case'] or list(window or ())!=collection_profile['interval'] or metadata or execution_budget!=collection_profile['execution_budget']:raise ValueError('PROFILE_PROBE_BINDING')
+            require_scope(collection_profile['council'],'VALIDATED',*window)
     if metadata and (window is None or case not in UI_CASES):raise ValueError('METADATA_LISTING_ONLY')
     if window is not None:
         from verification.discovery.arcus_ui_config import dated_config
@@ -674,7 +692,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         if budget is not None and worker_module != 'verification.direct_reference.instrumented_probe':
             raise ValueError('EXECUTION_BUDGET_SELECTION')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else [])+(['--execution-budget', budget['name'], '--deadline-origin', repr(start)] if budget is not None else [])+(['--campaign-scope',json.dumps(campaign_scope,sort_keys=True)] if campaign_scope is not None else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else [])+(['--execution-budget', budget['name'], '--deadline-origin', repr(start)] if budget is not None else [])+(['--campaign-scope',json.dumps(campaign_scope,sort_keys=True)] if campaign_scope is not None else [])+(['--collection-profile',json.dumps(collection_profile,sort_keys=True)] if collection_profile is not None else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -726,6 +744,9 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         if result.get('source_contract_failure')=='SOURCE_LOCAL_CRITERIA_CONTROL_TIMEOUT':
             result['containment_accounting_verified']=(child.returncode==0 and not expired and not survivors)
             result['accounting_complete']=result['containment_accounting_verified']
+        if collection_profile is not None:
+            from verification.discovery.source_profiles import validate_audit
+            validate_audit(collection_profile,result)
         if retain_proof and child.returncode!=0:
             result['failure']='PROOF_WORKER_EXIT_NOT_CONFIRMED'
         if budget is not None and result.get('execution_budget') != budget['name']:
@@ -774,7 +795,9 @@ def _main():
 
 
 def main():
-    if '--campaign-scope' not in sys.argv:return _main()
+    if '--campaign-scope' not in sys.argv:
+        if '--collection-profile' in sys.argv:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
+        return _main()
     from contextlib import nullcontext
     from verification.discovery.four_council_proof import manifest_scope
     selected=None
@@ -782,7 +805,12 @@ def main():
         i=sys.argv.index('--campaign-scope')
         if i+1>=len(sys.argv) or len(sys.argv[i+1])>512:raise ValueError('CAMPAIGN_SCOPE')
         selected=json.loads(sys.argv[i+1]);del sys.argv[i:i+2]
-    with manifest_scope(selected) if selected is not None else nullcontext():
+    profile=None
+    if '--collection-profile' in sys.argv:
+        i=sys.argv.index('--collection-profile')
+        if i+1>=len(sys.argv) or len(sys.argv[i+1])>8192:raise ValueError('COLLECTION_PROFILE')
+        profile=json.loads(sys.argv[i+1]);del sys.argv[i:i+2]
+    with manifest_scope(selected,profile) if selected is not None else nullcontext():
         return _main()
 
 

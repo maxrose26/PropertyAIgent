@@ -40,13 +40,25 @@ def select_rows(plan,expected_hash,councils):
     if not wanted or len(set(wanted))!=len(wanted) or any(c not in COUNCILS for c in wanted):raise ValueError('council selection')
     return [dict(row) for row in plan['rows'] if row['council'] in wanted]
 
-def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, campaign_scope=None):
+def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, campaign_scope=None, collection_profile=None):
+    if collection_profile is not None:
+        from .source_profiles import validate
+        validate(collection_profile,row)
+        if campaign_scope!=row:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
+        expected_mode='four-council-owner-local' if collection_profile['family']=='ARCUS_UI' else None
+        if execution_budget!=collection_profile['execution_budget'] or execution_mode!=expected_mode:raise ValueError('PROFILE_CALLER_BUDGET_OR_MODE')
     if campaign_scope is not None:
         from .four_council_proof import manifest_scope
         if row!=campaign_scope or not retain_proof or not no_transport_retry or not fixed_four_rows:raise ValueError('CAMPAIGN_READER_BINDING')
-        with manifest_scope(campaign_scope):
+        with manifest_scope(campaign_scope,collection_profile):
             return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
     return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
+
+
+def _profiled_arcus(row):
+    from .four_council_proof import current_collection_profile
+    p=current_collection_profile()
+    return p is not None and p['family']=='ARCUS_UI' and p['council']==row['council']
 
 
 def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
@@ -54,24 +66,27 @@ def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=N
     # A named browser execution budget applies to the Arcus UI reader only.
     if execution_budget is not None and (row['council'] not in ARCUS or not isinstance(execution_budget,str)):raise ValueError('execution budget')
     if type(fixed_four_rows) is not bool or (fixed_four_rows and (not retain_proof or not no_transport_retry)):raise ValueError('fixed row policy')
-    if execution_mode is not None and (execution_mode!='four-council-owner-local' or not retain_proof or row['council']!='rochdale'):
+    if execution_mode is not None and (execution_mode!='four-council-owner-local' or not retain_proof or (row['council']!='rochdale' and not _profiled_arcus(row))):
         raise ValueError('proof execution context')
     if retain_proof:
         from .four_council_proof import require_scope
         require_scope(row['council'],row['semantics'],row['start'],row['end'])
         if not no_transport_retry:raise ValueError('proof requires zero retry')
-    from .four_council_proof import current_manifest_scope
-    selected=current_manifest_scope()
+    from .four_council_proof import current_manifest_scope,current_collection_profile
+    selected=current_manifest_scope();profile=current_collection_profile()
     if row['council'] not in ARCUS:
         with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
             path=Path(td)/'source.json'
             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
-            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+(['--campaign-scope',json.dumps(selected,sort_keys=True)] if selected is not None else [])+['--output',str(path)],env=env,deadline=50)
+            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+(['--campaign-scope',json.dumps(selected,sort_keys=True)] if selected is not None else [])+(['--collection-profile',json.dumps(profile,sort_keys=True)] if profile is not None else [])+['--output',str(path)],env=env,deadline=50)
             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
             value=json.loads(path.read_bytes())
             if retain_proof and 'retained_proof' in value:
                 from .four_council_proof import validate_audit
                 validate_audit(value,(row['council'],row['semantics'],row['start'],row['end']))
+            if profile is not None:
+                from .source_profiles import validate_audit
+                validate_audit(profile,value)
             return retain_screening(value)
     from verification.direct_reference.instrumented_probe import supervised
     case='discovery_'+row['council']+'_ui_window'
@@ -84,9 +99,12 @@ def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=N
         if retain_proof and 'retained_proof' in value:
             from .four_council_proof import validate_audit
             validate_audit(value,(row['council'],row['semantics'],row['start'],row['end']))
+        if profile is not None:
+            from .source_profiles import validate_audit
+            validate_audit(profile,value)
         return retain_screening(value)
 
-def classify(row,a,*,execution_budget=None):
+def classify(row,a,*,execution_budget=None,collection_profile=None):
     """Qualify retained count/criteria evidence; never infer success from HTTP/exit."""
     if a.get('requested_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
     if row['council'] in ARCUS:
@@ -97,7 +115,12 @@ def classify(row,a,*,execution_budget=None):
     if a.get('capped') or a.get('completeness')=='INCOMPLETE' or a.get('enumeration_evidence')=='PAGE_CAP':return 'INCOMPLETE'
     if a.get('applied_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
     if row['council'] in ARCUS:
-        try:validate_arcus(a,dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end']),**({'execution_budget':execution_budget} if execution_budget is not None else {}))
+        config=dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end'])
+        if collection_profile is not None:
+            from .source_profiles import config as profile_config,validate_audit
+            try:validate_audit(collection_profile,a);config=profile_config(collection_profile)
+            except (ValueError,KeyError,TypeError):return 'UNKNOWN'
+        try:validate_arcus(a,config,**({'execution_budget':execution_budget} if execution_budget is not None else {}))
         except (ValueError,KeyError,TypeError):return 'UNKNOWN'
         return 'COMPLETE'
     if (a.get('cleanup')!='SESSION_BOUNDARY_CLOSED' or a.get('enumeration_evidence')!='COUNT_RECONCILED'
@@ -148,7 +171,7 @@ def main():
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--no-transport-retry',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true');p.add_argument('--fixed-four-row-limit',action='store_true')
-    p.add_argument('--campaign-scope')
+    p.add_argument('--campaign-scope');p.add_argument('--collection-profile')
     a=p.parse_args();c,start,end=a.idox_worker
     if a.fixed_four_row_limit and (not a.retain_four_council_proof or not a.no_transport_retry):raise ValueError('fixed row selection')
     if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
@@ -156,8 +179,13 @@ def main():
     from .four_council_proof import manifest_scope
     selected=json.loads(a.campaign_scope) if a.campaign_scope else None
     if selected is not None and (selected!=dict(council=c,semantics=SEMANTICS[c],start=start,end=end) or not a.fixed_four_row_limit):raise ValueError('CAMPAIGN_READER_BINDING')
-    with manifest_scope(selected) if selected is not None else contextlib.nullcontext():
+    profile=json.loads(a.collection_profile) if a.collection_profile else None
+    if profile is not None and selected is None:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
+    with manifest_scope(selected,profile) if selected is not None else contextlib.nullcontext():
         result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
+        if profile is not None:
+            from .source_profiles import bind_audit
+            result=bind_audit(profile,result)
         raw=json.dumps(result,sort_keys=True).encode()
         if len(raw)>512000:raise ValueError('bounded child audit')
         if a.retain_four_council_proof:
