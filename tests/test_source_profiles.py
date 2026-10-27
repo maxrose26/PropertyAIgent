@@ -188,7 +188,7 @@ def test_positive_supervised_command_to_real_probe_config(council,mode,tmp_path,
         assert '--metadata' not in command
         # Real main() consumes the same arguments the actual subprocess would receive.
         args=command[command.index('--worker'):]
-        with patch.object(sys,'argv',['probe',*args]),patch('playwright.async_api.async_playwright',entry),patch.object(p,'config',config):
+        with patch.dict(os.environ,kwargs['env'],clear=True),patch.object(sys,'argv',['probe',*args]),patch('playwright.async_api.async_playwright',entry),patch.object(p,'config',config):
             with pytest.raises(AtBrowserEntry):probe.main()
         Path(command[command.index('--output')+1]).write_bytes(canonical(expected))
         return Child()
