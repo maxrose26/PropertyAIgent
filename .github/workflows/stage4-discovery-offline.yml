@@ -93,6 +93,8 @@ on:
       - 'tests/test_e2e_connection_*.py'
       - 'tests/test_owner_caller_*.py'
       - 'tests/test_closed_idox_*.py'
+      - 'tests/test_oldham_authority_*.py'
+      - 'docs/design/oldham-finite-authority-20261027/**'
       - 'tests/closed_idox_source_fixture.py'
       - 'docs/design/closed-idox-admission-20261027/**'
       - 'docs/design/owner-caller-20261027/**'

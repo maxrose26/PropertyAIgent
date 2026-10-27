@@ -20,6 +20,8 @@ def verify_inventory(owner,c):
     definitions={**Owner.screening_v3_inventory(),**definitions}
     rows=owner.q(c,"SELECT p.proname,p.prosrc,pg_get_userbyid(p.proowner),p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname=ANY(%s)",(list(definitions),))
     if len(rows)!=len(definitions) or any(n not in definitions or body!=definitions[n] or who!='ingestion_storage_owner' or cfg!=['search_path=pg_catalog'] for n,body,who,cfg in rows):raise Denied('OLDHAM_POLICY_INVENTORY')
+    privileges=owner.q(c,"SELECT has_function_privilege('ingestion_worker_login','public.ingestion_oldham_allowed(jsonb,text,text,jsonb)','EXECUTE'),has_function_privilege('ingestion_effect_login','public.ingestion_oldham_allowed(jsonb,text,text,jsonb)','EXECUTE'),has_function_privilege('ingestion_application_login','public.ingestion_oldham_allowed(jsonb,text,text,jsonb)','EXECUTE')")[0]
+    if privileges!=(False,False,False):raise Denied('OLDHAM_POLICY_ACL')
 
 class Lifecycle:
     def __init__(self,owner,github):self.owner=owner;self.github=github;self.urls={};self.state='UNUSED'
@@ -71,7 +73,7 @@ class Lifecycle:
             self.state='UNCERTAIN';raise
     def teardown(self):
         # No automatic compensation after uncertain mutations. Caller must reconcile first.
-        self.safe();o=self.owner
+        self.safe();o=self.owner;o.tearing_down=True
         try:
             o.revoke()
             with o.connection() as c:

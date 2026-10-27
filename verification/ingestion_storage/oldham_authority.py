@@ -34,6 +34,14 @@ def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,
 
 class OldhamOwner(Owner):
     """Separate entrypoint: historical Owner.register is never called or modified."""
+    def __init__(self,*a,**kw):
+        super().__init__(*a,**kw)
+        self.admin_started=time.monotonic();original=self.check
+        def check():
+            original()
+            if time.monotonic()-self.admin_started >= (240 if self.tearing_down else 230):raise Denied('OLDHAM_ADMIN_DEADLINE')
+        self.check=check
+
     def issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None):
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
         if revision!=self.bindings.get('revision') or len(revision)!=40 or any(c not in '0123456789abcdef' for c in revision):raise Denied('OLDHAM_CODE_BINDING')
@@ -82,6 +90,15 @@ class OldhamOwner(Owner):
             flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
             if flags!=(False,False):
                 self.effect_uncertain=True;raise Denied('OLDHAM_TEMPORARY_CAPABILITY')
+        try:
+            with self.connection() as c:
+                self.q(c,'BEGIN',effect=True)
+                self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+                actual=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0][0]
+                if actual['grants'].get(expected.authority)!=grant or actual.get('oldham_allowances',{}).get(expected.authority)!=allowance:raise Denied('OLDHAM_COMMITTED_READBACK')
+                self.q(c,'ROLLBACK',effect=True)
+        except BaseException:
+            self.effect_uncertain=True;raise
         self.emit('oldham_authority_committed',dict(authority=expected.authority,registration_sha256=evidence['registration_sha256'],stop_sha256=sid))
         return expected
 
