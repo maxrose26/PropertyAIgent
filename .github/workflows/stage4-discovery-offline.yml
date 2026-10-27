@@ -439,6 +439,7 @@ jobs:
             ${{ runner.temp }}/cleanup.xml
             ${{ runner.temp }}/four-council-*/rehearsal.json
             ${{ runner.temp }}/three-council-*/rehearsal.json
+            ${{ runner.temp }}/three-council-v2-*/outer-kernel-*.json
             ${{ runner.temp }}/three-council-*-failure/**/events.jsonl
             ${{ runner.temp }}/three-council-*-failure/**/publication-events.jsonl
             ${{ runner.temp }}/three-council-*-failure/**/result-before-publication.json
