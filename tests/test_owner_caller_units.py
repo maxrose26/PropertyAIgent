@@ -337,7 +337,7 @@ def test_a_real_v2_slot_yields_observed_evidence_that_the_ledger_accepts(tmp_pat
     scope = scope_for(binding_for('manchester'), S, E)
     _, audit = contract_and_audit('arcus', 'manchester')
     source, got, receipt = arcus_slot_supervised(tmp_path, audit, scope)
-    assert source == audit and got == receipt['owned_cleanup']['outer_supervisor']
+    assert source == audit and got == receipt['outer_supervisor'] and 'outer_supervisor' not in receipt['owned_cleanup']
     assert got['cleanup'] == 'CLOSED' and got['exit_code'] == 0 and got['peak_owned_rss'] == 123456789 and got['live_owned_survivors'] == 0 and got['deadline_seconds'] == 80
     assert 0 <= got['elapsed_seconds'] < 80 and got['evidence'] == 'SOURCE_CGROUP_READBACK'
     validate_outer(got, BROWSER_SOURCE_V2_ITEM_LIMITS)
@@ -387,8 +387,8 @@ def test_a_slot_receipt_is_only_outer_evidence_for_the_source_it_describes(tmp_p
     _, _, receipt = arcus_slot_supervised(tmp_path, audit, scope)
     other = copy.deepcopy(audit)
     other['requests'] += 1
-    for bad_receipt, bad_audit in ((receipt, other), ({k: v for k, v in receipt.items() if k != 'owned_cleanup'}, audit), (dict(receipt, owned_cleanup=dict(receipt['owned_cleanup'], outer_supervisor=dict(receipt['owned_cleanup']['outer_supervisor'], extra=1))), audit),
-                                   (dict(receipt, owned_cleanup=dict(receipt['owned_cleanup'], outer_supervisor=dict(receipt['owned_cleanup']['outer_supervisor'], evidence='ASSUMED'))), audit), (None, audit)):
+    for bad_receipt, bad_audit in ((receipt, other), ({k: v for k, v in receipt.items() if k != 'outer_supervisor'}, audit), (dict(receipt, outer_supervisor=dict(receipt['outer_supervisor'], extra=1)), audit),
+                                   (dict(receipt, outer_supervisor=dict(receipt['outer_supervisor'], evidence='ASSUMED')), audit), (None, audit)):
         with pytest.raises(ValueError, match='OUTER_EVIDENCE_ABSENT_OR_UNBOUND'):
             outer_from_slot_receipt(bad_receipt, bad_audit)
 

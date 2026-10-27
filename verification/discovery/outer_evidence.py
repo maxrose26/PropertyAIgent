@@ -42,8 +42,7 @@ def outer_from_slot_receipt(receipt, source_audit):
     object is not exactly this module's shape is refused: there is no fallback and nothing is synthesised."""
     from verification.ingestion_storage.operational_publication import canonical      # the release's own serialiser: the slot receipt's source_sha256 is its hash
     raw = canonical(source_audit)
-    owned = receipt.get('owned_cleanup') if isinstance(receipt, dict) else None
-    outer = owned.get('outer_supervisor') if isinstance(owned, dict) else None
+    outer = receipt.get('outer_supervisor') if isinstance(receipt, dict) else None
     if (not isinstance(outer, dict) or set(outer) != set(KEYS) or outer.get('evidence') != EVIDENCE
             or receipt.get('source_sha256') != hashlib.sha256(raw).hexdigest()):
         raise ValueError('OUTER_EVIDENCE_ABSENT_OR_UNBOUND')

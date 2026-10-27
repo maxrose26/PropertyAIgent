@@ -276,6 +276,9 @@ def arcus_slot_supervised(tmp_path, audit, scope, *, mode='ok', peak_text=None, 
 
     root = tmp_path / 'arcus-slot'
     root.mkdir()
-    source, owned = FixtureSource(memory, {'version': version}, root).run(0, lambda: None)
+    runner = FixtureSource(memory, {'version': version}, root)
+    source, owned = runner.run(0, lambda: None)
     receipt = dict(index=0, scope=scope, outcome='COMPLETE', rejection=None, source_sha256=sha(canonical(source)), owned_cleanup=owned)
+    if getattr(runner, 'last_outer', None) is not None:      # exactly the line `Release.execute` adds
+        receipt['outer_supervisor'] = runner.last_outer
     return source, outer_from_slot_receipt(receipt, source), receipt

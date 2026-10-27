@@ -6,6 +6,7 @@ against the PREPARED grants. Local fixtures and a disposable database only; the 
 """
 import hashlib
 import json
+import time
 
 import pytest
 from sqlalchemy.exc import DBAPIError
@@ -26,6 +27,9 @@ def world():
 
 def closed(world, chain):
     assert all(s['cleanup'] == 'CLOSED' and s['connections_closed'] is True for s in chain.accounting.values() if isinstance(s, dict) and 'cleanup' in s)
+    deadline = time.monotonic() + 5      # the client has closed; the server reaps the backend asynchronously, so confirm it positively within a short bound
+    while restricted_sessions(world['boot']) and time.monotonic() < deadline:
+        time.sleep(0.05)
     assert restricted_sessions(world['boot']) == 0
 
 
@@ -36,7 +40,7 @@ def test_the_capture_consumes_the_outer_object_a_real_supervisor_produced(world,
     source, outer = chain.source, chain.outer
     assert source == chain.audit and receipt['source_sha256'] == digest(chain.audit)
     if family == 'arcus':      # the release's own Source.run, under the V2 execution budget, with its cgroup readback
-        assert outer['evidence'] == 'SOURCE_CGROUP_READBACK' and outer['cleanup'] == 'CLOSED' and chain.slot_receipt['owned_cleanup']['outer_supervisor'] == outer
+        assert outer['evidence'] == 'SOURCE_CGROUP_READBACK' and outer['cleanup'] == 'CLOSED' and chain.slot_receipt['outer_supervisor'] == outer
         assert chain.slot_receipt['source_sha256'] == hashlib.sha256(canonical(chain.audit)).hexdigest()      # the release's own serialiser and hash
     else:      # the owned-process envelope, which already reported accounting_complete and process counts
         assert outer['accounting_complete'] is True and outer['processes_seen'] >= 1 and outer['cleanup'] == 'CLOSED'

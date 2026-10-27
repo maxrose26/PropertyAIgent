@@ -367,6 +367,7 @@ class Source:
         return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source)]+(['--three-council-successor'] if self.r['version'] in SUCCESSORS else [])+(['--execution-budget',budget] if budget else [])
     def run(self,index,check):
         out=self.root/f'source-{index}.json';started=self.clock();poll_at=started
+        self.last_outer=None      # set only by a successful run of an execution-budget registration; never carried over from an earlier slot
         outer=budget_of(self.r['version'])['source_outer_seconds']
         child=None;primary=None;stage='SOURCE_CONTAINMENT_CHECK';pipe=BoundedPipe()
         closure=dict(source_group_closed=False,child_reaped=False,failures=[])
@@ -423,10 +424,10 @@ class Source:
             raw=out.read_bytes();stage='SOURCE_OUTPUT_DECODE';audit=json.loads(raw)
         except BaseException as error:raise SourceFailure(failure_detail(error,stage),closure) from None
         elapsed=self.clock()-started
-        if budget_of(self.r['version']).get('name') is not None:      # execution-budget (V2) registrations only: the outer object is observed, never inferred; historical slot receipts are unchanged
+        if budget_of(self.r['version']).get('name') is not None:      # execution-budget (V2) registrations only: the outer object is observed, never inferred; the closure and historical slot receipts are unchanged
             from verification.discovery.outer_evidence import observe_group,outer_supervisor
             peak,survivors=observe_group(self.memory.source)
-            closure=dict(closure,outer_supervisor=outer_supervisor(exit_code=child.returncode,elapsed_seconds=elapsed,closure=closure,peak_owned_rss=peak,live_owned_survivors=survivors,deadline_seconds=outer))
+            self.last_outer=outer_supervisor(exit_code=child.returncode,elapsed_seconds=elapsed,closure=closure,peak_owned_rss=peak,live_owned_survivors=survivors,deadline_seconds=outer)
         return audit,dict(closure,supervised_seconds=elapsed)
 
 
@@ -663,6 +664,7 @@ class Launcher:
                 if self.successor:self.slot_closure(owned)
                 local_code=self.local_outcome(reader_index,a,state) if rejection is None else None
                 receipt=dict(index=i,scope=row,outcome=state,rejection=rejection,source_sha256=sha(raw),owned_cleanup=owned)
+                if getattr(self.source,'last_outer',None) is not None:receipt['outer_supervisor']=self.source.last_outer      # execution-budget registrations only; historical receipts carry no such key
                 self.results.append(receipt)
                 if self.successor:
                     receipt.update(source_outcome=a.get('completeness'),continuation_code=local_code,

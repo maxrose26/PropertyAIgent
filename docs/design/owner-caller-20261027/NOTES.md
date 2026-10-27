@@ -16,7 +16,7 @@ registration and by the caller's preflight, naming every violated field. Nothing
 
 ## Outer-supervisor evidence
 * Idox: `operational_supervisor.supervise` already returns a compliant outer object (exit code, survivors, peak, `accounting_complete`, cleanup). Unchanged.
-* Arcus release slots: `Source.run` now adds `outer_supervisor` to `owned_cleanup` for execution-budget (V2) registrations only, built by `outer_evidence.outer_supervisor` from the child's observed exit code, the
+* Arcus release slots: `Source.run` records an observed outer object (`last_outer`, reset each run) for execution-budget (V2) registrations only and the release adds it to that slot's receipt as `outer_supervisor` (the closure object itself is unchanged, as the V2 spec requires), built by `outer_evidence.outer_supervisor` from the child's observed exit code, the
   elapsed time and the source cgroup's own `memory.peak` / `cgroup.procs` readback. An unreadable value is `None` and `cleanup` is `UNKNOWN`; nothing is inferred from the exit status. Historical release versions' receipts are unchanged.
 * Not shown offline: real kernel cgroup behaviour. The tests run the real `Source.run` and `supervise` over real child processes with a temporary directory standing in for the cgroup files.
 
