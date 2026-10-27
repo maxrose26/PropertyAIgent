@@ -95,7 +95,7 @@ VERSION_LIMITS[PROFILED_CAMPAIGN_VERSION]=SUCCESSOR_V2_LIMITS.copy()
 PERMITS[PROFILED_CAMPAIGN_VERSION]='OWNER_APPROVED_PROFILED_MANIFEST_SOURCE_ONLY_STOP_TREATMENT'
 VERSION_DEPENDENCIES[PROFILED_CAMPAIGN_VERSION]=VERSION_DEPENDENCIES[CAMPAIGN_VERSION]+(
     'verification/discovery/source_profiles.py','app/ingestion/collection_mode.py',
-    'app/ingestion/listing_screening.py','app/ingestion/coordinator.py',
+    'app/ingestion/listing_screening.py','app/ingestion/coordinator.py','app/ingestion/idox_adapter.py',
     'app/ingestion/ledger.py','app/ingestion/schema.py','app/ingestion/resource_accounting.py',
     'verification/discovery/screening_capture.py',
     'docs/design/nine-council-source-profiles-20261027/SPEC.md')

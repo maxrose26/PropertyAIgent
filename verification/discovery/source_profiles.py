@@ -76,10 +76,12 @@ def bind_audit(value, audit):
     else:
         if audit.get('execution_budget') is not None:raise ValueError('PROFILE_AUDIT_BUDGET')
         if audit.get('council')!=value['council']:raise ValueError('PROFILE_AUDIT_ROUTE')
-        root=SOURCE_ROOTS[value['council']][1].rstrip('/')+'/'
-        for row in audit.get('records',[]):
-            u=urlsplit(row['source_url'])
-            if u.scheme!='https' or u.netloc!=value['host'] or not u.path.startswith(root) or u.fragment:raise ValueError('PROFILE_AUDIT_ROUTE')
+        from datetime import date
+        from app.ingestion.idox_adapter import validate_listing_record
+        from .idox_window import WindowConfig
+        c=WindowConfig(value['council'],value['semantics'],*map(date.fromisoformat,value['interval']),max_transport_retries=0)
+        keys,refs=set(),set()
+        for row in audit.get('records',[]):validate_listing_record(c,row,keys,refs)
     if 'collection_profile' in audit and audit['collection_profile']!=value:raise ValueError('PROFILE_AUDIT_SUBSTITUTION')
     return dict(audit,collection_profile=value)
 

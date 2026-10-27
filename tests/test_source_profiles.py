@@ -276,3 +276,14 @@ def test_wrong_destination_in_records_refuses(row):
     value=audit(row);key='listing_records' if row['council'] in f.ARCUS else 'records'
     value[key][0]['source_url']='https://example.org/record'
     with pytest.raises(ValueError):p.validate_audit(value['collection_profile'],value)
+
+
+@pytest.mark.parametrize('kind',('unknown_state','missing_date','wrong_date','wrong_key'))
+def test_unsupported_idox_metadata_shape_refuses_parent(kind,tmp_path):
+    row=ROWS[0];value=audit(row);record=value['records'][0]
+    if kind=='unknown_state':record['fields']['proposal']['state']='INVENTED'
+    elif kind=='missing_date':record['fields'].pop('received_date')
+    elif kind=='wrong_date':record['fields']['received_date']['value']='Thu 01 Jan 2026'
+    else:record['source_key']='OTHER'
+    with pytest.raises((r.Stop,ValueError,KeyError)):
+        r.Launcher(registration(selection(('bolton',))),tmp_path,github=None,memory=None,source=None).accept(0,value)
