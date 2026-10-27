@@ -412,7 +412,7 @@ class Owner:
     stop_manual='STORAGE_TEST_STOP'      # the manual stop this registration is bound to (a mode bound to the observed generation-2 baseline sets its exact value)
     stop_sha=None      # None = the accepted generation-1 checkpoint digest
 
-    def build_grant(self,items,prepared,*,capture_key,source_calls,capture_only=True,screening=None):
+    def build_grant(self,items,prepared,*,capture_key,source_calls,capture_only=True,screening=None,writes=0,detail_source_keys=(),extra_outcomes=None):
         """The grant and bindings of one registration. With `screening=None` the grant is exactly the historical v1 grant; with a ScreeningRule (v3) it additionally lists that rule's config digest in
         `screening_configs` and widens the SCREENING completion vocabulary by the v3 admission outcomes (and by nothing else)."""
         bindings={x['key']:{k:x[k] for k in ('subject','task','contract','revision')} for x in [*items,*prepared]}
@@ -421,6 +421,9 @@ class Owner:
         if screening is not None:
             from .screening_v3_grant import apply_screening
             apply_screening(grant,screening)
+        if writes or detail_source_keys or extra_outcomes:      # the integrated chain's additions (identity writes, fresh detail reads, factual outcomes); the historical call passes none and its grant is byte-identical
+            grant['writes']=writes;grant['detail_source_keys']=sorted(detail_source_keys)
+            for task,outcomes in (extra_outcomes or {}).items():grant['completion_outcomes'][task]=list(dict.fromkeys([*grant['completion_outcomes'].get(task,[]),*outcomes]))
         return bindings,grant
 
     def register(self,items,authority,*,capture_key,source_calls,prepared=(),capture_only=True,screening=None):
