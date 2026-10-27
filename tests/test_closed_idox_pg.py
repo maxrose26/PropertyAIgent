@@ -25,7 +25,7 @@ def world():
     with psycopg.connect(settings()[0],autocommit=True) as c:
         assert c.execute('SELECT count(*) FROM pg_roles WHERE rolname=ANY(%s)',(RESTRICTED,)).fetchone()[0]==0
         assert c.execute('SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)',(RESTRICTED,)).fetchone()[0]==0
-    value=dict(server_version=w['server_version'],setup_seconds=w['setup_seconds'],setup_and_assertions='EXCLUDED_FROM_OPERATIONAL_COSTS',
+    value=dict(server_version=w['server_version'],setup_seconds=w['setup_seconds'],database_costs='RESTRICTED_BUDGET_DELTAS_EXCLUDING_SETUP_AND_ASSERTIONS',timing='REHEARSAL_WALL_INCLUDES_ASSERTIONS',setup_costs=w['setup_costs'],
         disposable_registration='EXPLICIT_OWNER_INSERTION_STAND_IN_NOT_PRODUCTION_AUTHORITY',credential_teardown='ROLES_AND_SESSIONS_ABSENT',cases=COSTS)
     if os.environ.get('CLOSED_IDOX_COST_PATH'):Path(os.environ['CLOSED_IDOX_COST_PATH']).write_text(json.dumps(value,sort_keys=True))
 
@@ -53,6 +53,9 @@ def admit_fixture(chain,n,tmp,*,status='Decided',decision='Approve',ref=None):
         return actual([command[0],'-m','tests.closed_idox_source_fixture',*command[3:],'--fixture-html',str(body)],**kw)
     with patch.object(operational_supervisor.subprocess,'Popen',launch):
         result=chain.caller.admit(adm,reader)
+    if (root/'worker-result.json').exists():
+        measured=json.loads((root/'worker-result.json').read_bytes())
+        observations.append(('synthetic_detail_metrics',{k:measured.get(k) for k in ('requests','received_body_bytes','elapsed_seconds')}))
     return result,calls,observations
 
 
@@ -70,7 +73,7 @@ def test_full_closed_caller_commit_readback_and_confinement(world,tmp_path,c):
         assert calls==[1]
         supervisor=next(v for k,v in observations if k=='source_supervisor_observed')
         assert supervisor['cleanup']=='CLOSED' and supervisor['exit_code']==0 and supervisor['live_owned_survivors']==0
-        source.append(supervisor)
+        source.append(dict(supervisor=supervisor,synthetic_detail_metrics=next(v for k,v in observations if k=='synthetic_detail_metrics')))
         row=application(boot,c,n.reference)
         assert row['status']=='Decided' and row['decision']=='Approve' and row['status_verified_at']
         assert row['site_id'] is None and row['unit_confirmation_status']=='discovery_pending'
@@ -78,7 +81,7 @@ def test_full_closed_caller_commit_readback_and_confinement(world,tmp_path,c):
     assert_confined(world,'idox',before,admitted=True);assert_closed(world,chain)
     bs=chain.caller.budgets
     COSTS.append(dict(council=c,commands=sum(x.statements-x.previous.get('driver_statements',0) for x in bs),connection_attempts=sum(x.attempts-x.previous.get('connection_attempts',0) for x in bs),
-        returned_data_value_bytes=sum(x.returned_bytes-x.previous.get('returned_data_value_bytes',0) for x in bs),admission_seconds=time.monotonic()-started,source_supervisors=source,
+        returned_data_value_bytes=sum(x.returned_bytes-x.previous.get('returned_data_value_bytes',0) for x in bs),rehearsal_admission_wall_seconds_including_assertions=time.monotonic()-started,source_supervisors=source,
         audit_archive_bytes=(chain.publisher.root/(receipt['durable_archive']['sha256']+'.json')).stat().st_size,identities=2,factual_deliveries=2,withheld=0,accounting=chain.accounting,aggregate_method='PER_BUDGET_DELTA_EXCLUDING_CARRIED_PRIOR'))
 
 
