@@ -25,6 +25,17 @@ class Allocation:
     def deadline(self):return min(self.started+CAPS['seconds']-RESERVE['seconds'],self.package_started+450)
     def totals(self):
         return dict(commands=sum(b.statements-b.previous.get('driver_statements',0) for b in self.budgets),connections=sum(b.attempts-b.previous.get('connection_attempts',0) for b in self.budgets),returned_bytes=sum(b.returned_bytes-b.previous.get('returned_data_value_bytes',0) for b in self.budgets),seconds=time.monotonic()-self.started)
+    def require_remaining(self,need):
+        """Only remaining work is added to spent usage; closure is never lent to work."""
+        self.check();spent=self.totals()
+        if any(spent[k]+need.get(k,0)+RESERVE[k]>CAPS[k] for k in ('commands','connections','returned_bytes')):
+            return False
+        # Reserve the entire eligible set against ACTUAL remaining work time.
+        # No admission entitlement can be based on the original clock again.
+        n=need.get('nominees',0)
+        if n and time.monotonic()+45*n>=self.deadline:return False
+        return True
+
     def check(self):
         if self.failed:raise Denied('OLDHAM_ALLOCATION_RECONCILE')
         if time.monotonic()>=self.deadline:self.failed=True;raise Denied('OLDHAM_OUTER_CLOSURE_RESERVE')

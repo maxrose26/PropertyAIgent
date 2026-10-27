@@ -101,16 +101,17 @@ def _idox_form(semantics, start='', end=''):
             '<input type="submit" name="action" value="Search"/>\n</form></body></html>').encode()
 
 
-def _idox_page(council, entries, start, end):
+def _idox_page(council, entries, start, end, *, first=1, total=None):
     when = mid(start, end)
     rows = ''.join(
         f'<li class="searchresult"><a class="summaryLink" href="applicationDetails.do?keyVal={idox_key(council, e)}&amp;activeTab=summary">{escape(e["proposal"])}</a>'
         f'<p class="address">{escape(e["address"])}</p><p class="metaInfo">Ref. No: {e["reference"]} · Received: {_fmt(e["received"] or when)} · Validated: {_fmt(e["validated"] or when)}</p></li>'
         for e in entries)
-    n = len(entries)
+    n = len(entries);total=n if total is None else total;last=first+n-1
+    nxt=f'<a class="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={(first-1)//10+2}">Next</a>' if last<total else ''
     sort = SORT.replace(b'/online-applications/', (IDOX_PREFIX[council] + '/').encode())
     page = (f'<html><h1>Planning – Results for Application Search</h1><select id="resultsPerPage"><option value="10" selected>10</option></select>'
-            f'<p class="pager">Showing 1-{n} of {n}</p><ul id="searchresults">{rows}</ul></html>').encode()
+            f'<p class="pager">Showing {first}-{last} of {total}{nxt}</p><ul id="searchresults">{rows}</ul></html>').encode()
     return page.replace(b'</html>', sort + b'</html>')
 
 
@@ -122,8 +123,9 @@ def idox_audit(council, entries, start, end):
     """The PRODUCTION Idox reader run over synthetic pages; returns the audit it produced."""
     cfg = idox_config(council, start, end)
     echo = _idox_form(cfg.semantics, start.strftime('%d/%m/%Y'), end.strftime('%d/%m/%Y'))
-    page = _idox_page(council, entries, start, end)
-    bodies = iter([_idox_form(cfg.semantics), page, page, echo])
+    pages=[_idox_page(council,entries[i:i+10],start,end,first=i+1,total=len(entries)) for i in range(0,len(entries),10)]
+    page=pages[0]
+    bodies = iter([_idox_form(cfg.semantics), page, page, *pages[1:], echo])
     return run(lambda *args, **kwargs: _Response(next(bodies)), cfg)
 
 

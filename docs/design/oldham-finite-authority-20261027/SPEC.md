@@ -33,3 +33,52 @@ Rollback text is review-only: revoke Oldham authority and disable access with po
 Disposable administration explicitly supplies effective pg_read_all_stats and password-presence column reads to the installer fixture, not runtime logins. This proves handling when those prerequisites exist, not their availability in production. Mapping/deletion acknowledgements use an in-memory names-only GitHub stand-in; source responses are synthetic, private workers and database transactions are real. Injected acknowledgement loss never creates permission to compensate. Later production approval must address verifier-retention risk for the application login as well as worker/effect; this development approval provisions no production credential.
 
 Runtime is additionally bound to the same owner package clock: active work stops at min(runtime270s, package450s). Administrative pre-effects stop at210s, teardown at240s; package diagnostic/closure475s, outer reporting480s, matching existing DEFAULT_DEADLINES. Each detail attempt must have its full unchanged45s source ceiling remaining before it starts. The owner caller factory shares one allocation across phases; no independently restarted deadline.
+
+## Staged capacity correction (dormant)
+
+Opt-in CAPTURE, SCREENING and ADMISSION derivations reuse the existing owner,
+registration, caller and allowance predicate. Historical default combined issuance
+is unchanged. CAPTURE reserves complete capture/screening with zero nominees.
+SCREENING binds every batch/assessment but authorises zero source calls and zero
+application writes; it creates no factual tasks. Only after every batch and
+assessment is COMPLETE, deterministically validated and independently re-read by
+the owner may ADMISSION insert exact factual tasks and issue N source calls/2N
+write transactions. Completed batches are not inserted or screened again.
+
+One owner/allocation/original expiry and package clock survive every phase. The
+admission capacity check adds only remaining 120N statement/four-N connection
+reservations to measured spent work, withholding existing closure reserves. The
+actual remaining shared work deadline must fit45N seconds before admission
+issuance, and each subsequent detail independently reserves45s immediately
+before starting. The static formula alone is not a completion guarantee. Six
+staged nominees can therefore be held after nonzero capture/screening time, even
+though the preserved historical combined six-nominee fixture completes quickly. Time may stop later
+effects; no automatic replay is authorised. Returned-value bytes remain dynamically
+bounded across every accounted connection. Extra owner issuance/readback is charged
+to the unchanged administrative240commands/13connections/1MiB/240seconds.
+
+An all-set capacity refusal preserves all completed screening and issues no
+admission authority, source call or application write. It reports
+SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY. No nominee subset is selected. Zero
+nominees needs no admission registration. Stop changes, expired/revoked authority,
+changed checkpoints, uncertain effects or uncertain closure refuse, not a capacity
+success. A held result requires actual saved screening verification and rollback
+of any temporary owner capability. SQL installation/rollback text, privileges,
+Oldham-only stop semantics and historical Bolton behaviour remain byte-identical.
+
+The11-record historical Oldham enumeration was COMPLETE under the classifier;
+raw UNKNOWN fields are separate layers. Its missing authentic supervisor binding
+and qualification carry-forward remain unresolved. This correction does not make
+that historical packet executable. No owner wrapper or live release is provided.
+
+
+Staged screening readback uses one fixed key-set SELECT on the existing restricted
+worker engine, under its DatabaseBudget; it does not open one connection per row.
+The owner independently re-reads the same completed rows under the control lock.
+Issuance driver waits are shortened to the shared work deadline minus the entire
+pending nominee source reservation, including COMMIT and committed readback.
+Expiry reservations cover only pending stages and never extend first issuance.
+A late/uncertain acknowledgement latches reconciliation, not a no-issuance hold.
+Fixture packet byte/hash measurements include source, outer, saved capture,
+completed screening, derived registrations and cost receipts. They are not a
+measurement of a future owner wrapper's final audit/publication envelope.
