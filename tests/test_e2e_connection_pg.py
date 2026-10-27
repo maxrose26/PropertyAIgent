@@ -9,6 +9,7 @@ The processing path is the production one, reached through ControllerLedger on t
 """
 import json
 import subprocess
+import time
 import sys
 import os
 from dataclasses import asdict, replace
@@ -59,6 +60,9 @@ def assert_closed(world, chain):
     stages = [chain.accounting['capture'], *chain.accounting.get('screening', []), *chain.accounting.get('admission', [])]
     assert all(s['cleanup'] == 'CLOSED' and s['connections_closed'] is True and s['failed_native_connections_closed'] is True and s['socket_closure'] == 'NO_NEW_OWNED_SOCKETS'
                and s['connections_opened'] == s['connections_closed_count'] and s['driver_statements'] <= 120 and s['connection_attempts'] <= 16 for s in stages), stages
+    deadline = time.monotonic() + 5      # the client has closed; the server reaps the backend asynchronously, so confirm it positively within a short bound
+    while restricted_sessions(world['boot']) and time.monotonic() < deadline:
+        time.sleep(0.05)
     assert restricted_sessions(world['boot']) == 0
 
 
