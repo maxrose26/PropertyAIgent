@@ -151,12 +151,16 @@ class Chain:
         return self
 
     def target_for(self, record):
+        from verification.ingestion_storage.idox_target import COUNCILS,derive
+        if self.council in COUNCILS:return derive(self.council,record)
         return idox_detail_target(self.council, record) if self.family == 'idox' else arcus_detail_target(self.council, record)
 
     def owner_registers_chain(self, nominees, *, ttl=1800, writes=None, source_calls=None, stop=None, others=()):
         """Prepare (PRODUCTION) the batch/screening/factual items and the chain grant from the saved capture and the nominees, then install them."""
         receipt = self.capture_receipt
-        targets = {r['reference']: self.target_for(r) for r in receipt['records']}
+        from verification.ingestion_storage.idox_target import COUNCILS
+        selected={n.reference for n in nominees} if self.council in COUNCILS else {r['reference'] for r in receipt['records']}
+        targets = {r['reference']: self.target_for(r) for r in receipt['records'] if r['reference'] in selected}
         reg = chain_registration(self._owner(ttl), self.binding, self.contract, dict(self.root, checkpoint=receipt), receipt, tuple(nominees), self.rule, targets, revision=self.revision, item_limits=self.item_limits,
                                  allow_test_evidence=True, other_receipts=others)
         grant = copy.deepcopy(reg.grant)

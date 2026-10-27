@@ -16,7 +16,7 @@ from app.ingestion.nomination import derive_nominees
 from . import new_identity_contract
 from .limit_reconciliation import grant_problems, reconcile_items
 from .operational_owner import item
-from .scope_binding import check_contract, check_detail_target, scope_for
+from .scope_binding import check_contract, check_detail_target, scope_for,check_capture
 
 AUTHORITY_PREFIX = 'INGESTION_CHAIN_'      # a disposable/design name; NO live policy recognises it (see the module docstring)
 FACTUAL_OUTCOMES = ['SUPPORTED_FACTS_VERIFIED', 'ALREADY_KNOWN']
@@ -63,6 +63,9 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
             or root.get('checkpoint') != receipt):      # the receipt must BE the stored root's saved capture, for exactly this scope
         raise Denied('CHAIN_FOREIGN_CAPTURE')
     reconcile_items(binding, item_limits)
+    check_capture(binding,contract,receipt)
+    from .idox_target import COUNCILS
+    if binding.council in COUNCILS and detail_targets is not None and (not isinstance(detail_targets,dict) or set(detail_targets)!={n.reference for n in nominees}):raise Denied('CLOSED_IDOX_TARGET_SET')
     # `other_receipts` are further saved captures of the same council, supplied only so that a reference observed differently elsewhere is withheld; the nominees registered here are
     # exactly those the derivation binds to THIS capture.
     derived = derive_nominees([receipt, *other_receipts], rule, allow_test_evidence=allow_test_evidence)
@@ -75,12 +78,13 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
         subject = dict(kind='APPLICATION', council=binding.council, reference=record['reference'])
         screens[record['reference']] = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=assessment_identity(record, rule)[3]), dependencies=[root['key']], limits=dict(item_limits))
     by_reference = {r['reference']: r for r in receipt['records']}
+    from .idox_target import COUNCILS,derive
     factory = getattr(new_identity_contract, binding.detail_factory)
     contracts, facts = {}, {}
     for nominee in nominees:
         record = by_reference[nominee.reference]
-        target = check_detail_target(binding, record, detail_targets.get(nominee.reference))
-        fc = factory(f'chain-fact-{binding.council}-{digest(record)[:16]}', target)
+        target = check_detail_target(binding, record, derive(binding.council,record) if binding.council in COUNCILS and detail_targets is None else (detail_targets or {}).get(nominee.reference))
+        fc = factory(f'chain-fact-{binding.council}-{digest(record)[:16]}', target,**({'verification_scope':'COUPLED'} if binding.council in COUNCILS else {}))
         contracts[nominee.reference] = fc
         subject = dict(kind='APPLICATION', council=binding.council, reference=nominee.reference)
         facts[nominee.reference] = item(dict(subject=subject, task='FACTUAL_REFRESH', contract=fc.name, revision=revision), dependencies=[screens[nominee.reference]['key']], limits=dict(item_limits))

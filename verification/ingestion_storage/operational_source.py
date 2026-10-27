@@ -10,8 +10,12 @@ from datetime import date
 from verification.ingestion_storage.operational_supervisor import supervise
 
 
-def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None):
+def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None,closed_target=False):
  if kind not in {'listing','detail','form_probe'}:raise ValueError('SOURCE_KIND')
+ if type(closed_target) is not bool or (closed_target and kind!='detail'):raise ValueError('CLOSED_IDOX_SELECTION')
+ if kind=='detail':
+  from .idox_target import validate
+  if closed_target or configuration.get('case','').startswith('chain_idox_') or 'target_sha256' in configuration:validate(configuration)
  root=Path(root)
  # Configuration contains only literal source identity/date scope, never secrets.
  raw=json.dumps(configuration,sort_keys=True,allow_nan=False).encode()
@@ -19,7 +23,7 @@ def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None
  with tempfile.TemporaryDirectory(prefix='ingestion-source-plan-') as home:
   plan=Path(home)/'plan.json';plan.write_bytes(raw)
   output=root/'worker-result.json'
-  outer=supervise([sys.executable,'-m','verification.ingestion_storage.operational_source','--worker',kind,'--plan',str(plan),'--output',str(output)],environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=root,source=True,seconds=45,stop_file=stop_file,memory_group=memory_group)
+  outer=supervise([sys.executable,'-m','verification.ingestion_storage.operational_source','--worker',kind,'--plan',str(plan),'--output',str(output)]+(['--closed-idox-target'] if closed_target else []),environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=root,source=True,seconds=45,stop_file=stop_file,memory_group=memory_group)
   if observe is not None:observe('source_supervisor_observed',outer)
   if output.is_file() and output.stat().st_size<=512*1024 and observe is not None:
    try:observe('source_worker_resource_observed',json.loads(output.read_bytes()).get('resource'))
@@ -31,9 +35,13 @@ def read(kind,configuration,*,root,stop_file=None,memory_group=None,observe=None
 
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--worker',choices=['listing','detail','form_probe'],required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--worker',choices=['listing','detail','form_probe'],required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--closed-idox-target',action='store_true');a=p.parse_args()
  if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith('_KEY') or k.endswith('_TOKEN') or k.endswith('_PASSWORD') for k in os.environ) or a.output.exists():raise ValueError('PRIVATE_CREDENTIAL_FREE_SOURCE')
  cfg=json.loads(a.plan.read_bytes())
+ if a.closed_idox_target and a.worker!='detail':raise ValueError('CLOSED_IDOX_SELECTION')
+ if a.worker=='detail':
+  from .idox_target import validate
+  if a.closed_idox_target or cfg.get('case','').startswith('chain_idox_') or 'target_sha256' in cfg:validate(cfg)
  import resource
  resource.setrlimit(resource.RLIMIT_AS,(1024**3,1024**3));resource.setrlimit(resource.RLIMIT_CPU,(45,45));resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
  if a.worker in ('listing','form_probe'):

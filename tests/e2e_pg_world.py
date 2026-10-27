@@ -26,6 +26,8 @@ from verification.ingestion_storage import screening_v3_worker_sql
 NAMES = ['provisioning_migrator', 'ingestion_worker_login', 'ingestion_storage_login', 'ingestion_effect_login', 'ingestion_recovery_login', 'ingestion_application_login']
 RESTRICTED = ['ingestion_worker_login', 'ingestion_effect_login', 'ingestion_application_login']
 COUNCILS = {
+    'bury': dict(name='Bury',base_url='https://planning.bury.gov.uk/online-applications',date_field_mode='received',doc_system='idox_anite'),
+    'oldham': dict(name='Oldham',base_url='https://planningpa.oldham.gov.uk/online-applications',date_field_mode='received',doc_system='idox'),
     'tameside': dict(name='Tameside Metropolitan Borough Council', base_url='https://publicaccess.tameside.gov.uk/online-applications', date_field_mode='received', doc_system='idox'),
     'stockport': dict(name='Stockport Metropolitan Borough Council', base_url='https://planning.stockport.gov.uk/PlanningData-live', date_field_mode='validated', doc_system='idox'),
     'manchester': dict(name='Manchester City Council', base_url='https://arcusbe.manchester.gov.uk/pr', date_field_mode='validated', doc_system='arcus'),
