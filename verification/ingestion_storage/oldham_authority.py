@@ -53,10 +53,16 @@ class OldhamOwner(Owner):
     """Separate entrypoint: historical Owner.register is never called or modified."""
     def __init__(self,*a,**kw):
         super().__init__(*a,**kw)
+        self.issuance_deadline=None;self.issuance_statement_cap=None
         self.original_expiry=self.expiry;self.staged_capture=None;self.staged_screening=None;self.issuance_mode=None;self.staged_prior={};self.staged_expiry=None;self.admission_held=False
         self.awaiting_verification=False;self.package_started=time.monotonic();self.admin_elapsed=0.;self.admin_depth=0;self.admin_live=None;original=self.check
         def check():
             original()
+            if self.issuance_deadline is not None:
+                remaining=self.issuance_deadline-time.monotonic()
+                if remaining<=0:raise Denied('OLDHAM_ISSUANCE_WORK_RESERVE')
+                from .operational_owner import ADMIN_STATEMENT_HARD_SECONDS
+                self.statement_hard_seconds=min(self.issuance_statement_cap or ADMIN_STATEMENT_HARD_SECONDS,remaining)
             active=self.admin_elapsed+(time.monotonic()-self.admin_live if self.admin_live is not None else 0)
             if active >= (240 if self.tearing_down else 210):raise Denied('OLDHAM_ADMIN_DEADLINE')
             if time.monotonic()-self.package_started >= (475 if self.tearing_down else 450):raise Denied('OLDHAM_OUTER_DEADLINE')
@@ -83,10 +89,17 @@ class OldhamOwner(Owner):
             with super().connection() as c:yield c
 
     def issue(self,*args,**kw):
-        try:return self._issue(*args,**kw)
+        original_cap=self.statement_hard_seconds
+        try:
+            result=self._issue(*args,**kw)
+            if self.issuance_deadline is not None and time.monotonic()>=self.issuance_deadline:
+                self.effect_uncertain=True;raise Denied('OLDHAM_ISSUANCE_ACK_RESERVE')
+            return result
         except BaseException:
             if self.awaiting_verification:self.effect_uncertain=True
             raise
+        finally:
+            self.issuance_deadline=None;self.issuance_statement_cap=None;self.statement_hard_seconds=original_cap
 
     def _issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None,phase=None,screening_rows=None):
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
@@ -98,6 +111,7 @@ class OldhamOwner(Owner):
         if source is None or outer is None:raise Denied('OLDHAM_CAPTURE_INPUTS_REQUIRED')
         projected=contract.project(source,outer,item_limits,source_bytes_limit=512*1024)
         from .oldham_allocation import capacity
+        capture_seal=digest(dict(source=digest(source),outer=digest(outer),qualification=contract.qualification_sha256,scope=contract.scope()))
         records=len(projected['records']);batches=(records+4)//5
         if phase is None:capacity(records,records if root is None else len(nominees))
         elif phase=='CAPTURE':capacity(records,0)
@@ -112,7 +126,7 @@ class OldhamOwner(Owner):
         expected=derive(self,binding,contract,revision=revision,item_limits=item_limits,root=root,receipt=receipt,nominees=nominees,rule=rule,detail_targets=detail_targets,allow_test_evidence=allow_test_evidence,phase=phase,screening_rows=screening_rows)
         capacity_hold=False
         if phase in ('SCREENING','ADMISSION'):
-            if not self.staged_capture or self.staged_capture!=digest(projected):raise Denied('OLDHAM_STAGED_CAPTURE_REQUIRED')
+            if not self.staged_capture or self.staged_capture!=capture_seal:raise Denied('OLDHAM_STAGED_CAPTURE_REQUIRED')
             if not hasattr(self,'_allocation'):raise Denied('OLDHAM_SHARED_ALLOCATION_REQUIRED')
             need=dict(commands=80*batches+8*records,connections=2*batches+records) if phase=='SCREENING' else dict(commands=120*len(nominees),connections=4*len(nominees),nominees=len(nominees))
             if phase=='ADMISSION' and self.staged_screening!=digest(dict(root=root['key'],receipt=digest(receipt),rule=rule.config())):raise Denied('OLDHAM_STAGED_SCREENING_REQUIRED')
@@ -159,6 +173,9 @@ class OldhamOwner(Owner):
                     if flags!=(False,False):self.effect_uncertain=True;raise Denied('OLDHAM_TEMPORARY_CAPABILITY')
                     self.admission_held=phase=='ADMISSION'
                     return dict(outcome='SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY' if phase=='ADMISSION' else 'SCREENING_HELD_CAPACITY',admission='NOT_ISSUED',source_calls=0,writes=0)
+                if phase in ('SCREENING','ADMISSION'):
+                    self.issuance_statement_cap=self.statement_hard_seconds
+                    self.issuance_deadline=self._allocation.deadline-45*len(nominees) if phase=='ADMISSION' else self._allocation.deadline
                 # Effects cannot borrow administrative closure/reporting capacity.
                 # Remaining insertion and two-connection acknowledgement envelope.
                 if self.commands+len(expected.insert)+10>200 or self.connections+1>11:raise Denied('OLDHAM_ADMIN_ISSUANCE_CAPACITY')
@@ -177,6 +194,7 @@ class OldhamOwner(Owner):
                 self.q(c,'REVOKE ingestion_storage_owner FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
                 self.q(c,'COMMIT',effect=True);self.awaiting_verification=True
             except BaseException:
+                self.issuance_deadline=None;self.statement_hard_seconds=self.issuance_statement_cap;self.issuance_statement_cap=None
                 if not self.effect_uncertain:self.q(c,'ROLLBACK',effect=True)
                 raise
             flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
@@ -192,11 +210,11 @@ class OldhamOwner(Owner):
         except BaseException:
             self.effect_uncertain=True;raise
         self.emit('oldham_authority_committed',dict(authority=expected.authority,registration_sha256=evidence['registration_sha256'],stop_sha256=sid))
-        self.awaiting_verification=False
         self.issuance_mode=mode
         if phase is not None:self.staged_prior[phase]=dict(authority=expected.authority,package_sha256=package_sha)
-        if phase=='CAPTURE':self.staged_capture=digest(projected);self.staged_expiry=expected.grant['expires_at']
+        if phase=='CAPTURE':self.staged_capture=capture_seal;self.staged_expiry=expected.grant['expires_at']
         if phase=='SCREENING':self.staged_screening=digest(dict(root=root['key'],receipt=digest(receipt),rule=rule.config()))
+        self.awaiting_verification=False
         return expected
 
     def revoke(self):

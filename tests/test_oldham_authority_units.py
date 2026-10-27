@@ -149,3 +149,15 @@ def test_staged_expiry_extension_and_combined_downgrade_refuse_before_connection
  reg=derive(o,b,c,phase='CAPTURE',**args);evidence['registration_sha256']=digest(registration_value(reg))
  with pytest.raises(Denied,match='ORIGINAL_EXPIRY'):o.issue(reg,b,c,source=source,outer=out,evidence=evidence,phase='CAPTURE',**args)
  assert o.connections==0
+
+
+@pytest.mark.parametrize('count',[11,19])
+def test_synthetic_multipage_fixture_and_capture_seal_are_canonical(count):
+ from app.ingestion.ledger import digest
+ from tests.e2e_connection_support import EXTENSION
+ o,b,c,_,out,args,_,_=inputs()
+ source=idox_audit('oldham',[entry(f'SYNTHETIC/P{i}',EXTENSION) for i in range(count)],START,END)
+ assert source['enumeration_evidence']=='COUNT_RECONCILED' and len(source['records'])==count and len(source['pages'])==2
+ projected=c.project(source,out,DEFAULT_LIMITS,source_bytes_limit=512*1024)
+ assert len(projected['records'])==count
+ assert digest(dict(source=digest(source),outer=digest(out),qualification=c.qualification_sha256,scope=c.scope()))

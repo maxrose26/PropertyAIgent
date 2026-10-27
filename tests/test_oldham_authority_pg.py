@@ -399,3 +399,63 @@ def test_staged_commit_uncertainty_cannot_issue_another_phase(world,tmp_path,mon
  assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
  # Injection removed only by the disposable test owner, not library compensation.
  o.effect_uncertain=False;staged_cost(ch,o,life,gh,records=6,nominees=2,result='INJECTED_UNCERTAINTY_NO_REPLAY')
+
+
+@pytest.mark.parametrize('phase',['SCREENING','ADMISSION'])
+@pytest.mark.parametrize('fault',['commit_ack','readback'])
+def test_staged_actual_issuance_uncertainty_blocks_every_followup(world,tmp_path,phase,fault):
+ from tests.e2e_connection_support import entry,SCHEME
+ from verification.ingestion_storage.operational_publication import Uncertain
+ ch,o,life,gh=setup(world,tmp_path,[entry('SYNTHETIC/ACK',SCHEME)],staged=True)
+ if phase=='ADMISSION':root,rows,ns=staged_screen(ch,o)
+ else:
+  ch.capture();ch.read_capture();root=world['boot'].execute('SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',(ch.root['key'],)).fetchone()[0];rows=None;ns=None
+ if fault=='commit_ack':
+  connector=o.connector;lost=[]
+  class Proxy:
+   def __init__(self,c):self.c=c
+   def __getattr__(self,n):return getattr(self.c,n)
+   def execute(self,q,params=None):
+    result=self.c.execute(q,params)
+    if q=='COMMIT' and not lost:lost.append(True);raise ConnectionError('SYNTHETIC_ACK_LOSS')
+    return result
+  o.connector=lambda:Proxy(connector())
+ else:
+  query=o.q
+  def fail(c,statement,params=None,**kw):
+   if o.awaiting_verification and isinstance(statement,str) and statement.startswith('SELECT pg_has_role'):raise ConnectionError('SYNTHETIC_READBACK_LOSS')
+   return query(c,statement,params,**kw)
+  o.q=fail
+ args=dict(root=root,phase=phase,nominees=() if ns is None else ns.nominees,screening_rows=rows)
+ with pytest.raises((Uncertain,ConnectionError)):issue(o,ch,**args)
+ assert o.effect_uncertain
+ issued=[a for a in ch._control()['grants'] if '_'+phase+'_' in a];assert len(issued)==1
+ before=(o.commands,o.connections,len(gh.calls))
+ with pytest.raises(Denied,match='RECONCILE'):issue(o,ch,**args)
+ with pytest.raises(Denied,match='RECONCILE'):life.teardown()
+ assert before==(o.commands,o.connections,len(gh.calls))
+ assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+ if phase=='ADMISSION':
+  for row in rows:
+   actual=world['boot'].execute('SELECT state,checkpoint FROM ingestion_work_items WHERE key=%s',(row['key'],)).fetchone()
+   assert actual==('COMPLETE',row['checkpoint'])
+
+
+def test_staged_issuance_waits_cannot_consume_future_source_reserve(world,tmp_path,monkeypatch):
+ from tests.e2e_connection_support import entry,SCHEME
+ ch,o,life,gh=setup(world,tmp_path,[entry('SYNTHETIC/TAIL',SCHEME)],staged=True)
+ root,rows,ns=staged_screen(ch,o);query=o.q;allocation=ch.caller.allocation;original_deadline=allocation.deadline
+ # Advance the shared deadline during issuance, after its pre-effect gate.
+ # No sleep or pressure workload; actual DB inserts remain uncommitted.
+ injected=[]
+ def advance(c,statement,params=None,**kw):
+  result=query(c,statement,params,**kw)
+  if isinstance(statement,str) and statement.startswith('INSERT INTO public.ingestion_work_items') and not injected:
+   injected.append(True);o.issuance_deadline=time.monotonic()-1
+  return result
+ o.q=advance
+ with pytest.raises(Denied,match='ISSUANCE_WORK_RESERVE'):staged_admission(ch,o,root,rows,ns)
+ assert injected and allocation.deadline==original_deadline
+ assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='FACTUAL_REFRESH'").fetchone()[0]==0
+ assert not any('_ADMISSION_' in a for a in ch._control()['grants'])
+ staged_cost(ch,o,life,gh,records=1,nominees=1,result='ISSUANCE_TAIL_RESERVE_REFUSED')
