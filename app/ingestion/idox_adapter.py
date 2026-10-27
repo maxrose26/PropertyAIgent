@@ -31,6 +31,21 @@ class IdoxListingContract:
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256) or self.config.max_transport_retries!=0:
             raise Denied('EXACT_IDOX_QUALIFICATION_AND_ZERO_RETRY_REQUIRED')
 
+    def scope(self):
+        """The exact discovery scope this contract captures (the ledger task subject)."""
+        c=self.config
+        return {'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}
+
+    def admission_window(self,receipt,council_code):
+        """The window proof shared admission re-derives from the exact retained receipt (logic moved unchanged from the controller)."""
+        c=self.config;r=receipt['resources']
+        return WindowEvidence(council_code,'manual-ingestion-controller',c.start,c.end,c.start,c.end,c.semantics,
+            receipt['contract'],receipt['source_sha256'],receipt['segments'][-1]['terminal'],len(receipt['segments']),len(receipt['records']),
+            r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'])
+
+    def record_body_sha256(self,record):
+        return record['provenance']['body_sha256']
+
     def _row(self,row,keys,refs):
         """The strict validation of ONE listing row (identity, fields, date inside the requested interval). Shared, unchanged, by the complete-window projection and the partial observation."""
         c=self.config
@@ -92,10 +107,12 @@ class IdoxListingContract:
         window=WindowEvidence(c.council,'coordinator-retained',c.start,c.end,c.start,c.end,c.semantics,
             self.name,source['applied_evidence_sha256'],pages[-1]['terminal'],len(pages),len(projected),r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'],explicit_zero=zero)
         if window.outcome!=Completeness.COMPLETE:raise Denied('IDOX_QUALIFIED_WINDOW_REQUIRED')
-        return dict(kind='LISTING_RECEIPT_V1',contract=self.name,council=c.council,interval=interval,records=projected,
+        receipt=dict(kind='LISTING_RECEIPT_V1',contract=self.name,council=c.council,interval=interval,records=projected,
             segments=pages,source_sha256=digest(source),qualification_sha256=self.qualification_sha256,
             applied_interval=interval,cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,
             resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.__dict__)
+        if c.semantics!='RECEIVED':receipt['date_semantics']=c.semantics      # historical receipts carry no date basis and their digests are pinned, so only a non-default basis (Stockport VALIDATED) is named here; retained_capture always names it
+        return receipt
 
     def observe(self,source,outer,limits,*,observed_at,source_bytes_limit=128*1024):
         """The partial observation: verified records from ONE results page whose total is unknown, with NO window claim. Only for an explicitly enabled council, only when EVERY condition holds; anything else stops exactly as

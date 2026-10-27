@@ -322,8 +322,9 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
         check();receipt=l.get(binding.discovery_key)['checkpoint']
     contract=coordinator.contracts.get(root['contract'])
     from app.ingestion.idox_adapter import IdoxListingContract
-    if not isinstance(contract,IdoxListingContract):raise Denied('BOUND_IDOX_CONTRACT')
-    cfg=contract.config;scope={'kind':'DISCOVERY_SCOPE','council':cfg.council,'start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':cfg.semantics}
+    from app.ingestion.arcus_adapter import ArcusListingContract
+    if not isinstance(contract,(IdoxListingContract,ArcusListingContract)):raise Denied('BOUND_IDOX_CONTRACT')      # the two known listing families only (the code is kept for the historical refusal)
+    scope=contract.scope()
     if root['subject']!=scope or receipt['contract']!=root['contract'] or receipt['interval']!=[scope['start'],scope['end']] or receipt['applied_interval']!=receipt['interval']:raise Denied('RETAINED_SCOPE_BINDING')
     if isinstance(l,ControllerLedger):l.budget.capture_checkpoint_sha256=digest(receipt)
     # Recompute every disposition in trusted controller memory. A worker's
@@ -358,13 +359,8 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
     # never borrowed from a caller's different date window.
     from dataclasses import replace
     from datetime import date
-    from app.pipeline.discovery_contract import WindowEvidence
-    cfg=coordinator.contracts[receipt['contract']].config
-    resources=receipt['resources']
-    w=WindowEvidence(envelope.council,'manual-ingestion-controller',cfg.start,cfg.end,cfg.start,cfg.end,cfg.semantics,
-        receipt['contract'],receipt['source_sha256'],receipt['segments'][-1]['terminal'],len(receipt['segments']),len(receipt['records']),
-        resources['requests_attempted'],resources['received_bytes'],resources['elapsed_seconds'])
-    envelope=replace(envelope,window=w,body_sha256=r['provenance']['body_sha256'])
+    w=contract.admission_window(receipt,envelope.council)      # the contract that validated the capture re-derives its window proof
+    envelope=replace(envelope,window=w,body_sha256=contract.record_body_sha256(r))
     # Exact task dependency was prepared before execution, never created by
     # the controller as a side effect of queue membership.
     fact=l.get(binding.factual_key)

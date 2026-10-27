@@ -67,6 +67,12 @@ def dated_config(config,start,end):
     destination=urlunsplit((u.scheme,u.netloc,u.path,urlencode([(k,value if k=='c__q' else v) for k,v in pairs]),''))
     return replace(config,destination=destination,start=start,end=end)
 
+def assessment_dated_config(config,start,end):
+    """Screening-grade (assessment metadata) configuration for ONE manifest window: exactly `dated_config`'s two-filter date substitution, plus the existing metadata
+    capture flags. Nothing else changes, so an admission-capable audit differs from the default projection only in the row metadata it captures."""
+    return replace(dated_config(config,start,end),capture_metadata=True,assessment_metadata=True)
+
+
 # New single-use source profile; existing consumed profiles retain their bytes
 # and default projection. Registration separately binds authority and date.
 SCREENING_CASE='discovery_manchester_screening_20261001_03'

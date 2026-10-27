@@ -20,7 +20,7 @@ non-empty local listing -> validated retained audit -> durable archive with veri
 ## Implementation (only the missing connections)
 | ID | Change | Files |
 |---|---|---|
-| S1 | Receipt `date_semantics`; batch identity takes semantics from the receipt (historical receipts without the key keep `RECEIVED`) | `app/ingestion/idox_adapter.py`, `app/ingestion/batching.py` |
+| S1 | Receipt `date_semantics`: an Idox receipt names its basis only when it is not `RECEIVED` (historical digests stay pinned); `retained_capture` always names it. Batch identity takes semantics from the receipt (a receipt without the key means `RECEIVED`) | `app/ingestion/idox_adapter.py`, `app/ingestion/batching.py` |
 | S2 | `Coordinator.retained_capture`: verify archive readback, project, checkpoint, finish; no listing request, no `source_calls` spend, no replay, optional evidence label | `app/ingestion/coordinator.py` |
 | S3 | `ArcusListingContract`: validated audit -> `LISTING_RECEIPT_V1` with `WindowEvidence`, per-record provenance, execution-budget pass-through, annotation-key handling; `ListingContract` gains an optional `execution_budget` | `app/ingestion/arcus_adapter.py`, `app/ingestion/coordinator.py` |
 | S4 | Deterministic exact nominee derivation (pure; frozen v3 table; conflicting observations withheld) | `app/ingestion/nomination.py` |
@@ -52,3 +52,10 @@ Source-only fixture success is never reported as admission proof; synthetic cont
 
 ## Local-development note
 Hosted CI (PostgreSQL 17) is the authority. Locally only PostgreSQL 16 is available, on a separate loopback port; the system cluster on 5432 is not touched.
+
+## Running the integrated tests
+
+Hosted CI (job `e2e-connection-pg`, postgres:17 service on 127.0.0.1:5432) is the authority. Locally, on a machine that has its own PostgreSQL on 5432, run the tests inside a private
+user+network namespace (`unshare --user --map-user=$(id -u) --map-group=$(id -g) --keep-caps --net`, loopback up) with a disposable PostgreSQL 17+ on that namespace's own
+127.0.0.1:5432; the production controller's fixed-disposable-URL guard is unchanged. The first local proof ran on PostgreSQL 18.4; the server version is recorded by the fixture.
+All archives and receipts produced are labelled `TEST_ARCHIVE_NOT_LIVE_EVIDENCE` and carry a synthetic qualification hash; they are not live evidence and qualify no council markup.

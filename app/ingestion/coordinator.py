@@ -4,9 +4,9 @@ This delivery is admitted only on disposable engines by Ledger. There are no
 live authority registrations or network clients, schedules or later agents.
 """
 from dataclasses import dataclass
-import hashlib,json,math
+import hashlib,json,math,re
 from sqlalchemy import select
-from .ledger import Denied,bounded,digest
+from .ledger import Denied,bounded,digest,MAX_PAYLOAD
 from .listing_screening import qualifier_output_of,screen_row,routing_of,identity_admission_eligible,ScreeningRule,assessment_identity,SCREENING_CONTRACT_RULES,V1_CONTRACT,RULE_V1
 from .resource_accounting import combined_bytes
 
@@ -20,7 +20,7 @@ def validate_outer(outer,limits):
         or outer.get('expired') is not False or outer.get('limit_hit') is not None):raise Denied('OUTER_SAFETY')
 
 
-def validate_source_resources(source,outer,limits):
+def validate_source_resources(source,outer,limits,*,audit_bytes_limit=None):
     validate_outer(outer,limits)
     for k in ('requests','decoded_bytes','encoded_bytes','outbound_payload_bytes','peak_owned_rss'):
         if type(source.get(k)) is not int or source[k]<0:raise Denied('SOURCE_ACCOUNTING')
@@ -29,7 +29,14 @@ def validate_source_resources(source,outer,limits):
         or source.get('cleanup')!='CONTEXT_BROWSER_CLOSED' or source.get('process_cleanup')!='CLOSED'
         or type(source.get('live_owned_survivors')) is not int or source['live_owned_survivors']!=0 or source.get('supervisor_limit_hit') is not False
         or source.get('safety_failure') is not False or source.get('safety_events')!=[]):raise Denied('SOURCE_SAFETY')
-    bounded(source,min(128*1024,limits['audit_bytes']))
+    bounded(source,min(128*1024,limits['audit_bytes']) if audit_bytes_limit is None else audit_bytes_limit)
+
+
+ANNOTATION_KEYS=('processing_screen',)      # informational v1 annotation added to released audits AFTER the segment hash was taken; never part of the qualified row
+
+
+def canonical_rows(rows):
+    return [{k:v for k,v in row.items() if k not in ANNOTATION_KEYS} for row in rows]
 
 
 @dataclass(frozen=True)
@@ -39,26 +46,28 @@ class ListingContract:
     case:str
     audit_validator:object
     row_qualifier:object
+    execution_budget:str|None=None      # the browser budget the audit must declare exactly; None is the historical envelope and refuses any audit that declares one
 
     def __post_init__(self):
         if not callable(self.audit_validator) or not callable(self.row_qualifier):raise Denied("QUALIFIED_ADAPTER_REQUIRED")
 
     # Receipt validation is the existing reader's exact source-specific audit.
-    def validate(self,source):
+    def validate(self,source,*,audit_bytes_limit=MAX_PAYLOAD):
         if source.get('case')!=self.case or source.get('requested_interval')!=[self.config.start,self.config.end]:raise Denied('SOURCE_BINDING')
-        self.audit_validator(source,self.config)
+        self.audit_validator(source,self.config,**({} if self.execution_budget is None else {'execution_budget':self.execution_budget}))
         for key in ('requests','decoded_bytes','encoded_bytes','outbound_payload_bytes','peak_owned_rss'):
             if type(source.get(key)) is not int or source[key]<0:raise Denied('SOURCE_ACCOUNTING')
         if source['peak_owned_rss']>1024**3:raise Denied('SOURCE_RSS')
         if type(source.get('supervisor_seconds')) not in (int,float) or not math.isfinite(source['supervisor_seconds']) or not 0<=source['supervisor_seconds']<=45:raise Denied('SOURCE_CLOCK')
-        for row in source['listing_records']:
+        rows=canonical_rows(source['listing_records'])
+        for row in rows:
             fields=[dict(label='Reference',value=row['reference'])]
             if self.config.row_date:fields.append(dict(label='Valid Date',value=row['validated_date']['literal']))
             card=dict(fields=fields,links=[dict(text=row['reference'],href=row['source_url'])],assessment_capture=row['assessment_capture'])
             if self.row_qualifier('Showing 1 to 1 of 1 results',[card],1,config=self.config)[3][0]!=row:raise Denied('ROW_PROVENANCE')
-        bounded(source)
+        bounded(source,audit_bytes_limit)
         for seg in source['listing_segments']:
-            if source['listing_records'] and seg.get('evidence_sha256')!=hashlib.sha256(json.dumps(source['listing_records'][seg['first']-1:seg['last']],sort_keys=True).encode()).hexdigest():raise Denied('SEGMENT_HASH')
+            if rows and seg.get('evidence_sha256')!=hashlib.sha256(json.dumps(rows[seg['first']-1:seg['last']],sort_keys=True).encode()).hexdigest():raise Denied('SEGMENT_HASH')
 
 
 @dataclass(frozen=True)
@@ -193,6 +202,33 @@ class Coordinator:
         except Exception:
             self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
             raise
+
+    def retained_capture(self,claim,source,outer,archive,*,expected_source_sha256,evidence_label=None):
+        """Capture an already published audit WITHOUT another listing request: no source call is made and none is spent.
+
+        Order: the exact contract validates and projects the audit first (a tampered or unqualified audit is never archived), the audit is then archived and read back
+        (`archive_capture`), strictly before the checkpoint, and then finished. A tampered audit, an unverified archive, a replay, a foreign task or an unsupported contract stops before any checkpoint.
+        `expected_source_sha256` (mandatory) binds the audit to the hash its publisher recorded. `evidence_label` marks a receipt as a test or other non-live artefact, so it can
+        never be passed off as live evidence. Works for the two known listing families (Idox and Arcus).
+        """
+        from .idox_adapter import IdoxListingContract
+        from .arcus_adapter import ArcusListingContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,(IdoxListingContract,ArcusListingContract)):raise Denied('UNSUPPORTED_RETAINED_CONTRACT')
+        if row['task']!='DISCOVERY' or row['subject']!=contract.scope():raise Denied('RETAINED_TASK_SCOPE')
+        if row['checkpoint'] is not None:raise Denied('RESUME_CHECKPOINT_NO_SOURCE_REPLAY')
+        if not isinstance(expected_source_sha256,str) or digest(source)!=expected_source_sha256:raise Denied('RETAINED_AUDIT_BINDING')      # mandatory: an Idox audit binds page hashes, not each record's text, so only the publisher's recorded hash can detect a changed record
+        if evidence_label is not None and (not isinstance(evidence_label,str) or not re.fullmatch('[A-Z0-9_]{1,64}',evidence_label)):raise Denied('EVIDENCE_LABEL')
+        from .batching import archive_capture
+        receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024)      # validate first: a tampered or unqualified audit is never archived
+        saved=archive_capture(source,archive)      # then archive with a verified readback, strictly before any checkpoint
+        receipt.pop('window',None);receipt['durable_archive']=saved
+        receipt.setdefault('date_semantics',contract.scope()['semantics'])      # a retained capture always states its date basis
+        if evidence_label is not None:receipt['evidence_label']=evidence_label
+        bounded(receipt)
+        self.ledger.checkpoint(claim,receipt)
+        self.ledger.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=[],source_sha256=receipt['source_sha256']))
+        return receipt
 
     def idox_form_probe(self,claim,supervised_reader):
         """The form-probe analogue of idox_source: one DB-gated source intent, one form-only read, the observation recorded, the item finished UNSUPPORTED_CONTRACT (never reusable as a capture). A council

@@ -11,7 +11,8 @@ import hashlib
 from app.ingestion.ledger import Denied, digest
 from app.ingestion.listing_screening import RULE_V3, V3_CONTRACT, assessment_identity, code_binding, routing_of
 from app.ingestion.idox_adapter import IdoxListingContract
-from .new_identity_contract import accepted_idox_new_identity
+from app.ingestion.arcus_adapter import ArcusListingContract
+from .new_identity_contract import ARCUS_PROJECTION_MODULES, accepted_arcus_new_identity, accepted_idox_new_identity
 from .operational_controller import AcceptanceBinding, ControllerLedger, _execute
 
 
@@ -31,19 +32,22 @@ class V3AdmissionBinding:
 def factual_binding(contract):
     """Bind the existing factory and its target, not an arbitrary callable.
 
-    No new council qualification: Arcus and unrecognised projectors are refused.
+    No new council qualification: only the two reviewed families (Idox and Arcus) are bound; unrecognised projectors are refused.
     Module bytes are part of the binding; the overall reviewed revision remains
     a separate controller/registration prerequisite.
     """
     from app.ingestion.new_identity import NewIdentityContract
     if not isinstance(contract, NewIdentityContract):
         raise Denied('V3_FACTUAL_CONTRACT_REQUIRED')
-    known = accepted_idox_new_identity(contract.name, contract.row, verification_scope=contract.verification_scope)
     components = ('projector', 'handoff', 'coupled_gate')
-    if any(getattr(contract, name) is not getattr(known, name) for name in components):
-        raise Denied('V3_FACTUAL_COMPONENT_UNSUPPORTED')
+    for factory, extra in ((accepted_idox_new_identity, ()), (accepted_arcus_new_identity, ARCUS_PROJECTION_MODULES)):
+        known = factory(contract.name, contract.row, verification_scope=contract.verification_scope)
+        if all(getattr(contract, name) is getattr(known, name) for name in components):
+            break
+    else:
+        raise Denied('V3_FACTUAL_COMPONENT_UNSUPPORTED')      # only the two reviewed factories; Arcus no longer refused, anything else still is
     import inspect
-    modules = {getattr(known, name).__module__ for name in components}
+    modules = {getattr(known, name).__module__ for name in components} | set(extra)
     modules.add(__name__.rsplit('.', 1)[0] + '.new_identity_contract')
     import importlib
     hashes = {name: hashlib.sha256(Path(inspect.getsourcefile(importlib.import_module(name))).read_bytes()).hexdigest()
@@ -76,7 +80,7 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
     if (root['state'] != 'COMPLETE' or root['task'] != 'DISCOVERY'
             or (root['contract'], root['revision']) != (binding.capture_contract, binding.capture_revision)
             or receipt.get('kind') != 'LISTING_RECEIPT_V1' or digest(receipt) != b.retained_capture_sha256
-            or not isinstance(contract, IdoxListingContract)
+            or not isinstance(contract, (IdoxListingContract, ArcusListingContract))
             or binding.council != council.code or receipt.get('council') != binding.council
             or envelope.council != binding.council):
         raise Denied('V3_COMPLETE_IDOX_CAPTURE_REQUIRED')
