@@ -30,7 +30,9 @@ def batch_plans(capture_key,capture,screening=None,*,observation_councils=()):
             from .listing_screening import screening_plan_binding
             plan['screening']=screening_plan_binding(screening)[0]      # explicit v3 selection: part of the plan, so part of the batch identity (new keys; the v1 batches are never touched)
         interval=capture['requested_interval'] if observation else capture['interval']
-        identity=dict(subject={'kind':'DISCOVERY_SCOPE','council':capture['council'],'start':interval[0],'end':interval[1],'semantics':'RECEIVED'},task='LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan))
+        semantics=capture.get('date_semantics','RECEIVED')      # historical receipts carry no date basis and keep their RECEIVED identity; a receipt that names one (Stockport is VALIDATED) must batch under it
+        if semantics not in ('RECEIVED','VALIDATED') or (observation and semantics!='RECEIVED'):raise Denied('DATE_SEMANTICS')
+        identity=dict(subject={'kind':'DISCOVERY_SCOPE','council':capture['council'],'start':interval[0],'end':interval[1],'semantics':semantics},task='LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan))
         key=digest(identity);plans.append(dict(identity,key=key,dependencies=sorted([capture_key]+([previous] if previous else [])),checkpoint={'kind':'BATCH_PLAN_V1','plan':plan},max_attempts=2));previous=key
     return plans
 

@@ -33,6 +33,13 @@ def manifest(start,end,purpose):
             cursor=stop+timedelta(days=1)
     return dict(purpose=purpose,start=start,end=end,rule=RULE,limits=LIMITS.copy(),rows=rows)
 
+def select_rows(plan,expected_hash,councils):
+    """The rows of exactly the named councils from a canonical, hash-matched manifest. Nothing outside the regenerated plan can be selected."""
+    if plan!=manifest(plan['start'],plan['end'],plan['purpose']) or digest(plan)!=expected_hash:raise ValueError('unreviewed manifest')
+    wanted=list(councils)
+    if not wanted or len(set(wanted))!=len(wanted) or any(c not in COUNCILS for c in wanted):raise ValueError('council selection')
+    return [dict(row) for row in plan['rows'] if row['council'] in wanted]
+
 def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
     if type(no_transport_retry) is not bool or type(retain_proof) is not bool:raise ValueError('retry/proof policy')
     # A named browser execution budget applies to the Arcus UI reader only.
