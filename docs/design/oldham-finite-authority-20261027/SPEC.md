@@ -1,0 +1,35 @@
+# Dormant finite Oldham authority connection
+
+Baseline c007ec76643305cfdbf8ba8c7f390eca95a179f1, tree 4b654bd9683c68ed88e81615b61d3f0e425cc578. Offline development only; no production installation or authority.
+
+Separate owner issuance for derived CAPTURE and CHAIN registrations. Oldham RECEIVED only, complete metadata, COUPLED facts. Windows are sealed data (one to seven inclusive days); no fixed historical date and no source discovery here. Existing Owner.register, Bolton policy, privileges and source budgets stay unchanged.
+
+Only the known generation-3 historical stop projection is acknowledged: global_stop=CONSUMED_SALFORD_GLOBAL_STOP/run38884069913, manual_stop and last_hard_stop=IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE, hard_stop_generation=3. Every field must be present and equal. This allowance intentionally excepts exactly those historical global/manual stop fields; a changed projection or generation invalidates at the next SQL worker boundary. Persistence uncertainty, write barriers and deferrals remain independent. No immediate interruption guarantee.
+
+Owner rederives registration from authoritative scope/contract, saved root/checkpoint, nominees, rule and targets. No arbitrary prepared grant accepted. Exact package binds code, capture/source/qualification/supervisor hashes, work rows, targets, grant and stop identity. Separate capture and chain authority, single-use names, expiry <=24h, explicit revocation. Counters are mutable only downward; immutable grant identity excludes counters but allowance records their original caps. No replay or automatic replacement after uncertain acknowledgement.
+
+Cumulative runtime allowance remains 1040 statements, 40 connection attempts, 4MiB returned values and 300 supervised seconds. Closure reserves are withheld before effects. Derive pre-effect capacity from recorded stage maxima, refuse excess; no splitting or truncation. Existing stage limits unchanged. N nominees: N exact source calls and 2N write transactions. Zero is valid.
+
+Three-login lifecycle reuses worker/effect/application capability roles and existing column grants, 48 random byte passwords, memory-only URLs, protected secret mapping, initial NOLOGIN, finite expiry and positive disable/password/membership/session/secret readbacks. Application writer remains column privileges plus trusted caller enforcement, not per-nominee database isolation. No new broad role, no new source/parser/writer.
+
+Validation: unit rejection/derivation, exact SQL replacement/inverse, actual restricted PG caller with installed derived policy, owner issuance/rollback/lost acknowledgements, stop changes/barriers/expiry/counters, identity and B2 uncertainty, write confinement and three-role teardown. Synthetic source/API fixtures, real child processes/PG/cgroups; no council contact. Production prerequisites remain installation inventory/access/control inspection, separately approved installation/credentials and finite owner release.
+
+## Exact compatibility and allocation
+
+Installation is derived from the combined v3/partial-observation worker. Its two Oldham substitutions are invertible; all Bolton function definitions remain byte-identical. The full recognised inventory is the reviewed generation-3/v6 inventory with this combined worker and one owner-only Oldham predicate. The activation gate is the unchanged three-login application-writer gate. Extra helper execution by runtime roles refuses.
+
+CAPTURE issuance reserves worst-case nominee capacity (every record) before effects: the current conservative formula admits at most six records, even if a larger capture might later have zero nominees. This is refusal, not truncation or a larger entitlement. CHAIN rechecks the exact nominee count. Runtime allocations share1040commands/40connections/4MiB/300seconds and withhold32commands/two connections/64KiB/thirty seconds for closure. Per-budget returned caps and hard deadlines are bounded by the remaining aggregate. Uncertain close receipts latch reconciliation. Stage budgets do not become additive entitlements. No claim that a full weekly batch fits.
+
+The owner remains bounded by existing administrative command/connection ceilings and240seconds with thirty seconds reserved for teardown. This library is not an owner-launch command, registration renderer or production release. Existing hidden-input/verified-TLS release tooling remains a later explicit binding. No expiry clock is started by this document.
+
+The allowance deliberately accepts only the known generation-3 stop projection, including last_hard_stop. Clearing the global stop also invalidates Oldham authority. Detection occurs at SQL boundaries, not during an already-issued source request. In-flight transaction locks retain existing stop ordering. Unexpected sessions are reported after bounded waits; no new termination privilege is granted. Failed/uncertain mutation acknowledgement stops further mutation and requires separate reconciliation; no compensation or replacement issuance.
+
+## Review corrections and proof boundaries
+
+The administrative clock counts only nested owner administrative phases, including mapping/deletion API waits, not intervening runtime work; the outer480second clock remains independent. Post-commit capability/grant/revocation readback failures latch reconciliation. The SQL guard also checks Oldham authority when global_stop is cleared, and the package digest binds original counters/expiry as well as evidence and targets. All future production URL mappings must pass the existing exact runtime-principal and verified-TLS validation before protected mapping.
+
+Rollback text is review-only: revoke Oldham authority and disable access with positive session/secret readbacks before restoring the prior combined worker. Consumed grants/allowances and all audit history remain retained. No rollback or installation is performed by these Python imports.
+
+Disposable administration explicitly supplies effective pg_read_all_stats and password-presence column reads to the installer fixture, not runtime logins. This proves handling when those prerequisites exist, not their availability in production. Mapping/deletion acknowledgements use an in-memory names-only GitHub stand-in; source responses are synthetic, private workers and database transactions are real. Injected acknowledgement loss never creates permission to compensate. Later production approval must address verifier-retention risk for the application login as well as worker/effect; this development approval provisions no production credential.
+
+Runtime is additionally bound to the same owner package clock: active work stops at min(runtime270s, package450s). Administrative pre-effects stop at210s, teardown at240s; package diagnostic/closure475s, outer reporting480s, matching existing DEFAULT_DEADLINES. Each detail attempt must have its full unchanged45s source ceiling remaining before it starts. The owner caller factory shares one allocation across phases; no independently restarted deadline.
