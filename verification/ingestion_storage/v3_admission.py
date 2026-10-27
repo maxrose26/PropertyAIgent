@@ -55,7 +55,7 @@ def factual_binding(contract):
     return digest(dict(name=contract.name, row=contract.row, verification_scope=contract.verification_scope, modules=hashes))
 
 
-def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, council, check=lambda: None):
+def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, council, check=lambda: None, allow_test_evidence=False):
     """No listing callback exists here: a complete saved capture is mandatory.
 
     Ineligible records remain untouched investigation evidence. No row/grant is
@@ -84,6 +84,8 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
             or binding.council != council.code or receipt.get('council') != binding.council
             or envelope.council != binding.council):
         raise Denied('V3_COMPLETE_IDOX_CAPTURE_REQUIRED')
+    if receipt.get('evidence_label') and not allow_test_evidence:
+        raise Denied('TEST_EVIDENCE_NOT_LIVE')      # a labelled test artefact is never live evidence unless a test explicitly opts in
     records = [r for r in receipt['records'] if r['reference'] == b.reference]
     if len(records) != 1 or digest(records[0]) != b.listing_revision:
         raise Denied('V3_NOMINATED_RECORD_BINDING')

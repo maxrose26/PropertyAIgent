@@ -277,12 +277,12 @@ class AcceptanceBinding:
     screening_batch_key:str|None=None
 
 
-def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
+def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None,allow_test_evidence=False):
     # Real SQL v3 admission requires the complete retained nomination binding.
     # Historical v1 and disposable Ledger callers keep their existing defaults.
     from .v3_admission import V3AdmissionBinding,execute_retained_v3
     if isinstance(binding,V3AdmissionBinding):
-        return execute_retained_v3(coordinator,binding,detail_reader=detail_reader,envelope=envelope,council=council,check=check)
+        return execute_retained_v3(coordinator,binding,detail_reader=detail_reader,envelope=envelope,council=council,check=check,allow_test_evidence=allow_test_evidence)
     from app.ingestion.listing_screening import RULE_V3
     if isinstance(coordinator.ledger,ControllerLedger) and coordinator.screening_rule.rule_version==RULE_V3:
         raise Denied('V3_RETAINED_NOMINATION_REQUIRED')

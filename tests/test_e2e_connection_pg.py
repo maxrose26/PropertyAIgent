@@ -33,6 +33,8 @@ EXPECTED = {'E2E/1/26': 'ADMIT_SCHEME', 'E2E/2/26': 'ADMIT_FOR_ASSESSMENT', 'E2E
 WRITES = {'idox': {'applications', 'application_lifecycle_events'}, 'arcus': {'applications'}}
 FORBIDDEN = ['sites', 'documents', 'scheme_intelligence', 'companies', 'application_companies', 'contacts', 'visual_evidence', 'buyers', 'buyer_mandates', 'buyer_profiles',
              'opportunity_monitoring_states', 'current_buyer_opportunity_states', 'acquisition_subject_anchors', 'applicant_intelligences']
+# The exact production binding that refuses each forgery (the capture-digest check keeps its historical Idox-era name).
+REFUSED_BY = {'capture': 'V3_COMPLETE_IDOX_CAPTURE_REQUIRED', 'screening': 'V3_ASSESSMENT_BINDING', 'nominee': 'V3_NOMINATED_RECORD_BINDING', 'factual': 'V3_FACTUAL_TASK_BINDING'}
 UNCERTAIN = ['after_admission', 'interrupt_after_commit', 'b2_readback_failure', 'committed_readback_failure', 'ledger_lost_ack']
 
 
@@ -221,7 +223,7 @@ def test_conflicting_observations_are_withheld_and_never_admitted(world, tmp_pat
     a.capture(), a.read_capture()
     b = Chain(world, tmp_path, family, 'conflict-b-' + family, [entry('E2E/1/26', ASSESS), entry('E2E/2/26', ASSESS)]).owner_registers_capture()      # same reference, different content
     b.capture(), b.read_capture()
-    both = derive_nominees([a.capture_receipt, b.capture_receipt], a.rule)
+    both = derive_nominees([a.capture_receipt, b.capture_receipt], a.rule, allow_test_evidence=True)
     assert [c['reference'] for c in both.conflicts] == ['E2E/1/26'] and len(both.conflicts[0]['observations']) == 2
     assert [n.reference for n in both.nominees] == ['E2E/2/26']      # the identical observation still nominates, bound to one capture
     owner = a if both.nominees[0].capture_sha256 == digest(a.capture_receipt) else b
@@ -264,6 +266,7 @@ def test_tampering_after_capture_is_refused_by_the_production_bindings(world, tm
         adm.binding = replace(adm.binding, factual_contract_sha256='0' * 64)
     with pytest.raises((Denied, DBAPIError)) as exc:
         chain.admit(adm)
+    assert isinstance(exc.value, Denied) and str(exc.value) == REFUSED_BY[forgery], (forgery, repr(exc.value))      # the specific production binding, not just any refusal
     unexpected(exc.value)
     assert adm.detail_calls == [] and boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 0
     assert_confined(world, family, before, admitted=False)
@@ -485,4 +488,18 @@ def test_stockport_validated_scope_batches_through_the_sql_ledger(world, tmp_pat
     from app.ingestion.batching import batch_plans
     stale = {k: v for k, v in chain.capture_receipt.items() if k != 'date_semantics'}
     assert batch_plans(chain.root['key'], stale, chain.rule)[0]['subject']['semantics'] == 'RECEIVED' != chain.contract.scope()['semantics']
+    assert_closed(world, chain)
+
+
+@pytest.mark.parametrize('family', FAMILIES)
+def test_a_labelled_test_archive_is_never_accepted_as_live_evidence(world, tmp_path, family):
+    """The label is enforced, not just carried: nomination and admission refuse a TEST_ARCHIVE receipt unless the caller explicitly opts in."""
+    boot = world['boot']
+    chain, nominees = staged(world, tmp_path, family, 'label-' + family)
+    with pytest.raises(Denied, match='TEST_EVIDENCE_NOT_LIVE'):
+        derive_nominees([chain.capture_receipt], chain.rule)
+    adm = chain.prepare(nominees.nominees[0])
+    with pytest.raises(Denied, match='TEST_EVIDENCE_NOT_LIVE'):
+        chain.admit(adm, allow_test_evidence=False)
+    assert adm.detail_calls == [] and boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 0
     assert_closed(world, chain)

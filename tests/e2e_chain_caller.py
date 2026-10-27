@@ -231,7 +231,7 @@ class Chain:
         return saved
 
     def nominees(self, receipts=None):
-        return derive_nominees(receipts or [self.capture_receipt], self.rule)
+        return derive_nominees(receipts or [self.capture_receipt], self.rule, allow_test_evidence=True)
 
     def _contracts(self):
         return {self.contract.name: self.contract, **{c.name: c for c in self.factual_contracts.values()}}
@@ -288,8 +288,8 @@ class Chain:
         self.listing_requests.append(1)
         raise AssertionError('the integrated chain must never request a listing')
 
-    def admit(self, adm):
+    def admit(self, adm, *, allow_test_evidence=True):
         try:
-            return execute(adm.co, adm.binding, listing_reader=self.no_listing, detail_reader=adm.detail, envelope=adm.envelope, council=adm.council, check=adm.budget.check)
+            return execute(adm.co, adm.binding, listing_reader=self.no_listing, detail_reader=adm.detail, envelope=adm.envelope, council=adm.council, check=adm.budget.check, allow_test_evidence=allow_test_evidence)
         finally:
             self.accounting.setdefault('admission', []).append(adm.budget.close([]))

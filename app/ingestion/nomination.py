@@ -30,12 +30,13 @@ class NomineeSet:
     sha256:str
 
 
-def derive_nominees(receipts,rule):
+def derive_nominees(receipts,rule,*,allow_test_evidence=False):
     if rule.rule_version!=RULE_V3:raise Denied('V3_RULE_REQUIRED')
     receipts=list(receipts)
     for rc in receipts:
         if (rc.get('kind')!='LISTING_RECEIPT_V1' or not rc.get('durable_archive') or rc.get('cleanup')!='CLOSED'
             or rc.get('accounting_complete') is not True):raise Denied('RETAINED_CAPTURE_REQUIRED')
+        if rc.get('evidence_label') and not allow_test_evidence:raise Denied('TEST_EVIDENCE_NOT_LIVE')      # a labelled test artefact is never live evidence unless a test explicitly opts in
     observations={}
     for rc in sorted(receipts,key=digest):
         capture=digest(rc)
