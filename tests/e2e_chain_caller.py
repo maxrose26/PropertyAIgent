@@ -147,18 +147,18 @@ class Chain:
         if source_calls is not None:
             grant['source_calls'] = source_calls
         self._install(reg, grant=grant, stop=stop)
-        self.root, self.caller.root_key, self.capture_registration = reg.rows[0], reg.root_key, reg
+        self.root, self.capture_registration = reg.rows[0], reg
         return self
 
     def target_for(self, record):
         return idox_detail_target(self.council, record) if self.family == 'idox' else arcus_detail_target(self.council, record)
 
-    def owner_registers_chain(self, nominees, *, ttl=1800, writes=None, source_calls=None, stop=None, now=None, others=()):
+    def owner_registers_chain(self, nominees, *, ttl=1800, writes=None, source_calls=None, stop=None, others=()):
         """Prepare (PRODUCTION) the batch/screening/factual items and the chain grant from the saved capture and the nominees, then install them."""
         receipt = self.capture_receipt
         targets = {r['reference']: self.target_for(r) for r in receipt['records']}
-        reg = chain_registration(self._owner(ttl), self.binding, self.contract, self.root, receipt, tuple(nominees), self.rule, targets, revision=self.revision, item_limits=self.item_limits,
-                                 now=time.time() if now is None else now, allow_test_evidence=True, other_receipts=others)
+        reg = chain_registration(self._owner(ttl), self.binding, self.contract, dict(self.root, checkpoint=receipt), receipt, tuple(nominees), self.rule, targets, revision=self.revision, item_limits=self.item_limits,
+                                 allow_test_evidence=True, other_receipts=others)
         grant = copy.deepcopy(reg.grant)
         if writes is not None:
             grant['writes'] = writes
@@ -196,6 +196,8 @@ class Chain:
 
     def capture(self, *, source=None, expected=None, label=LABEL):
         supervised, outer = self.supervised_source()
+        if self.caller.preflighted != self.root['key']:
+            self.caller.preflight(self.root['key'])      # the caller refuses to capture without it
         return self.caller.capture(supervised if source is None else source, outer, expected_source_sha256=digest(supervised) if expected is None else expected,
                                    evidence_label=label, archive=self.publisher)
 

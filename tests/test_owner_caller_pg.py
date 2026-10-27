@@ -169,3 +169,29 @@ def test_a_prepared_grant_made_insufficient_is_refused_by_the_database(world, tm
     closed(world, chain)
     exact = chain.chain_registration.grant
     assert exact['writes'] == 2 * len(nominees.nominees) and exact['source_calls'] == len(nominees.nominees)
+
+
+@pytest.mark.parametrize('family', FAMILIES)
+def test_capture_is_refused_without_a_preflight_of_this_exact_root(world, tmp_path, family):
+    chain = Chain(world, tmp_path, family, 'nopreflight-' + family).owner_reset().owner_registers_capture()
+    supervised, outer = chain.supervised_source()
+    with pytest.raises(Denied, match='PREFLIGHT_REQUIRED'):
+        chain.caller.capture(supervised, outer, expected_source_sha256=digest(supervised), evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE', archive=chain.publisher)
+    assert world['boot'].execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s', (chain.root['key'],)).fetchone()[0] is None and chain.publisher.calls == []
+    chain.caller.preflighted = 'f' * 64      # a preflight of some OTHER root does not count
+    chain.caller.root_key = chain.root['key']
+    with pytest.raises(Denied, match='PREFLIGHT_REQUIRED'):
+        chain.caller.capture(supervised, outer, expected_source_sha256=digest(supervised), evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE', archive=chain.publisher)
+    closed(world, chain)
+
+
+@pytest.mark.parametrize('family', FAMILIES)
+def test_only_registered_nominees_can_be_prepared_for_admission(world, tmp_path, family):
+    chain = Chain(world, tmp_path, family, 'unregistered-' + family).owner_reset().owner_registers_capture()
+    chain.capture(), chain.read_capture()
+    nominees = chain.nominees()
+    chain.owner_registers_chain(nominees.nominees)
+    stray = nominees.nominees[0].__class__(**{**nominees.nominees[0].__dict__, 'reference': 'E2E/3/26'})
+    with pytest.raises(Denied, match='CHAIN_NOMINEE_NOT_REGISTERED'):
+        chain.caller.prepare(stray)
+    closed(world, chain)

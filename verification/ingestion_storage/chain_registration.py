@@ -6,6 +6,7 @@ authority (`Owner.register`, which also registers the policy's named exception) 
 accepts only the pinned Bolton scope today (`BOLTON_ONLY`, `EXACT_BOLTON_DAY`), so issuing for another council needs a reviewed policy step that does not exist yet.
 """
 import hashlib
+import time
 from dataclasses import dataclass, field
 
 from app.ingestion.batching import batch_plans
@@ -49,15 +50,17 @@ def capture_registration(owner, binding, contract, start, end, *, revision, item
     return Registration('CAPTURE', authority_name(binding, 'CAPTURE', revision), [root], [root], grant, bindings, root['key'])
 
 
-def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, now, allow_test_evidence=False, other_receipts=()):
+def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, allow_test_evidence=False, other_receipts=()):
     """The batch, screening and factual items and the one grant covering them, for exactly the nominees the receipt yields.
 
     `detail_targets` maps reference -> the fresh-detail case target; each must name exactly the nominated record (`check_detail_target`). Refuses before preparing anything when the
-    receipt is not the saved capture of this scope, when `nominees` is not exactly what `derive_nominees` yields from it, when a limit does not fit, or when the authority would be
+    receipt is not the stored root's saved capture of exactly this scope (contract, interval, date basis), when `nominees` is not exactly what `derive_nominees` yields from it, when a limit does not fit, or when the authority would be
     expired or too short for the work it covers.
     """
     scope = contract.scope()
-    if root.get('subject') != scope or root.get('task') != 'DISCOVERY' or root.get('contract') != contract.name or receipt.get('council') != binding.council:
+    if (root.get('subject') != scope or root.get('task') != 'DISCOVERY' or root.get('contract') != contract.name or receipt.get('council') != binding.council
+            or receipt.get('contract') != contract.name or receipt.get('interval') != [scope['start'], scope['end']] or receipt.get('date_semantics', 'RECEIVED') != scope['semantics']
+            or root.get('checkpoint') != receipt):      # the receipt must BE the stored root's saved capture, for exactly this scope
         raise Denied('CHAIN_FOREIGN_CAPTURE')
     reconcile_items(binding, item_limits)
     # `other_receipts` are further saved captures of the same council, supplied only so that a reference observed differently elsewhere is withheld; the nominees registered here are
@@ -81,7 +84,7 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
         contracts[nominee.reference] = fc
         subject = dict(kind='APPLICATION', council=binding.council, reference=nominee.reference)
         facts[nominee.reference] = item(dict(subject=subject, task='FACTUAL_REFRESH', contract=fc.name, revision=revision), dependencies=[screens[nominee.reference]['key']], limits=dict(item_limits))
-    lifetime = (owner.grant_expiry or owner.expiry).timestamp() - now
+    lifetime = (owner.grant_expiry or owner.expiry).timestamp() - time.time()      # the clock is read here, never supplied by the caller
     problems = grant_problems(binding, lifetime, batches=len(batches), nominees=len(nominees))
     if problems:
         raise Denied('LIMIT_INCOMPATIBLE:' + ','.join(problems))

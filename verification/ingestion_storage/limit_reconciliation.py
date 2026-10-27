@@ -39,9 +39,16 @@ def required_grant_seconds(binding, *, batches, nominees):
     return select(binding.execution_budget)['slot_active_seconds'] + STAGE_LEASE_SECONDS * (batches + nominees)
 
 
+def reviewed_item_limits(binding):
+    """The ONE ledger limits value reviewed for this binding. A caller never names limits: it passes this constant, and `item_problems` refuses anything else."""
+    return BROWSER_SOURCE_V2_ITEM_LIMITS if binding.execution_budget else DEFAULT_LIMITS
+
+
 def item_problems(binding, item_limits):
     if binding.supervisor == 'IDOX_REQUESTS' and binding.execution_budget is not None:
         return ['reader.execution_budget_not_supported_by_supervisor']
+    if not isinstance(item_limits, dict) or set(item_limits) != set(DEFAULT_LIMITS) or any(type(v) is not int or v < 0 for v in item_limits.values()):
+        return ['ledger.item_limits_malformed']
     budget = select(binding.execution_budget)
     need = {'ledger.worker_seconds': (item_limits['worker_seconds'], '>=', budget['worker_seconds']),
             'ledger.outer_seconds': (item_limits['outer_seconds'], '>', budget['source_outer_seconds']),
@@ -49,7 +56,10 @@ def item_problems(binding, item_limits):
             'ledger.aggregate_rss': (item_limits['aggregate_rss'], '>=', budget['source_memory_bytes'])}
     if binding.supervisor == 'IDOX_REQUESTS':
         need['supervisor.source_seconds'] = (IDOX_SUPERVISOR['source_seconds'], '>=', budget['worker_seconds'])
-    return [name for name, (have, op, want) in need.items() if not (have >= want if op == '>=' else have > want)]
+    problems = [name for name, (have, op, want) in need.items() if not (have >= want if op == '>=' else have > want)]
+    if item_limits != reviewed_item_limits(binding):      # fits the budget is necessary, not sufficient: the stored limits are exactly the reviewed value (requests, bytes, rows, pages, audit_bytes included)
+        problems.append('ledger.item_limits_not_reviewed')
+    return problems
 
 
 def grant_problems(binding, lifetime_seconds, *, batches, nominees):

@@ -45,6 +45,11 @@ def contract_and_audit(family, council):
     return arcus_contract(council, START, END, budget=binding.execution_budget), arcus_audit(council, ALL, START, END, budget=binding.execution_budget)
 
 
+def rooted(cap, receipt):
+    """The root row as the owner would read it back after the capture: with the saved capture as its checkpoint."""
+    return dict(cap.rows[0], checkpoint=receipt)
+
+
 def prepared(family, council, tmp_path, *, ttl=1800):
     """(binding, contract, capture registration, saved receipt, nominees, targets) for one family, all through the production preparation."""
     binding = binding_for(council)
@@ -137,7 +142,7 @@ def test_the_v2_budget_with_default_ledger_limits_is_refused_naming_every_violat
     limits = dict(DEFAULT_LIMITS)
     with pytest.raises(Denied) as exc:
         reconcile_items(binding_for('manchester'), limits)
-    assert str(exc.value) == 'LIMIT_INCOMPATIBLE:ledger.worker_seconds,ledger.outer_seconds,ledger.source_rss'
+    assert str(exc.value) == 'LIMIT_INCOMPATIBLE:ledger.worker_seconds,ledger.outer_seconds,ledger.source_rss,ledger.item_limits_not_reviewed'
     assert limits == DEFAULT_LIMITS      # nothing was raised, clamped or substituted
 
 
@@ -208,7 +213,7 @@ def test_a_capture_registration_with_an_incompatible_selection_is_refused_before
 @pytest.mark.parametrize('family,council', FAMILIES)
 def test_the_chain_registration_derives_every_key_counter_and_outcome_from_the_capture_and_nominees(family, council, tmp_path):
     binding, contract, cap, receipt, nominees, targets = prepared(family, council, tmp_path)
-    reg = chain_registration(owner(), binding, contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), now=time.time(), allow_test_evidence=True)
+    reg = chain_registration(owner(), binding, contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), allow_test_evidence=True)
     n = len(nominees.nominees)
     assert n == 2 and reg.kind == 'CHAIN' and len(reg.batches) == 2 and len(reg.screens) == 6 and len(reg.facts) == 2
     g = reg.grant
@@ -217,18 +222,18 @@ def test_the_chain_registration_derives_every_key_counter_and_outcome_from_the_c
     assert set(g['keys']) == {r['key'] for r in reg.rows} == set(g['bindings']) and set(reg.bindings) == set(g['keys'])
     assert [r['key'] for r in reg.insert] == [r['key'] for r in [*reg.batches, *reg.facts.values()]]      # the root is already registered; screening children are created by the batch step
     assert g['completion_outcomes']['FACTUAL_REFRESH'] == ['SUPPORTED_FACTS_VERIFIED', 'ALREADY_KNOWN'] and 'ADMIT_SCHEME' in g['completion_outcomes']['SCREENING']
-    assert g['screening_configs'] == [digest(RULE.config())] or len(g['screening_configs']) == 1
+    assert len(g['screening_configs']) == 1
     assert {r['limits']['worker_seconds'] for r in reg.rows} == {limits_for(binding)['worker_seconds']}
     assert reg.authority == authority_name(binding, 'CHAIN', 'unit') != cap.authority
-    again = chain_registration(owner(), binding, contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), now=time.time(), allow_test_evidence=True)
+    again = chain_registration(owner(), binding, contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), allow_test_evidence=True)
     assert [r['key'] for r in again.rows] == [r['key'] for r in reg.rows]      # deterministic: the same inputs give the same keys
 
 
 @pytest.mark.parametrize('family,council', FAMILIES)
 def test_the_chain_registration_refuses_foreign_underived_or_mistargeted_inputs(family, council, tmp_path):
     binding, contract, cap, receipt, nominees, targets = prepared(family, council, tmp_path)
-    kw = dict(revision='unit', item_limits=limits_for(binding), now=time.time(), allow_test_evidence=True)
-    root = cap.rows[0]
+    kw = dict(revision='unit', item_limits=limits_for(binding), allow_test_evidence=True)
+    root = rooted(cap, receipt)
 
     def go(**override):
         args = dict(owner=owner(), binding=binding, contract=contract, root=root, receipt=receipt, nominees=nominees.nominees, rule=RULE, detail_targets=targets)
@@ -250,14 +255,14 @@ def test_the_chain_registration_refuses_foreign_underived_or_mistargeted_inputs(
     with pytest.raises(Denied, match='SCOPE_DETAIL_TARGET_MISMATCH'):
         go(detail_targets={})
     with pytest.raises(Denied, match='TEST_EVIDENCE_NOT_LIVE'):
-        chain_registration(owner(), binding, contract, root, dict(receipt, evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE'), nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding),
-                           now=time.time())      # labelled receipt, no opt-in
+        chain_registration(owner(), binding, contract, dict(root, checkpoint=dict(receipt, evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE')), dict(receipt, evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE'), nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding),
+                           )      # labelled receipt, no opt-in
 
 
 def test_the_chain_registration_refuses_limits_that_do_not_fit_the_selected_budget(tmp_path):
     binding, contract, cap, receipt, nominees, targets = prepared('arcus', 'manchester', tmp_path)
-    with pytest.raises(Denied, match='LIMIT_INCOMPATIBLE:ledger.worker_seconds,ledger.outer_seconds,ledger.source_rss'):
-        chain_registration(owner(), binding, contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=DEFAULT_LIMITS, now=time.time(), allow_test_evidence=True)
+    with pytest.raises(Denied, match='LIMIT_INCOMPATIBLE:ledger.worker_seconds,ledger.outer_seconds,ledger.source_rss,ledger.item_limits_not_reviewed'):
+        chain_registration(owner(), binding, contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=DEFAULT_LIMITS, allow_test_evidence=True)
 
 
 @pytest.mark.parametrize('family,council', FAMILIES)
@@ -266,8 +271,8 @@ def test_an_expired_or_too_short_authority_is_refused_at_preparation(family, cou
     need = required_grant_seconds(binding, batches=2, nominees=2)
     for ttl in (-5, 0, need - 60):
         with pytest.raises(Denied, match='grant.lifetime_seconds'):
-            chain_registration(owner(ttl), binding, contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), now=time.time(), allow_test_evidence=True)
-    assert chain_registration(owner(need + 60), binding, contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), now=time.time(),
+            chain_registration(owner(ttl), binding, contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding), allow_test_evidence=True)
+    assert chain_registration(owner(need + 60), binding, contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(binding),
                               allow_test_evidence=True).kind == 'CHAIN'
 
 
@@ -277,7 +282,7 @@ def test_another_council_cannot_borrow_a_registration(tmp_path):
     other_binding, other_contract, other_cap, *_ = prepared('arcus', 'manchester', tmp_path / 'other')
     assert cap.authority != other_cap.authority and cap.root_key != other_cap.root_key
     with pytest.raises(Denied, match='CHAIN_FOREIGN_CAPTURE'):
-        chain_registration(owner(), other_binding, other_contract, cap.rows[0], receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(other_binding), now=time.time(),
+        chain_registration(owner(), other_binding, other_contract, rooted(cap, receipt), receipt, nominees.nominees, RULE, targets, revision='unit', item_limits=limits_for(other_binding),
                            allow_test_evidence=True)
 
 
@@ -322,7 +327,7 @@ def test_a_fully_observed_closed_slot_is_the_only_closed_outer_object():
     }
     for name, kwargs in bad.items():
         built = outer_supervisor(**kwargs)
-        assert built['cleanup'] != 'CLOSED' or name in {'deadline', 'nonzero_exit'}, name
+        assert (built['cleanup'] == 'CLOSED') == (name in {'deadline', 'nonzero_exit'}), name      # those two close cleanly and are refused for exit code / deadline
         with pytest.raises(Denied, match='OUTER_SAFETY'):
             validate_outer(built, DEFAULT_LIMITS)
     assert outer_supervisor(**bad['missing_peak'])['cleanup'] == 'UNKNOWN' and outer_supervisor(**bad['survivor'])['cleanup'] == 'FAILED'
@@ -393,3 +398,30 @@ def test_the_idox_envelope_produces_a_compliant_outer_object_from_a_real_child(t
     source, got = idox_supervised(tmp_path, audit)
     assert source == audit and got['exit_code'] == 0 and got['cleanup'] == 'CLOSED' and got['live_owned_survivors'] == 0 and got['accounting_complete'] is True and got['limit_hit'] is None
     validate_outer(got, DEFAULT_LIMITS)
+
+
+# ----------------------------------------------------------------------------------------------- review findings (limits, scope of receipt, preflight)
+@pytest.mark.parametrize('change', [dict(requests=0), dict(bytes=1), dict(audit_bytes=1), dict(rows=0), dict(pages=0), dict(worker_seconds=100000), dict(outer_seconds=10 ** 9)])
+def test_item_limits_must_be_exactly_the_reviewed_value_not_merely_large_enough(change):
+    for council, base in (('tameside', DEFAULT_LIMITS), ('manchester', BROWSER_SOURCE_V2_ITEM_LIMITS)):
+        with pytest.raises(Denied, match='ledger.item_limits_not_reviewed'):
+            reconcile_items(binding_for(council), dict(base, **change))
+
+
+@pytest.mark.parametrize('broken', [lambda d: {k: v for k, v in d.items() if k != 'rows'}, lambda d: dict(d, worker_seconds=True), lambda d: dict(d, rows=1.5), lambda d: dict(d, rows=-1), lambda d: dict(d, extra=1), lambda d: None])
+def test_malformed_item_limits_are_a_denial_not_a_crash(broken):
+    with pytest.raises(Denied, match='ledger.item_limits_malformed'):
+        reconcile_items(binding_for('tameside'), broken(dict(DEFAULT_LIMITS)))
+
+
+@pytest.mark.parametrize('family,council', FAMILIES)
+def test_the_receipt_must_be_the_stored_roots_capture_for_exactly_this_scope(family, council, tmp_path):
+    binding, contract, cap, receipt, nominees, targets = prepared(family, council, tmp_path)
+    kw = dict(revision='unit', item_limits=limits_for(binding), allow_test_evidence=True)
+    root = rooted(cap, receipt)
+    assert chain_registration(owner(), binding, contract, root, receipt, nominees.nominees, RULE, targets, **kw).kind == 'CHAIN'
+    for name, bad_receipt, bad_root in (('other_week', dict(receipt, interval=['2026-11-02', '2026-11-08']), root), ('other_contract', dict(receipt, contract='other'), root),
+                                         ('other_basis', dict(receipt, date_semantics='RECEIVED' if family == 'arcus' else 'VALIDATED'), root), ('root_without_checkpoint', receipt, cap.rows[0]),
+                                         ('root_with_other_checkpoint', receipt, dict(root, checkpoint=dict(receipt, source_sha256='0' * 64)))):
+        with pytest.raises(Denied, match='CHAIN_FOREIGN_CAPTURE'):
+            chain_registration(owner(), binding, contract, bad_root, bad_receipt, nominees.nominees, RULE, targets, **kw)

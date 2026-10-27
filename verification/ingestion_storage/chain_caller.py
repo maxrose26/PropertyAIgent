@@ -44,6 +44,7 @@ class ChainCaller:
         self.bindings, self.capture_authority, self.chain_authority = bindings, capture_authority, chain_authority      # `bindings` is shared with the registration(s) that fill it
         self.stop_file, self.allow_test_evidence = stop_file, allow_test_evidence
         self.registration = None
+        self.preflighted = None
         self.budgets, self.accounting = [], {}
         self.listing_requests = []      # stays empty: no stage requests a listing
         self.capture_receipt = self.prior = None
@@ -82,12 +83,16 @@ class ChainCaller:
             row = co.ledger.get(root_key)
             if row['subject'] != self.contract.scope() or row['contract'] != self.contract.name or row['task'] != 'DISCOVERY':
                 raise Denied('CHAIN_FOREIGN_CAPTURE')
-            return reconcile_items(self.sb, row['limits'])
+            layers = reconcile_items(self.sb, row['limits'])
+            self.preflighted = root_key
+            return layers
         finally:
             self.accounting['preflight'] = budget.close([])
 
     def capture(self, source, outer, *, expected_source_sha256, evidence_label, archive):
         """Retained capture: validate, archive with verified readback, checkpoint, finish. No listing request, no source spend."""
+        if self.root_key is None or self.preflighted != self.root_key:
+            raise Denied('PREFLIGHT_REQUIRED')      # no capture is stored for a root whose limits were not reconciled first
         budget = self._budget(slot_key=self.root_key)
         co = self._coordinator(budget, self.capture_authority, {self.contract.name: self.contract})
         try:
@@ -110,7 +115,7 @@ class ChainCaller:
         return saved
 
     def nominees(self, receipts=None):
-        return derive_nominees(receipts or [self.capture_receipt], self.rule, allow_test_evidence=self.allow_test_evidence)
+        return derive_nominees([self.capture_receipt] if receipts is None else receipts, self.rule, allow_test_evidence=self.allow_test_evidence)
 
     def screen(self):
         costs = []
@@ -134,6 +139,8 @@ class ChainCaller:
     def prepare(self, nominee):
         """Everything one admission needs, built from the restricted ledger's retained state and the nominee: nothing is taken from the caller's memory of the capture."""
         reg, receipt = self.registration, self.capture_receipt
+        if nominee.reference not in reg.facts:
+            raise Denied('CHAIN_NOMINEE_NOT_REGISTERED')
         record = next(r for r in receipt['records'] if r['reference'] == nominee.reference)
         batch = reg.batches[receipt['records'].index(record) // 5]
         fc = reg.factual_contracts[nominee.reference]
