@@ -158,7 +158,7 @@ def failure_detail(error,stage):
 # Fixed reasons a failed worker may print (the Stop codes raised on its path plus the guard's two generic ones).
 # Child output is untrusted: only membership in this set is ever recorded (docs/design/real-worker-proof-20261026/SPEC.md).
 # `reason_state=VALIDATED` means well-formed and allowlisted, not authentic: the worker asserts its own reason.
-WORKER_EXIT_REASONS=frozenset({'CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
+WORKER_EXIT_REASONS=frozenset({'CAMPAIGN_CHILD_BINDING','CAMPAIGN_MIXED_SELECTORS','CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
     'SOURCE_CGROUP_V2','SOURCE_CGROUP_IDENTITY','SOURCE_MEMORY_ENFORCEMENT','SOURCE_OWNER_ENVIRONMENT',
     'UNCLASSIFIED_STOP','DEPENDENCY_UNAVAILABLE','PREPARATION_FAILURE'})
 WORKER_OUTPUT_BOUND=4096
