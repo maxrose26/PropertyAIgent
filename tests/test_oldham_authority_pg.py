@@ -273,12 +273,14 @@ def staged_screen(ch,o):
  reg=issue(o,ch,root=root,phase='SCREENING');ch.chain_registration=reg;ch.caller.use(reg)
  assert reg.grant['source_calls']==reg.grant['writes']==0 and not reg.facts
  ch.screen();rows=ch.caller.read_screening()
+ ch.staged_rows=rows;ch.staged_registrations=[registration_value(ch.capture_registration),registration_value(reg)]
  return root,rows,ch.nominees()
 
 
 def staged_admission(ch,o,root,rows,ns):
  reg=issue(o,ch,root=root,nominees=ns.nominees,phase='ADMISSION',screening_rows=rows)
  if not isinstance(reg,dict):ch.chain_registration=reg;ch.caller.use(reg)
+ ch.staged_registrations.append(reg if isinstance(reg,dict) else registration_value(reg))
  return reg
 
 
@@ -288,7 +290,11 @@ def staged_cost(ch,o,life,gh,*,records,nominees,result):
  assert o.opened==o.closed and not o.effect_uncertain
  value=dict(case='STAGED',records=records,nominees=nominees,result=result,admin=o.accounting(),admin_supervised_seconds=o.admin_elapsed,
             runtime=ch.caller.allocation.totals(),credential_teardown=life.state,source_inputs='SYNTHETIC_REAL_CHILD',github='IN_MEMORY_ACK_STAND_IN')
- value['exported_fixture_bytes']=len(json.dumps(value,default=str,sort_keys=True).encode());COSTS.append(value)
+ packet=dict(source=ch.source,outer=ch.outer,capture=ch.capture_receipt,screening=getattr(ch,'staged_rows',[]),registrations=getattr(ch,'staged_registrations',[]),costs=value)
+ raw=json.dumps(packet,default=str,sort_keys=True,separators=(',',':')).encode()
+ import hashlib
+ value['retained_fixture_packet_bytes']=len(raw);value['retained_fixture_packet_sha256']=hashlib.sha256(raw).hexdigest()
+ value['exported_fixture_bytes']=len(json.dumps(value,default=str,sort_keys=True).encode());assert len(raw)<2*1024**2-128*1024;COSTS.append(value)
 
 
 @pytest.mark.parametrize('count',[11,19])

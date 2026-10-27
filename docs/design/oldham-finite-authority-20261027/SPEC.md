@@ -70,3 +70,15 @@ The11-record historical Oldham enumeration was COMPLETE under the classifier;
 raw UNKNOWN fields are separate layers. Its missing authentic supervisor binding
 and qualification carry-forward remain unresolved. This correction does not make
 that historical packet executable. No owner wrapper or live release is provided.
+
+
+Staged screening readback uses one fixed key-set SELECT on the existing restricted
+worker engine, under its DatabaseBudget; it does not open one connection per row.
+The owner independently re-reads the same completed rows under the control lock.
+Issuance driver waits are shortened to the shared work deadline minus the entire
+pending nominee source reservation, including COMMIT and committed readback.
+Expiry reservations cover only pending stages and never extend first issuance.
+A late/uncertain acknowledgement latches reconciliation, not a no-issuance hold.
+Fixture packet byte/hash measurements include source, outer, saved capture,
+completed screening, derived registrations and cost receipts. They are not a
+measurement of a future owner wrapper's final audit/publication envelope.

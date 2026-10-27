@@ -147,7 +147,7 @@ def completed_screening(registration,receipt,rule,rows):
                 or saved.get('capture_sha256')!=receipt['source_sha256'] or saved.get('source_sha256')!=receipt['source_sha256']
                 or saved.get('source_url')!=record['source_url'] or saved.get('source_record_id')!=record['source_record_id']):
             raise Denied('STAGED_ASSESSMENT_CHECKPOINT')
-    return digest(rows)
+    return digest(sorted(rows,key=lambda r:r['key']))
 
 
 def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False):

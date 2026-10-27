@@ -142,7 +142,13 @@ class ChainCaller:
         budget=self._budget()
         co=self._coordinator(budget,self.chain_authority,self._contracts())
         try:
-            rows=[co.ledger.get(r['key']) for r in [*self.registration.batches,*self.registration.screens.values()]]
+            from sqlalchemy import select
+            from app.ingestion.schema import WorkItem
+            keys=[r['key'] for r in [*self.registration.batches,*self.registration.screens.values()]]
+            if any(k not in co.ledger.bindings for k in keys):raise Denied('STAGED_READBACK_BINDING')
+            with co.ledger.worker_engine.begin() as connection:
+                co.ledger._limits(connection)
+                rows=[dict(row) for row in connection.execute(select(WorkItem).where(WorkItem.c.key.in_(keys)).order_by(WorkItem.c.key)).mappings()]
             completed_screening(self.registration,self.capture_receipt,self.rule,rows)
             return rows
         finally:self.accounting['screening_readback']=budget.close([])
