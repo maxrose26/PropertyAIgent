@@ -23,4 +23,3 @@ def select(name):
     if name not in BUDGETS:
         raise ValueError('EXECUTION_BUDGET')
     return BUDGETS[name]
-
