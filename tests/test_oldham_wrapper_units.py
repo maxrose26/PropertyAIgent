@@ -50,3 +50,38 @@ def test_external_publication_bytes_count_in_final_result(tmp_path):
     finalise(j,dict(status='COMPLETED',cleanup='CLOSED'),input_seconds=0,active_started=None,external_bytes=12345,output=lambda s,**_:lines.append(s))
     result=json.loads(lines[0]);assert result['exported_bytes']==result['persisted_evidence_bytes']+result['terminal_json_bytes']+12345
     assert result['attempted_publication_bytes']==12345
+
+
+def test_work_export_boundary_and_reserved_closure(tmp_path):
+    from types import SimpleNamespace
+    from verification.ingestion_storage.oldham_owner_once import Operation,MAX_EXPORT,RESERVE
+    from datetime import datetime,timezone,timedelta
+    op=object.__new__(Operation);op.started=None;op.closing=False;op.memory=None
+    op.data={'expiry':datetime.now(timezone.utc)+timedelta(hours=1)}
+    op.journal=SimpleNamespace(root=tmp_path);op.published=MAX_EXPORT-RESERVE
+    op.check() # exact work boundary remains valid
+    op.published+=1
+    with pytest.raises(Denied,match='EXPORT_RESERVE'):op.check()
+    op.closing=True;op.check() # only the already reserved closing envelope opens
+    op.published=MAX_EXPORT-8192+1
+    with pytest.raises(Denied,match='EXPORT_RESERVE'):op.check()
+
+
+def test_io_reserve_refuses_start_without_reporting_capacity(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    from verification.ingestion_storage import oldham_owner_once as command
+    from datetime import datetime,timezone,timedelta
+    op=object.__new__(command.Operation);op.started=100;op.closing=False;op.owner=None;op.memory=None;op.published=0
+    op.data={'expiry':datetime.now(timezone.utc)+timedelta(hours=1)};op.journal=SimpleNamespace(root=tmp_path)
+    monkeypatch.setattr(command.time,'monotonic',lambda:535)
+    with pytest.raises(Denied,match='DEADLINE'):op.check()
+    op.closing=True;op.check()
+    monkeypatch.setattr(command.time,'monotonic',lambda:560)
+    with pytest.raises(Denied,match='DEADLINE'):op.check()
+
+
+def test_fault_scenario_release_identity_remains_valid(tmp_path,monkeypatch):
+    original=pkg.git
+    monkeypatch.setattr(pkg,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
+    path,sha=packet(tmp_path/'fault',tag='application_uncertain',supervised=False)
+    assert pkg.validate(path,sha,disposable=True)['package']['release_id']=='oldham-owner-test-application-uncertain'

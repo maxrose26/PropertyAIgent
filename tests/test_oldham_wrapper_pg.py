@@ -8,7 +8,7 @@ from tests.oldham_wrapper_fixture import packet
 CASES=[]
 
 @pytest.mark.parametrize('scenario,records,nominees,status,cleanup',[
-    ('success',2,1,'COMPLETED','CLOSED'),('zero',11,0,'COMPLETED','CLOSED'),
+    ('success',2,1,'COMPLETED','CLOSED'),('five',6,5,'COMPLETED','CLOSED'),('zero',11,0,'COMPLETED','CLOSED'),('zero19',19,0,'COMPLETED','CLOSED'),
     ('hold',6,6,'COMPLETED','CLOSED'),('cancel',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),
     ('stop',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),('expiry',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),
     ('existing',2,1,'COMPLETED','CLOSED'),
@@ -32,14 +32,19 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     assert result['exported_bytes']<=2*1024**2
     assert result['exported_bytes']==result['persisted_evidence_bytes']+result['terminal_json_bytes']+result.get('attempted_publication_bytes',0)
     assert result['accounting']['github_requests']<=40
+    assert result['accounting']['total_command_seconds']>=result['accounting']['preflight_seconds']>=0
+    if scenario=='success':assert len(result['nominee_results'])==1 and result['nominee_results'][0]['application_id'] is not None
     admin=result['accounting']['administration'];assert admin['commands']<=240 and admin['connections']<=13 and admin['returned_data_value_bytes']<=1024**2
     runtime=result['accounting']['runtime'];assert runtime['commands']<=1040 and runtime['connections']<=40 and runtime['returned_bytes']<=4*1024**2
     if scenario=='existing':assert result['nominee_results'][0]['application_id'] is not None and result['detail_attempts']==0
-    if scenario in ('application_uncertain','ledger_ack_uncertain','b2_uncertain'):assert result['runtime_effect_uncertain'] and result['access']=='UNCERTAIN'
-    if scenario=='zero':assert result['outcome']=='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' and result['detail_attempts']==0
+    if scenario in ('application_uncertain','ledger_ack_uncertain','b2_uncertain'):
+        assert result['runtime_effect_uncertain'] and result['access']=='UNCERTAIN'
+        assert result['outcome']=='ADMISSION_PROCESSING_IN_PROGRESS'
+    if scenario=='five':assert result['detail_attempts']==5 and len(result['nominee_results'])==5 and all(n['application_id'] is not None for n in result['nominee_results'])
+    if scenario in ('zero','zero19'):assert result['outcome']=='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' and result['detail_attempts']==0
     if scenario=='hold':assert result['outcome']=='SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY' and result['detail_attempts']==0
     if cleanup=='CLOSED':assert result['access']=='DISABLED_VERIFIED' and result['process_closure']['live_children']==result['process_closure']['new_sockets']==0
-    state=home/'.local/state/propertyaigent'/('oldham-owner-test-'+scenario)
+    state=home/'.local/state/propertyaigent'/('oldham-owner-test-'+scenario.replace('_','-'))
     assert (state/'final-result.json').is_file() and (state/'events.jsonl').is_file()
     if scenario=='success':
         again=subprocess.run(command,env=env,stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=20)

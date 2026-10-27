@@ -25,9 +25,9 @@ def environment():
 
 class Operation:
     """Thin orchestration only; policy, grants, writes, transport and supervision remain delegated."""
-    def __init__(self,data,journal,memory,backend,*,started=None):
+    def __init__(self,data,journal,memory,backend,*,started=None,command_started=None):
         self.data=data;self.p=data['package'];self.journal=journal;self.memory=memory;self.backend=backend
-        self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
+        self.created=time.monotonic() if command_started is None else command_started;self.preflight_seconds=0;self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
         self.head=self.p['evidence_head'];self.directory='docs/design/ingestion-operational-execution-'+self.p['release_id']
         self.owner=None;self.life=None;self.caller=None;self.result={};self.baseline=owned_resources();self.closure=None;self.finished=False;self.runtime_uncertain=False;self.preparation_progress=None
         self.github=GitHub(journal.emit,self.check,bound=26,**({'runner':backend.github} if backend else {}))
@@ -54,6 +54,11 @@ class Operation:
         return self.head
 
     def preflight(self):
+        began=time.monotonic()
+        try:return self._preflight()
+        finally:self.preflight_seconds=time.monotonic()-began
+
+    def _preflight(self):
         self.stage='PUBLICATION_PREFLIGHT'
         if self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']!=self.head:raise Denied('OLDHAM_EVIDENCE_HEAD_CHANGED')
         if self.github.probe(REPO+'/contents/'+self.directory+'/claim/claim.json?ref='+self.head) is not None:raise Denied('OLDHAM_RELEASE_USED')
@@ -138,7 +143,7 @@ class Operation:
             if isinstance(screen,dict):raise Denied('OLDHAM_SCREENING_CAPACITY')
             self.caller.bindings.update(screen.bindings);self.caller.use(screen)
             self.stage='SCREENING';self.caller.screen();rows=self.caller.read_screening();ns=self.caller.nominees()
-            self.result=dict(outcome='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',records=len(receipt['records']),nominees=len(ns.nominees),nominee_results=[],capture_sha256=digest(receipt),screening_sha256=digest(rows),detail_attempts=0)
+            self.result=dict(outcome='SCREENING_COMPLETE_ADMISSION_NOT_STARTED' if ns.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',records=len(receipt['records']),nominees=len(ns.nominees),nominee_results=[],capture_sha256=digest(receipt),screening_sha256=digest(rows),detail_attempts=0)
             self.checkpoint('SCREENING_COMPLETE',capture_sha256=digest(receipt),screening_sha256=digest(rows),root_key=root['key'],nominees=len(ns.nominees))
             if self.backend:self.backend.after_screening(self)
             if ns.nominees:
@@ -146,7 +151,7 @@ class Operation:
                 if isinstance(admission,dict):self.result['outcome']=admission['outcome']
                 else:
                     self.caller.bindings.update(admission.bindings);self.caller.use(admission)
-                    self.result['outcome']='ADMISSION_PROCESSING_COMPLETE'
+                    self.result['outcome']='ADMISSION_PROCESSING_IN_PROGRESS'
                     for i,n in enumerate(ns.nominees):
                         self.check();self.stage='FRESH_DETAIL_ADMISSION';adm=self.caller.prepare(n)
                         reader=self.caller.closed_idox_detail(adm,root=self.journal.root/('detail-'+str(i)),memory_group=None if self.memory is None else self.memory.source,observe=self.observe)
@@ -155,8 +160,9 @@ class Operation:
                         def counted(row):
                             self.result['detail_attempts']+=1;return original(row)
                         value=self.caller.admit(adm,counted)
-                        self.result['nominee_results'].append(dict(reference=n.reference,outcome=value.get('outcome'),application_id=value.get('application_id'),identity=value.get('admission'),factual=value.get('factual')))
+                        self.result['nominee_results'].append(dict(reference=n.reference,outcome=value.get('outcome'),application_id=value.get('application_id') if value.get('application_id') is not None else (value.get('factual') or {}).get('application_id'),identity=value.get('admission'),factual=value.get('factual')))
                         self.checkpoint('NOMINEE_READBACK',reference=n.reference,outcome=value.get('outcome'),completed=i+1)
+                    self.result['outcome']='ADMISSION_PROCESSING_COMPLETE'
             self.stage='TEARDOWN';self.closing=True;self.github.bound=40;self.life.teardown()
             self.result.update(status='COMPLETED',access='DISABLED_VERIFIED',cleanup='PENDING_PROCESS_READBACK')
             return self.finish()
@@ -171,7 +177,7 @@ class Operation:
         if event in ('source_supervisor_observed','source_worker_resource_observed'):self.journal.emit(event,value)
 
     def accounting(self):
-        return dict(preparation=None if self.preparation_progress is None else dict(report=self.preparation_progress.report(),work=self.preparation_progress.work()),fixture_setup=None if not self.backend or not self.backend.world else self.backend.world['setup_costs'],administration=None if self.owner is None else self.owner.accounting(),runtime=None if self.caller is None else self.caller.allocation.totals(),runtime_receipts={} if self.caller is None else self.caller.accounting,github_requests=self.github.requests,attempted_publication_bytes=self.published,elapsed_active_seconds=None if self.started is None else time.monotonic()-self.started)
+        return dict(preflight_seconds=self.preflight_seconds,total_command_seconds=time.monotonic()-self.created,preparation=None if self.preparation_progress is None else dict(report=self.preparation_progress.report(),work=self.preparation_progress.work()),fixture_setup=None if not self.backend or not self.backend.world else self.backend.world['setup_costs'],administration=None if self.owner is None else self.owner.accounting(),runtime=None if self.caller is None else self.caller.allocation.totals(),runtime_receipts={} if self.caller is None else self.caller.accounting,github_requests=self.github.requests,attempted_publication_bytes=self.published,elapsed_active_seconds=None if self.started is None else time.monotonic()-self.started)
 
     def failed(self,exc):
         from .connection_diagnostics import safe_failure
@@ -225,7 +231,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser();parser.add_argument('--package',type=Path,required=True);parser.add_argument('--package-sha256',required=True);parser.add_argument('--disposable-test',action='store_true')
     a=parser.parse_args(argv);memory=None;backend=None;op=None
     from .operational_cleanup import HardDeadline
-    outer=HardDeadline(time.monotonic()+790)
+    entered=time.monotonic();outer=HardDeadline(entered+790)
     try:
         if a.disposable_test:
             from tests.oldham_wrapper_fixture import Backend
@@ -238,7 +244,7 @@ def main(argv=None):
         state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,parents=True,exist_ok=True)
         root=state/data['package']['release_id']
         if root.exists():raise Denied('OLDHAM_LOCAL_RELEASE_USED')
-        journal=Journal(root);op=Operation(data,journal,memory,backend);op.preflight()
+        journal=Journal(root);op=Operation(data,journal,memory,backend,command_started=entered);op.preflight()
         if backend and backend.native:
             from .operational_memory import OperationalMemory
             memory=OperationalMemory();op.memory=memory;op.baseline=owned_resources()
@@ -258,7 +264,7 @@ def main(argv=None):
             try:
                 if memory is not None:proof=memory.close()
             except BaseException:pass
-            print(json.dumps(dict(status='PREFLIGHT_REFUSED',credential_requested=False,database_connections=0,cleanup='UNCERTAIN' if memory is not None and not proof else 'NO_EFFECTS',failure='SEALED_INPUT_OR_ENVIRONMENT',memory=proof)),flush=True)
+            print(json.dumps(dict(status='PREFLIGHT_REFUSED',credential_requested=False,database_connections=0,cleanup='NO_EFFECTS' if memory is None or proof is not None and proof.get('owned_groups_removed') is True and proof.get('owned_survivors')==0 else 'UNCERTAIN',failure='SEALED_INPUT_OR_ENVIRONMENT',memory=proof)),flush=True)
         if backend:backend.close()
         outer.close()
         return 1

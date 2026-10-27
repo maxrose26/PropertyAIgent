@@ -53,3 +53,21 @@ existing bounded cancel/close3s before the phase deadline/reporting reserve.
 Runtime persistence/acknowledgement or connection-closure uncertainty forbids later
 mutations. Full preparation Progress diagnostics and per-nominee actual outcomes
 (including existing IDs and factual withholding) are retained without credentials.
+
+
+## Dormant command contract
+
+```sh
+python -m verification.ingestion_storage.oldham_owner_once \
+  --package /private/reviewed/package.json --package-sha256 REVIEWED_SHA256
+```
+
+This is an interface example, not a released owner command. No live sealed input or
+expiry is issued by this PR. Run only under the existing reviewed outer systemd
+scope; native mode refuses missing kernel containment. Required installed policy,
+non-secret destination, exact stop/control state, existing owner capability, three
+restricted-role inventory, credential lifecycle and publication access must each be
+separately inspected/approved before any production package is released. The current
+historical Oldham packet is not upgraded by this code. A full synthetic command uses
+`--disposable-test`; that flag accepts only the fixed local test backend and labelled
+synthetic qualification, and cannot certify historical or council evidence.

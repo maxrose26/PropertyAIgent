@@ -34,7 +34,7 @@ def packet(root,*,records=2,nominees=1,tag='success',supervised=True):
     for name,value in values.items():
         raw=canonical(value);(root/(name+'.json')).write_bytes(raw);descriptors[name]=dict(name=name+'.json',sha256=pkg.sha(raw))
     deps=pkg.dependencies();scope=dict(kind='DISCOVERY_SCOPE',council='oldham',start=START.isoformat(),end=END.isoformat(),semantics='RECEIVED')
-    p=dict(version=pkg.VERSION,mode='DISPOSABLE_TEST',release_id='oldham-owner-test-'+tag,revision=pkg.git('rev-parse','HEAD'),tree=pkg.git('rev-parse','HEAD^{tree}'),dependencies=deps,packages=pkg.packages(),scope=scope,
+    p=dict(version=pkg.VERSION,mode='DISPOSABLE_TEST',release_id='oldham-owner-test-'+tag.replace('_','-'),revision=pkg.git('rev-parse','HEAD'),tree=pkg.git('rev-parse','HEAD^{tree}'),dependencies=deps,packages=pkg.packages(),scope=scope,
            **descriptors,qualification_binding=dict(qualification_sha256=descriptors['qualification']['sha256'],source_sha256=digest(source),outer_sha256=digest(outer),scope=scope,dependencies_sha256=digest(deps)),
            control_sha256=digest(CONTROL),evidence_head='1'*40,origin=dict(commit='1'*40,source_path='docs/design/ingestion-operational-execution-disposable-input/slot-0/source.json',slot_path='docs/design/ingestion-operational-execution-disposable-input/slot-0/receipt.json'),expires_at=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat(),risk_acceptance=pkg.RISK)
     raw=canonical(p);path=root/'package.json';path.write_bytes(raw)
