@@ -631,8 +631,10 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
     rss_ceiling = 1024**3 if budget is None else budget['rss_ceiling_bytes']
     if prepared_font_cache is not None and (not isinstance(prepared_font_cache, tuple) or len(prepared_font_cache) != 2
             or not all(isinstance(x, str) for x in prepared_font_cache)):raise ValueError('PREPARED_FONT_CACHE_SELECTION')
+    campaign_scope=None
     if retain_proof:
-        from verification.discovery.four_council_proof import require_scope
+        from verification.discovery.four_council_proof import require_scope,current_manifest_scope
+        campaign_scope=current_manifest_scope()
         if case!='discovery_rochdale_ui_window' or window is None or metadata:raise ValueError('PROOF_LISTING_ONLY')
         require_scope('rochdale','VALIDATED',*window)
     if metadata and (window is None or case not in UI_CASES):raise ValueError('METADATA_LISTING_ONLY')
@@ -672,7 +674,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         if budget is not None and worker_module != 'verification.direct_reference.instrumented_probe':
             raise ValueError('EXECUTION_BUDGET_SELECTION')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else [])+(['--execution-budget', budget['name'], '--deadline-origin', repr(start)] if budget is not None else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--prepared-font-cache', prepared_font_cache[0], '--prepared-font-cache-sha256', prepared_font_cache[1]] if prepared_font_cache is not None else [])+(['--execution-budget', budget['name'], '--deadline-origin', repr(start)] if budget is not None else [])+(['--campaign-scope',json.dumps(campaign_scope,sort_keys=True)] if campaign_scope is not None else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -739,7 +741,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         return 0 if result.get('failure') is None else 1
 
 
-def main():
+def _main():
     p = argparse.ArgumentParser()
     p.add_argument('--case', choices=CASES, required=True)
     p.add_argument('--output', type=Path, required=True)
@@ -769,6 +771,19 @@ def main():
         else:a.output.write_text(raw)
         return 0
     return supervised(a.case, a.output, a.execution_mode,window,a.metadata,**({"retain_proof":True} if a.retain_four_council_proof else {}),**fonts)
+
+
+def main():
+    if '--campaign-scope' not in sys.argv:return _main()
+    from contextlib import nullcontext
+    from verification.discovery.four_council_proof import manifest_scope
+    selected=None
+    if '--campaign-scope' in sys.argv:
+        i=sys.argv.index('--campaign-scope')
+        if i+1>=len(sys.argv) or len(sys.argv[i+1])>512:raise ValueError('CAMPAIGN_SCOPE')
+        selected=json.loads(sys.argv[i+1]);del sys.argv[i:i+2]
+    with manifest_scope(selected) if selected is not None else nullcontext():
+        return _main()
 
 
 if __name__ == '__main__':

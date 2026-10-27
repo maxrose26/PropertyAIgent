@@ -30,13 +30,14 @@ SUCCESSOR_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V1'
 # Same rows/allowlist/stop policy as V1 under the BROWSER_SOURCE_V2 execution budget
 # (docs/design/execution-budget-20261026/SPEC.md). V1 versions stay byte-identical.
 SUCCESSOR_V2_VERSION = 'THREE_COUNCIL_SOURCE_RELEASE_V2'
-SUCCESSORS = (SUCCESSOR_VERSION, SUCCESSOR_V2_VERSION)
+CAMPAIGN_VERSION = 'FINITE_MANIFEST_SOURCE_RELEASE_V1'
+SUCCESSORS = (SUCCESSOR_VERSION, SUCCESSOR_V2_VERSION, CAMPAIGN_VERSION)
 BRANCH = 'stage4/narrow-continuation-evidence-20261016'
 REPO = 'repos/maxrose26/PropertyAIgent'
 PERMIT = 'OWNER_APPROVED_FIXED_FOUR_SOURCE_ONLY_STOP_TREATMENT'
 SUCCESSOR_PERMIT = 'OWNER_APPROVED_FIXED_THREE_SOURCE_ONLY_STOP_TREATMENT'
 SUCCESSOR_V2_PERMIT = 'OWNER_APPROVED_FIXED_THREE_SOURCE_ONLY_STOP_TREATMENT_V2'
-PERMITS = {VERSION: PERMIT, SUCCESSOR_VERSION: SUCCESSOR_PERMIT, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_PERMIT}
+PERMITS = {VERSION: PERMIT, SUCCESSOR_VERSION: SUCCESSOR_PERMIT, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_PERMIT, CAMPAIGN_VERSION: 'OWNER_APPROVED_FINITE_MANIFEST_SOURCE_ONLY_STOP_TREATMENT'}
 PRESERVED = ['CONSUMED_SALFORD_GLOBAL_STOP:38884069913', 'STORAGE_TEST_STOP']
 ROWS = [dict(council=c, semantics=s, start=a, end=b) for c,s,a,b in [
     ('bury','RECEIVED','2026-10-08','2026-10-14'),
@@ -58,7 +59,7 @@ SUCCESSOR_LIMITS = dict(LIMITS, observations=3, requests=100,
 SUCCESSOR_V2_LIMITS = dict(SUCCESSOR_LIMITS, worker_seconds=225, active_seconds=270,
     slot_active_seconds=90, source_memory_bytes=1536*1024**2, aggregate_memory_bytes=2048*1024**2,
     execution_budget='BROWSER_SOURCE_V2')
-VERSION_LIMITS = {VERSION: LIMITS, SUCCESSOR_VERSION: SUCCESSOR_LIMITS, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_LIMITS}
+VERSION_LIMITS = {VERSION: LIMITS, SUCCESSOR_VERSION: SUCCESSOR_LIMITS, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_LIMITS, CAMPAIGN_VERSION: SUCCESSOR_V2_LIMITS.copy()}
 LOCAL_OUTCOMES = ('ROCHDALE_RESULT_MARKER_TIMEOUT', 'IDOX_SEARCH_OR_SORT_TIMEOUT',
                   'OLDHAM_SORT_SELECTOR_ABSENT')
 PACKAGES = ('requests','beautifulsoup4','lxml','playwright','psutil','cryptography')
@@ -82,11 +83,11 @@ SUCCESSOR_V2_DEPENDENCIES = ('docs/design/execution-budget-20261026/manifest.jso
     'verification/discovery/criteria_containment.py','verification/discovery/source_diagnostics.py',
     'verification/discovery/execution_budget.py','app/ingestion/source_budget.py','verification/discovery/outer_evidence.py',
     'verification/ah_pg/requirements.lock','verification/discovery/runtime_dependencies.py')
-VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES}
+VERSION_DEPENDENCIES = {VERSION: (), SUCCESSOR_VERSION: SUCCESSOR_DEPENDENCIES, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_DEPENDENCIES, CAMPAIGN_VERSION: SUCCESSOR_V2_DEPENDENCIES+('verification/discovery/campaign_manifest.py','docs/design/finite-manifest-release-20261027/SPEC.md')}
 # V2 also binds what the real worker path imports lazily (app.pipeline.site_linking: rapidfuzz, SQLAlchemy); exact pins are
 # those of verification/ah_pg/requirements.lock (docs/design/real-worker-proof-20261026/SPEC.md). V1 bindings are unchanged.
 V2_PACKAGES = PACKAGES + ('rapidfuzz','SQLAlchemy')
-VERSION_PACKAGES = {VERSION: PACKAGES, SUCCESSOR_VERSION: PACKAGES, SUCCESSOR_V2_VERSION: V2_PACKAGES}
+VERSION_PACKAGES = {VERSION: PACKAGES, SUCCESSOR_VERSION: PACKAGES, SUCCESSOR_V2_VERSION: V2_PACKAGES, CAMPAIGN_VERSION: V2_PACKAGES}
 
 # Historical envelope, held here so V1 execution never imports or depends on execution_budget
 # (absent from the V1 dependency bindings). Must equal execution_budget.HISTORICAL (tested).
@@ -157,7 +158,7 @@ def failure_detail(error,stage):
 # Fixed reasons a failed worker may print (the Stop codes raised on its path plus the guard's two generic ones).
 # Child output is untrusted: only membership in this set is ever recorded (docs/design/real-worker-proof-20261026/SPEC.md).
 # `reason_state=VALIDATED` means well-formed and allowlisted, not authentic: the worker asserts its own reason.
-WORKER_EXIT_REASONS=frozenset({'CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
+WORKER_EXIT_REASONS=frozenset({'CAMPAIGN_CHILD_BINDING','CAMPAIGN_MIXED_SELECTORS','CHILD_ENVIRONMENT','CHILD_GROUP','CHILD_EXECUTION_BUDGET','WORKER_EXPORT_BOUND',
     'SOURCE_CGROUP_V2','SOURCE_CGROUP_IDENTITY','SOURCE_MEMORY_ENFORCEMENT','SOURCE_OWNER_ENVIRONMENT',
     'UNCLASSIFIED_STOP','DEPENDENCY_UNAVAILABLE','PREPARATION_FAILURE'})
 WORKER_OUTPUT_BOUND=4096
@@ -253,17 +254,28 @@ def selected_version(successor=False, version=None):
     return version
 
 
-def manifest(*, successor=False, version=None):
+def manifest(*, successor=False, version=None, campaign=None):
     from app.pipeline.discovery_contract import SOURCE_ROOTS
     version=selected_version(successor,version);successor=version in SUCCESSORS
-    rows=ROWS[1:] if successor else ROWS
+    if version==CAMPAIGN_VERSION:
+        from .campaign_manifest import select,capacity
+        try:
+            rows=select(campaign);capacity(rows,VERSION_LIMITS[version])
+        except (ValueError,KeyError,TypeError,OverflowError):raise Stop('CAMPAIGN_MANIFEST_OR_CAPACITY') from None
+    else:
+        if campaign is not None:raise Stop('CAMPAIGN_VERSION_REQUIRED')
+        rows=ROWS[1:] if successor else ROWS
     routes={row['council']:('https://'+SOURCE_ROOTS[row['council']][0]+SOURCE_ROOTS[row['council']][1].rstrip('/')+'/search.do?action=advanced&searchType=Application') for row in rows if row['council']!='rochdale'}
-    routes['rochdale']=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],'2026-10-08','2026-10-14').destination
+    if version!=CAMPAIGN_VERSION:routes['rochdale']=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],'2026-10-08','2026-10-14').destination
+    else:
+        # Per-slot routes (including repeated council windows), never supplied URLs.
+        routes=[finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],row['start'],row['end']).destination if row['council']=='rochdale' else routes[row['council']] for row in rows]
     value=dict(version=version, rows=rows, source_routes=routes,
         limits=VERSION_LIMITS[version], retain_proof=True,
         no_transport_retry=True, persistence=False, coverage_advance=False,
         stop_policy='EXACT_SOURCE_LOCAL_ALLOWLIST' if successor else 'STOP_ALL_NON_COMPLETE', evidence_branch=BRANCH)
     if successor:value['continuation_allowlist']=list(LOCAL_OUTCOMES)
+    if version==CAMPAIGN_VERSION:value.update(json.loads(canonical(campaign)))
     return value
 
 
@@ -284,13 +296,13 @@ def runtime_check(version, **kwargs):
     return runtime_dependencies.check(paths,VERSION_PACKAGES[version],**kwargs)
 
 
-def render(release_id, revision, tree, evidence_head, issued, expires, *, released=False, successor=False, version=None):
+def render(release_id, revision, tree, evidence_head, issued, expires, *, released=False, successor=False, version=None, campaign=None):
     if not re.fullmatch(r'[a-z0-9-]{8,64}',release_id): raise Stop('RELEASE_ID')
     for v in (revision,tree,evidence_head):
         if not re.fullmatch('[0-9a-f]{40}',v): raise Stop('GIT_BINDING')
     if not 0 < (stamp(expires)-stamp(issued)).total_seconds() <= 86400: raise Stop('EXPIRY_INTERVAL')
     version=selected_version(successor,version)
-    value=manifest(version=version)
+    value=manifest(version=version,campaign=campaign)
     return dict(version=value['version'], release_id=release_id, revision=revision, tree=tree,
         manifest=json.loads(canonical(value)), manifest_sha256=sha(canonical(value)),
         dependencies=dependencies(version=version), packages=packages(version), evidence_head=evidence_head,
@@ -316,8 +328,12 @@ def validate(r, *, clock=now, checkout=True):
         'released','stop_treatment','preserved_stops','stop_evidence'}
     if set(r)!=required: raise Stop('REGISTRATION_SCHEMA')
     if r['version'] not in VERSION_LIMITS:raise Stop('REGISTRATION_VERSION')
-    expected=render(r['release_id'],r['revision'],r['tree'],r['evidence_head'],r['issued_at'],r['expires_at'],released=r['released'],version=r['version'])
-    if r != expected or r['released'] is not True: raise Stop('REGISTRATION_INACTIVE_OR_CHANGED')
+    campaign={}
+    if r['version']==CAMPAIGN_VERSION:
+        try:campaign={'campaign':{k:r['manifest'][k] for k in ('finite_manifest','finite_manifest_sha256','selected_ordinals')}}
+        except (KeyError,TypeError):raise Stop('CAMPAIGN_INPUT_SCHEMA') from None
+    expected=render(r['release_id'],r['revision'],r['tree'],r['evidence_head'],r['issued_at'],r['expires_at'],released=r['released'],version=r['version'],**campaign)
+    if r != expected or r['released'] is not True or (r['version']==CAMPAIGN_VERSION and canonical(r)!=canonical(expected)): raise Stop('REGISTRATION_INACTIVE_OR_CHANGED')
     if not stamp(r['issued_at'])<=clock()<stamp(r['expires_at']): raise Stop('REGISTRATION_EXPIRED_OR_FUTURE')
     if checkout and (git('rev-parse','HEAD')!=r['revision'] or git('rev-parse','HEAD^{tree}')!=r['tree'] or git('status','--porcelain')):
         raise Stop('CHECKOUT_BINDING')
@@ -358,12 +374,28 @@ def verify_chain(raw):
     return previous
 
 
+def source_row(registration,index):
+    rows=registration['manifest']['rows'] if registration['version']==CAMPAIGN_VERSION else ROWS
+    if type(index) is not int or not 0<=index<len(rows):raise Stop('SOURCE_SLOT')
+    return rows[index]
+
+
+def is_arcus(registration,index):
+    return source_row(registration,index)['council'] in finite.ARCUS
+
+
 class Source:
     """Whole-source-cgroup cancellation; nested readers may start new sessions."""
     def __init__(self,memory,registration,root,*,clock=time.monotonic,sleep=time.sleep):
         self.memory=memory;self.r=registration;self.root=root;self.clock=clock;self.sleep=sleep
     def command(self,index,out):
         budget=VERSION_LIMITS[self.r['version']].get('execution_budget')
+        if self.r['version']==CAMPAIGN_VERSION:
+            validate(self.r,checkout=False)
+            path=self.root/'campaign-registration.json';raw=canonical(self.r)
+            if not path.exists():write_new(path,raw)
+            if path.is_symlink() or path.read_bytes()!=raw:raise Stop('CAMPAIGN_CHILD_BINDING')
+            return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source),'--campaign-registration',str(path),'--campaign-registration-sha256',sha(raw)]
         return [sys.executable,'-m','verification.discovery.four_council_release','worker',str(index),str(out),str(self.memory.source)]+(['--three-council-successor'] if self.r['version'] in SUCCESSORS else [])+(['--execution-budget',budget] if budget else [])
     def run(self,index,check):
         out=self.root/f'source-{index}.json';started=self.clock();poll_at=started
@@ -419,7 +451,7 @@ class Source:
             if primary is None:primary=failure_detail(Stop('SOURCE_CLEANUP_UNCERTAIN'),'SOURCE_CLOSURE')
         if primary is not None:raise SourceFailure(primary,closure)
         try:
-            stage='SOURCE_OUTPUT_READ';bound=65535 if index==1 else 512000
+            stage='SOURCE_OUTPUT_READ';bound=65535 if is_arcus(self.r,index) else 512000
             if not out.is_file() or out.is_symlink() or out.stat().st_size>bound:raise Stop('SOURCE_OUTPUT_BOUND')
             raw=out.read_bytes();stage='SOURCE_OUTPUT_DECODE';audit=json.loads(raw)
         except BaseException as error:raise SourceFailure(failure_detail(error,stage),closure) from None
@@ -435,8 +467,12 @@ class Launcher:
     def __init__(self,r,root,*,github,memory,source,clock=time.monotonic,wall=now,emit=None):
         self.r=r;self.root=Path(root);self.github=github;self.memory=memory;self.source=source
         self.successor=r['version'] in SUCCESSORS
-        self.rows=ROWS[1:] if self.successor else ROWS
-        self.indices=(1,2,3) if self.successor else (0,1,2,3)
+        self.campaign=r['version']==CAMPAIGN_VERSION
+        if self.campaign:
+            from .campaign_manifest import input_from_manifest
+            if canonical(r['manifest'])!=canonical(manifest(version=CAMPAIGN_VERSION,campaign=input_from_manifest(r['manifest']))):raise Stop('CAMPAIGN_MANIFEST_BINDING')
+        self.rows=r['manifest']['rows'] if self.campaign else ROWS[1:] if self.successor else ROWS
+        self.indices=tuple(range(len(self.rows))) if self.campaign else (1,2,3) if self.successor else (0,1,2,3)
         self.limits=VERSION_LIMITS[r['version']];self.budget=budget_of(r['version'])
         self.clock=clock;self.wall=wall;self.emit=emit or (lambda *_:None)
         self.start=clock();self.expected=r['evidence_head'];self.next_control=0
@@ -482,21 +518,28 @@ class Launcher:
             self.publication_calls+=self.github.requests-before
             # All attempted exported payloads count, even lost acknowledgements.
             self.exported+=raw_bytes
+    def row(self,index):return source_row(self.r,index)
+    def arcus(self,index):return is_arcus(self.r,index)
+    def proof_check(self,index,a):
+        from contextlib import nullcontext
+        row=self.row(index)
+        with proof.manifest_scope(row) if self.campaign else nullcontext():
+            return proof.validate_audit(a,tuple(row[k] for k in ('council','semantics','start','end')))
     def accept(self,index,a):
-        row=ROWS[index];proof.validate_audit(a,tuple(row[k] for k in ('council','semantics','start','end')))
+        row=self.row(index);self.proof_check(index,a)
         if (a.get('requested_interval')!=[row['start'],row['end']] or a.get('date_semantics')!=row['semantics'] or
             a.get('persistence') is not False or not identities(row,a)):raise Stop('SOURCE_IDENTITY_OR_EFFECT')
-        source_rows=a.get('listing_records' if index==1 else 'records',[])
-        source_pages=a.get('listing_segments' if index==1 else 'pages',[])
+        source_rows=a.get('listing_records' if self.arcus(index) else 'records',[])
+        source_pages=a.get('listing_segments' if self.arcus(index) else 'pages',[])
         if len(source_rows)>60 or len(source_pages)>6:raise Stop('SOURCE_ROW_OR_PAGE_BOUND')
         if a.get('safety_failure') or a.get('safety_events'):raise Stop('SOURCE_SECURITY')
         if self.successor:
             if a.get('applied_interval') not in (None,[row['start'],row['end']]):raise Stop('SOURCE_CRITERIA')
             if a.get('proof_retention_failure'):raise Stop('SOURCE_PROOF_FAILURE')
-            if index==1 and a.get('supervisor_limit_hit') is not False:raise Stop('SOURCE_ACCOUNTING')
-            if index!=1 and a.get('resource',{}).get('budget_exhaustion') is not False:
+            if self.arcus(index) and a.get('supervisor_limit_hit') is not False:raise Stop('SOURCE_ACCOUNTING')
+            if not self.arcus(index) and a.get('resource',{}).get('budget_exhaustion') is not False:
                 raise Stop('SOURCE_ACCOUNTING')
-        if index==1:
+        if self.arcus(index):
             expected=finite.dated_config(finite.UI_CASES['discovery_rochdale_ui_window'],row['start'],row['end']).destination
             if a.get('destination')!=expected or a.get('case')!='discovery_rochdale_ui_window':raise Stop('SOURCE_DESTINATION')
             closed=a.get('cleanup')=='CONTEXT_BROWSER_CLOSED' and a.get('process_cleanup')=='CLOSED' and a.get('live_owned_survivors')==0
@@ -508,12 +551,12 @@ class Launcher:
         cost=resources(row,a)
         if cost is None or a.get('accounting_complete') is False:raise Stop('SOURCE_ACCOUNTING')
         # Browser (Rochdale) worker bound follows the selected budget; Idox readers keep 45s.
-        bound=self.budget['worker_seconds'] if index==1 else 45
+        bound=self.budget['worker_seconds'] if self.arcus(index) else 45
         if type(worker) not in (int,float) or not math.isfinite(worker) or not 0<=worker<=bound:raise Stop('SOURCE_TIME_ACCOUNTING')
         self.requests+=cost[0];self.source_bytes+=cost[1];self.source_seconds+=worker
         if self.requests>self.limits['requests'] or self.source_bytes>self.limits['mixed_source_bytes'] or self.source_seconds>self.limits['worker_seconds']:raise Stop('CUMULATIVE_SOURCE_BOUND')
         if not closed:raise Stop('SOURCE_CLEANUP_UNCERTAIN')
-        state=finite.classify(row,a,**({'execution_budget':self.budget['name']} if index==1 and self.budget['name'] else {}))
+        state=finite.classify(row,a,**({'execution_budget':self.budget['name']} if self.arcus(index) and self.budget['name'] else {}))
         if self.successor and state=='COMPLETE' and a.get('completeness')=='FAILED':
             raise Stop('SOURCE_OUTCOME_CONFLICT')
         return state
@@ -530,9 +573,9 @@ class Launcher:
             return None
         if a.get('applied_interval') is not None:return None
         p=a['retained_proof']['events']
-        if index==1:
+        if self.arcus(index):
             from .criteria_containment import eligible
-            if (not eligible(ROWS[index],a,**({'execution_budget':self.budget['name']} if self.budget['name'] else {})) or a.get('listing_failure')!='TimeoutError'
+            if (not eligible(self.row(index),a,**({'execution_budget':self.budget['name']} if self.budget['name'] else {})) or a.get('listing_failure')!='TimeoutError'
                 or a.get('criteria_control_timeout',{}).get('operation')!='RESULT_MARKER_VISIBLE'
                 or a.get('listing_records')!=[] or a.get('listing_segments')!=[]
                 or a.get('enumeration_evidence') is not None):return None
@@ -543,7 +586,7 @@ class Launcher:
             return LOCAL_OUTCOMES[0]
         if state!='FAILED':return None
         resource=a.get('resource',{})
-        row=ROWS[index]
+        row=self.row(index)
         if (resource.get('council')!=row['council'] or resource.get('adapter')!='idox'
             or resource.get('reference')!=row['semantics']+':'+row['start']+':'+row['end']
             or resource.get('outcome')!='FAILED' or type(resource.get('redirects')) is not int or resource['redirects']!=0
@@ -572,8 +615,8 @@ class Launcher:
             and diagnostic.get('transport')=={'http_status':None,'media_type':None,'redirect':None,
                 'rejection_outcome':'TIMEOUT','rejection_reason':'transport failed'}):
             if [e['operation'] for e in p] == (['FORM','SEARCH_REQUEST'] if operation=='SEARCH_REQUEST' else ['FORM','SEARCH','SORT_REQUEST']):
-                return LOCAL_OUTCOMES[1]
-        if (index==3 and a.get('failure')=='ListingError:sort selector' and operation=='SORT_FORM_PARSE'
+                if not self.campaign or row['council'] in {'tameside','oldham'}:return LOCAL_OUTCOMES[1]
+        if ((self.row(index)['council']=='oldham' if self.campaign else index==3) and a.get('failure')=='ListingError:sort selector' and operation=='SORT_FORM_PARSE'
             and resource.get('requests_attempted')==2
             and diagnostic.get('stage')=='SORT_FORM_PARSE' and diagnostic.get('code')=='SORT_SELECTOR_COUNT'
             and diagnostic.get('shape_available') is True
@@ -609,8 +652,8 @@ class Launcher:
             raise Stop('NEXT_AUTHORITY_ALLOCATION')
         if self.active_seconds+self.limits['slot_active_seconds']>self.limits['active_seconds']:
             raise Stop('NEXT_ACTIVE_ALLOCATION')
-        if (sum(x['requests'] for x in self.reserved)+(80 if next_index==1 else 10)>self.limits['requests']
-            or sum(x['bytes'] for x in self.reserved)+(20*1024**2 if next_index==1 else 3_000_000)>self.limits['mixed_source_bytes']):
+        if (sum(x['requests'] for x in self.reserved)+(80 if self.arcus(next_index) else 10)>self.limits['requests']
+            or sum(x['bytes'] for x in self.reserved)+(20*1024**2 if self.arcus(next_index) else 3_000_000)>self.limits['mixed_source_bytes']):
             raise Stop('NEXT_SOURCE_RESERVATION')
         if self.clock()-self.start+480>self.limits['package_seconds']-10:
             raise Stop('NEXT_JOB_ALLOCATION')
@@ -621,6 +664,8 @@ class Launcher:
         reason=None;process='UNCERTAIN';closure={};publication='NOT_ATTEMPTED';active_slot=None;active_started=None
         try:
             self.slot_deadline=self.start+self.limits['per_job_seconds']-10
+            if self.campaign:self.deadline()
+            if self.campaign and (stamp(self.r['expires_at'])-self.wall()).total_seconds()<self.limits['package_seconds']-(self.clock()-self.start):raise Stop('INITIAL_AUTHORITY_ALLOCATION')
             self.stage='INITIAL_CONTROL';self.poll()
             self.stage='CONSUMED_HISTORY'
             history=self.github.probe(REPO+'/contents/'+self.r['directory']+'/claim/consumed.json?ref='+self.expected)
@@ -636,7 +681,7 @@ class Launcher:
                 self.slot_deadline=slot_started+self.limits['per_job_seconds']-10
                 self.poll();active_slot=i
                 if self.clock()-slot_started>self.limits['setup_seconds']:raise Stop('SETUP_DEADLINE')
-                self.reserved.append(dict(index=i,requests=80 if reader_index==1 else 10,bytes=20*1024**2 if reader_index==1 else 3_000_000))
+                self.reserved.append(dict(index=i,requests=80 if self.arcus(reader_index) else 10,bytes=20*1024**2 if self.arcus(reader_index) else 3_000_000))
                 self.emit('source_intent',dict(index=i,scope=row,reserved=self.reserved[-1]))
                 print(f'[{i+1}/{len(self.rows)}] {row["council"].upper()}: one observation; '+('exact isolation policy applies.' if self.successor else 'stop-all applies.'),flush=True)
                 active_started=self.clock()
@@ -646,14 +691,14 @@ class Launcher:
                 used=self.clock()-active_started;self.active_seconds+=used;active_started=None
                 if used>self.budget['slot_active_seconds'] or self.active_seconds>self.limits['active_seconds']:raise Stop('ACTIVE_ALLOCATION')
                 raw=canonical(a)
-                if len(raw)>(65535 if reader_index==1 else 512000):raise Stop('RETURNED_AUDIT_BOUND')
+                if len(raw)>(65535 if self.arcus(reader_index) else 512000):raise Stop('RETURNED_AUDIT_BOUND')
                 local=self.root/f'returned-{i}.json';write_new(local,raw)
                 retained=dict(index=i,sha256=sha(raw),bytes=len(raw),local_file=local.name,export='HELD_UNVALIDATED')
                 self.returned_evidence.append(retained)
                 # Reuse #180's scope/hash/projection gate; malformed or transplanted
                 # proof stays local with its hash. Never export an unvalidated body.
                 self.stage='SOURCE_PROOF_VALIDATION'
-                proof.validate_audit(a,tuple(row[k] for k in ('council','semantics','start','end')))
+                self.proof_check(reader_index,a)
                 rejection=None
                 self.stage='SOURCE_ACCEPTANCE'
                 try:state=self.accept(reader_index,a)
@@ -728,8 +773,8 @@ class Launcher:
             if children_known and memory_known and self.memory_latch is None:process='PENDING_MEMORY_SCOPE_CLOSURE'
         all_complete=reason is None and len(self.results)==len(self.rows) and all(x['outcome']=='COMPLETE' for x in self.results)
         result=dict(version=self.r['version'],release_id=self.r['release_id'],
-            status=('THREE_COMPLETE' if self.successor else 'FOUR_COMPLETE') if all_complete else
-                ('OBSERVATIONS_FINISHED_WITH_GAPS' if self.successor and reason is None and len(self.results)==3 else 'STOP_RECONCILE_NO_RETRY'),
+            status=('MANIFEST_OBSERVATIONS_COMPLETE' if self.campaign else 'THREE_COMPLETE' if self.successor else 'FOUR_COMPLETE') if all_complete else
+                ('OBSERVATIONS_FINISHED_WITH_GAPS' if self.successor and reason is None and len(self.results)==len(self.rows) else 'STOP_RECONCILE_NO_RETRY'),
             reason=reason,results=self.results,returned_evidence=self.returned_evidence,not_attempted=self.rows[len(self.reserved):],
             consumed=self.consumed,accounting_complete=self.accounting_complete,
             failure=self.failure,reporting_failures=list(self.reporting_failures),
@@ -775,7 +820,27 @@ def owner_source_context(execution_budget=None):
     return True
 
 
-def worker(index,out,group,*,successor=False,execution_budget=None):
+def worker(index,out,group,*,successor=False,execution_budget=None,campaign_registration=None,campaign_registration_sha256=None):
+    if campaign_registration is not None:
+        if successor or execution_budget is not None:raise Stop('CAMPAIGN_MIXED_SELECTORS')
+        path=Path(campaign_registration)
+        if path.is_symlink() or path.stat().st_size>65536:raise Stop('CAMPAIGN_CHILD_BINDING')
+        raw=path.read_bytes()
+        if sha(raw)!=campaign_registration_sha256:raise Stop('CAMPAIGN_CHILD_BINDING')
+        registration=validate(json.loads(raw),checkout=False)
+        if registration['version']!=CAMPAIGN_VERSION:raise Stop('CAMPAIGN_CHILD_BINDING')
+        row=source_row(registration,index)
+        group=Path(group)
+        if group.name!='source' or not group.is_dir():raise Stop('CHILD_GROUP')
+        group.joinpath('cgroup.procs').write_text(str(os.getpid()))
+        owner_source_context('BROWSER_SOURCE_V2')
+        value=finite.read(row,retain_proof=True,no_transport_retry=True,fixed_four_rows=True,
+            execution_mode='four-council-owner-local' if row['council']=='rochdale' else None,
+            execution_budget='BROWSER_SOURCE_V2' if row['council']=='rochdale' else None,campaign_scope=row)
+        raw=canonical(value)
+        if len(raw)>(65535 if row['council']=='rochdale' else 512000):raise Stop('WORKER_EXPORT_BOUND')
+        write_new(out,raw);return
+    if campaign_registration_sha256 is not None:raise Stop('CAMPAIGN_CHILD_BINDING')
     # Private child, deliberately no owner credentials/control API capability.
     if not (1<=index<4 if successor else 0<=index<4) or any(k not in {'PATH','HOME','TMPDIR','PYTHONDONTWRITEBYTECODE','LC_CTYPE','PLAYWRIGHT_BROWSERS_PATH'} for k in os.environ):raise Stop('CHILD_ENVIRONMENT')
     if execution_budget is not None and (not successor or execution_budget!=SUCCESSOR_V2_LIMITS['execution_budget']):raise Stop('CHILD_EXECUTION_BUDGET')
@@ -793,17 +858,17 @@ def worker(index,out,group,*,successor=False,execution_budget=None):
 def main():
     entry_started=time.monotonic()
     p=argparse.ArgumentParser();sub=p.add_subparsers(dest='mode',required=True)
-    w=sub.add_parser('worker');w.add_argument('index',type=int);w.add_argument('out',type=Path);w.add_argument('group',type=Path);w.add_argument('--three-council-successor',action='store_true');w.add_argument('--execution-budget')
-    r=sub.add_parser('render');r.add_argument('--release-id',required=True);r.add_argument('--revision',required=True);r.add_argument('--tree',required=True);r.add_argument('--evidence-head',required=True);r.add_argument('--issued-at',required=True);r.add_argument('--expires-at',required=True);r.add_argument('--output',required=True,type=Path);r.add_argument('--propose-reviewed-stop-treatment',action='store_true');r.add_argument('--three-council-successor',action='store_true');r.add_argument('--version',choices=tuple(VERSION_LIMITS))
+    w=sub.add_parser('worker');w.add_argument('index',type=int);w.add_argument('out',type=Path);w.add_argument('group',type=Path);w.add_argument('--three-council-successor',action='store_true');w.add_argument('--execution-budget');w.add_argument('--campaign-registration');w.add_argument('--campaign-registration-sha256')
+    r=sub.add_parser('render');r.add_argument('--release-id',required=True);r.add_argument('--revision',required=True);r.add_argument('--tree',required=True);r.add_argument('--evidence-head',required=True);r.add_argument('--issued-at',required=True);r.add_argument('--expires-at',required=True);r.add_argument('--output',required=True,type=Path);r.add_argument('--propose-reviewed-stop-treatment',action='store_true');r.add_argument('--three-council-successor',action='store_true');r.add_argument('--version',choices=tuple(VERSION_LIMITS));r.add_argument('--campaign-manifest',type=Path)
     # Rendering creates local proposals only, never authority or a remote control.
     c=sub.add_parser('runtime-check');c.add_argument('--version',required=True,choices=tuple(VERSION_LIMITS))
     a=sub.add_parser('run');a.add_argument('--registration',required=True,type=Path);a.add_argument('--registration-sha256',required=True);a.add_argument('--enable-reviewed-source-only-stop-treatment',action='store_true')
     args=p.parse_args()
     if args.mode=='runtime-check':
         report=runtime_check(args.version);print(json.dumps(report,sort_keys=True),flush=True);return 0 if report['ok'] else 1
-    if args.mode=='worker':return worker(args.index,args.out,args.group,successor=args.three_council_successor,execution_budget=args.execution_budget)
+    if args.mode=='worker':return worker(args.index,args.out,args.group,successor=args.three_council_successor,execution_budget=args.execution_budget,campaign_registration=args.campaign_registration,campaign_registration_sha256=args.campaign_registration_sha256)
     if args.mode=='render':
-        value=render(args.release_id,args.revision,args.tree,args.evidence_head,args.issued_at,args.expires_at,released=args.propose_reviewed_stop_treatment,successor=args.three_council_successor,version=args.version)
+        value=render(args.release_id,args.revision,args.tree,args.evidence_head,args.issued_at,args.expires_at,released=args.propose_reviewed_stop_treatment,successor=args.three_council_successor,version=args.version,**({'campaign':json.loads(args.campaign_manifest.read_bytes())} if args.campaign_manifest else {}))
         write_new(args.output,canonical(value))
         write_new(args.output.with_suffix('.control.json'),canonical(control(value,enabled=args.propose_reviewed_stop_treatment)))
         print('PROPOSED_FILES_ONLY_NO_AUTHORITY' if args.propose_reviewed_stop_treatment else 'INACTIVE_REGISTRATION_RENDERED');return
@@ -813,7 +878,7 @@ def main():
     if os.environ.get('GH_HOST','github.com')!='github.com':raise Stop('GITHUB_DESTINATION')
     if not args.enable_reviewed_source_only_stop_treatment:raise Stop('STOP_TREATMENT_NOT_ENABLED')
     if any(any(s in k.upper() for s in ('DATABASE','SUPABASE','OPENAI','ANTHROPIC')) for k in os.environ):raise Stop('OWNER_CREDENTIAL_CONTEXT')
-    if r['version']==SUCCESSOR_V2_VERSION:
+    if r['version'] in (SUCCESSOR_V2_VERSION,CAMPAIGN_VERSION):
         # Before any claim, in the interpreter that will run the worker: names and exception classes only are reported.
         report=runtime_check(r['version'])
         if not report['ok']:
@@ -942,7 +1007,7 @@ def finish(launch,journal,result,root):
         accounting=result['accounting'],outcomes=[dict(council=x['scope']['council'],outcome=x['outcome']) for x in result['results']])
     try:print(json.dumps(summary,sort_keys=True),flush=True)
     except BaseException:return 1
-    return 0 if result['status'] in {'FOUR_COMPLETE','THREE_COMPLETE'} and result['cleanup']=='CLOSED' else 1
+    return 0 if result['status'] in {'FOUR_COMPLETE','THREE_COMPLETE','MANIFEST_OBSERVATIONS_COMPLETE'} and result['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':
     try:sys.exit(main())
