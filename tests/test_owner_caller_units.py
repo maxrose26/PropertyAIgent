@@ -65,7 +65,7 @@ def prepared(family, council, tmp_path, *, ttl=1800):
 
 # ------------------------------------------------------------------------------------------------------------------ scope bindings
 def test_the_registry_is_closed_and_each_binding_matches_the_platform_configuration():
-    assert set(CHAIN_BINDINGS) == {'tameside', 'manchester'}
+    assert set(CHAIN_BINDINGS) == {'tameside','manchester','bury','oldham','stockport'}
     for council in CHAIN_BINDINGS:
         assert binding_for(council) == CHAIN_BINDINGS[council]
     assert binding_for('tameside').semantics == 'RECEIVED' and binding_for('manchester').semantics == 'VALIDATED'
@@ -73,7 +73,7 @@ def test_the_registry_is_closed_and_each_binding_matches_the_platform_configurat
 
 
 @pytest.mark.parametrize('council,code', [('bolton', 'SCOPE_HISTORICAL_ONLY'), ('rochdale', 'SCOPE_ROCHDALE_INITIAL_STATUS_UNQUALIFIED'), ('salford', 'SCOPE_NOT_BOUND'),
-                                          ('oldham', 'SCOPE_NOT_BOUND'), ('stockport', 'SCOPE_NOT_BOUND'), ('nowhere', 'SCOPE_NOT_BOUND'), ('', 'SCOPE_NOT_BOUND')])
+                                          ('wigan','SCOPE_NOT_BOUND'), ('nowhere', 'SCOPE_NOT_BOUND'), ('', 'SCOPE_NOT_BOUND')])
 def test_unbound_historical_and_unqualified_councils_are_refused_with_the_exact_reason(council, code):
     with pytest.raises(Denied) as exc:
         binding_for(council)

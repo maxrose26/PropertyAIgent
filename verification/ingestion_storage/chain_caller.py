@@ -76,6 +76,10 @@ class ChainCaller:
     # ------------------------------------------------------------------------------------------------------------ stages
     def preflight(self, root_key):
         """Before ANY source work: the registered root's own limits must fit the selected reader, supervisor and ledger. Read through the restricted ledger, not taken from the caller."""
+        from .idox_target import COUNCILS
+        if self.sb.council in COUNCILS:
+            from .scope_binding import check_contract
+            scope=self.contract.scope();check_contract(self.sb,self.contract,scope['start'],scope['end'])
         self.root_key = root_key
         budget = self._budget()
         co = self._coordinator(budget, self.capture_authority, {self.contract.name: self.contract})
@@ -111,6 +115,8 @@ class ChainCaller:
             budget.capture_checkpoint_sha256 = digest(saved)
         finally:
             self.prior = budget.close([])
+        from .scope_binding import check_capture
+        check_capture(self.sb,self.contract,saved)
         self.capture_receipt = saved
         return saved
 
@@ -139,11 +145,20 @@ class ChainCaller:
     def prepare(self, nominee):
         """Everything one admission needs, built from the restricted ledger's retained state and the nominee: nothing is taken from the caller's memory of the capture."""
         reg, receipt = self.registration, self.capture_receipt
+        from .scope_binding import check_capture
+        check_capture(self.sb,self.contract,receipt)
+        from .idox_target import COUNCILS
+        if self.sb.council in COUNCILS and nominee not in derive_nominees([receipt],self.rule,allow_test_evidence=self.allow_test_evidence).nominees:raise Denied('CLOSED_IDOX_NOMINEE_BINDING')
         if nominee.reference not in reg.facts:
             raise Denied('CHAIN_NOMINEE_NOT_REGISTERED')
         record = next(r for r in receipt['records'] if r['reference'] == nominee.reference)
         batch = reg.batches[receipt['records'].index(record) // 5]
         fc = reg.factual_contracts[nominee.reference]
+        from .idox_target import COUNCILS
+        if self.sb.council in COUNCILS:
+            from .scope_binding import check_detail_target
+            check_detail_target(self.sb,record,fc.row)
+            if fc.verification_scope!='COUPLED':raise Denied('CLOSED_IDOX_FACTUAL_SCOPE')
         budget = self._budget(previous=self.prior)
         co = self._coordinator(budget, self.chain_authority, self._contracts())
         nom = AcceptanceBinding(self.root_key, reg.screens[nominee.reference]['key'], reg.facts[nominee.reference]['key'], record['reference'], record['source_url'], record['source_record_id'],
@@ -167,6 +182,21 @@ class ChainCaller:
     def no_listing(self, _):
         self.listing_requests.append(1)
         raise Denied('CHAIN_NEVER_LISTS')
+
+    def closed_idox_detail(self, adm, *, root, memory_group=None, observe=None):
+        """Bind the existing private source transport to ONE prepared factual item."""
+        from .idox_target import COUNCILS,validate
+        if self.sb.council not in COUNCILS:raise Denied('CLOSED_IDOX_COUNCIL')
+        target=self.registration.factual_contracts[adm.nominee.reference].row
+        validate(target)
+        def read(row):
+            if row['key']!=adm.fact['key'] or row['contract']!=adm.binding.factual_contract:raise Denied('CLOSED_IDOX_FACTUAL_TASK')
+            record=next(r for r in self.capture_receipt['records'] if r['reference']==adm.nominee.reference)
+            from .scope_binding import check_detail_target
+            check_detail_target(self.sb,record,target)
+            from .operational_source import read as source_read
+            return source_read('detail',target,root=root,stop_file=self.stop_file,memory_group=memory_group,observe=observe,closed_target=True)
+        return read
 
     def admit(self, adm, detail_reader):
         """One nominee: fresh detail verification, shared identity admission, B2, committed readback. `detail_reader` is the caller's bounded detail source for the nominated case."""
