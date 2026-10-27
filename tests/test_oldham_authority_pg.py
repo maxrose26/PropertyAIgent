@@ -49,7 +49,8 @@ def issue(o,ch,*,root=None,nominees=(),phase=None,screening_rows=None):
  extra={} if root is None else dict(root=root,receipt=ch.capture_receipt,nominees=tuple(nominees),rule=ch.rule,detail_targets=None,allow_test_evidence=True)
  reg=derive(o,ch.binding,ch.contract,**args,**extra)
  o.require_control_sha256=digest(ch._control())
- o.issue(reg,ch.binding,ch.contract,source=ch.source,outer=ch.outer,evidence=evidence(ch,reg),**args,**extra)
+ actual=o.issue(reg,ch.binding,ch.contract,source=ch.source,outer=ch.outer,evidence=evidence(ch,reg),**args,**extra)
+ if isinstance(actual,dict):return actual
  ch.bindings.update(reg.bindings)
  return reg
 
@@ -341,7 +342,7 @@ def test_staged_all_nominees_fit_or_whole_set_held(world,tmp_path,extra_connecti
  root,rows,ns=staged_screen(ch,o);saved=deepcopy(rows);allocation=ch.caller.allocation
  # Synthetic accounting boundary, not memory pressure or extra DB operations.
  spent=allocation.totals();extra=40-2-4-spent['connections']+extra_connections
- allocation.budgets.append(SimpleNamespace(statements=0,attempts=extra,returned_bytes=0,previous={},hard_deadline_events=[]))
+ boundary=SimpleNamespace(statements=0,attempts=extra,returned_bytes=0,previous={},hard_deadline_events=[]);allocation.budgets.append(boundary)
  result=staged_admission(ch,o,root,rows,ns)
  if extra_connections:
   assert result['outcome']=='SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY'
@@ -351,7 +352,7 @@ def test_staged_all_nominees_fit_or_whole_set_held(world,tmp_path,extra_connecti
   assert ch.caller.read_screening()==saved
  else:assert result.kind=='ADMISSION'
  # Reconciliation assertions for the synthetic counter are separate from DB receipts.
- allocation.budgets.pop();staged_cost(ch,o,life,gh,records=1,nominees=1,result='CAPACITY_HOLD' if extra_connections else 'CAPACITY_FITS')
+ allocation.budgets.remove(boundary);staged_cost(ch,o,life,gh,records=1,nominees=1,result='CAPACITY_HOLD' if extra_connections else 'CAPACITY_FITS')
 
 
 @pytest.mark.parametrize('forgery',['outcome','row_outcome','revision','batch','nominees','target'])
