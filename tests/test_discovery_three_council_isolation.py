@@ -346,3 +346,60 @@ def test_complete_slot_publication_cannot_leave_survivors_before_next(world,monk
             else:monkeypatch.setattr(r,'sockets',lambda:launch.baseline|{'socket:new'})
     launch.publish=publish;out=launch.execute()
     assert source.calls==[1] and out['status']=='STOP_RECONCILE_NO_RETRY'
+
+
+@pytest.mark.parametrize('overflow', [False, True])
+def test_added_outer_receipt_bytes_are_charged_at_exact_aggregate_export_bound(world, overflow):
+    # Actual publisher/CAS/readback, fixture API only; no kernel claims in this unit test.
+    from verification.discovery.outer_evidence import outer_supervisor
+    reg, api, memory, source, launch, events = world
+    outer = outer_supervisor(exit_code=0, elapsed_seconds=1.0,
+        closure=dict(source_group_closed=True, child_reaped=True, failures=[]),
+        peak_owned_rss=4096, live_owned_survivors=0, deadline_seconds=80)
+    receipt = dict(source_sha256='a'*64, outer_supervisor=outer)
+    raw = canonical(receipt)
+    files = {'receipt.json': raw, 'HASHES.json': canonical({'receipt.json': r.sha(raw)})}
+    size = sum(map(len, files.values()))
+    launch.exported = launch.limits['exported_bytes'] - size + int(overflow)
+    before = launch.exported
+    calls = len(api.calls)
+    if overflow:
+        with pytest.raises(r.Stop, match='PUBLICATION_OR_EXPORT_BOUND'):
+            launch.publish(files, 'outer-bound')
+        assert len(api.calls) == calls and launch.exported == before
+    else:
+        launch.publish(files, 'outer-bound')
+        assert launch.exported == launch.limits['exported_bytes']
+        assert launch.exported - before == size
+        tree = api.trees[api.commits[api.head]]
+        import base64
+        stored = api.blobs[tree[reg['directory'] + '/outer-bound/receipt.json']]
+        assert base64.b64decode(stored['content']) == raw
+
+
+@pytest.mark.parametrize('overflow', [False, True])
+def test_added_outer_receipt_bytes_obey_actual_slot_envelope_bound(world, overflow):
+    reg, api, memory, source, launch, events = world
+    from verification.discovery.outer_evidence import outer_supervisor
+    source.last_outer = outer_supervisor(exit_code=0, elapsed_seconds=1.0,
+        closure=dict(source_group_closed=True, child_reaped=True, failures=[]),
+        peak_owned_rss=4096, live_owned_survivors=0, deadline_seconds=80)
+    a = audit(1)
+    source.values[1] = a      # pin the timestamped fixture bytes used to compute the exact envelope
+    owned = dict(source_group_closed=True, supervised_seconds=.01)
+    receipt = dict(index=0, scope=reg['manifest']['rows'][0], outcome='COMPLETE', rejection=None,
+        source_sha256=r.sha(canonical(a)), owned_cleanup=owned, outer_supervisor=source.last_outer,
+        source_outcome=a.get('completeness'), continuation_code=None, continuation_eligible=False)
+    exact = len(canonical(a)) + len(canonical(receipt)) + 8192
+    # Test-only smaller bound, never an increase to a production ceiling.
+    launch.limits = dict(launch.limits, per_slot_export_bytes=exact - int(overflow))
+    out = launch.execute()
+    tree = api.trees[api.commits[api.head]]
+    path = reg['directory'] + '/slot-0/receipt.json'
+    if overflow:
+        assert out['reason'] == 'SLOT_EXPORT_BOUND' and path not in tree
+        assert source.calls == [1]
+    else:
+        assert path in tree
+        import base64
+        assert base64.b64decode(api.blobs[tree[path]]['content']) == canonical(receipt)

@@ -28,3 +28,11 @@ registration and by the caller's preflight, naming every violated field. Nothing
 * The outer object inside a slot receipt is bound to the source audit by the receipt's `source_sha256` and a fixed key set, not signed: its integrity rests on custody of the published receipt (the release publishes and reads it back), as for every other field of that receipt.
 * `check_contract` pins the contract's type, scope and (Arcus) budget. The contract's qualification, validators and configuration are supplied by the caller and are a live-qualification item; the synthetic contracts here qualify no real markup.
 * Item limits are the reviewed constant per binding (`reviewed_item_limits`); a caller cannot name others. `chain_registration` takes the clock itself and requires the receipt to be the stored root's saved capture; `ChainCaller.capture` refuses without a preflight of that exact root.
+
+## Narrow selected-budget correction
+
+`ListingContract.validate` now selects its RSS and worker-time ceilings from the exact contract-selected execution budget. `None` remains 45 seconds/1GiB; explicitly selected `BROWSER_SOURCE_V2` is 75 seconds/1.5GiB. Reader validation still requires the audit's budget declaration to match; reconciliation still requires the exact reviewed item limits. No limit is inferred from an audit or increased automatically.
+
+Synthetic counter boundaries run through the restricted `ChainCaller.capture` for V2, including exact maxima and overflows. The historical Arcus retained-capture entrypoint is tested separately on the restricted ledger: this does not add a historical Arcus route to the closed chain registry. No pressure allocation is used for these tests.
+
+`outer_supervisor` is serialized inside `receipt.json` before the existing per-slot `source + receipt + 8192` bound and before `Launcher.publish` sums all attempted file bytes (including `HASHES.json`). Exact-bound and one-byte overflow tests cover both gates; limits are unchanged. The existing V2 native fixture additionally compares each successful slot's outer peak/survivors with the actual source cgroup files and tests missing-evidence refusal. This supersedes the earlier "not shown offline" statement only when that hosted real-cgroup scenario passes; temporary-file unit scenarios remain simulations.

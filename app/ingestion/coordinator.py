@@ -57,8 +57,10 @@ class ListingContract:
         self.audit_validator(source,self.config,**({} if self.execution_budget is None else {'execution_budget':self.execution_budget}))
         for key in ('requests','decoded_bytes','encoded_bytes','outbound_payload_bytes','peak_owned_rss'):
             if type(source.get(key)) is not int or source[key]<0:raise Denied('SOURCE_ACCOUNTING')
-        if source['peak_owned_rss']>1024**3:raise Denied('SOURCE_RSS')
-        if type(source.get('supervisor_seconds')) not in (int,float) or not math.isfinite(source['supervisor_seconds']) or not 0<=source['supervisor_seconds']<=45:raise Denied('SOURCE_CLOCK')
+        from verification.discovery.execution_budget import select
+        budget=select(self.execution_budget)      # exact caller selection; None preserves the historical envelope
+        if source['peak_owned_rss']>budget['rss_ceiling_bytes']:raise Denied('SOURCE_RSS')
+        if type(source.get('supervisor_seconds')) not in (int,float) or not math.isfinite(source['supervisor_seconds']) or not 0<=source['supervisor_seconds']<=budget['worker_seconds']:raise Denied('SOURCE_CLOCK')
         rows=canonical_rows(source['listing_records'])
         for row in rows:
             fields=[dict(label='Reference',value=row['reference'])]

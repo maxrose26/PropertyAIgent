@@ -199,3 +199,60 @@ def test_only_registered_nominees_can_be_prepared_for_admission(world, tmp_path,
     with pytest.raises(Denied, match='CHAIN_NOMINEE_NOT_REGISTERED'):
         chain.caller.prepare(stray)
     closed(world, chain)
+
+
+@pytest.mark.parametrize('seconds,rss,accepted', [
+    (46, 100000, True), (5, 1024**3 + 1, True),
+    (75, 1536 * 1024**2, True),
+    (75.001, 100000, False), (5, 1536 * 1024**2 + 1, False),
+])
+def test_selected_v2_boundaries_through_actual_restricted_caller_capture(world, tmp_path, seconds, rss, accepted):
+    # Synthetic accounting only: no memory pressure and no delayed source.
+    chain = Chain(world, tmp_path, 'arcus', f'v2-bound-{seconds}-{rss}').owner_reset().owner_registers_capture()
+    layers = chain.caller.preflight(chain.root['key'])
+    assert layers['reader']['worker_seconds'] == layers['ledger']['worker_seconds'] == 75
+    assert layers['reader']['rss_ceiling_bytes'] == layers['ledger']['source_rss'] == 1536 * 1024**2
+    chain.audit.update(supervisor_seconds=seconds, peak_owned_rss=rss)
+    if accepted:
+        receipt = chain.capture()
+        assert receipt['resources']['supervisor_seconds'] == seconds
+        assert receipt['resources']['peak_owned_rss'] == rss
+        assert chain.read_capture() == receipt
+    else:
+        with pytest.raises(Denied, match='SOURCE_SAFETY'):
+            chain.capture()
+        row = world['boot'].execute('SELECT state, checkpoint FROM ingestion_work_items WHERE key=%s', (chain.root['key'],)).fetchone()
+        assert row[1] is None and row[0] != 'COMPLETE'
+    closed(world, chain)
+
+
+@pytest.mark.parametrize('seconds,rss,accepted', [
+    (45, 1024**3, True), (45.001, 100000, False), (5, 1024**3 + 1, False),
+])
+def test_historical_arcus_contract_retains_its_bounds_in_restricted_capture(world, tmp_path, seconds, rss, accepted):
+    # No historical Arcus binding is added to the closed ChainCaller registry.
+    # Exercise the existing retained-capture entrypoint with a default contract,
+    # using the real restricted ledger, archive and committed checkpoint.
+    from tests.e2e_connection_support import arcus_audit, arcus_contract, outer
+    from tests.e2e_chain_caller import START, END
+    chain = Chain(world, tmp_path, 'arcus', f'historical-{seconds}-{rss}').owner_reset().owner_registers_capture()
+    historical = arcus_contract('manchester', START, END, name=chain.contract.name)
+    source = arcus_audit('manchester', chain.entries, START, END)
+    source.update(supervisor_seconds=seconds, peak_owned_rss=rss)
+    budget = chain.caller._budget()
+    co = chain.caller._coordinator(budget, chain.auth_capture, {historical.name: historical})
+    try:
+        claim = co.ledger.claim(chain.root['key'], lease_seconds=165)
+        def capture():
+            return co.retained_capture(claim, source, outer(), chain.publisher,
+                expected_source_sha256=digest(source), evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE')
+        if accepted:
+            receipt = capture()
+            assert co.ledger.get(claim.key)['checkpoint'] == receipt
+        else:
+            with pytest.raises(Denied, match='ARCUS_AUDIT_REJECTED|SOURCE_RSS'):
+                capture()
+            assert co.ledger.get(claim.key)['checkpoint'] is None and chain.publisher.calls == []
+    finally:
+        chain.accounting['historical-capture'] = budget.close([])
+    closed(world, chain)

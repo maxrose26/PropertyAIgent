@@ -425,3 +425,32 @@ def test_the_receipt_must_be_the_stored_roots_capture_for_exactly_this_scope(fam
                                          ('root_with_other_checkpoint', receipt, dict(root, checkpoint=dict(receipt, source_sha256='0' * 64)))):
         with pytest.raises(Denied, match='CHAIN_FOREIGN_CAPTURE'):
             chain_registration(owner(), binding, contract, bad_root, bad_receipt, nominees.nominees, RULE, targets, **kw)
+
+
+@pytest.mark.parametrize('budget,seconds,rss,code', [
+    (None, 45, 1024**3, None),
+    (None, 45.001, 100000, 'UI resource bound'),
+    (None, 5, 1024**3 + 1, 'SOURCE_RSS'),
+    ('BROWSER_SOURCE_V2', 75, 1536 * 1024**2, None),
+    ('BROWSER_SOURCE_V2', 75.001, 100000, 'UI resource bound'),
+    ('BROWSER_SOURCE_V2', 5, 1536 * 1024**2 + 1, 'SOURCE_RSS'),
+])
+def test_listing_contract_exact_selected_budget_and_historical_boundaries(budget, seconds, rss, code):
+    # Actual qualified validator and adapter, synthetic counters only.
+    contract = arcus_contract('manchester', START, END, budget=budget)
+    audit = arcus_audit('manchester', ALL, START, END, budget=budget)
+    audit.update(supervisor_seconds=seconds, peak_owned_rss=rss)
+    if code:
+        with pytest.raises((Denied, ValueError), match=code):
+            contract._listing().validate(audit)
+    else:
+        contract._listing().validate(audit)
+
+
+def test_listing_budget_is_selected_by_contract_not_self_declared_by_audit():
+    audit = arcus_audit('manchester', ALL, START, END, budget='BROWSER_SOURCE_V2')
+    with pytest.raises(ValueError, match='UI execution budget'):
+        arcus_contract('manchester', START, END)._listing().validate(audit)
+    audit.pop('execution_budget')
+    with pytest.raises(ValueError, match='UI execution budget'):
+        arcus_contract('manchester', START, END, budget='BROWSER_SOURCE_V2')._listing().validate(audit)
