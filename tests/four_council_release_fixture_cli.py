@@ -210,7 +210,32 @@ def main():
                     subprocess.run([sys.executable,'-c','import os,time\nif os.fork()==0:\n    time.sleep(60)'],preexec_fn=attach,start_new_session=True,check=True)
                     return value
                 self.memory.latch=survivor_after_latch
-            try:return super().run(index,check)
+            try:
+                result=super().run(index,check)
+                if a.native and budget_name:
+                    # Existing council-free native slot; read real kernel files, never fixture files.
+                    from app.ingestion.coordinator import validate_outer
+                    from app.ingestion.ledger import Denied
+                    from verification.discovery.outer_evidence import observe_group,outer_from_slot_receipt
+                    from verification.ingestion_storage.limit_reconciliation import BROWSER_SOURCE_V2_ITEM_LIMITS
+                    peak,survivors=observe_group(self.memory.source)
+                    assert self.last_outer['peak_owned_rss']==peak and peak>0
+                    assert self.last_outer['live_owned_survivors']==survivors==0
+                    validate_outer(self.last_outer,BROWSER_SOURCE_V2_ITEM_LIMITS)
+                    source,owned=result
+                    receipt=dict(source_sha256=r.sha(canonical(source)),outer_supervisor=self.last_outer)
+                    assert outer_from_slot_receipt(receipt,source)==self.last_outer
+                    try:outer_from_slot_receipt(dict(source_sha256=receipt['source_sha256']),source)
+                    except ValueError:pass
+                    else:raise AssertionError('MISSING_OUTER_ACCEPTED')
+                    missing=dict(self.last_outer,peak_owned_rss=None,cleanup='UNKNOWN')
+                    try:validate_outer(missing,BROWSER_SOURCE_V2_ITEM_LIMITS)
+                    except Denied:pass
+                    else:raise AssertionError('MISSING_KERNEL_PEAK_ACCEPTED')
+                    r.write_new(a.root/f'outer-kernel-{index}.json',canonical(dict(
+                        native=True,outer=self.last_outer,kernel_peak=peak,kernel_survivors=survivors,
+                        missing_receipt_refused=True,missing_peak_refused=True)))
+                return result
             except r.SourceFailure:
                 if a.fault=='memory-enforcement-lost':(self.memory.source/'memory.max').write_text(str(2*1024**3))
                 raise

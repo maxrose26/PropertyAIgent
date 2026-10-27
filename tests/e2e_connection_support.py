@@ -65,7 +65,7 @@ class IsolatedTestPublisher:
 
 
 def outer():
-    """A synthetic, compliant outer-supervisor object (the release does not yet produce one in the ledger's shape)."""
+    """A synthetic, compliant outer-supervisor object for contract-level unit tests only. The integrated chain takes its outer object from a real supervised run (`idox_supervised`, `arcus_slot_supervised`)."""
     return dict(exit_code=0, cleanup='CLOSED', live_owned_survivors=0, expired=False, limit_hit=None, peak_owned_rss=1000, elapsed_seconds=1)
 
 
@@ -215,3 +215,70 @@ def window(council):
     """A fixed synthetic Monday-to-Sunday week (never described as any real observation)."""
     start = date(2026, 11, 9)
     return start, date(2026, 11, 15)
+
+
+# ------------------------------------------------------------------------------------------------ supervised sources (genuine outer evidence)
+# The source audit is produced by a REAL supervised child process, and the outer object comes from the supervisor that ran it: Idox through the existing owned-process envelope
+# (`operational_supervisor.supervise`), Arcus through the release's own `Source.run` with its cgroup readback. The child only copies the synthetic audit to its output path (no network,
+# no council); the cgroup directory is a plain temporary directory standing in for the kernel's files, so memory.peak is a fixed stand-in value and process membership is emptied
+# by the child (what the kernel does when a member exits). Neither stand-in is described as a measurement.
+_CHILD = ("import shutil, sys\nshutil.copy(sys.argv[1], sys.argv[2])\n"
+          "mode = sys.argv[4] if len(sys.argv) > 4 else 'ok'\n"
+          "if len(sys.argv) > 3 and mode != 'member':\n    open(sys.argv[3], 'w').close()\n"
+          "sys.exit(1 if mode == 'exit1' else 0)\n")
+
+
+def _child_script(tmp_path):
+    script = tmp_path / 'fixture_child.py'
+    script.write_text(_CHILD)
+    return script
+
+
+def idox_supervised(tmp_path, audit):
+    """(source audit read back from the supervised child's output, the owned-process envelope's own outer result)."""
+    import sys
+    from verification.ingestion_storage.operational_supervisor import supervise
+    audit_file = tmp_path / 'idox-audit-input.json'
+    audit_file.write_text(json.dumps(audit, sort_keys=True))
+    root = tmp_path / 'idox-source'
+    outer = supervise([sys.executable, str(_child_script(tmp_path)), str(audit_file), str(root / 'source.json')], environment={}, root=root, seconds=30, source=True)
+    return json.loads((root / 'source.json').read_text()), outer
+
+
+class _FakeCgroupMemory:
+    def __init__(self, root):
+        self.source = root / 'cgroup' / 'source'
+        self.source.mkdir(parents=True)
+        for name, text in (('cgroup.kill', ''), ('cgroup.procs', ''), ('cgroup.events', 'populated 0\nfrozen 0\n'), ('memory.peak', '123456789\n')):
+            (self.source / name).write_text(text)
+
+    def snapshot(self):
+        return None
+
+
+def arcus_slot_supervised(tmp_path, audit, scope, *, mode='ok', peak_text=None, version=None):
+    """(source audit, outer object) from the release's own `Source.run` under the V2 execution budget, and the slot receipt it yields (built exactly as `Release.execute` builds it)."""
+    import sys
+    from verification.discovery.four_council_release import SUCCESSOR_V2_VERSION, Source, sha
+    version = version or SUCCESSOR_V2_VERSION
+    from verification.discovery.outer_evidence import outer_from_slot_receipt
+    from verification.ingestion_storage.operational_publication import canonical
+    audit_file = tmp_path / 'arcus-audit-input.json'
+    audit_file.write_text(json.dumps(audit, sort_keys=True))
+    memory = _FakeCgroupMemory(tmp_path)
+    if peak_text is not None:
+        (memory.source / 'memory.peak').write_text(peak_text)
+    script = _child_script(tmp_path)
+
+    class FixtureSource(Source):
+        def command(self, index, out):
+            return [sys.executable, str(script), str(audit_file), str(out), str(self.memory.source / 'cgroup.procs'), mode]
+
+    root = tmp_path / 'arcus-slot'
+    root.mkdir()
+    runner = FixtureSource(memory, {'version': version}, root)
+    source, owned = runner.run(0, lambda: None)
+    receipt = dict(index=0, scope=scope, outcome='COMPLETE', rejection=None, source_sha256=sha(canonical(source)), owned_cleanup=owned)
+    if getattr(runner, 'last_outer', None) is not None:      # exactly the line `Release.execute` adds
+        receipt['outer_supervisor'] = runner.last_outer
+    return source, outer_from_slot_receipt(receipt, source), receipt

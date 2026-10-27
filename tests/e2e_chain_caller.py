@@ -1,45 +1,34 @@
-"""The integrated test caller: one object that drives the whole chain through the PRODUCTION entry points and restricted disposable roles.
+"""The integrated test harness: owner STAND-INS around the PRODUCTION owner preparation and the PRODUCTION chain caller.
 
-Only the OWNER STAND-INS (methods `owner_*`) use the bootstrap connection: they insert the work items and grants that the owner's registration ceremony would create, exactly as
-the existing admission test does. Everything else is production code reached through `ControllerLedger` on the three restricted logins:
+What is production here: the scope binding, limit reconciliation, `Owner.build_grant`-based preparation of items/grants/bindings from the validated capture and nominees
+(`chain_registration`), and every stage (`ChainCaller`) through `ControllerLedger` on the three restricted logins. What is a disposable stand-in: only the INSERTION of the prepared rows
+and grant into the disposable control record (`_install`) -- the owner's `register`, which also registers the policy's named exception, accepts only the pinned Bolton scope today -- and the
+fixture forgeries the tests apply to a prepared grant. Sources are produced by real supervised child processes (`idox_supervised`, `arcus_slot_supervised`) over synthetic audits.
 
-  retained_capture -> process_batch (frozen v3 screening) -> derive_nominees -> execute (execute_retained_v3 -> fresh detail -> shared admission and B2 -> committed readback)
-
-Nothing here substitutes the processing path under test. All data are synthetic; archives are labelled test artefacts; no council or production database is contacted.
+All data are synthetic; archives are labelled test artefacts; no council or production database is contacted.
 """
 import copy
 import json
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from types import SimpleNamespace
 
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session
-
-from app.config import get_council
-from app.db.models import Application, Base
-from app.ingestion.batching import batch_plans, process_batch
-from app.ingestion.coordinator import Coordinator
+from app.db.models import Base
 from app.ingestion.ledger import DEFAULT_LIMITS, digest
-from app.ingestion.listing_screening import RULE_V3, V3_CONTRACT, ScreeningRule, assessment_identity, code_binding
-from app.ingestion.nomination import derive_nominees
-from app.pipeline.discovery_contract import DiscoveryEnvelope, WindowEvidence
+from app.ingestion.listing_screening import RULE_V3, ScreeningRule
 from tests.e2e_connection_support import (ASSESS, EXTENSION, LABEL, NO_COUNT, PARENT, SCHEME, BELOW, IsolatedTestPublisher, arcus_audit, arcus_contract, arcus_detail_audit,
-                                          arcus_detail_target, entry, idox_audit, idox_contract, idox_detail, idox_detail_target, outer)
+                                          arcus_detail_target, arcus_slot_supervised, entry, idox_audit, idox_contract, idox_detail, idox_detail_target, idox_supervised)
 from verification.direct_reference.fixtures import summary
-from verification.discovery.finite_acceptance import SEMANTICS
-from verification.ingestion_storage.new_identity_contract import accepted_arcus_new_identity, accepted_idox_new_identity
-from verification.ingestion_storage.operational_controller import AcceptanceBinding, ControllerLedger, DatabaseBudget, execute
-from verification.ingestion_storage.retained_world import item
-from verification.ingestion_storage.screening_v3_grant import apply_screening
-from verification.ingestion_storage.v3_admission import V3AdmissionBinding, factual_binding
+from verification.ingestion_storage.chain_caller import ROLES, ChainCaller
+from verification.ingestion_storage.chain_registration import authority_name, capture_registration, chain_registration
+from verification.ingestion_storage.limit_reconciliation import BROWSER_SOURCE_V2_ITEM_LIMITS
+from verification.ingestion_storage.operational_owner import Owner
+from verification.ingestion_storage.scope_binding import binding_for
 
 START, END = date(2026, 11, 9), date(2026, 11, 15)
 MIXED = [entry('E2E/1/26', SCHEME), entry('E2E/2/26', ASSESS), entry('E2E/3/26', NO_COUNT), entry('E2E/4/26', EXTENSION), entry('E2E/5/26', BELOW), entry('E2E/6/26', PARENT)]
 FAMILY_COUNCIL = {'idox': 'tameside', 'arcus': 'manchester'}
-AUTH_CAPTURE, AUTH_CHAIN = 'INGESTION_TEST_e2e_capture', 'INGESTION_TEST_e2e_chain'
-ROLES = ['ingestion_worker_login', 'ingestion_effect_login', 'ingestion_application_login']
+OWNER_BINDINGS = dict(revision='a' * 40, workflow_sha256='b' * 64, manifest_sha256='c' * 64)      # what the owner's execution binding would carry; synthetic here
 APPLICATION_COLUMNS = ['id', 'council_code', 'reference', 'status', 'decision', 'decision_issued_date', 'status_verified_at', 'planning_field_verification', 'unit_confirmation_status', 'site_id', 'proposal', 'address',
                        'application_type', 'estimated_unit_count', 'opportunity_classification']
 
@@ -62,71 +51,84 @@ def application(boot, council, reference):
 
 
 def restricted_sessions(boot):
-    return boot.execute('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY(%s)', (ROLES,)).fetchone()[0]
+    return boot.execute('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY(%s)', (list(ROLES),)).fetchone()[0]
 
 
 @dataclass
 class Admission:
-    co: object
-    binding: object
-    budget: object
-    envelope: object
-    council: object
+    """The production admission bundle plus the fixture's detail source for the nominated case."""
+    inner: object
     detail: object
     detail_calls: list
-    nominee: object
-    fact: dict
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def __setattr__(self, name, value):
+        if name in ('inner', 'detail', 'detail_calls'):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self.inner, name, value)      # a forged field lands on the production bundle that is actually admitted
 
 
 class Chain:
-    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None):
+    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None, binding=None):
         self.w, self.family, self.tag = world, family, tag
+        self.tmp = tmp_path / ('src-' + tag)      # one directory per chain: two chains in one test never share supervised-source paths
+        self.tmp.mkdir()
         self.council = council or FAMILY_COUNCIL[family]
+        self.binding = binding or binding_for(self.council)
         self.entries = entries if entries is not None else copy.deepcopy(MIXED)
         self.rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
         self.publisher = IsolatedTestPublisher(tmp_path, publisher_mode)
-        self.stop_file = stop_file
-        self.auth_capture, self.auth_chain = f'{AUTH_CAPTURE}_{tag}', f'{AUTH_CHAIN}_{tag}'      # one pair of authorities per chain, so two captures can coexist
         self.revision = contract_revision or tag
+        self.item_limits = BROWSER_SOURCE_V2_ITEM_LIMITS if self.binding.execution_budget else DEFAULT_LIMITS
+        self.auth_capture, self.auth_chain = authority_name(self.binding, 'CAPTURE', self.revision), authority_name(self.binding, 'CHAIN', self.revision)
+        budget = self.binding.execution_budget
         if family == 'idox':
             self.contract, self.audit = idox_contract(self.council, START, END), idox_audit(self.council, self.entries, START, END)
         else:
-            self.contract, self.audit = arcus_contract(self.council, START, END), arcus_audit(self.council, self.entries, START, END)
-        self.listing_requests = []      # the integrated caller never lists: this stays empty and every test asserts it
-        self.budgets, self.accounting = [], {}
-        self.root = item(dict(subject=self.contract.scope(), task='DISCOVERY', contract=self.contract.name, revision=self.revision))
+            self.contract, self.audit = arcus_contract(self.council, START, END, budget=budget), arcus_audit(self.council, self.entries, START, END, budget=budget)
         self.bindings = {}
-        self.capture_receipt = None
+        self.caller = ChainCaller(self.binding, self.contract, self.rule, world['urls'], revision=self.revision, bindings=self.bindings, capture_authority=self.auth_capture,
+                                  chain_authority=self.auth_chain, stop_file=stop_file, allow_test_evidence=True)
+        self.root = None
+        self.outer = None
+        self.source = None
+        self.chain_registration = None
 
-    # ------------------------------------------------------------------------------------------------------------ plumbing
-    def _budget(self, **kw):
-        budget = DatabaseBudget(stop_file=self.stop_file, **kw) if self.stop_file else DatabaseBudget(**kw)
-        self.budgets.append(budget)
-        return budget
+    # ------------------------------------------------------------------------------------------------------------ views of the production caller
+    listing_requests = property(lambda self: self.caller.listing_requests)
+    accounting = property(lambda self: self.caller.accounting)
+    capture_receipt = property(lambda self: self.caller.capture_receipt, lambda self, v: setattr(self.caller, 'capture_receipt', v))
+    prior = property(lambda self: self.caller.prior)
+    batches = property(lambda self: self.chain_registration.batches)
+    screens = property(lambda self: self.chain_registration.screens)
+    facts = property(lambda self: self.chain_registration.facts)
+    factual_contracts = property(lambda self: self.chain_registration.factual_contracts)
 
-    def _coordinator(self, budget, authority, contracts):
-        urls = self.w['urls']
-        worker, broker, app = [budget.engine(urls[r]) for r in ROLES]
-        ledger = ControllerLedger(worker, budget=budget, owner='one', authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
-        return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule})
-
+    # ------------------------------------------------------------------------------------------------ OWNER STAND-INS (bootstrap)
     def _control(self):
         return self.w['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
 
     def _write_control(self, control):
         self.w['boot'].execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)", (json.dumps(control),))
 
-    def _grant(self, keys, contracts, bindings, *, ttl, source_calls, writes, detail_keys=(), capture_only=False, outcomes=None):
-        grant = dict(keys=list(keys), contracts=list(contracts), bindings=bindings, expires_at=time.time() + ttl, source_calls=source_calls, writes=writes, login='ingestion_worker_login',
-                     effect_login='ingestion_effect_login', workers=['one'], detail_source_keys=list(detail_keys), completion_outcomes=copy.deepcopy(outcomes or {}))
-        if capture_only:
-            grant['capture_only'] = True
-        return grant
+    def _owner(self, ttl):
+        """The PRODUCTION Owner, used only for its grant preparation (no connection is ever opened by it here)."""
+        return Owner(None, lambda *_: None, lambda: None, expiry=datetime.fromtimestamp(time.time() + ttl, timezone.utc), bindings=dict(OWNER_BINDINGS))
 
-    def _insert(self, row):
-        self.w['boot'].execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)', (json.dumps(row),))
+    def _install(self, registration, *, grant=None, stop=None):
+        """DISPOSABLE stand-in for the insertion half of `Owner.register`: put the prepared rows and grant into the disposable control record. `grant` is a (possibly forged) copy."""
+        control = self._control()
+        control['grants'][registration.authority] = registration.grant if grant is None else grant
+        if stop is not None:
+            control['global_stop'] = stop
+        self._write_control(control)
+        self.bindings.update(registration.bindings)
+        for row in registration.insert:
+            self.w['boot'].execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)', (json.dumps(row),))
 
-    # ------------------------------------------------------------------------------------------------ OWNER STAND-INS (bootstrap)
     def owner_reset(self):
         boot = self.w['boot']
         boot.execute('DELETE FROM ingestion_work_attempts')
@@ -135,58 +137,36 @@ class Chain:
         self._write_control(copy.deepcopy(self.w['control']))
         return self
 
-    def owner_registers_capture(self, *, ttl=600, capture_only=False, outcomes=('ENUMERATED_METADATA_RETAINED',), source_calls=0, stop=None):
-        control = self._control()
-        binding = {k: self.root[k] for k in ('subject', 'task', 'contract', 'revision')}
-        self.bindings[self.root['key']] = binding
-        control['grants'][self.auth_capture] = self._grant([self.root['key']], [self.contract.name], {self.root['key']: binding}, ttl=ttl, source_calls=source_calls, writes=0,
-                                                      capture_only=capture_only, outcomes={'DISCOVERY': list(outcomes)})
-        if stop is not None:
-            control['global_stop'] = stop
-        self._write_control(control)
-        self._insert(self.root)
+    def owner_registers_capture(self, *, ttl=1800, capture_only=False, outcomes=None, source_calls=None, stop=None, item_limits=None):
+        reg = capture_registration(self._owner(ttl), self.binding, self.contract, START.isoformat(), END.isoformat(), revision=self.revision, item_limits=item_limits or self.item_limits)
+        grant = copy.deepcopy(reg.grant)      # fixture forgeries are applied to a COPY of what production prepared
+        if capture_only:
+            grant['capture_only'] = True
+        if outcomes is not None:
+            grant['completion_outcomes']['DISCOVERY'] = list(outcomes)
+        if source_calls is not None:
+            grant['source_calls'] = source_calls
+        self._install(reg, grant=grant, stop=stop)
+        self.root, self.capture_registration = reg.rows[0], reg
         return self
 
     def target_for(self, record):
-        if self.family == 'idox':
-            return idox_detail_target(self.council, record)
-        return arcus_detail_target(self.council, record)
+        return idox_detail_target(self.council, record) if self.family == 'idox' else arcus_detail_target(self.council, record)
 
-    def owner_registers_chain(self, nominees, *, ttl=600, writes=None, source_calls=None, stop=None, extra_contracts=()):
-        """Insert the batch and factual items the owner would create from the sealed nominee set, and the second authority that covers them."""
+    def owner_registers_chain(self, nominees, *, ttl=1800, writes=None, source_calls=None, stop=None, others=()):
+        """Prepare (PRODUCTION) the batch/screening/factual items and the chain grant from the saved capture and the nominees, then install them."""
         receipt = self.capture_receipt
-        plans = batch_plans(self.root['key'], receipt, self.rule)
-        self.batches = [item({k: p[k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=p['dependencies'], checkpoint=p['checkpoint']) for p in plans]
-        self.screens = {}
-        for record in receipt['records']:
-            subject = dict(kind='APPLICATION', council=self.council, reference=record['reference'])
-            self.screens[record['reference']] = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=assessment_identity(record, self.rule)[3]), dependencies=[self.root['key']])
-        self.facts, self.factual_contracts = {}, {}
-        by_reference = {r['reference']: r for r in receipt['records']}
-        for n, nominee in enumerate(nominees):
-            record = by_reference[nominee.reference]
-            target = self.target_for(record)
-            factory = accepted_idox_new_identity if self.family == 'idox' else accepted_arcus_new_identity
-            fc = factory(f'e2e-fact-{self.family}-{n}', target)
-            self.factual_contracts[nominee.reference] = fc
-            subject = dict(kind='APPLICATION', council=self.council, reference=nominee.reference)
-            self.facts[nominee.reference] = item(dict(subject=subject, task='FACTUAL_REFRESH', contract=fc.name, revision=self.tag), dependencies=[self.screens[nominee.reference]['key']])
-        rows = [self.root, *self.batches, *self.screens.values(), *self.facts.values()]
-        bindings = {r['key']: {k: r[k] for k in ('subject', 'task', 'contract', 'revision')} for r in rows}
-        self.bindings.update(bindings)
-        contracts = [self.contract.name, 'listing-batch-v1', V3_CONTRACT, *[c.name for c in self.factual_contracts.values()], *extra_contracts]
-        n = len(nominees)
-        grant = self._grant(bindings, contracts, bindings, ttl=ttl, source_calls=n if source_calls is None else source_calls, writes=2 * n if writes is None else writes,
-                            detail_keys=[f['key'] for f in self.facts.values()],
-                            outcomes={'LISTING_METADATA': ['BATCH_SCREENED'], 'FACTUAL_REFRESH': ['SUPPORTED_FACTS_VERIFIED', 'ALREADY_KNOWN'], 'SCREENING': []})
-        apply_screening(grant, self.rule)
-        control = self._control()
-        control['grants'][self.auth_chain] = grant
-        if stop is not None:
-            control['global_stop'] = stop
-        self._write_control(control)
-        for row in [*self.batches, *self.facts.values()]:
-            self._insert(row)
+        targets = {r['reference']: self.target_for(r) for r in receipt['records']}
+        reg = chain_registration(self._owner(ttl), self.binding, self.contract, dict(self.root, checkpoint=receipt), receipt, tuple(nominees), self.rule, targets, revision=self.revision, item_limits=self.item_limits,
+                                 allow_test_evidence=True, other_receipts=others)
+        grant = copy.deepcopy(reg.grant)
+        if writes is not None:
+            grant['writes'] = writes
+        if source_calls is not None:
+            grant['source_calls'] = source_calls
+        self._install(reg, grant=grant, stop=stop)
+        self.chain_registration = reg
+        self.caller.use(reg)
         return self
 
     def owner_sets_stop(self, reason='DISPOSABLE_TEST_STOP'):
@@ -204,92 +184,56 @@ class Chain:
         """Fixture-only forgery of a stored checkpoint, to prove the production binding checks refuse it."""
         self.w['boot'].execute('UPDATE ingestion_work_items SET checkpoint=jsonb_set(checkpoint::jsonb, %s::text[], %s::jsonb)::json WHERE key=%s', (path, json.dumps(value), key))
 
-    # ------------------------------------------------------------------------------------------------------------ PRODUCTION
+    # ------------------------------------------------------------------------------------------------------------ PRODUCTION STAGES
+    def supervised_source(self):
+        """Run the (synthetic) source under its REAL supervisor once: the audit it wrote and the outer object that supervisor produced."""
+        if self.source is None:
+            if self.family == 'idox':
+                self.source, self.outer = idox_supervised(self.tmp, self.audit)
+            else:
+                self.source, self.outer, self.slot_receipt = arcus_slot_supervised(self.tmp, self.audit, self.contract.scope())
+        return self.source, self.outer
+
     def capture(self, *, source=None, expected=None, label=LABEL):
-        """Retained capture through the restricted worker and broker: validate, archive with verified readback, checkpoint, finish. No listing request."""
-        budget = self._budget(slot_key=self.root['key'])
-        co = self._coordinator(budget, self.auth_capture, {self.contract.name: self.contract})
-        source = self.audit if source is None else source
-        try:
-            claim = co.ledger.claim(self.root['key'], lease_seconds=165)
-            receipt = co.retained_capture(claim, source, outer(), self.publisher, expected_source_sha256=digest(self.audit) if expected is None else expected, evidence_label=label)
-            self.capture_receipt = receipt
-            return receipt
-        finally:
-            self.accounting['capture'] = budget.close([])
+        supervised, outer = self.supervised_source()
+        if self.caller.preflighted != self.root['key']:
+            self.caller.preflight(self.root['key'])      # the caller refuses to capture without it
+        return self.caller.capture(supervised if source is None else source, outer, expected_source_sha256=digest(supervised) if expected is None else expected,
+                                   evidence_label=label, archive=self.publisher)
 
     def read_capture(self):
-        """The checkpoint as the restricted ledger holds it (what every later stage consumes), not the caller's memory."""
-        budget = self._budget()
-        co = self._coordinator(budget, self.auth_capture, {self.contract.name: self.contract})
-        try:
-            saved = co.ledger.get(self.root['key'])['checkpoint']
-            budget.capture_checkpoint_sha256 = digest(saved)
-        finally:
-            self.prior = budget.close([])
-        self.capture_receipt = saved
-        return saved
+        return self.caller.read_capture()
 
     def nominees(self, receipts=None):
-        return derive_nominees(receipts or [self.capture_receipt], self.rule, allow_test_evidence=True)
-
-    def _contracts(self):
-        return {self.contract.name: self.contract, **{c.name: c for c in self.factual_contracts.values()}}
+        return self.caller.nominees(receipts)
 
     def screen(self):
-        costs = []
-        for batch in self.batches:
-            budget = self._budget(slot_key=batch['key'])
-            co = self._coordinator(budget, self.auth_chain, self._contracts())
-            try:
-                process_batch(co, batch['key'], check=budget.check)
-            finally:
-                costs.append(budget.close([]))
-        self.accounting['screening'] = costs
+        return self.caller.screen()
 
     def screening_outcome(self, reference):
-        return self.w['boot'].execute('SELECT checkpoint::jsonb->\'count_assessment\'->>\'admission\' FROM ingestion_work_items WHERE key=%s', (self.screens[reference]['key'],)).fetchone()[0]
+        return self.caller.screening_outcome(reference)
+
+    def probe_claim(self, key):
+        return self.caller.probe_claim(key)
 
     def prepare(self, nominee, *, detail_status='Decided'):
-        """Everything an admission needs, built from the restricted ledger's own retained state; mirrors the existing admission test's `scenario`."""
-        receipt = self.capture_receipt
-        record = next(r for r in receipt['records'] if r['reference'] == nominee.reference)
-        index = receipt['records'].index(record)
-        batch = self.batches[index // 5]
+        """The production admission bundle plus the fixture's detail source for the nominated case."""
+        record = next(r for r in self.capture_receipt['records'] if r['reference'] == nominee.reference)
         target = self.target_for(record)
-        fc = self.factual_contracts[nominee.reference]
         if self.family == 'idox':
             source = idox_detail(target, summary(record['reference'], status=detail_status, decision='Approve' if detail_status == 'Decided' else '', date='Mon 28 Sep 2026' if detail_status == 'Decided' else ''))
         else:
             source = arcus_detail_audit(target)
         calls = []
+
         def detail(_):
             calls.append(1)
-            return source, outer()
-        budget = self._budget(previous=self.prior)
-        co = self._coordinator(budget, self.auth_chain, self._contracts())
-        nom = AcceptanceBinding(self.root['key'], self.screens[nominee.reference]['key'], self.facts[nominee.reference]['key'], record['reference'], record['source_url'], record['source_record_id'],
-                                digest(record), digest(receipt), digest(self.prior), batch['key'])
-        binding = V3AdmissionBinding(nom, self.council, self.contract.name, self.revision, digest(self.rule.config()), digest(code_binding()), fc.name, self.tag, factual_binding(fc))
-        window = WindowEvidence(self.council, 'e2e-placeholder', START, END, START, END, SEMANTICS[self.council], 'e2e', 'date-labels', 'terminal-count', 1, 1, 2, 2000, 1)
-        env = DiscoveryEnvelope(self.council, record['reference'], record['source_url'], record['source_record_id'], datetime(2026, 11, 16, tzinfo=timezone.utc), window, (record['reference'],), 'a' * 64, ())
-        return Admission(co, binding, budget, env, get_council(self.council), detail, calls, nominee, self.facts[nominee.reference])
-
-    def probe_claim(self, key):
-        """Try to claim a work item through a FRESH accounted budget that is always closed, so a probe can never leave an unaccounted connection behind."""
-        budget = self._budget()
-        co = self._coordinator(budget, self.auth_chain, self._contracts())
-        try:
-            return co.ledger.claim(key, lease_seconds=165)
-        finally:
-            self.accounting.setdefault('probes', []).append(budget.close([]))
-
-    def no_listing(self, _):
-        self.listing_requests.append(1)
-        raise AssertionError('the integrated chain must never request a listing')
+            return source, self.outer
+        return Admission(self.caller.prepare(nominee), detail, calls)
 
     def admit(self, adm, *, allow_test_evidence=True):
+        self.caller.allow_test_evidence = allow_test_evidence
         try:
-            return execute(adm.co, adm.binding, listing_reader=self.no_listing, detail_reader=adm.detail, envelope=adm.envelope, council=adm.council, check=adm.budget.check, allow_test_evidence=allow_test_evidence)
+            return self.caller.admit(adm.inner, adm.detail)
         finally:
-            self.accounting.setdefault('admission', []).append(adm.budget.close([]))
+            self.caller.allow_test_evidence = True
