@@ -42,6 +42,8 @@ class ArcusListingContract:
         return ListingContract(self.name,self.config,self.case,self.audit_validator,self.row_qualifier,self.execution_budget)
 
     def project(self,source,outer,limits,*,source_bytes_limit=128*1024):
+        from .collection_mode import require_screening_mode
+        require_screening_mode(source,self.config.council)
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied('SOURCE_AUDIT_BOUND')
         c=self.config
         validate_source_resources(source,outer,limits,audit_bytes_limit=source_bytes_limit)

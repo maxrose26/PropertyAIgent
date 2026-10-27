@@ -37,6 +37,11 @@ def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 _manifest_scope=ContextVar('manifest_proof_scope',default=None)
+_profile_scope=ContextVar('manifest_collection_profile',default=None)
+
+def current_collection_profile():
+    value=_profile_scope.get()
+    return dict(value) if value is not None else None
 
 
 def current_manifest_scope():
@@ -45,12 +50,22 @@ def current_manifest_scope():
 
 
 @contextmanager
-def manifest_scope(row):
+def manifest_scope(row, profile=None):
     from .campaign_manifest import require_row
-    row=dict(require_row(row))
+    row=dict(require_row(row,profiled=profile is not None))
+    if profile is not None:
+        from .source_profiles import validate
+        validate(profile,row)
     token=_manifest_scope.set(row)
-    try:yield
-    finally:_manifest_scope.reset(token)
+    profile_token=_profile_scope.set(profile)
+    try:
+        if profile is None:yield
+        else:
+            from .source_profiles import selected
+            with selected(profile):yield
+    finally:
+        _profile_scope.reset(profile_token)
+        _manifest_scope.reset(token)
 
 
 def require_scope(council,semantics,start,end):
@@ -185,7 +200,8 @@ def validate_proof(value):
         p=e['sanitised_evidence']
         if not isinstance(p,dict) or sha(encoded(p))!=e['sanitised_sha256']:raise ProofError('PROOF_SANITISED_HASH')
         if p.get('view')=='PLAYWRIGHT_RENDERED_LOCATORS':
-            if value['scope'][0]!='rochdale' or e['original_response_availability']!='NOT_CAPTURED_RENDERED_LOCATORS' or any(e[k] is not None for k in ('original_response_sha256','rendered_dom_sha256','body_bytes')):raise ProofError('PROOF_RENDERED_BINDING')
+            selected=current_collection_profile()
+            if (value['scope'][0]!='rochdale' and (selected is None or selected['family']!='ARCUS_UI' or selected['council']!=value['scope'][0])) or e['original_response_availability']!='NOT_CAPTURED_RENDERED_LOCATORS' or any(e[k] is not None for k in ('original_response_sha256','rendered_dom_sha256','body_bytes')):raise ProofError('PROOF_RENDERED_BINDING')
             if set(p)!={'availability','view','markers','cards','zero_literal_matches','next_controls','criteria','visibility'}:raise ProofError('PROOF_RENDERED_SCHEMA')
             if p['availability'] not in {'PRESENT','PARTIAL','UNAVAILABLE'}:raise ProofError('PROOF_RENDERED_STATE')
             if not isinstance(p['markers'],list) or len(p['markers'])>4:raise ProofError('PROOF_RENDERED_MARKERS')
@@ -195,6 +211,9 @@ def validate_proof(value):
             for k in ('cards','zero_literal_matches','next_controls'):
                 if p[k] is not None and (type(p[k]) is not int or not 0<=p[k]<=20000):raise ProofError('PROOF_RENDERED_COUNT')
             allowed={'Valid date from','Valid date to','Location of works','Description','Decision notice was sent date from','Decision notice was sent date to','Ward','Application Status','Application type','Parish','Category'}
+            if selected is not None:
+                from .source_profiles import config
+                c=config(selected);allowed={'Valid date from','Valid date to','Category',*c.blank_inputs,*c.blank_combos}
             if set(p['criteria'])!=allowed or any(v not in {'MATCH','MISMATCH','ABSENT','AMBIGUOUS','UNAVAILABLE','NOT_ATTEMPTED'} for v in p['criteria'].values()):raise ProofError('PROOF_RENDERED_CRITERIA')
             continue
         if e['original_response_availability']=='NOT_CAPTURED_RENDERED_LOCATORS':raise ProofError('PROOF_RENDERED_BINDING')
@@ -276,7 +295,8 @@ def validate_audit(value,expected_scope=None):
     scope=tuple(p['scope'])
     if expected_scope is not None and scope!=tuple(expected_scope):raise ProofError('PROOF_ENCLOSING_SCOPE')
     if 'requested_interval' in value:
-        c='rochdale' if value.get('case')=='discovery_rochdale_ui_window' else value.get('council')
+        selected=current_collection_profile()
+        c=selected['council'] if selected is not None and value.get('case')==selected['case'] else 'rochdale' if value.get('case')=='discovery_rochdale_ui_window' else value.get('council')
         if (c,value.get('date_semantics'),*value['requested_interval'])!=scope:raise ProofError('PROOF_ENCLOSING_SCOPE')
     if 'response_provenance' in value:
         hashes={v.get('body_sha256') for v in value['response_provenance']}

@@ -12,6 +12,20 @@ from app.pipeline.discovery_contract import WindowEvidence,Completeness,Literal
 from app.scrapers.discovery_idox import source_url
 
 
+def validate_listing_record(c,row,keys,refs):
+    """The strict validation of ONE listing row (identity, fields, date inside the requested interval). Shared, unchanged, by the complete-window projection and the partial observation."""
+    url,key=source_url(c.council,row['source_url'])
+    if row['identity_state']!='PRESENT_VALUE' or not isinstance(row['reference'],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9/._ -]{0,99}',row['reference']) or key!=row['source_key'] or key in keys or row['reference'] in refs:raise Denied('IDOX_ROW_IDENTITY')
+    keys.add(key);refs.add(row['reference']);fields={}
+    for name in ('proposal','address','received_date','validated_date','application_type'):
+        f=row['fields'].get(name,dict(state='UNKNOWN',value=None,locator='NOT_CAPTURED'))
+        literal=Literal(f['state'],f.get('value'),f['locator'])
+        fields[name]=dict(state=literal.state,value=literal.value,locator=literal.locator,truncated=False)
+    d=fields['received_date' if c.semantics=='RECEIVED' else 'validated_date']
+    if d['state']!='PRESENT_VALUE' or not c.start<=datetime.strptime(d['value'],'%a %d %b %Y').date()<=c.end:raise Denied('IDOX_ROW_DATE')
+    return url,key,fields
+
+
 # Partial listing observations (specification 033). The kind is deliberately NOT a weaker receipt: it has no field from which a completeness claim could be read.
 OBSERVATION_KIND='LISTING_OBSERVATION_V1'
 OBSERVATION_WINDOW_CLAIM='NONE'      # the ONLY window-level statement an observation makes
@@ -47,20 +61,11 @@ class IdoxListingContract:
         return record['provenance']['body_sha256']
 
     def _row(self,row,keys,refs):
-        """The strict validation of ONE listing row (identity, fields, date inside the requested interval). Shared, unchanged, by the complete-window projection and the partial observation."""
-        c=self.config
-        url,key=source_url(c.council,row['source_url'])
-        if row['identity_state']!='PRESENT_VALUE' or not isinstance(row['reference'],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9/._ -]{0,99}',row['reference']) or key!=row['source_key'] or key in keys or row['reference'] in refs:raise Denied('IDOX_ROW_IDENTITY')
-        keys.add(key);refs.add(row['reference']);fields={}
-        for name in ('proposal','address','received_date','validated_date','application_type'):
-            f=row['fields'].get(name,dict(state='UNKNOWN',value=None,locator='NOT_CAPTURED'))
-            literal=Literal(f['state'],f.get('value'),f['locator'])
-            fields[name]=dict(state=literal.state,value=literal.value,locator=literal.locator,truncated=False)
-        d=fields['received_date' if c.semantics=='RECEIVED' else 'validated_date']
-        if d['state']!='PRESENT_VALUE' or not c.start<=datetime.strptime(d['value'],'%a %d %b %Y').date()<=c.end:raise Denied('IDOX_ROW_DATE')
-        return url,key,fields
+        return validate_listing_record(self.config,row,keys,refs)
 
     def project(self, source, outer, limits,*,source_bytes_limit=128*1024):
+        from .collection_mode import require_screening_mode
+        require_screening_mode(source,self.config.council)
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
         validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
@@ -117,6 +122,8 @@ class IdoxListingContract:
     def observe(self,source,outer,limits,*,observed_at,source_bytes_limit=128*1024):
         """The partial observation: verified records from ONE results page whose total is unknown, with NO window claim. Only for an explicitly enabled council, only when EVERY condition holds; anything else stops exactly as
         `project` does. Admission does not infer completeness from the short page: it records that a bounded set of valid records was observed."""
+        from .collection_mode import require_screening_mode
+        require_screening_mode(source,self.config.council)
         c=self.config
         if not self.partial_observation or c.council not in OBSERVATION_COUNCILS or c.semantics!='RECEIVED':raise Denied('PARTIAL_OBSERVATION_NOT_ENABLED')
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
