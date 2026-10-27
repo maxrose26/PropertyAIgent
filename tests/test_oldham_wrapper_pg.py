@@ -12,7 +12,7 @@ CASES=[]
     ('hold',6,6,'COMPLETED','CLOSED'),('cancel',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),
     ('stop',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),('expiry',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),
     ('existing',2,1,'COMPLETED','CLOSED'),
-    ('export_boundary',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),('export_overflow',2,1,'STOP_RECONCILE_NO_RETRY','CLOSED'),
+    ('export_boundary',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('export_overflow',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('deadline',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('application_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('ledger_ack_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('b2_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('publication_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('uncertain_commit',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN')])
@@ -26,6 +26,7 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     assert 'Traceback' not in run.stdout+run.stderr,run.stderr[-1000:]
     lines=[json.loads(l) for l in run.stdout.splitlines() if l.startswith('{')];assert lines,run.stderr[-1000:]
     result=lines[-1]
+    CASES.append(dict(scenario=scenario,result=result)) # retain failures as well as successes
     assert result.get('status')==status and result.get('cleanup')==cleanup,result
     assert run.returncode==(0 if status=='COMPLETED' and cleanup=='CLOSED' else 1),result
     assert result.get('source_listing_requests')==0
@@ -36,6 +37,11 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     if scenario=='success':assert len(result['nominee_results'])==1 and result['nominee_results'][0]['application_id'] is not None
     admin=result['accounting']['administration'];assert admin['commands']<=240 and admin['connections']<=13 and admin['returned_data_value_bytes']<=1024**2
     runtime=result['accounting']['runtime'];assert runtime['commands']<=1040 and runtime['connections']<=40 and runtime['returned_bytes']<=4*1024**2
+    if scenario in ('export_boundary','export_overflow'):
+        assert result['accounting_injection']=='SYNTHETIC_EXPORT_BOUNDARY'
+        assert result['access']=='DISABLED_VERIFIED' and result['detail_attempts']==0
+        assert result['process_closure']['live_children']==result['process_closure']['new_sockets']==0
+        assert result['publication']=='UNCERTAIN_OR_HELD'
     if scenario=='existing':assert result['nominee_results'][0]['application_id'] is not None and result['detail_attempts']==0
     if scenario in ('application_uncertain','ledger_ack_uncertain','b2_uncertain'):
         assert result['runtime_effect_uncertain'] and result['access']=='UNCERTAIN'
@@ -49,7 +55,6 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     if scenario=='success':
         again=subprocess.run(command,env=env,stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=20)
         assert again.returncode==1 and json.loads(again.stdout.splitlines()[-1])['credential_requested'] is False
-    CASES.append(dict(scenario=scenario,result=result))
 
 
 def teardown_module():
