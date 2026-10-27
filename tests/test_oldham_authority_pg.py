@@ -93,7 +93,7 @@ def test_sql_stop_changes_invalidate_even_when_global_stop_cleared(world,tmp_pat
  assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
  life.teardown()
 
-@pytest.mark.parametrize('fault',('revoked','expired','grant_binding','package','missing','source_cap'))
+@pytest.mark.parametrize('fault',('revoked','expired','grant_binding','package','missing','source_cap','binding_reseal'))
 def test_sql_allowance_tampering_refuses(world,tmp_path,fault):
  ch,o,life,gh=setup(world,tmp_path);ctl=ch._control();a=ch.auth_capture;e=ctl['oldham_allowances'][a]
  if fault=='revoked':e['revoked']=True
@@ -101,6 +101,9 @@ def test_sql_allowance_tampering_refuses(world,tmp_path,fault):
  elif fault=='grant_binding':e['grant_binding']['capture_key']='f'*64
  elif fault=='package':e['package']['scope']['start']='2026-11-10'
  elif fault=='missing':del ctl['oldham_allowances'][a]
+ elif fault=='binding_reseal':
+  ctl['grants'][a]['completion_outcomes']['DISCOVERY'].append('UNREVIEWED')
+  e['grant_binding']={k:v for k,v in ctl['grants'][a].items() if k not in ('source_calls','writes')}
  else:ctl['grants'][a]['source_calls']=1
  ch._write_control(ctl)
  with pytest.raises(Exception):ch.capture()

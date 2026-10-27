@@ -26,6 +26,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $oldham$
  AND ctl->'oldham_allowances'->authority->>'revoked'='false'
  AND (ctl->'oldham_allowances'->authority->>'expires_at')::double precision>extract(epoch FROM clock_timestamp())
  AND ctl->'oldham_allowances'->authority->'grant_binding'=(ctl->'grants'->authority)-ARRAY['source_calls','writes']
+ AND ((ctl->'grants'->authority)-ARRAY['source_calls','writes','oldham_package_sha256'])=((ctl->'oldham_allowances'->authority->'package'->'registration'->'grant')-ARRAY['source_calls','writes'])
  AND ctl->'oldham_allowances'->authority->'grant_binding'->'keys' ? work_key
  AND (ctl->'grants'->authority->>'source_calls')::integer BETWEEN 0 AND (ctl->'oldham_allowances'->authority->>'source_cap')::integer
  AND (ctl->'grants'->authority->>'writes')::integer BETWEEN 0 AND (ctl->'oldham_allowances'->authority->>'write_cap')::integer
