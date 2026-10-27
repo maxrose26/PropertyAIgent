@@ -161,13 +161,17 @@ def test_routing_fails_closed_on_anything_ambiguous_or_tampered():
 
 def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     """Phase A: nothing selected v3. Slice 1 (PR #171) adds exactly one explicit consumer set; this test pins it, and the held production paths are pinned in tests/test_ingestion_screening_v3_slice1.py."""
-    allowed={'app/ingestion/nomination.py','verification/ingestion_storage/operational_controller.py','verification/ingestion_storage/v3_admission.py', 'verification/ingestion_storage/observation_worker_sql.py','app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/policy_screening_v3.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py'}
+    allowed={'app/ingestion/nomination.py','verification/ingestion_storage/operational_controller.py','verification/ingestion_storage/v3_admission.py', 'verification/ingestion_storage/observation_worker_sql.py','app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/policy_screening_v3.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py','verification/ingestion_storage/oldham_authority.py'}
     offenders=set()
     for path in list((ROOT/'app').rglob('*.py'))+list((ROOT/'verification').rglob('*.py')):
         if path.name in ('listing_screening.py','count_assessment.py','count_evidence.py'):continue
         text=path.read_text(encoding='utf-8',errors='ignore')
         if re.search(r'RULE_V3|screening-assessment-v3|routing_of|ingestion\.count_(?:assessment|evidence)|from\s+\.count_(?:assessment|evidence)|from\s+\.\s+import\s+[^\n]*count_(?:assessment|evidence)',text):offenders.add(path.relative_to(ROOT).as_posix())
     assert offenders<=allowed,offenders      # explicit opt-in only: the disposable coordinator and the read-only projections; no production path
+    # Owner issuance validates the frozen configuration; it must not directly screen rows.
+    import ast
+    owner=ast.parse((ROOT/'verification/ingestion_storage/oldham_authority.py').read_text())
+    assert not [n for n in ast.walk(owner) if isinstance(n,ast.Call) and ((isinstance(n.func,ast.Attribute) and n.func.attr in {'screen','screen_row','rescreen','re_screen'}) or (isinstance(n.func,ast.Name) and n.func.id in {'screen_row','assess_proposal'}))]
     assert not [n for n in dir(ls) if 'rescreen' in n.lower() or 're_screen' in n.lower()]
 
 

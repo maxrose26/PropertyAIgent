@@ -33,7 +33,7 @@ def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,
     if root is not None:
         from app.ingestion.listing_screening import ScreeningRule,RULE_V3
         frozen=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
-        if rule is None or rule.config()!=frozen.config():raise Denied('OLDHAM_FROZEN_SCREENING')
+        if type(rule) is not ScreeningRule or rule.config()!=frozen.config() or rule.link_related is not False:raise Denied('OLDHAM_FROZEN_SCREENING')
     if root is None:return capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
     return chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
 

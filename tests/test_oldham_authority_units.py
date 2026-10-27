@@ -112,3 +112,11 @@ def test_shared_owner_outer_deadline_is_not_restarted(monkeypatch):
  assert allocation.deadline==550 #450s package reserve, earlier than runtime570
  clock[0]=550
  with pytest.raises(Denied,match='OUTER_CLOSURE_RESERVE'):allocation.check()
+
+@pytest.mark.parametrize('version,threshold,related',[('v1',10,False),('v3',11,False),('v3',10,True)])
+def test_owner_configuration_selection_cannot_change_frozen_screening(version,threshold,related):
+ from app.ingestion.listing_screening import ScreeningRule,RULE_V1,RULE_V3
+ o,b,c,*_=inputs();rule=ScreeningRule(RULE_V1,link_related=related) if version=='v1' else ScreeningRule(RULE_V3,unit_threshold=threshold,link_related=related)
+ with pytest.raises(Denied,match='OLDHAM_FROZEN_SCREENING'):
+  derive(o,b,c,revision='a'*40,item_limits=DEFAULT_LIMITS,root={},rule=rule)
+ assert o.connections==0
