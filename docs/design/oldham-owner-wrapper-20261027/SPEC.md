@@ -71,3 +71,11 @@ separately inspected/approved before any production package is released. The cur
 historical Oldham packet is not upgraded by this code. A full synthetic command uses
 `--disposable-test`; that flag accepts only the fixed local test backend and labelled
 synthetic qualification, and cannot certify historical or council evidence.
+
+
+Detail accounting reuses the existing Idox projector's bounded `audit` projection
+(requests, body bytes, worker/supervisor time and closure). It is retained per factual
+key in the full journal and final accounting. The shared reader's generic nested
+`resource` observation may be absent for a flat detail audit; absence is not zero.
+A started detail has an unverified placeholder until that existing projection returns;
+failed or missing returns retain partial/unknown accounting rather than inventing use.

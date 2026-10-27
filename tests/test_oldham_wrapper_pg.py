@@ -46,8 +46,17 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     if scenario in ('application_uncertain','ledger_ack_uncertain','b2_uncertain'):
         assert result['runtime_effect_uncertain'] and result['access']=='UNCERTAIN'
         assert result['outcome']=='ADMISSION_PROCESSING_IN_PROGRESS'
+    if scenario in ('success','five'):
+        source=result['accounting']['source']
+        assert source['status']=='COMPLETE' and len(source['receipts'])==result['detail_attempts']
+        assert source['totals']['requests']==result['detail_attempts'] and source['totals']['received_body_bytes']>0
+        assert all(x['source_outcome']=='PROJECTED_OBSERVATION' and len(x['target_sha256'])==64 for x in source['receipts'])
+        assert all(x['worker']['requests']==1 and x['worker']['received_body_bytes']>0 and x['worker']['cleanup_state']=='CLOSED' for x in source['receipts'])
     if scenario=='five':assert result['detail_attempts']==5 and len(result['nominee_results'])==5 and all(n['application_id'] is not None for n in result['nominee_results'])
-    if scenario in ('zero','zero19'):assert result['outcome']=='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' and result['detail_attempts']==0
+    if scenario in ('zero','zero19'):
+        assert result['outcome']=='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' and result['detail_attempts']==0
+        assert result['accounting']['source']['status']=='NOT_STARTED' and result['accounting']['source']['attempts']==0
+        assert result['accounting']['source']['totals']['requests']==0
     if scenario=='hold':assert result['outcome']=='SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY' and result['detail_attempts']==0
     if cleanup=='CLOSED':assert result['access']=='DISABLED_VERIFIED' and result['process_closure']['live_children']==result['process_closure']['new_sockets']==0
     state=home/'.local/state/propertyaigent'/('oldham-owner-test-'+scenario.replace('_','-'))

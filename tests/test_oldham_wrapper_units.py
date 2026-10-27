@@ -85,3 +85,13 @@ def test_fault_scenario_release_identity_remains_valid(tmp_path,monkeypatch):
     monkeypatch.setattr(pkg,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
     path,sha=packet(tmp_path/'fault',tag='application_uncertain',supervised=False)
     assert pkg.validate(path,sha,disposable=True)['package']['release_id']=='oldham-owner-test-application-uncertain'
+
+
+def test_partial_source_accounting_never_becomes_zero_or_complete():
+    from verification.ingestion_storage.oldham_owner_once import Operation
+    op=object.__new__(Operation);op.source_receipts=[];op.source_accounting='NOT_STARTED'
+    assert op.source_totals()['totals']['requests']==0
+    op.source_receipts=[dict(status='ATTEMPTED_UNVERIFIED')];op.source_accounting='ATTEMPTED_UNVERIFIED'
+    assert op.source_totals()['totals'] is None and op.source_totals()['attempts']==1
+    op.source_receipts.insert(0,dict(status='RETURNED_ACCOUNTING_VALIDATED',worker=dict(requests=1,received_body_bytes=123,elapsed_seconds=.5,supervisor_seconds=.7)))
+    total=op.source_totals();assert total['totals'] is None and total['known_subtotal']['requests']==1

@@ -29,6 +29,7 @@ class Operation:
         self.data=data;self.p=data['package'];self.journal=journal;self.memory=memory;self.backend=backend
         self.created=time.monotonic() if command_started is None else command_started;self.preflight_seconds=0;self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
         self.head=self.p['evidence_head'];self.directory='docs/design/ingestion-operational-execution-'+self.p['release_id']
+        self.source_receipts=[];self.source_accounting='NOT_STARTED'
         self.owner=None;self.life=None;self.caller=None;self.result={};self.baseline=owned_resources();self.closure=None;self.finished=False;self.runtime_uncertain=False;self.preparation_progress=None
         self.github=GitHub(journal.emit,self.check,bound=26,**({'runner':backend.github} if backend else {}))
 
@@ -158,7 +159,18 @@ class Operation:
                         if self.backend:reader=self.backend.detail(reader,adm,self)
                         original=reader
                         def counted(row):
-                            self.result['detail_attempts']+=1;return original(row)
+                            self.result['detail_attempts']+=1;self.source_accounting='ATTEMPTED_UNVERIFIED'
+                            target=self.caller.registration.factual_contracts[n.reference].row
+                            accounted=dict(reference=n.reference,factual_key=row['key'],target_sha256=digest(target),status='ATTEMPTED_UNVERIFIED')
+                            self.source_receipts.append(accounted)
+                            audit,outer=original(row)
+                            from verification.discovery.material_qualification import project_idox
+                            projection=project_idox(target,audit);projected=projection['audit']
+                            known=projected.get('budget_state')=='WITHIN_LIMITS' and projected.get('cleanup_state')=='CLOSED'
+                            accounted.update(status='RETURNED_ACCOUNTING_VALIDATED' if known else 'RETURNED_UNVERIFIED',target_sha256=digest(target),source_outcome=projection['failure'] or 'PROJECTED_OBSERVATION',worker=projected,supervisor=outer)
+                            self.source_accounting='COMPLETE' if all(x['status']=='RETURNED_ACCOUNTING_VALIDATED' for x in self.source_receipts) else 'PARTIAL'
+                            self.journal.emit('detail_accounting_returned',accounted)
+                            return audit,outer
                         value=self.caller.admit(adm,counted)
                         self.result['nominee_results'].append(dict(reference=n.reference,outcome=value.get('outcome'),application_id=value.get('application_id') if value.get('application_id') is not None else (value.get('factual') or {}).get('application_id'),identity=value.get('admission'),factual=value.get('factual')))
                         self.checkpoint('NOMINEE_READBACK',reference=n.reference,outcome=value.get('outcome'),completed=i+1)
@@ -176,8 +188,15 @@ class Operation:
         # Source diagnostics are fixed structured observations; never exception text.
         if event in ('source_supervisor_observed','source_worker_resource_observed'):self.journal.emit(event,value)
 
+    def source_totals(self):
+        names=dict(requests='requests',received_body_bytes='received_body_bytes',worker_seconds='elapsed_seconds',supervisor_seconds='supervisor_seconds')
+        known=[x['worker'] for x in self.source_receipts if x['status']=='RETURNED_ACCOUNTING_VALIDATED']
+        subtotal={k:sum(x[v] for x in known) for k,v in names.items()}
+        complete=len(known)==len(self.source_receipts)
+        return dict(status=self.source_accounting,attempts=len(self.source_receipts),totals=subtotal if complete else None,known_subtotal=subtotal,receipts=self.source_receipts)
+
     def accounting(self):
-        return dict(preflight_seconds=self.preflight_seconds,total_command_seconds=time.monotonic()-self.created,preparation=None if self.preparation_progress is None else dict(report=self.preparation_progress.report(),work=self.preparation_progress.work()),fixture_setup=None if not self.backend or not self.backend.world else self.backend.world['setup_costs'],administration=None if self.owner is None else self.owner.accounting(),runtime=None if self.caller is None else self.caller.allocation.totals(),runtime_receipts={} if self.caller is None else self.caller.accounting,github_requests=self.github.requests,attempted_publication_bytes=self.published,elapsed_active_seconds=None if self.started is None else time.monotonic()-self.started)
+        return dict(source=self.source_totals(),preflight_seconds=self.preflight_seconds,total_command_seconds=time.monotonic()-self.created,preparation=None if self.preparation_progress is None else dict(report=self.preparation_progress.report(),work=self.preparation_progress.work()),fixture_setup=None if not self.backend or not self.backend.world else self.backend.world['setup_costs'],administration=None if self.owner is None else self.owner.accounting(),runtime=None if self.caller is None else self.caller.allocation.totals(),runtime_receipts={} if self.caller is None else self.caller.accounting,github_requests=self.github.requests,attempted_publication_bytes=self.published,elapsed_active_seconds=None if self.started is None else time.monotonic()-self.started)
 
     def failed(self,exc):
         from .connection_diagnostics import safe_failure
