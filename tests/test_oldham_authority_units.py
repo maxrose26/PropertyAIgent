@@ -120,3 +120,32 @@ def test_owner_configuration_selection_cannot_change_frozen_screening(version,th
  with pytest.raises(Denied,match='OLDHAM_FROZEN_SCREENING'):
   derive(o,b,c,revision='a'*40,item_limits=DEFAULT_LIMITS,root={},rule=rule)
  assert o.connections==0
+
+
+def test_staged_remaining_time_reserves_entire_set_and_never_restarts(monkeypatch):
+ from verification.ingestion_storage import oldham_allocation as a
+ clock=[100.];monkeypatch.setattr(a.time,'monotonic',lambda:clock[0]);alloc=a.Allocation()
+ assert alloc.require_remaining(dict(nominees=3))
+ clock[0]=320 #50 work seconds remain, not enough for3*45
+ assert not alloc.require_remaining(dict(nominees=3))
+ assert alloc.require_remaining(dict(nominees=1))
+ assert alloc.started==100 and alloc.deadline==370
+ clock[0]=325
+ assert not alloc.require_remaining(dict(nominees=1))
+
+
+def test_staged_pending_expiry_does_not_recharge_completed_batches():
+ from verification.ingestion_storage.limit_reconciliation import pending_grant_problems
+ assert not pending_grant_problems(195,phase='ADMISSION',batches=12,nominees=1)
+ assert pending_grant_problems(194,phase='ADMISSION',batches=0,nominees=1)
+ assert not pending_grant_problems(690,phase='SCREENING',batches=4)
+ assert pending_grant_problems(689,phase='SCREENING',batches=4)
+
+
+def test_staged_expiry_extension_and_combined_downgrade_refuse_before_connection():
+ o,b,c,source,out,args,reg,evidence=inputs();o.issuance_mode='STAGED'
+ with pytest.raises(Denied,match='ISSUANCE_MODE'):o.issue(reg,b,c,source=source,outer=out,evidence=evidence,**args)
+ o.issuance_mode=None;o.original_expiry=o.expiry-timedelta(seconds=1)
+ reg=derive(o,b,c,phase='CAPTURE',**args);evidence['registration_sha256']=digest(registration_value(reg))
+ with pytest.raises(Denied,match='ORIGINAL_EXPIRY'):o.issue(reg,b,c,source=source,outer=out,evidence=evidence,phase='CAPTURE',**args)
+ assert o.connections==0

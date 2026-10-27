@@ -6,7 +6,7 @@ import json
 import time
 
 from app.ingestion.ledger import Denied,digest,bounded
-from .chain_registration import capture_registration,chain_registration
+from .chain_registration import capture_registration,chain_registration,screening_registration,admission_registration,completed_screening,authority_name
 from .operational_owner import Owner,STOP,GENERATION3_STOP
 from .scope_binding import binding_for
 
@@ -26,14 +26,26 @@ def scope_check(binding,contract):
     return s
 
 def registration_value(reg):
-    return {k:deepcopy(getattr(reg,k)) for k in ('kind','authority','rows','insert','grant','bindings','root_key')} | {'targets':{k:dict(v.row) for k,v in reg.factual_contracts.items()}}
+    value={k:deepcopy(getattr(reg,k)) for k in ('kind','authority','rows','insert','grant','bindings','root_key')} | {'targets':{k:dict(v.row) for k,v in reg.factual_contracts.items()}}
+    if reg.kind=='ADMISSION':value['screening_sha256']=reg.screening_sha256
+    return value
 
-def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False):
+def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,phase=None,screening_rows=None):
     scope_check(binding,contract)
     if root is not None:
         from app.ingestion.listing_screening import ScreeningRule,RULE_V3
         frozen=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         if type(rule) is not ScreeningRule or rule.config()!=frozen.config() or rule.link_related is not False:raise Denied('OLDHAM_FROZEN_SCREENING')
+    if phase not in (None,'CAPTURE','SCREENING','ADMISSION'):raise Denied('OLDHAM_PHASE')
+    if phase=='CAPTURE' and root is not None or phase in ('SCREENING','ADMISSION') and root is None:raise Denied('OLDHAM_PHASE_INPUT')
+    if phase=='CAPTURE':
+        reg=capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
+        reg.authority=authority_name(binding,'STAGED_CAPTURE',revision);return reg
+    if phase=='SCREENING':
+        if nominees or detail_targets is not None:raise Denied('OLDHAM_SCREENING_NO_FACTS')
+        return screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
+    if phase=='ADMISSION':
+        return admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,screening_rows=screening_rows,allow_test_evidence=allow_test_evidence)
     if root is None:return capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
     return chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
 
@@ -41,6 +53,7 @@ class OldhamOwner(Owner):
     """Separate entrypoint: historical Owner.register is never called or modified."""
     def __init__(self,*a,**kw):
         super().__init__(*a,**kw)
+        self.original_expiry=self.expiry;self.staged_capture=None;self.staged_screening=None;self.issuance_mode=None;self.staged_prior={};self.staged_expiry=None;self.admission_held=False
         self.awaiting_verification=False;self.package_started=time.monotonic();self.admin_elapsed=0.;self.admin_depth=0;self.admin_live=None;original=self.check
         def check():
             original()
@@ -75,17 +88,35 @@ class OldhamOwner(Owner):
             if self.awaiting_verification:self.effect_uncertain=True
             raise
 
-    def _issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None):
+    def _issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None,phase=None,screening_rows=None):
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
+        mode='LEGACY' if phase is None else 'STAGED'
+        if self.issuance_mode not in (None,mode):raise Denied('OLDHAM_ISSUANCE_MODE')
+        if self.admission_held:raise Denied('OLDHAM_ADMISSION_HELD')
+        if phase=='CAPTURE' and self.staged_prior or phase=='SCREENING' and set(self.staged_prior)!={'CAPTURE'} or phase=='ADMISSION' and set(self.staged_prior)!={'CAPTURE','SCREENING'}:raise Denied('OLDHAM_PHASE_ORDER')
         if revision!=self.bindings.get('revision') or len(revision)!=40 or any(c not in '0123456789abcdef' for c in revision):raise Denied('OLDHAM_CODE_BINDING')
         if source is None or outer is None:raise Denied('OLDHAM_CAPTURE_INPUTS_REQUIRED')
         projected=contract.project(source,outer,item_limits,source_bytes_limit=512*1024)
         from .oldham_allocation import capacity
-        capacity(len(projected['records']),len(projected['records']) if root is None else len(nominees))
+        records=len(projected['records']);batches=(records+4)//5
+        if phase is None:capacity(records,records if root is None else len(nominees))
+        elif phase=='CAPTURE':capacity(records,0)
+        elif phase not in ('SCREENING','ADMISSION'):raise Denied('OLDHAM_PHASE')
+        if phase is not None and (self.expiry!=self.original_expiry or (self.grant_expiry or self.expiry)>self.original_expiry):raise Denied('OLDHAM_ORIGINAL_EXPIRY')
         from .limit_reconciliation import grant_problems
         lifetime=(self.grant_expiry or self.expiry).timestamp()-time.time()
-        if grant_problems(binding,lifetime,batches=(len(projected['records'])+4)//5,nominees=len(projected['records']) if root is None else len(nominees)):raise Denied('OLDHAM_INSUFFICIENT_LIFETIME')
-        expected=derive(self,binding,contract,revision=revision,item_limits=item_limits,root=root,receipt=receipt,nominees=nominees,rule=rule,detail_targets=detail_targets,allow_test_evidence=allow_test_evidence)
+        from .limit_reconciliation import pending_grant_problems
+        problems=grant_problems(binding,lifetime,batches=batches,nominees=records if root is None else len(nominees)) if phase is None else pending_grant_problems(lifetime,phase=phase,batches=batches,nominees=len(nominees))
+        if problems:raise Denied('OLDHAM_INSUFFICIENT_LIFETIME')
+        if phase is not None and self.staged_expiry is not None and (self.grant_expiry or self.expiry).timestamp()!=self.staged_expiry:raise Denied('OLDHAM_ORIGINAL_EXPIRY')
+        expected=derive(self,binding,contract,revision=revision,item_limits=item_limits,root=root,receipt=receipt,nominees=nominees,rule=rule,detail_targets=detail_targets,allow_test_evidence=allow_test_evidence,phase=phase,screening_rows=screening_rows)
+        capacity_hold=False
+        if phase in ('SCREENING','ADMISSION'):
+            if not self.staged_capture or self.staged_capture!=digest(projected):raise Denied('OLDHAM_STAGED_CAPTURE_REQUIRED')
+            if not hasattr(self,'_allocation'):raise Denied('OLDHAM_SHARED_ALLOCATION_REQUIRED')
+            need=dict(commands=80*batches+8*records,connections=2*batches+records) if phase=='SCREENING' else dict(commands=120*len(nominees),connections=4*len(nominees),nominees=len(nominees))
+            if phase=='ADMISSION' and self.staged_screening!=digest(dict(root=root['key'],receipt=digest(receipt),rule=rule.config())):raise Denied('OLDHAM_STAGED_SCREENING_REQUIRED')
+            capacity_hold=not self._allocation.require_remaining(need)
         bounded(registration_value(expected))
         if registration_value(expected)!=registration_value(prepared):raise Denied('OLDHAM_ALTERED_REGISTRATION')
         if set(evidence)!={'source_sha256','qualification_sha256','outer_sha256','registration_sha256'} or any(not isinstance(v,str) or len(v)!=64 or any(c not in '0123456789abcdef' for c in v) for v in evidence.values()):raise Denied('OLDHAM_EVIDENCE_BINDING')
@@ -105,9 +136,32 @@ class OldhamOwner(Owner):
                 sid=stop_identity(ctl)
                 if expected.authority in ctl['grants'] or expected.authority in ctl.get('oldham_allowances',{}):raise Denied('OLDHAM_CONSUMED')
                 if self.require_control_sha256 is None or digest(ctl)!=self.require_control_sha256:raise Denied('OLDHAM_CONTROL_CHANGED')
+                if phase in ('SCREENING','ADMISSION'):
+                    for prior in self.staged_prior.values():
+                        authority=prior['authority'];entry=ctl.get('oldham_allowances',{}).get(authority,{})
+                        if entry.get('package_sha256')!=prior['package_sha256']:raise Denied('OLDHAM_PRIOR_AUTHORITY_CHANGED')
+                        allowed=self.q(c,"SELECT public.ingestion_oldham_allowed(outcome::jsonb,%s,%s,%s::jsonb) FROM public.ingestion_work_items WHERE key=repeat('0',64)",(authority,expected.root_key,json.dumps(contract.scope())))[0][0]
+                        if allowed is not True:raise Denied('OLDHAM_PRIOR_AUTHORITY_INACTIVE')
                 if root is not None:
                     saved=self.q(c,'SELECT row_to_json(w) FROM public.ingestion_work_items w WHERE key=%s',(root['key'],))[0][0]
                     if any(saved.get(k)!=root.get(k) for k in ('key','subject','contract','revision')) or saved.get('state')!='COMPLETE' or saved.get('checkpoint')!=receipt:raise Denied('OLDHAM_SAVED_CAPTURE_CHANGED')
+                if phase=='ADMISSION':
+                    keys=[r['key'] for r in [*expected.batches,*expected.screens.values()]]
+                    actual_rows=self.q(c,'SELECT row_to_json(w) FROM public.ingestion_work_items w WHERE key=ANY(%s) ORDER BY key',(keys,))
+                    actual_rows=[r[0] for r in actual_rows]
+                    submitted=sorted(screening_rows,key=lambda r:r['key'])
+                    if actual_rows!=submitted:raise Denied('OLDHAM_SAVED_SCREENING_CHANGED')
+                    completed_screening(expected,receipt,rule,actual_rows)
+                if phase in ('SCREENING','ADMISSION'):capacity_hold=not self._allocation.require_remaining(need)
+                if capacity_hold:
+                    self.q(c,'ROLLBACK',effect=True)
+                    flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET')")[0]
+                    if flags!=(False,False):self.effect_uncertain=True;raise Denied('OLDHAM_TEMPORARY_CAPABILITY')
+                    self.admission_held=phase=='ADMISSION'
+                    return dict(outcome='SCREENING_COMPLETED_ADMISSION_HELD_CAPACITY' if phase=='ADMISSION' else 'SCREENING_HELD_CAPACITY',admission='NOT_ISSUED',source_calls=0,writes=0)
+                # Effects cannot borrow administrative closure/reporting capacity.
+                # Remaining insertion and two-connection acknowledgement envelope.
+                if self.commands+len(expected.insert)+10>200 or self.connections+1>11:raise Denied('OLDHAM_ADMIN_ISSUANCE_CAPACITY')
                 for row in expected.insert:self.q(c,'INSERT INTO public.ingestion_work_items SELECT * FROM json_populate_record(NULL::public.ingestion_work_items,%s::json)',(json.dumps(row),),effect=True)
                 grant=deepcopy(expected.grant)
                 allowance=dict(grant_binding={k:v for k,v in grant.items() if k not in ('source_calls','writes')},source_cap=grant['source_calls'],write_cap=grant['writes'],revoked=False,expires_at=grant['expires_at'],stop_sha256=sid,scope=scope_check(binding,contract),evidence=evidence,targets={k:dict(v.row) for k,v in expected.factual_contracts.items()})
@@ -139,6 +193,10 @@ class OldhamOwner(Owner):
             self.effect_uncertain=True;raise
         self.emit('oldham_authority_committed',dict(authority=expected.authority,registration_sha256=evidence['registration_sha256'],stop_sha256=sid))
         self.awaiting_verification=False
+        self.issuance_mode=mode
+        if phase is not None:self.staged_prior[phase]=dict(authority=expected.authority,package_sha256=package_sha)
+        if phase=='CAPTURE':self.staged_capture=digest(projected);self.staged_expiry=expected.grant['expires_at']
+        if phase=='SCREENING':self.staged_screening=digest(dict(root=root['key'],receipt=digest(receipt),rule=rule.config()))
         return expected
 
     def revoke(self):

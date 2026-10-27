@@ -81,3 +81,11 @@ def reconcile(binding, item_limits, *, lifetime_seconds, batches, nominees):
     if problems:
         raise Denied('LIMIT_INCOMPATIBLE:' + ','.join(problems))
     return layers(binding, item_limits, lifetime_seconds=lifetime_seconds)
+
+
+def pending_grant_problems(lifetime_seconds,*,phase,batches=0,nominees=0):
+    """New staged path only: completed stages consume no second expiry reservation."""
+    pending={'CAPTURE':1,'SCREENING':batches,'ADMISSION':nominees}
+    if phase not in pending:raise Denied('STAGED_PHASE')
+    required=STAGE_LEASE_SECONDS*pending[phase]+30  # unchanged closure reserve
+    return [] if isinstance(lifetime_seconds,(int,float)) and required<=lifetime_seconds<=GRANT_MAX_SECONDS else ['grant.pending_lifetime_seconds']

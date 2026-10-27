@@ -66,9 +66,10 @@ class ChainCaller:
 
     def use(self, registration):
         """Adopt the prepared CHAIN registration (its bindings must already be the ones the authority was issued against)."""
-        if registration.kind != 'CHAIN' or registration.root_key != self.root_key:
+        if registration.kind not in ('CHAIN','SCREENING','ADMISSION') or registration.root_key != self.root_key:
             raise Denied('CHAIN_REGISTRATION_MISMATCH')
         self.registration = registration
+        if registration.kind in ('SCREENING','ADMISSION'):self.chain_authority=registration.authority
         return self
 
     root_key = None
@@ -124,6 +125,7 @@ class ChainCaller:
         return derive_nominees([self.capture_receipt] if receipts is None else receipts, self.rule, allow_test_evidence=self.allow_test_evidence)
 
     def screen(self):
+        if self.registration.kind=='ADMISSION':raise Denied('STAGED_SCREENING_REPLAY_FORBIDDEN')
         costs = []
         for batch in self.registration.batches:
             budget = self._budget(slot_key=batch['key'])
@@ -133,6 +135,17 @@ class ChainCaller:
             finally:
                 costs.append(budget.close([]))
         self.accounting['screening'] = costs
+
+    def read_screening(self):
+        """One accounted connection; all completed batch/assessment evidence, never a new assessment."""
+        from .chain_registration import completed_screening
+        budget=self._budget()
+        co=self._coordinator(budget,self.chain_authority,self._contracts())
+        try:
+            rows=[co.ledger.get(r['key']) for r in [*self.registration.batches,*self.registration.screens.values()]]
+            completed_screening(self.registration,self.capture_receipt,self.rule,rows)
+            return rows
+        finally:self.accounting['screening_readback']=budget.close([])
 
     def screening_outcome(self, reference):
         budget = self._budget()
