@@ -94,9 +94,11 @@ def test_a_third_request_is_refused_by_the_budget_not_by_the_stub():
     assert b.requests == 2 and (b.budget.requests, b.budget.response_bytes, b.budget.total_bytes, b.budget.seconds) == (2, 500_000, 1_000_000, 45)
 
 
-def test_the_declared_limits_are_the_existing_reader_ceilings_not_a_function_of_a_previous_response():
-    assert d.LIMITS == dict(requests=2, response_bytes=500_000, total_bytes=1_000_000, reader_seconds=45, connect_seconds=3, read_seconds=8, supervisor_seconds=50, max_registration_hours=2)
-    assert d.LIMITS['total_bytes'] == d.LIMITS['requests'] * d.LIMITS['response_bytes']
+def test_the_declared_limits_are_the_existing_readers_own_ceilings_not_a_function_of_a_previous_response():
+    reader = d.WindowBoundary(lambda *a, **k: None, d.config()).budget      # the real collection reader's budget
+    assert (d.LIMITS['response_bytes'], d.LIMITS['reader_seconds']) == (reader.response_bytes, reader.seconds)
+    assert d.LIMITS['requests'] == 2 and d.LIMITS['total_bytes'] == d.LIMITS['requests'] * d.LIMITS['response_bytes']
+    assert d.LIMITS['supervisor_seconds'] == 50 and (d.LIMITS['connect_seconds'], d.LIMITS['read_seconds']) == (3, 8)
 
 
 @pytest.mark.parametrize('first', [Resp(b'<html></html>', status=404), Resp(b'<html></html>', status=503), Resp(b'<html></html>', status=302, headers={'Content-Type': 'text/html', 'Location': '/x'}),
@@ -245,10 +247,14 @@ def test_validate_binds_the_exact_bytes_the_clock_and_the_checkout():
         with pytest.raises(ValueError):
             d.validate(json.loads(raw), d.sha(raw), raw, **{'clock': lambda: NOW + timedelta(minutes=5), 'git': git, **kwargs})
     with pytest.raises(ValueError, match='REGISTRATION_HASH'):
-        d.validate(json.loads(raw), '0' * 64, raw, clock=lambda: NOW + timedelta(minutes=5))
+        d.validate(json.loads(raw), '0' * 64, raw, clock=lambda: NOW + timedelta(minutes=5), git=git)
+    with pytest.raises(ValueError, match='CHECKOUT_BINDING'):
+        d.validate(json.loads(raw), d.sha(raw), raw, clock=lambda: NOW + timedelta(minutes=5), git=None)      # a missing checkout fact fails closed
+    with pytest.raises(TypeError):
+        d.validate(json.loads(raw), d.sha(raw), raw)      # git is required, never defaulted
     tampered = dict(r, limits=dict(r['limits'], requests=3))
     with pytest.raises(ValueError):
-        d.validate(tampered, d.sha(d.canonical(tampered)), d.canonical(tampered), clock=lambda: NOW + timedelta(minutes=5))
+        d.validate(tampered, d.sha(d.canonical(tampered)), d.canonical(tampered), clock=lambda: NOW + timedelta(minutes=5), git=git)
 
 
 def run_args(tmp_path, flag=True, sha=None):
@@ -263,6 +269,7 @@ def test_run_is_single_use_and_creates_nothing_without_the_enabling_flag(tmp_pat
     import verification.stage26b_l1.actions_runner as runner
     monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
     monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: dict(scope='x'))
     launched = []
     monkeypatch.setattr(runner, 'supervise', lambda command, **kw: launched.append(command) or (0, False))
     with pytest.raises(ValueError, match='DIAGNOSTIC_NOT_ENABLED'):
@@ -274,6 +281,7 @@ def test_run_is_single_use_and_creates_nothing_without_the_enabling_flag(tmp_pat
     assert d.main(run_args(tmp_path)) == 1      # the stub child wrote no audit: reported as a failed run, not success
     directory = tmp_path / 'state' / IDENT
     assert len(launched) == 1 and stat.S_IMODE(directory.stat().st_mode) == 0o700 and (directory / 'registration.json').exists()
+    assert launched[0][-2] == '--registration-sha256' and len(launched[0][-1]) == 64      # the worker gets the hash it must re-validate
     with pytest.raises(FileExistsError):
         d.main(run_args(tmp_path))      # consumed: never replayed
     assert len(launched) == 1
@@ -284,6 +292,7 @@ def test_run_refuses_a_credential_environment_and_a_wrong_checkout(tmp_path, mon
     monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
     monkeypatch.setattr(runner, 'supervise', lambda *a, **k: (_ for _ in ()).throw(AssertionError('must not launch')))
     monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: dict(scope='x'))
     monkeypatch.setenv('DATABASE_URL', 'x')
     with pytest.raises(ValueError, match='OWNER_CREDENTIAL_CONTEXT'):
         d.main(run_args(tmp_path))
@@ -299,3 +308,190 @@ def test_the_module_makes_no_request_on_import_render_or_inspect(monkeypatch):
     monkeypatch.setattr(socket, 'socket', lambda *a, **k: (_ for _ in ()).throw(AssertionError('network')))
     reg()
     inspect(raw_page(pager=False))
+
+
+# --------------------------------------------------------------------------------------------------------------------- review findings
+def mkclaim(tmp_path, monkeypatch, *, extra=None):
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
+    monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: dict(scope='x'))
+    r = reg(issued=(datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), expires=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat())
+    raw = d.canonical(r)
+    d.STATE_ROOT.mkdir(mode=0o700)
+    directory = d.STATE_ROOT / IDENT
+    directory.mkdir(mode=0o700)
+    (directory / 'registration.json').write_bytes(raw)
+    for name in extra or ():
+        (directory / name).write_bytes(b'x')
+    return directory, d.sha(raw)
+
+
+def test_the_worker_cannot_make_a_request_without_the_parents_validated_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(d, 'live', lambda *a, **k: (_ for _ in ()).throw(AssertionError('a request would have been made')))
+    bare = tmp_path / 'bare'
+    bare.mkdir(mode=0o700)
+    with pytest.raises(ValueError, match='CLAIM_REQUIRED'):
+        d.main(['worker', '--directory', str(bare), '--registration-sha256', '0' * 64])      # an arbitrary directory is not a claim
+    directory, digest = mkclaim(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match='REGISTRATION_HASH'):
+        d.main(['worker', '--directory', str(directory), '--registration-sha256', '0' * 64])
+    (directory / 'form.html').write_bytes(b'x')
+    with pytest.raises(ValueError, match='CLAIM_REQUIRED'):
+        d.main(['worker', '--directory', str(directory), '--registration-sha256', digest])      # a used claim is not fresh
+    (tmp_path / 'again').mkdir()
+    other, digest2 = mkclaim(tmp_path / 'again', monkeypatch)
+    monkeypatch.setattr(d, '_git', lambda: dict(head='c' * 40, tree=TREE, dirty=False))
+    with pytest.raises(ValueError, match='CHECKOUT_BINDING'):
+        d.main(['worker', '--directory', str(other), '--registration-sha256', digest2])
+
+
+def test_the_worker_runs_only_with_a_fresh_valid_claim(tmp_path, monkeypatch):
+    directory, digest = mkclaim(tmp_path, monkeypatch)
+    seen = []
+    monkeypatch.setattr(d, 'live', lambda cfg, dr: seen.append(dr) or dict(failure=None, responses=[]))
+    assert d.main(['worker', '--directory', str(directory), '--registration-sha256', digest]) == 0 and seen == [directory]
+    assert (directory / 'audit.json').exists() and stat.S_IMODE((directory / 'audit.json').stat().st_mode) == 0o600
+
+
+def test_containment_requires_the_dedicated_scope_and_the_exact_memory_limit(tmp_path):
+    cgroup = tmp_path / 'sys' / 'user.slice' / d.SCOPE_UNIT
+    cgroup.mkdir(parents=True)
+    (cgroup / 'memory.max').write_text(str(d.MEMORY_BYTES) + '\n')
+    (cgroup / 'memory.swap.max').write_text('0\n')
+    proc = tmp_path / 'proc'
+    proc.write_text('0::/user.slice/' + d.SCOPE_UNIT + '\n')
+    assert d.containment(str(proc), str(tmp_path / 'sys'))['memory_max'] == d.MEMORY_BYTES
+    (cgroup / 'memory.swap.max').write_text('max\n')
+    with pytest.raises(ValueError, match='DIAGNOSTIC_MEMORY_LIMIT'):
+        d.containment(str(proc), str(tmp_path / 'sys'))
+    (cgroup / 'memory.swap.max').write_text('0\n')
+    (cgroup / 'memory.max').write_text('2147483648\n')
+    with pytest.raises(ValueError, match='DIAGNOSTIC_MEMORY_LIMIT'):
+        d.containment(str(proc), str(tmp_path / 'sys'))
+    proc.write_text('0::/user.slice/other.scope\n')
+    with pytest.raises(ValueError, match='DIAGNOSTIC_SCOPE_REQUIRED'):
+        d.containment(str(proc), str(tmp_path / 'sys'))
+    proc.write_text('1:name=x:/a\n0::/b\n')
+    with pytest.raises(ValueError, match='CGROUP_V2_REQUIRED'):
+        d.containment(str(proc), str(tmp_path / 'sys'))
+
+
+def test_run_refuses_outside_the_scope_before_consuming_the_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
+    monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: (_ for _ in ()).throw(ValueError('DIAGNOSTIC_SCOPE_REQUIRED')))
+    with pytest.raises(ValueError, match='DIAGNOSTIC_SCOPE_REQUIRED'):
+        d.main(run_args(tmp_path))
+    assert not (tmp_path / 'state').exists()
+
+
+def test_interruption_kills_through_the_supervisor_and_leaves_the_claim_consumed(tmp_path, monkeypatch):
+    import verification.stage26b_l1.actions_runner as runner
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
+    monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: dict(scope='x'))
+    monkeypatch.setattr(runner, 'supervise', lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()))
+    import signal
+    previous = signal.getsignal(signal.SIGTERM)
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            d.main(run_args(tmp_path))
+        handler = signal.getsignal(signal.SIGTERM)
+        with pytest.raises(KeyboardInterrupt):
+            handler(signal.SIGTERM, None)      # SIGTERM is turned into the same interruption the supervisor cleans up after
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+    assert (tmp_path / 'state' / IDENT).is_dir()
+    monkeypatch.setattr(runner, 'supervise', lambda *a, **k: (_ for _ in ()).throw(AssertionError('never replayed')))
+    with pytest.raises(FileExistsError):
+        d.main(run_args(tmp_path))
+
+
+def test_the_state_root_must_be_a_private_directory_we_own(tmp_path, monkeypatch):
+    target = tmp_path / 'loose'
+    target.mkdir()
+    os.chmod(target, 0o755)
+    monkeypatch.setattr(d, 'STATE_ROOT', target)
+    with pytest.raises(ValueError, match='STATE_ROOT'):
+        d._state_root()
+    real = tmp_path / 'real'
+    real.mkdir(mode=0o700)
+    link = tmp_path / 'link'
+    link.symlink_to(real)
+    monkeypatch.setattr(d, 'STATE_ROOT', link)
+    with pytest.raises(ValueError, match='STATE_ROOT'):
+        d._state_root()
+
+
+def test_a_malformed_audit_is_a_failed_run_not_a_crash(tmp_path, monkeypatch):
+    import verification.stage26b_l1.actions_runner as runner
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state')
+    monkeypatch.setattr(d, '_git', lambda: dict(head=REV, tree=TREE, dirty=False))
+    monkeypatch.setattr(d, 'containment', lambda: dict(scope='x'))
+
+    def fake(command, **kw):
+        (tmp_path / 'state' / IDENT / 'audit.json').write_bytes(b'{"not": "an audit"}')
+        return 0, False
+    monkeypatch.setattr(runner, 'supervise', fake)
+    assert d.main(run_args(tmp_path)) == 1
+
+
+def test_a_redirect_is_reported_even_though_none_is_followed(private):
+    dispatch, _ = stub(Resp(FORM), Resp(b'', status=302, headers={'Content-Type': 'text/html', 'Location': d.config().base + '/search.do'}))
+    out = d.capture(dispatch, d.config(), private)
+    assert out['resource']['redirects'] == 0 and out['redirect_observed'] is True
+    ok, _ = stub(Resp(FORM), Resp(page()))
+    private2 = private.parent / 'second'
+    private2.mkdir(mode=0o700)
+    assert d.capture(ok, d.config(), private2)['redirect_observed'] is False
+
+
+def test_tokens_in_paths_and_form_actions_are_never_reported():
+    markup = (b'<a class="next" href="/online-applications/page.do;jsessionid=ABC123SESSION?searchCriteria.page=2&amp;_csrf=TOKEN1">Next</a>'
+              b'<form action="/online-applications/y.do?_csrf=TOKEN2;jsessionid=ABC456"><input type="hidden" name="searchCriteria.page" value="TOKEN3"></form>'
+              b'<meta name="totalResults" content="SECRETCONTENT">')
+    r = inspect(raw_page(pager=False).replace(b'</html>', markup + b'</html>'))
+    exported = json.dumps(r)
+    for secret in ('ABC123SESSION', 'TOKEN1', 'TOKEN2', 'TOKEN3', 'ABC456', 'SECRETCONTENT'):
+        assert secret not in exported
+    assert r['navigation_links'][0]['href_path'] == '/online-applications/page.do' and r['navigation_links'][0]['parameter_names'] == ['_csrf', 'jsessionid', 'searchCriteria.page']      # names only, never their values
+
+
+def test_headings_inside_records_and_text_in_ancestors_of_records_are_not_reported():
+    body = raw_page(pager=False).replace(b'<ul id="searchresults">', b'<ul id="searchresults">').replace(b'Outline', b'<h2>SECRETWORD HEADING</h2>Outline')
+    r = inspect(body)
+    assert 'SECRETWORD' not in json.dumps(r) and all('SECRETWORD' not in h for h in r['structure']['headings'])
+
+
+@pytest.mark.parametrize('rename', [b'id="searchresults"', b'id="results-renamed"'])
+def test_when_the_results_list_cannot_be_located_all_free_text_is_suppressed(rename):
+    body = raw_page(pager=False).replace(b'id="searchresults"', b'id="results-renamed"' if rename.endswith(b'renamed"') else b'id="searchresults"')
+    body = body.replace(b'Outline', PROPOSAL_MARKER + b' 7 results of 9')
+    r = inspect(body)
+    if rename.endswith(b'renamed"'):
+        assert r['text_suppressed'] is True and 'SECRETWORD' not in json.dumps(r) and r['structure']['results_containers'] == 0
+    else:
+        assert r['text_suppressed'] is False and 'SECRETWORD' not in json.dumps(r)
+
+
+def test_signals_in_comments_attributes_button_text_and_script_strings_are_found():
+    markup = (b'<!-- total: 5 results -->'
+              b'<div data-total="5" title="5 results" aria-label="Showing 1 - 5 of 5"></div>'
+              b'<button disabled>Next</button><a href="#">&raquo;</a>'
+              b"<script>var label = 'Showing 1 - 5 of 5'; var t = {total: 5};</script>")
+    r = inspect(raw_page(pager=False).replace(b'</html>', markup + b'</html>'))
+    assert any(h['source'] == 'COMMENT' for h in r['count_text']) and any(h['source'] == 'SCRIPT' and h['pattern'] == 'SHOWING_RANGE_OF_TOTAL' for h in r['count_text'])
+    assert {a['attribute'] for a in r['attribute_signals']} >= {'data-total', 'title', 'aria-label'}
+    assert any(n['disabled'] for n in r['navigation_text']) and len(r['navigation_text']) >= 2
+    assert r['scanned'] and r['not_scanned'] and r['parser']['total'] is None      # the report says what it did and did not examine
+
+
+def test_hostile_nesting_and_size_are_bounded():
+    import time as _time
+    deep = raw_page(pager=False).replace(b'</html>', b'<div>' * 5000 + b'x' + b'</div>' * 5000 + b'</html>')
+    started = _time.monotonic()
+    r = inspect(deep)
+    assert _time.monotonic() - started < 15 and r['availability'] == 'PRESENT'
+    assert inspect(b'x' * (d.MAX_INSPECT_BYTES + 1))['availability'] == 'TOO_LARGE'
+    wide = raw_page(pager=False).replace(b'</html>', b'<i></i>' * 30000 + b'</html>')
+    assert inspect(wide).get('scan_truncated') is True

@@ -16,15 +16,23 @@ in the HTML. Five rows below page size 10 proves nothing. The smallest evidence 
   headers, cookies, URLs, HTML or record text. Nothing is published or committed.
 
 ## Authority (inactive until approved)
-`render` produces a local registration (identity, scope, revision/tree, limits, issue and expiry within two hours, `database_synchronised: false`, `publication: NONE`) and prints its hash. `run` refuses unless
-the exact hash matches, the registration is current, the checkout is clean at the registered revision/tree, `--enable-reviewed-source-only-diagnostic` is given, and no DATABASE/SUPABASE/OPENAI/ANTHROPIC
-variable is present. It does not read or synchronise database stops, and it has no remote control or head check: cancellation is local Ctrl+C / SIGTERM only. Existing Salford/global and manual stops are unchanged.
-Containment is a transient user scope (`MemoryMax=1 GiB`, swap 0) plus the 50 s supervisor; it does not use the release controller's cgroup enforcement, so closure is process-exit evidence, not cgroup readback.
+`render` produces a local registration (identity, scope, revision/tree, limits, issue and expiry within two hours, containment, `database_synchronised: false`, `publication: NONE`) and prints its hash. `run` refuses unless the
+exact hash matches, the registration is current, the checkout (this module's own repository) is clean at the registered revision and tree, `--enable-reviewed-source-only-diagnostic` is given, no
+DATABASE/SUPABASE/OPENAI/ANTHROPIC variable is present, and the process is already inside the dedicated scope below. The single-use claim directory is created only after those checks. The worker child accepts nothing
+but that fresh claim: it re-validates the registration, checkout and scope and refuses a directory that holds anything else, so it cannot be used to bypass `run`.
+The run does not read or synchronise database stops and has no remote control or head check. Existing Salford/global and manual stops are unchanged.
+
+## Containment and cancellation (what is and is not enforced)
+* Enforced before any request: the process is inside a cgroup named `propertyaigent-diagnostic.scope` whose own `memory.max` is exactly 1 GiB and `memory.swap.max` is 0 (read-only inspection of its own cgroup). The owner starts it with
+  `systemd-run --user --scope --unit=propertyaigent-diagnostic -p MemoryMax=1073741824 -p MemorySwapMax=0 -p OOMPolicy=kill -p RuntimeMaxSec=120s ...`.
+* Enforced by the supervisor: the existing 50 s deadline and whole-process-group kill on timeout or interruption.
+* Cancellation: Ctrl+C or SIGTERM to the run process (SIGTERM is turned into the same interruption); the supervisor then kills the worker's group.
+* NOT provided: the release controller's `OperationalMemory` enforcement, kernel source/controller sub-groups, `cgroup.kill`, or positive cgroup closure readback. Closure here is process exit plus the supervisor's group kill.
 
 ## Inspector (pure, offline, no request)
 `inspect_html` reports structure only, never the results list or its text: count-like text outside the results list (with element chain), navigation-like elements and links (classes, rel, disabled state, parameter names),
 count/page inputs, numeric assignments in scripts, meta tags, `resultsPerPage`, and what the existing parser extracts from the same bytes (rows, first/last/total/terminal, next link, `p.pager` count).
-It reports observed facts. An absent signal in one response proves nothing about the portal in general.
+It reports observed facts and states in `scanned` / `not_scanned` exactly what it examined (text, comments, inline scripts, selected attributes, anchors, forms, inputs, meta, the parser view) and what it did not (the results list, external scripts, JavaScript-rendered DOM, headers, non-UTF-8 bodies). If the results list cannot be located exactly once, all free text is suppressed. Paths and form actions are reported without query, fragment or path parameters, and input/meta values only if purely numeric. An absent signal in one response proves nothing about the portal in general.
 
 ## Not in scope
 Any parser or proof change (that follows only from evidence), partial admission, other councils, publication, database access.
