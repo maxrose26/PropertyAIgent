@@ -37,12 +37,16 @@ def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanu
     # Active mode receives no application URL, and the fixture's url_factory asserts this.
     if status=='COMPLETED':
         assert result['records']==5 and result['nominees']==nominees and result['access']=='DISABLED_VERIFIED'
+        assert len(result['screening_results'])==5 and result['coverage_advance'] is False and result['admission']=='NOT_AUTHORISED' and result['application_engine']=='NOT_CREATED'
+        assert result['completeness_basis']=='OWNER_ACCEPTED_SINGLE_PAGE' and result['owner_acceptance']
+        assert all(len(r['checkpoint_sha256'])==64 and r['outcome']['retained'] is True for r in result['screening_results'])
         assert result['outcome']==('SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' if not nominees else 'SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE')
         assert result['process_closure']['live_children']==result['process_closure']['new_sockets']==0
         assert 'oldham_install_committed' in audit and 'oldham_retirement_closed' in audit
         assert all(not any(e['payload']['flags']) for e in events if e['event']=='oldham_install_capabilities')
         assert any(e['event']=='oldham_two_login_teardown' and e['payload']['cleanup']=='CLOSED' for e in events)
     else:
+        assert result['failure']['stage']=='RETIREMENT_AND_INSTALLATION'
         assert 'oldham_install_committed' not in audit
         assert not any(e['event']=='oldham_two_login_activation' for e in events)
         # No compensating rollback, issuance or replay after an uncertain effect.

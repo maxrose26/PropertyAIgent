@@ -162,6 +162,12 @@ class Operation:
                 from .chain_registration import completed_screening
                 completed_screening(screen,receipt,self.rule,rows)
             self.result.update(outcome='SCREENING_COMPLETE_ADMISSION_NOT_STARTED' if ns.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',records=len(receipt['records']),nominees=len(ns.nominees),nominee_results=[],capture_sha256=digest(receipt),screening_sha256=digest(rows),detail_attempts=0)
+            if self.capture_screening_only:
+                self.result.update(operation='CAPTURE_SCREENING_ONLY',coverage_advance=False,admission='NOT_AUTHORISED',application_engine='NOT_CREATED',
+                    completeness_basis=receipt.get('completeness_basis','SOURCE_TERMINAL'),owner_acceptance=receipt.get('owner_acceptance'),
+                    screening_results=[dict(reference=r['subject']['reference'],outcome=r['outcome'],screening_key=r['key'],checkpoint_sha256=digest(r['checkpoint']),
+                        record_sha256=r['checkpoint']['record_sha256'],assessment_revision=r['checkpoint']['assessment_revision'],config_sha256=r['checkpoint']['config_sha256'])
+                        for r in sorted((r for r in rows if r['task']=='SCREENING'),key=lambda r:r['subject']['reference'])])
             self.checkpoint('SCREENING_COMPLETE',capture_sha256=digest(receipt),screening_sha256=digest(rows),root_key=root['key'],nominees=len(ns.nominees))
             if self.backend:self.backend.after_screening(self)
             if self.capture_screening_only and ns.nominees:self.result['outcome']='SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE'

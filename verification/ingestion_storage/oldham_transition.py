@@ -48,6 +48,10 @@ class Transition:
         if (len(rows)!=len(expected) or observed!=wanted
             or any(who!='ingestion_storage_owner' or cfg!=['search_path=pg_catalog'] for _,_,who,cfg in rows)):
             raise Denied('OLDHAM_INSTALL_PREDECESSOR_CHANGED')
+        acls=self.o.q(c,"SELECT proname,encode(sha256(convert_to(coalesce(proacl::text,''),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND proname=ANY(%s)",(list(expected),))
+        hashes=dict(acls)
+        if hasattr(self,'predecessor_acls') and hashes!=self.predecessor_acls:raise Denied('OLDHAM_PREDECESSOR_ACL_CHANGED')
+        self.predecessor_acls=hashes
 
     def barriers(self,c):
         ctl=self.o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
@@ -56,9 +60,10 @@ class Transition:
         if self.o.require_control_sha256 is not None and digest(ctl)!=self.o.require_control_sha256:raise Denied('OLDHAM_INSTALL_CONTROL_CHANGED')
         counts=self.o.q(c,"SELECT count(*) FILTER (WHERE state='PERSISTENCE_UNCERTAIN'),count(*) FILTER (WHERE phase='WRITE_INTENT') FROM public.ingestion_work_items")[0]
         active=any(g.get('expires_at',0)>__import__('time').time() for g in ctl.get('grants',{}).values())
+        active_allowance=any(a.get('revoked') is not True and a.get('expires_at',0)>__import__('time').time() for a in ctl.get('oldham_allowances',{}).values())
         deferred=ctl.get('council_deferred_until',{}).get('oldham',0)>__import__('time').time()
-        self.o.emit('oldham_install_barriers',dict(persistence_uncertain=counts[0],write_intents=counts[1],active_grants=active,oldham_deferred=deferred,control_sha256=digest(ctl)))
-        if counts!=(0,0) or active or deferred:raise Denied('OLDHAM_INSTALL_BARRIER')
+        self.o.emit('oldham_install_barriers',dict(persistence_uncertain=counts[0],write_intents=counts[1],active_grants=active,active_oldham_allowance=active_allowance,oldham_deferred=deferred,control_sha256=digest(ctl)))
+        if counts!=(0,0) or active or active_allowance or deferred:raise Denied('OLDHAM_INSTALL_BARRIER')
         # The capability-free inspection cannot expose the full control digest.
         # Bind its first actual observation here, then require it unchanged at
         # installation and every existing issuance/preflight boundary.
@@ -135,6 +140,10 @@ class Transition:
                 helper=self.o.q(c,"SELECT prosecdef,provolatile,pg_get_function_identity_arguments(oid) FROM pg_proc WHERE oid='public.ingestion_oldham_allowed(jsonb,text,text,jsonb)'::regprocedure")[0]
                 self.o.emit('oldham_install_helper_readback',dict(security_definer=helper[0],volatility=helper[1],arguments=helper[2]))
                 if helper!=(True,'s','ctl jsonb, authority text, work_key text, subject jsonb'):raise Uncertain('OLDHAM_INSTALL_HELPER_READBACK')
+                acl=self.o.q(c,"SELECT count(*)=1 AND bool_and(a.grantee=p.proowner AND a.privilege_type='EXECUTE') FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid='public.ingestion_oldham_allowed(jsonb,text,text,jsonb)'::regprocedure")[0][0]
+                acls=self.o.q(c,"SELECT proname,encode(sha256(convert_to(coalesce(proacl::text,''),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND proname=ANY(%s)",(list(self.predecessor_acls),))
+                self.o.emit('oldham_install_privileges',dict(helper_owner_execute_only=acl,predecessor_acls_unchanged=dict(acls)==self.predecessor_acls))
+                if acl is not True or dict(acls)!=self.predecessor_acls:raise Uncertain('OLDHAM_INSTALL_PRIVILEGE_READBACK')
                 self.capabilities_absent(c)
                 self.installed=True
                 self.o.emit('oldham_install_committed',dict(installation_sha256=hashlib.sha256(install.encode()).hexdigest(),rollback_executed=False))

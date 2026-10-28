@@ -139,7 +139,7 @@ class Backend:
                 def execute(self,q,params=None):
                     result=self.c.execute(q,params)
                     text=q if isinstance(q,str) else q.as_string(self.c)
-                    if text.strip()=='COMMIT':
+                    if text.strip().rstrip(';')=='COMMIT':
                         commits.append(True)
                         target=1 if scenario=='cs_retire_ack' else 2
                         if scenario!='cs_install_readback' and len(commits)==target and not lost:
