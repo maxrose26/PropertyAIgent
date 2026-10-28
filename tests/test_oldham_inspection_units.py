@@ -222,7 +222,7 @@ def test_the_package_manifest_is_complete_and_the_registration_renders_offline()
     r=render_registration.render(root=root,minutes=30)
     assert set(r)==oi.REGISTRATION_KEYS and r['limits']==oi.BOUND and r['statements_sha256']==oi.statements_sha256() and set(r['hashes'])==set(manifest['bound_paths'])
     text=(d/'PACKAGE.md').read_text()
-    for _,statement,_ in oi.planned():assert statement in text      # the package lists exactly the statements the controller can send
+    for statement in oi.allowed():assert statement in text      # the package lists every statement the controller can send, including the variant forms
     assert 'NOT AUTHORISED FOR EXECUTION' in text and 'NOT AUTHORISED FOR EXECUTION' in (d/'owner-run.sh').read_text()
 
 
@@ -230,8 +230,9 @@ def test_a_partial_installation_that_fits_several_reviewed_states_names_all_and_
     lone=e()['pre_oldham']['GENERATION3_SCREENING_V3_APPLIED']['ingestion_bolton_allowed']
     got=oi.classify_functions(rows_for({'ingestion_bolton_allowed':lone}))
     assert got['state']=='MISSING_OBJECTS' and got['recognised'] is None and got['reason']=='PARTIAL_CONSISTENT_WITH_SEVERAL_REVIEWED_STATES' and len(got['candidates'])>1 and 'GENERATION3_SCREENING_V3_APPLIED' in got['candidates']
-    shared=oi.classify_functions(rows_for({'ingestion_raise_stop':e()['pre_oldham']['ORIGINAL']['ingestion_raise_stop']})) if 'ingestion_raise_stop' in e()['pre_oldham']['ORIGINAL'] else got
-    assert shared['recognised'] is None
+    inventory=dict(e()['pre_oldham']['GENERATION3_SCREENING_V3_APPLIED']);inventory.pop('ingestion_register_bolton_exception')
+    wrong_owner=oi.classify_functions(rows_for(inventory,owner='provisioning_bootstrap'))      # a partial installation with a changed owner is not offered as merely 'missing objects'
+    assert wrong_owner['state']=='UNEXPECTED_OR_MIXED' and wrong_owner['reason']=='PARTIAL_WITH_OWNER_OR_SEARCH_PATH_CHANGED'
 
 
 def test_the_verdict_states_what_it_checked_and_what_it_did_not():

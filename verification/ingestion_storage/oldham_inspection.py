@@ -142,6 +142,7 @@ def classify_functions(rows):
         return dict(detail,state='OLDHAM_EXACT_INSTALLATION',reason='BODY_OWNER_SEARCH_PATH_MATCH',recognised='OLDHAM_EXACT',checked=CLASSIFICATION_CHECKS,not_checked=CLASSIFICATION_NOT_CHECKED)
     # A strict subset whose every present body is consistent with a reviewed state is "missing objects". Several reviewed states share most bodies, so EVERY consistent state is named and none is chosen.
     candidates=dict(expected['pre_oldham'],OLDHAM_EXACT=expected['oldham'])
+    if not detail['owner_and_search_path_as_reviewed']:return dict(detail,state='UNEXPECTED_OR_MIXED',reason='PARTIAL_WITH_OWNER_OR_SEARCH_PATH_CHANGED',recognised=None)      # the partial verdict is only offered for objects that are otherwise as reviewed
     fits={key:sorted(set(inventory)-set(observed)) for key,inventory in candidates.items() if set(observed)<set(inventory) and all(inventory[n]==h for n,h in observed.items())}
     if len(fits)==1:
         (key,missing),=fits.items();return dict(detail,state='MISSING_OBJECTS',reason='PARTIAL_OF_ONE_REVIEWED_STATE',recognised=key,missing=missing)
