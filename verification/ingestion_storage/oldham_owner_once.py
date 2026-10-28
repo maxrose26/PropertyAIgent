@@ -27,10 +27,11 @@ class Operation:
     """Thin orchestration only; policy, grants, writes, transport and supervision remain delegated."""
     def __init__(self,data,journal,memory,backend,*,started=None,command_started=None):
         self.data=data;self.p=data['package'];self.journal=journal;self.memory=memory;self.backend=backend
+        self.capture_screening_only=self.p['version']==pkg.VERSION_CAPTURE_SCREENING
         self.created=time.monotonic() if command_started is None else command_started;self.preflight_seconds=0;self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
         self.head=self.p['evidence_head'];self.directory='docs/design/ingestion-operational-execution-'+self.p['release_id']
         self.source_receipts=[];self.source_accounting='NOT_STARTED'
-        self.owner=None;self.life=None;self.caller=None;self.result={};self.baseline=owned_resources();self.closure=None;self.finished=False;self.runtime_uncertain=False;self.preparation_progress=None
+        self.owner=None;self.life=None;self.caller=None;self.result=dict(detail_attempts=0) if self.capture_screening_only else {};self.baseline=owned_resources();self.closure=None;self.finished=False;self.runtime_uncertain=False;self.preparation_progress=None
         self.github=GitHub(journal.emit,self.check,bound=26,**({'runner':backend.github} if backend else {}))
 
     def check(self):
@@ -90,8 +91,9 @@ class Operation:
         bindings=dict(revision=self.p['revision'],workflow_sha256=self.p['dependencies']['verification/ingestion_storage/oldham_owner_once.py'],manifest_sha256=self.data['sha256'])
         self.owner=OldhamOwner(config['connect'],self.journal.emit,self.check,identity=config['identity'],expiry=self.data['expiry'],bindings=bindings)
         self.owner.package_started=started
+        self.owner.capture_screening_only=self.capture_screening_only
         self.owner.require_control_sha256=self.p['control_sha256']
-        self.life=Lifecycle(self.owner,self.github)
+        self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only)
         return self
 
     def owner_preflight(self):
@@ -130,13 +132,17 @@ class Operation:
             self.stage='DURABLE_CLAIM'
             claim=canonical(dict(package=self.p,package_sha256=self.data['sha256'],consumed=True))
             self.publish({'claim.json':claim},'claim');self.claimed=True
+            if self.capture_screening_only:
+                self.stage='RETIREMENT_AND_INSTALLATION'
+                from .oldham_transition import Transition
+                Transition(self).run()
             self.stage='OWNER_PREFLIGHT';self.owner_preflight()
             self.rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
             self.stage='CAPTURE_ISSUANCE';capture=self.issue('CAPTURE')
             self.stage='ACCESS_ACTIVATION'
             urls=self.life.activate(url_factory=self.config['url_factory'],ssl=self.config.get('ssl'),route=self.config.get('route'))
             options={k:self.config[k] for k in ('ssl','route','hostaddr') if self.config.get(k) is not None}
-            self.caller=self.owner.caller(self.data['binding'],self.data['contract'],self.rule,urls,revision=self.p['revision'],bindings=dict(capture.bindings),capture_authority=capture.authority,chain_authority='',stop_file=self.journal.root/'STOP',allow_test_evidence=self.backend is not None,engine_options=options)
+            self.caller=self.owner.caller(self.data['binding'],self.data['contract'],self.rule,urls,revision=self.p['revision'],bindings=dict(capture.bindings),capture_authority=capture.authority,chain_authority='',stop_file=self.journal.root/'STOP',allow_test_evidence=self.backend is not None,engine_options=options,capture_screening_only=self.capture_screening_only)
             self.stage='RETAINED_CAPTURE';self.caller.preflight(capture.root_key)
             receipt=self.caller.capture(self.data['source'],self.data['outer'],expected_source_sha256=digest(self.data['source']),evidence_label='TEST_ARCHIVE_NOT_LIVE_EVIDENCE' if self.backend else None,archive=self.archive)
             receipt=self.caller.read_capture();root=dict(capture.rows[0],state='COMPLETE',checkpoint=receipt)
@@ -144,10 +150,14 @@ class Operation:
             if isinstance(screen,dict):raise Denied('OLDHAM_SCREENING_CAPACITY')
             self.caller.bindings.update(screen.bindings);self.caller.use(screen)
             self.stage='SCREENING';self.caller.screen();rows=self.caller.read_screening();ns=self.caller.nominees()
-            self.result=dict(outcome='SCREENING_COMPLETE_ADMISSION_NOT_STARTED' if ns.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',records=len(receipt['records']),nominees=len(ns.nominees),nominee_results=[],capture_sha256=digest(receipt),screening_sha256=digest(rows),detail_attempts=0)
+            if self.capture_screening_only:
+                from .chain_registration import completed_screening
+                completed_screening(screen,receipt,self.rule,rows)
+            self.result.update(outcome='SCREENING_COMPLETE_ADMISSION_NOT_STARTED' if ns.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',records=len(receipt['records']),nominees=len(ns.nominees),nominee_results=[],capture_sha256=digest(receipt),screening_sha256=digest(rows),detail_attempts=0)
             self.checkpoint('SCREENING_COMPLETE',capture_sha256=digest(receipt),screening_sha256=digest(rows),root_key=root['key'],nominees=len(ns.nominees))
             if self.backend:self.backend.after_screening(self)
-            if ns.nominees:
+            if self.capture_screening_only and ns.nominees:self.result['outcome']='SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE'
+            if ns.nominees and not self.capture_screening_only:
                 self.stage='ADMISSION_ISSUANCE';admission=self.issue('ADMISSION',root=root,receipt=receipt,nominees=ns.nominees,rows=rows)
                 if isinstance(admission,dict):self.result['outcome']=admission['outcome']
                 else:

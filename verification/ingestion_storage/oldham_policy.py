@@ -53,5 +53,9 @@ def undo(text):
 def installation_script():
     return v3.CEREMONY_OPEN+FUNCTION+'\n'+replacement()+'\n'+v3.CEREMONY_CLOSE
 
-def rollback_script():
-    return v3.CEREMONY_OPEN+v3.original_function(observation.combined())+'\nDROP FUNCTION public.ingestion_oldham_allowed(jsonb,text,text,jsonb);\n'+v3.CEREMONY_CLOSE
+def rollback_script(predecessor='COMBINED_V3_PARTIAL'):
+    # Historical default is preserved. A transition seals its actual reviewed
+    # predecessor; this function only renders text and never compensates a commit.
+    if predecessor not in ('COMBINED_V3_PARTIAL','GENERATION3_SCREENING_V3_APPLIED'):raise ValueError('OLDHAM_PREDECESSOR')
+    original=observation.combined() if predecessor=='COMBINED_V3_PARTIAL' else v3.derive()
+    return v3.CEREMONY_OPEN+v3.original_function(original)+'\nDROP FUNCTION public.ingestion_oldham_allowed(jsonb,text,text,jsonb);\n'+v3.CEREMONY_CLOSE

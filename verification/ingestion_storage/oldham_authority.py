@@ -102,6 +102,7 @@ class OldhamOwner(Owner):
             self.issuance_deadline=None;self.issuance_statement_cap=None;self.statement_hard_seconds=original_cap
 
     def _issue(self,prepared,binding,contract,*,revision,item_limits,evidence,root=None,receipt=None,nominees=(),rule=None,detail_targets=None,allow_test_evidence=False,source=None,outer=None,phase=None,screening_rows=None):
+        if getattr(self,'capture_screening_only',False) and phase not in ('CAPTURE','SCREENING'):raise Denied('OLDHAM_CAPTURE_SCREENING_NO_ADMISSION')
         if self.effect_uncertain:raise Denied('OLDHAM_RECONCILE_REQUIRED')
         mode='LEGACY' if phase is None else 'STAGED'
         if self.issuance_mode not in (None,mode):raise Denied('OLDHAM_ISSUANCE_MODE')
