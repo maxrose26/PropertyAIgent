@@ -39,7 +39,8 @@ class Admission:
 
 
 class ChainCaller:
-    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False):
+    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None):
+        self.engine_options=dict(engine_options or {})
         self.sb, self.contract, self.rule, self.urls, self.revision = scope_binding, contract, rule, urls, revision
         self.bindings, self.capture_authority, self.chain_authority = bindings, capture_authority, chain_authority      # `bindings` is shared with the registration(s) that fill it
         self.stop_file, self.allow_test_evidence = stop_file, allow_test_evidence
@@ -56,7 +57,7 @@ class ChainCaller:
         return budget
 
     def _coordinator(self, budget, authority, contracts):
-        worker, broker, app = [budget.engine(self.urls[r]) for r in ROLES]
+        worker, broker, app = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES]
         ledger = ControllerLedger(worker, budget=budget, owner=WORKER, authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
         return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule})
 

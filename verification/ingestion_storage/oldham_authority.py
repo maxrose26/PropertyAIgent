@@ -210,6 +210,7 @@ class OldhamOwner(Owner):
         except BaseException:
             self.effect_uncertain=True;raise
         self.emit('oldham_authority_committed',dict(authority=expected.authority,registration_sha256=evidence['registration_sha256'],stop_sha256=sid))
+        self.original_control=deepcopy(actual);self.require_control_sha256=digest(actual)
         self.issuance_mode=mode
         if phase is not None:self.staged_prior[phase]=dict(authority=expected.authority,package_sha256=package_sha)
         if phase=='CAPTURE':self.staged_capture=capture_seal;self.staged_expiry=expected.grant['expires_at']

@@ -27,10 +27,11 @@ def early_outcome(failure,closure,progress=None):
 
 TIMING=dict(input_seconds=300,active_seconds=480,work_seconds=450,diagnostic_seconds=25,report_seconds=5,outer_seconds=790)
 
-def finalise(journal,result,*,input_seconds,active_started,output=print):
+def finalise(journal,result,*,input_seconds,active_started,output=print,external_bytes=0):
     result['phase_timing']=dict(credential_input_seconds=input_seconds,
         active_seconds_before_reporting=0 if active_started is None else time.monotonic()-active_started)
     saved=False
+    if type(external_bytes) is not int or not 0<=external_bytes<=2*1024**2:raise ValueError('EXTERNAL_OUTPUT_BOUND')
     try:
         raw=canonical(result)
         current=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
@@ -38,11 +39,12 @@ def finalise(journal,result,*,input_seconds,active_started,output=print):
         projected=current-(prior.stat().st_size if prior.exists() else 0)+len(raw)
         receipt=dict(result,audit=str(journal.file),audit_sha256=hashlib.sha256(journal.file.read_bytes()).hexdigest(),
             audit_chain_head=journal.head,result_sha256=hashlib.sha256(raw).hexdigest(),
-            persisted_evidence_bytes=projected,terminal_json_bytes=0,exported_bytes=projected)
+            persisted_evidence_bytes=projected,terminal_json_bytes=0,exported_bytes=projected+external_bytes)
+        if external_bytes:receipt['attempted_publication_bytes']=external_bytes
         for _ in range(10):
             line=json.dumps(receipt,sort_keys=True);size=len(line.encode())+1
             if receipt['terminal_json_bytes']==size:break
-            receipt['terminal_json_bytes']=size;receipt['exported_bytes']=projected+size
+            receipt['terminal_json_bytes']=size;receipt['exported_bytes']=projected+size+external_bytes
         else:raise ValueError('OUTPUT_ACCOUNTING')
         if size>256*1024 or receipt['exported_bytes']>2*1024**2-8192:raise ValueError('COMBINED_OUTPUT_BOUND')
         # Both persisted replacement and terminal are checked before either effect.
@@ -56,7 +58,7 @@ def finalise(journal,result,*,input_seconds,active_started,output=print):
             current=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
             prior=journal.root/'final-result.json'
             projected=current-(prior.stat().st_size if prior.exists() else 0)+len(canonical(fallback))
-            if projected+len(payload.encode())+1>2*1024**2:raise ValueError('FALLBACK_BOUND')
+            if projected+len(payload.encode())+1+external_bytes>2*1024**2:raise ValueError('FALLBACK_BOUND')
             if not saved:journal.save('final-result.json',fallback)
             output(payload,flush=True)
         except BaseException:pass
@@ -102,9 +104,9 @@ def early_closure(baseline,proof,progress):
                 outer_scope_removal='NOT_VERIFIABLE_BEFORE_CONTROLLER_EXIT')
 
 
-def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMING,progress=None,baseline=None):
+def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMING,progress=None,baseline=None,external_bytes=None,initial_worker=None):
     """Same production and disposable controller; no runtime timing override."""
-    outer=time.monotonic();input_started=outer;active=None;worker=None;hard=None;raw=None;input_seconds=0;where='SESSION_INPUT'
+    outer=time.monotonic();input_started=outer;active=None;worker=initial_worker;hard=None;raw=None;input_seconds=0;where='SESSION_INPUT'
     try:
         arm_deadline(timing['input_seconds'],'SECURE_INPUT_DEADLINE')
         journal.emit('credential_input_started',dict(maximum_seconds=timing['input_seconds'],database_and_secret_operations_permitted=False))
@@ -153,6 +155,6 @@ def session(journal,expiry,reader,prepare,*,memory=None,output=print,timing=TIMI
     hard=reporting_hard
     try:
         arm_deadline(max(.001,end-time.monotonic()),'FINAL_REPORT_DEADLINE')
-        return finalise(journal,result,input_seconds=input_seconds,active_started=active,output=output)
+        return finalise(journal,result,input_seconds=input_seconds,active_started=active,output=output,external_bytes=external_bytes() if external_bytes is not None else 0)
     finally:
         signal.setitimer(signal.ITIMER_REAL,0);hard.close()
