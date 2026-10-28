@@ -120,6 +120,16 @@ class Backend:
             if self.scenario=='cs_barrier':w['boot'].execute("UPDATE ingestion_work_items SET phase='WRITE_INTENT' WHERE key=repeat('0',64)")
             if self.scenario=='cs_predecessor':
                 w['boot'].execute(oldham_policy.installation_script()) # unexpected installed successor, never replay
+            if self.scenario=='cs_missing_create_grant':
+                w['boot'].execute('REVOKE GRANT OPTION FOR CREATE ON SCHEMA public FROM provisioning_migrator')
+            if self.scenario=='cs_self_grant':
+                with w['connect']('provisioning_migrator') as c:
+                    # A legal self-granted row with no inherited/SET capability.
+                    # ADMIN TRUE would create a circular administration dependency
+                    # during fixture setup, before the actual command guard runs.
+                    c.execute('GRANT ingestion_storage_owner TO CURRENT_USER WITH ADMIN FALSE, INHERIT FALSE, SET FALSE')
+                    row=c.execute("SELECT admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole AND grantor=current_user::regrole").fetchone()
+                    assert row==(False,False,False)
         if self.scenario=='existing':
             from sqlalchemy.orm import Session
             from app.db.models import Application
@@ -213,6 +223,14 @@ class Backend:
         self.closed=True
         for p in reversed(self.patchers):p.stop()
         if self.world is not None:
+            if self.scenario in ('cs_missing_create_grant','cs_self_grant'):
+                boot=self.world['boot']
+                rows=boot.execute("SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NOT NULL FROM pg_roles r JOIN pg_authid a ON a.oid=r.oid WHERE r.rolname=ANY(%s) ORDER BY 1",(['ingestion_worker_login','ingestion_effect_login'],)).fetchall()
+                assert len(rows)==2 and all(r[1] and r[2] for r in rows)
+                assert self.names=={'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}
+                if self.scenario=='cs_self_grant':
+                    row=boot.execute("SELECT admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member='provisioning_migrator'::regrole AND grantor='provisioning_migrator'::regrole").fetchone()
+                    assert row==(False,False,False)
             changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
             if self.capture_screening_only:assert not changed and self.source_calls==0
             else:assert changed<={'applications','application_lifecycle_events'}

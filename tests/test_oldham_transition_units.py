@@ -115,3 +115,20 @@ def test_capture_reuses_exact_immutable_archive_with_committed_readback():
     assert calls[0][0]=='GET' and calls[0][1].endswith('?ref='+'a'*40)
     blob['sha']='0'*40
     with pytest.raises(Exception):op.archive(raw)
+
+
+@pytest.mark.parametrize('permissions,self_grant',[(False,False),(True,True)])
+def test_owner_preconditions_refuse_before_the_first_membership_effect(permissions,self_grant):
+    sent=[];events=[]
+    def q(c,s,*a,**kw):
+        sent.append((s,kw.get('effect',False)))
+        if 'SELECT current_user' in s:return [('owner','owner',False,True,True,True)]
+        if 'USAGE WITH GRANT OPTION' in s:return [(True,permissions,True,True,True)]
+        if 'grantor=current_user' in s:return [(self_grant,)]
+        return [(False,False,False,False,False)]
+    x=object.__new__(t.Transition);x.o=SimpleNamespace(identity='owner',q=q,emit=lambda e,v:events.append((e,v)));x.op=SimpleNamespace(stage='RETIREMENT_AND_INSTALLATION')
+    with pytest.raises(Denied,match='INSTALL_PERMISSIONS|PREEXISTING_SELF_GRANT'):x.check_before_retirement(None)
+    assert x.op.stage=='TRANSITION_OWNER_PRECONDITIONS'
+    assert not any(effect for _,effect in sent) and not any(s=='BEGIN' or s.startswith('GRANT ') for s,_ in sent)
+    assert any(e=='oldham_transition_owner_permissions' for e,_ in events)
+    assert any(e=='oldham_transition_self_grant' for e,_ in events)
