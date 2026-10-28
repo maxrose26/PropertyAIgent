@@ -20,7 +20,7 @@ from tests.e2e_chain_caller import START,END,snapshot,changed_tables
 CONTROL=dict(STOP_STATE,grants={},bolton_exceptions={})
 
 
-def packet(root,*,records=2,nominees=1,tag='success',supervised=True,single_page=False,accept=None):
+def packet(root,*,records=2,nominees=1,tag='success',supervised=True,single_page=False,accept=None,transition=False):
     root=Path(root);root.mkdir(parents=True,exist_ok=False)
     entries=[entry(f'SYNTHETIC/{i}',SCHEME if i<nominees else EXTENSION) for i in range(records)]
     audit=idox_audit('oldham',entries,START,END,single_page_no_pager=single_page)
@@ -42,6 +42,14 @@ def packet(root,*,records=2,nominees=1,tag='success',supervised=True,single_page
            **descriptors,qualification_binding=dict(qualification_sha256=descriptors['qualification']['sha256'],source_sha256=digest(source),outer_sha256=digest(outer),scope=scope,dependencies_sha256=digest(deps),**(dict(owner_acceptance_sha256=acceptance.sha256) if acceptance else {})),
            **(dict(owner_acceptance=acceptance.key) if acceptance else {}),
            control_sha256=digest(CONTROL),evidence_head='1'*40,origin=dict(commit='1'*40,source_path='docs/design/ingestion-operational-execution-disposable-input/slot-0/source.json',slot_path='docs/design/ingestion-operational-execution-disposable-input/slot-0/receipt.json'),expires_at=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat(),risk_acceptance=pkg.RISK)
+    if transition:
+        from verification.ingestion_storage import oldham_transition as t
+        inspection=dict(status='OLDHAM_READONLY_INSPECTION_COMPLETE',outcome=dict(closure='VERIFIED'),inspection=dict(functions=dict(state='RECOGNISED_PRE_OLDHAM',recognised=t.PREDECESSOR,owner_and_search_path_as_reviewed=True)),evidence_label='DISPOSABLE_INSPECTION_STAND_IN_NOT_PRODUCTION')
+        raw=canonical(inspection);(root/'inspection.json').write_bytes(raw)
+        install,rollback=t.texts(t.PREDECESSOR)
+        p.update(version=pkg.VERSION_CAPTURE_SCREENING,operation=t.OPERATION,risk_acceptance=t.RISK,
+            transition=dict(inspection=dict(name='inspection.json',sha256=pkg.sha(raw)),predecessor=t.PREDECESSOR,retire_standing=True,external_consumers_confirmed=True,installation_sha256=pkg.sha(install.encode()),rollback_sha256=pkg.sha(rollback.encode())))
+        p.pop('control_sha256');p['control_stop_sha256']=digest(STOP_STATE)
     raw=canonical(p);path=root/'package.json';path.write_bytes(raw)
     return path,pkg.sha(raw)
 
@@ -50,14 +58,16 @@ class Backend:
     def __init__(self,path):
         from tests.test_discovery_four_council_release import API
         self.path=Path(path);self.p=json.loads(self.path.read_bytes());self.native=os.environ.get('OLDHAM_WRAPPER_NATIVE')=='1'
+        self.capture_screening_only=self.p['version']==pkg.VERSION_CAPTURE_SCREENING
         self.scenario=os.environ.get('OLDHAM_WRAPPER_SCENARIO','success');self.gen=None;self.world=None;self.inputs=0;self.closed=False;self.patchers=[];self.names={'DATABASE_URL'};self.source_calls=0
         self.api=object.__new__(API);self.api.head=self.p['evidence_head'];self.api.trees={'2'*40:{}};self.api.commits={self.api.head:'2'*40};self.api.blobs={};self.api.calls=[];self.api.fail=None;self.api.lost=False;self.api.ref_moved=False
-        if self.p['version']==pkg.VERSION_ACCEPTED:      # TEST-ONLY: this fixture backend is imported only by the disposable command; it installs a labelled acceptance for the package's synthetic audit. The production registry is never touched in live mode.
+        if self.p['version'] in (pkg.VERSION_ACCEPTED,pkg.VERSION_CAPTURE_SCREENING):      # TEST-ONLY: this fixture backend is imported only by the disposable command; it installs a labelled acceptance for the package's synthetic audit. The production registry is never touched in live mode.
             from types import MappingProxyType
             from app.ingestion import owner_acceptance
             from tests.e2e_connection_support import make_test_acceptance
             acceptance=make_test_acceptance(json.loads((self.path.parent/self.p['source']['name']).read_bytes()),'oldham',START,END)
             owner_acceptance.ACCEPTANCES=MappingProxyType({acceptance.key:acceptance})
+        if self.capture_screening_only:self.names.update(('INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'))
         raw=(self.path.parent/self.p['qualification']['name']).read_bytes()
         self.api.trees['2'*40][str(pkg.QUALIFICATION)]=self.api.blob(raw);self.patches=0
         for key,description in [('source_path','source'),('slot_path','outer')]:
@@ -69,7 +79,10 @@ class Backend:
             return subprocess.CompletedProcess(command,0,b'',b'')
         method,path=command[3:5]
         if '/environments/stage4-production-canary/secrets' in path:
-            if method=='DELETE':self.names.discard(path.rsplit('/',1)[-1]);return subprocess.CompletedProcess(command,0,b'HTTP/2.0 204 No Content\r\n',b'')
+            if method=='DELETE':
+                self.names.discard(path.rsplit('/',1)[-1])
+                if self.scenario=='cs_secret_ack':raise TimeoutError('SYNTHETIC_SECRET_ACK_LOSS')
+                return subprocess.CompletedProcess(command,0,b'HTTP/2.0 204 No Content\r\n',b'')
             assert method=='GET';return subprocess.CompletedProcess(command,0,canonical(dict(total_count=len(self.names),secrets=[dict(name=n) for n in sorted(self.names)])),b'')
         if method=='GET' and '/compare/' in path:return subprocess.CompletedProcess(command,0,canonical(dict(status='identical',base_commit=dict(sha=self.p['origin']['commit']))),b'')
         if method=='PATCH':
@@ -90,13 +103,23 @@ class Backend:
         from verification.ingestion_storage.operational_owner import PKG,GENERATION3_SCREENING_V3_POLICY
         self.gen=disposable_world();self.world=next(self.gen);w=self.world
         with w['connect']('provisioning_migrator') as c:
-            c.execute((PKG/'successor-policy.sql').read_text());c.execute(GENERATION3_SCREENING_V3_POLICY.read_text());c.execute(oldham_policy.installation_script())
+            c.execute((PKG/'successor-policy.sql').read_text());c.execute(GENERATION3_SCREENING_V3_POLICY.read_text())
+            if self.capture_screening_only:
+                from verification.ingestion_storage import screening_v3_worker_sql as v3
+                c.execute(v3.installation_script())
+            else:c.execute(oldham_policy.installation_script())
         w['boot'].execute('ALTER ROLE provisioning_migrator CREATEDB BYPASSRLS') # accepted OWNER flags; runtime roles unchanged
         w['boot'].execute('GRANT SELECT (rolname,rolpassword) ON pg_authid TO provisioning_migrator')
         w['boot'].execute('GRANT pg_read_all_stats TO provisioning_migrator WITH INHERIT TRUE, SET FALSE')
         for r in RESTRICTED:
             w['boot'].execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(r)))
         w['boot'].execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(CONTROL),))
+        if self.capture_screening_only:
+            for role in ('ingestion_worker_login','ingestion_effect_login'):
+                w['boot'].execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {}').format(sql.Identifier(role),sql.Literal('SYNTHETIC_STANDING_FIXTURE_ONLY')))
+            if self.scenario=='cs_barrier':w['boot'].execute("UPDATE ingestion_work_items SET phase='WRITE_INTENT' WHERE key=repeat('0',64)")
+            if self.scenario=='cs_predecessor':
+                w['boot'].execute(oldham_policy.installation_script()) # unexpected installed successor, never replay
         if self.scenario=='existing':
             from sqlalchemy.orm import Session
             from app.db.models import Application
@@ -104,8 +127,28 @@ class Backend:
             with Session(w['app']) as session:
                 session.add(Application(council_code='oldham',reference=first['reference'],unit_confirmation_status='discovery_pending'));session.commit()
         self.before=snapshot(w['boot'])
-        def url_factory(role,password):return make_url(w['urls'][role]).set(password=password).render_as_string(hide_password=False)
-        return dict(connect=lambda:w['connect']('provisioning_migrator'),identity='provisioning_migrator',url_factory=url_factory)
+        def url_factory(role,password):
+            if self.capture_screening_only:assert role in ('ingestion_worker_login','ingestion_effect_login')
+            return make_url(w['urls'][role]).set(password=password).render_as_string(hide_password=False)
+        connector=lambda:w['connect']('provisioning_migrator')
+        if self.scenario in ('cs_retire_ack','cs_install_ack','cs_install_readback'):
+            commits=[];lost=[];original=connector;scenario=self.scenario
+            class Proxy:
+                def __init__(self,c):self.c=c
+                def __getattr__(self,n):return getattr(self.c,n)
+                def execute(self,q,params=None):
+                    result=self.c.execute(q,params)
+                    text=q if isinstance(q,str) else q.as_string(self.c)
+                    if text.strip().rstrip(';')=='COMMIT':
+                        commits.append(True)
+                        target=1 if scenario=='cs_retire_ack' else 2
+                        if scenario!='cs_install_readback' and len(commits)==target and not lost:
+                            lost.append(True);raise ConnectionError('SYNTHETIC_COMMIT_ACK_LOSS')
+                    if scenario=='cs_install_readback' and len(commits)==2 and 'SELECT p.proname,p.prosrc' in text and not lost:
+                        lost.append(True);raise ConnectionError('SYNTHETIC_INSTALL_READBACK_LOSS')
+                    return result
+            connector=lambda:Proxy(original())
+        return dict(connect=connector,identity='provisioning_migrator',url_factory=url_factory)
 
     def after_screening(self,op):
         w=self.world
@@ -170,15 +213,21 @@ class Backend:
         self.closed=True
         for p in reversed(self.patchers):p.stop()
         if self.world is not None:
-            assert set(changed_tables(self.before,snapshot(self.world['boot'])))<={'applications','application_lifecycle_events'}
+            changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
+            if self.capture_screening_only:assert not changed and self.source_calls==0
+            else:assert changed<={'applications','application_lifecycle_events'}
         if self.gen is not None:
             try:next(self.gen)
             except StopIteration:pass
 
 
 def native():
-    parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);a=parser.parse_args()
-    path,sha=packet(a.root,tag='native')
+    parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--capture-screening-only',action='store_true');a=parser.parse_args()
+    if a.capture_screening_only:
+        from pytest import MonkeyPatch
+        path,sha=packet(a.root,tag='native-capture-screening',records=5,nominees=0,single_page=True,accept=MonkeyPatch(),transition=True)
+        os.environ['OLDHAM_WRAPPER_SCENARIO']='cs_zero'
+    else:path,sha=packet(a.root,tag='native')
     os.environ['OLDHAM_WRAPPER_NATIVE']='1'
     os.execv(sys.executable,[sys.executable,'-m','verification.ingestion_storage.oldham_owner_once','--package',str(path),'--package-sha256',sha,'--disposable-test'])
 

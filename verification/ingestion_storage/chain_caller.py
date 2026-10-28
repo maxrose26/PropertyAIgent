@@ -39,7 +39,10 @@ class Admission:
 
 
 class ChainCaller:
-    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None):
+    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None, capture_screening_only=False):
+        if type(capture_screening_only) is not bool:raise Denied('CAPTURE_SCREENING_MODE')
+        if capture_screening_only and scope_binding.council!='oldham':raise Denied('CAPTURE_SCREENING_COUNCIL')
+        self.capture_screening_only=capture_screening_only
         self.engine_options=dict(engine_options or {})
         self.sb, self.contract, self.rule, self.urls, self.revision = scope_binding, contract, rule, urls, revision
         self.bindings, self.capture_authority, self.chain_authority = bindings, capture_authority, chain_authority      # `bindings` is shared with the registration(s) that fill it
@@ -57,7 +60,8 @@ class ChainCaller:
         return budget
 
     def _coordinator(self, budget, authority, contracts):
-        worker, broker, app = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES]
+        worker, broker = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES[:2]]
+        app=None if self.capture_screening_only else budget.engine(self.urls[ROLES[2]],**self.engine_options)
         ledger = ControllerLedger(worker, budget=budget, owner=WORKER, authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
         return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule})
 
@@ -67,6 +71,7 @@ class ChainCaller:
 
     def use(self, registration):
         """Adopt the prepared CHAIN registration (its bindings must already be the ones the authority was issued against)."""
+        if self.capture_screening_only and registration.kind!='SCREENING':raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
         if registration.kind not in ('CHAIN','SCREENING','ADMISSION') or registration.root_key != self.root_key:
             raise Denied('CHAIN_REGISTRATION_MISMATCH')
         self.registration = registration
@@ -163,6 +168,7 @@ class ChainCaller:
             self.accounting.setdefault('reads', []).append(budget.close([]))
 
     def prepare(self, nominee):
+        if self.capture_screening_only:raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
         """Everything one admission needs, built from the restricted ledger's retained state and the nominee: nothing is taken from the caller's memory of the capture."""
         reg, receipt = self.registration, self.capture_receipt
         from .scope_binding import check_capture
@@ -204,6 +210,7 @@ class ChainCaller:
         raise Denied('CHAIN_NEVER_LISTS')
 
     def closed_idox_detail(self, adm, *, root, memory_group=None, observe=None):
+        if self.capture_screening_only:raise Denied('CAPTURE_SCREENING_NO_DETAIL')
         """Bind the existing private source transport to ONE prepared factual item."""
         from .idox_target import COUNCILS,validate
         if self.sb.council not in COUNCILS:raise Denied('CLOSED_IDOX_COUNCIL')
@@ -219,6 +226,7 @@ class ChainCaller:
         return read
 
     def admit(self, adm, detail_reader):
+        if self.capture_screening_only:raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
         """One nominee: fresh detail verification, shared identity admission, B2, committed readback. `detail_reader` is the caller's bounded detail source for the nominated case."""
         try:
             return execute(adm.co, adm.binding, listing_reader=self.no_listing, detail_reader=detail_reader, envelope=adm.envelope, council=adm.council, check=adm.budget.check,
