@@ -48,20 +48,34 @@ def metadata_digest(proposal, address, received, validated):
     return hashlib.sha256(json.dumps([proposal, address, received, validated], separators=(',', ':')).encode()).hexdigest()
 
 
+def record_digest(identity, metadata):
+    return hashlib.sha256((identity + '\x1f' + metadata).encode()).hexdigest()
+
+
 def expected_from_audit(audit, audit_sha256):
-    """The original observation's records as HASHES only (identity and metadata), for the registration. No reference, key or text is kept."""
-    recs = audit['records']
-    return dict(count=len(recs), source_audit_sha256=audit_sha256,
-                identity_sha256=sorted(identity_digest(r['reference'], r['source_key']) for r in recs),
-                metadata_sha256=sorted(metadata_digest(r['fields']['proposal'].get('value'), r['fields']['address'].get('value'), r['fields']['received_date'].get('value'),
-                                                       r['fields']['validated_date'].get('value')) for r in recs))
+    """The original observation's records as HASHES only (identity, metadata and the two joined per record), for the registration. The audit must be the Oldham RECEIVED 15-21 October observation with unique records;
+    no reference, key or text is kept."""
+    recs = audit.get('records') if isinstance(audit, dict) else None
+    if (not isinstance(recs, list) or not recs or audit.get('council') != SCOPE['council'] or audit.get('date_semantics') != SCOPE['semantics']
+            or audit.get('requested_interval') != [SCOPE['start'], SCOPE['end']] or audit.get('failure') is not None
+            or len({r['reference'] for r in recs}) != len(recs) or len({r['source_key'] for r in recs}) != len(recs)):
+        raise ValueError('ORIGINAL_AUDIT_SCOPE')
+    ids, metas, joint = [], [], []
+    for r in recs:
+        f = r['fields']
+        i = identity_digest(r['reference'], r['source_key'])
+        m = metadata_digest(f['proposal'].get('value'), f['address'].get('value'), f['received_date'].get('value'), f['validated_date'].get('value'))
+        ids.append(i)
+        metas.append(m)
+        joint.append(record_digest(i, m))
+    return dict(count=len(recs), source_audit_sha256=audit_sha256, identity_sha256=sorted(ids), metadata_sha256=sorted(metas), record_sha256=sorted(joint))
 
 
 def check_expected(expected):
-    if (not isinstance(expected, dict) or set(expected) != {'count', 'source_audit_sha256', 'identity_sha256', 'metadata_sha256'} or type(expected['count']) is not int or not 1 <= expected['count'] <= 10
-            or not HEX64.fullmatch(str(expected['source_audit_sha256'])) or len(expected['identity_sha256']) != expected['count'] or len(expected['metadata_sha256']) != expected['count']
-            or any(not HEX64.fullmatch(str(h)) for h in [*expected['identity_sha256'], *expected['metadata_sha256']])
-            or expected['identity_sha256'] != sorted(set(expected['identity_sha256'])) or expected['metadata_sha256'] != sorted(expected['metadata_sha256'])):
+    if (not isinstance(expected, dict) or set(expected) != {'count', 'source_audit_sha256', 'identity_sha256', 'metadata_sha256', 'record_sha256'} or type(expected['count']) is not int or not 1 <= expected['count'] <= 10
+            or not HEX64.fullmatch(str(expected['source_audit_sha256'])) or len(expected['identity_sha256']) != expected['count'] or len(expected['metadata_sha256']) != expected['count'] or len(expected['record_sha256']) != expected['count']
+            or any(not HEX64.fullmatch(str(h)) for h in [*expected['identity_sha256'], *expected['metadata_sha256'], *expected['record_sha256']])
+            or expected['identity_sha256'] != sorted(set(expected['identity_sha256'])) or expected['metadata_sha256'] != sorted(expected['metadata_sha256']) or expected['record_sha256'] != sorted(set(expected['record_sha256']))):
         raise ValueError('EXPECTED_RECORDS')
     return expected
 
@@ -138,14 +152,18 @@ def capture(dispatch, cfg, directory, expected):
         ids = sorted(identity_digest(r.reference, r.source_key) for r in page.rows)
         metas = sorted(metadata_digest(r.fields['proposal'].value, r.fields['address'].value, r.fields['received_date'].value, r.fields['validated_date'].value) for r in page.rows)
         out['page1'] = dict(rows=len(keys), unique_keys=len(set(keys)) == len(keys), unique_references=len(set(refs)) == len(refs), sort_retained=True,
-                            reference_order_observed_descending=refs == sorted(refs, reverse=True), first=page.first, last=page.last, total=page.total, terminal=page.terminal,
-                            next_present=page.next_url is not None, pager_elements=len(step['projection']['pager_markers']), response_sha256=step['sha256'])
+                            reference_order_observed_descending=refs == sorted(refs, reverse=True), first=page.first, last=page.last, total=page.total, terminal=page.terminal, page_size=page.page_size,
+                            next_present=page.next_url is not None, next_controls=step['projection']['next_controls'], pager_elements=len(step['projection']['pager_markers']), response_sha256=step['sha256'])
+        joint = sorted(record_digest(identity_digest(r.reference, r.source_key), metadata_digest(r.fields['proposal'].value, r.fields['address'].value, r.fields['received_date'].value, r.fields['validated_date'].value)) for r in page.rows)
         exp_ids, exp_meta = expected['identity_sha256'], expected['metadata_sha256']
         out['original_comparison'] = dict(
             expected_count=expected['count'], seen_count=len(ids), identity_matches=len(set(ids) & set(exp_ids)), identity_missing=len(set(exp_ids) - set(ids)), identity_extra=len(set(ids) - set(exp_ids)),
-            metadata_matches=sum(min(metas.count(h), exp_meta.count(h)) for h in set(metas) & set(exp_meta)), seen_identity_set_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
-        if page.total is not None or page.terminal is not None or page.next_url is not None or step['projection']['pager_markers']:
-            out['abort'] = 'NOT_SINGLE_PAGE_SHAPE'      # a pager or total on page 1 means this is not the single-page case: nothing is asked beyond it
+            metadata_matches=sum(min(metas.count(h), exp_meta.count(h)) for h in set(metas) & set(exp_meta)), record_matches=len(set(joint) & set(expected['record_sha256'])), seen_identity_set_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest())
+        if not (len(keys) >= 1 and out['page1']['unique_keys'] and out['page1']['unique_references'] and page.page_size == PAGE_SIZE and all(refs)):
+            out['abort'] = 'PAGE_1_NOT_RECOGNISED'      # missing or duplicate identities, or another page size: nothing is asked beyond page 1
+            raise _Stop
+        if page.total is not None or page.terminal is not None or page.next_url is not None or step['projection']['pager_markers'] or step['projection']['next_controls']:
+            out['abort'] = 'NOT_SINGLE_PAGE_SHAPE'      # a pager, total or next control on page 1 means this is not the single-page case: nothing is asked beyond it
             raise _Stop
         b.extra.update(BEYOND_END=source_url(cfg.council, 'pagedSearchResults.do?action=page&searchCriteria.page=2', page=2), CONTROL=b.policy.base_url + '/pagedSearchResults.do?action=page&searchCriteria.page=0')
         stage = 'PAGE_2'
@@ -213,6 +231,15 @@ def _results_page_marker(step):
     return tuple(markers[0]) if markers and len({tuple(m) for m in markers}) == 1 else None
 
 
+def _any_marker_on_results_page(step):
+    """For the CONTROL: ANY pager marker on a recognised results page, whatever its rows. A control that carries a stamped total (clamped to a real page, say) shows that the portal marks every page request, so the
+    page-2 marker would not be specific."""
+    p = step.get('projection') or {}
+    if step.get('http_status') != 200 or step.get('media_type') != 'text/html' or step.get('redirect') != 'NONE' or not p.get('html'):
+        return False
+    return any(h['results_heading'] for h in p['headings']) and not p['password_inputs'] and any(p['pager_markers'])
+
+
 def _marker(step):
     """The page-2 signal: an explicit marker that is FOR page 2 (`first` = 11) and describes an EMPTY range (a start beyond its own total, or an end before its start)."""
     m = _results_page_marker(step)
@@ -228,18 +255,15 @@ def classify_probe(audit):
     try:
         return _classify_probe(audit)
     except (KeyError, TypeError, IndexError, AttributeError):
-        return dict(verdict='INCONCLUSIVE', reasons=['UNPARSEABLE_EXPORT'], historical_application='WITHHELD', signal=None)
+        return dict(verdict='INCONCLUSIVE', reasons=['UNPARSEABLE_EXPORT'], historical_application='WITHHELD_NO_ESTABLISHED_SIGNAL', signal=None)
 
 
 def _classify_probe(audit):
     cmpr = audit.get('original_comparison')
 
-    def withheld():
-        if not cmpr:
-            return 'WITHHELD'
-        same = cmpr['identity_missing'] == 0 and cmpr['identity_extra'] == 0 and cmpr['metadata_matches'] == cmpr['expected_count'] == cmpr['seen_count']
-        return 'APPLICABLE' if same else 'WITHHELD_DRIFT'
-    result = dict(verdict='INCONCLUSIVE', reasons=[], historical_application=withheld(), signal=None, drift=cmpr)
+    def hashes_unchanged():
+        return bool(cmpr) and cmpr['identity_missing'] == 0 and cmpr['identity_extra'] == 0 and cmpr['metadata_matches'] == cmpr['expected_count'] == cmpr['seen_count'] == cmpr['record_matches']
+    result = dict(verdict='INCONCLUSIVE', reasons=[], historical_application='WITHHELD_NO_ESTABLISHED_SIGNAL', signal=None, drift=cmpr)
     if audit.get('abort') or audit.get('failure'):
         result['reasons'] = [audit.get('abort') or 'FAILURE:' + str((audit['failure'] or {}).get('stage'))]
         return result
@@ -247,9 +271,9 @@ def _classify_probe(audit):
     steps = {s['name']: s for s in audit['steps']}
     page2, session, control, page1 = steps.get('page-2'), steps.get('session-check'), steps.get('control-invalid-page'), steps['page-1']
     r = result['reasons']
-    if not (p1['rows'] >= 1 and p1['unique_keys'] and p1['unique_references'] and p1['sort_retained'] is True):
+    if not (p1['rows'] >= 1 and p1['unique_keys'] and p1['unique_references'] and p1['sort_retained'] is True and p1['page_size'] == PAGE_SIZE):
         r.append('PAGE_1_NOT_RECOGNISED_SORTED_AND_UNIQUE')
-    if p1['total'] is not None or p1['terminal'] is not None or p1['next_present'] or p1['first'] is not None:
+    if p1['total'] is not None or p1['terminal'] is not None or p1['next_present'] or p1['first'] is not None or p1['pager_elements'] or p1['next_controls']:
         r.append('PAGE_1_NOT_THE_SINGLE_PAGE_SHAPE')      # never asserted as complete: the shape is only the precondition for asking
     if page2 is None:
         return dict(result, reasons=sorted(set(r + ['NO_PAGE_2_OBSERVATION'])))
@@ -265,9 +289,10 @@ def _classify_probe(audit):
         r.append('SESSION_NOT_ALIVE_OR_CRITERIA_CHANGED')
     if control is None:
         r.append('NO_INVALID_REQUEST_CONTROL')
-    elif _results_page_marker(control) is not None or (control['projection'].get('fingerprint') == proj.get('fingerprint') and control.get('http_status') == page2.get('http_status')):
+    elif _any_marker_on_results_page(control) or (control['projection'].get('fingerprint') == proj.get('fingerprint') and control.get('http_status') == page2.get('http_status')):
         r.append('CONTROL_NOT_DISTINCT_FROM_THE_SIGNAL')
-    if audit.get('resource', {}).get('retries') != 0 or audit.get('resource', {}).get('redirects') != 0 or audit.get('resource', {}).get('budget_exhaustion'):
+    res = audit.get('resource', {})
+    if res.get('retries') != 0 or res.get('redirects') != 0 or res.get('budget_exhaustion') or res.get('requests_attempted') != LIMITS['requests'] or len(audit['steps']) != 6:
         r.append('ACCOUNTING_DISQUALIFIES')
     if r:
         return dict(result, reasons=sorted(set(r)))
@@ -275,7 +300,8 @@ def _classify_probe(audit):
     seen = p1['rows']
     result['signal'] = dict(marker_total=total, seen=seen)
     if total == seen:
-        return dict(result, verdict='ESTABLISHED', reasons=[])
+        applicable = 'APPLICABLE' if hashes_unchanged() else 'WITHHELD_DRIFT'      # only an ESTABLISHED signal can ever apply, and only to an unchanged record set
+        return dict(result, verdict='ESTABLISHED', reasons=[], historical_application=applicable)
     return dict(result, verdict='UNRECONCILED', reasons=['TOTAL_GREATER_THAN_RECORDS_SEEN' if total > seen else 'TOTAL_LESS_THAN_RECORDS_SEEN'])      # cause (changed result set, reader defect, portal) undetermined
 
 

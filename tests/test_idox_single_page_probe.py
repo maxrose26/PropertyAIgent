@@ -63,11 +63,15 @@ def marker(first, last, total):
     return shell('<p class="pager">Showing %s - %s of %s</p><ul id="searchresults"></ul>' % (first, last, total))
 
 
+def original_audit(refs=REFS):
+    return dict(council='oldham', date_semantics='RECEIVED', requested_interval=['2026-10-15', '2026-10-21'], failure=None,
+                records=[dict(reference=r, source_key='SK%d' % i, fields={'proposal': dict(value=None), 'address': dict(value=None), 'received_date': dict(value=None), 'validated_date': dict(value=None)})
+                         for i, r in enumerate(refs)])
+
+
 def expected_for(refs=REFS, proposal=None):
     """The registration's expected-record hashes, built from the same generator through the production helper."""
-    audit = dict(records=[dict(reference=r, source_key='SK%d' % i, fields={'proposal': dict(value=None), 'address': dict(value=None), 'received_date': dict(value=None), 'validated_date': dict(value=None)})
-                          for i, r in enumerate(refs)])
-    return pr.expected_from_audit(audit, '1' * 64)
+    return pr.expected_from_audit(original_audit(refs), '1' * 64)
 
 
 def seen_expected(private_dir_unused=None, refs=REFS, proposal=None):
@@ -77,7 +81,9 @@ def seen_expected(private_dir_unused=None, refs=REFS, proposal=None):
     page = parse_page(single_page(refs, proposal=proposal), 'oldham', 1, pr.config().start, pr.config().end, 'RECEIVED')
     ids = sorted(pr.identity_digest(r.reference, r.source_key) for r in page.rows)
     metas = sorted(pr.metadata_digest(r.fields['proposal'].value, r.fields['address'].value, r.fields['received_date'].value, r.fields['validated_date'].value) for r in page.rows)
-    return dict(count=len(ids), source_audit_sha256='2' * 64, identity_sha256=ids, metadata_sha256=metas)
+    joint = sorted(pr.record_digest(pr.identity_digest(r.reference, r.source_key), pr.metadata_digest(r.fields['proposal'].value, r.fields['address'].value, r.fields['received_date'].value,
+                                                                                                  r.fields['validated_date'].value)) for r in page.rows)
+    return dict(count=len(ids), source_audit_sha256='2' * 64, identity_sha256=ids, metadata_sha256=metas, record_sha256=joint)
 
 
 class Council:
@@ -214,9 +220,9 @@ def test_a_well_formed_total_that_differs_from_the_records_seen_is_unreconciled_
 def test_the_expected_count_is_never_forced(tmp_path):
     """An expected record count of 9 in the registration does not turn a total of 9 into success: only the records actually seen on page 1 reconcile."""
     wrong = seen_expected()
-    wrong.update(count=9, identity_sha256=sorted({'%064x' % i for i in range(9)}), metadata_sha256=sorted('%064x' % i for i in range(9)))
+    wrong.update(count=9, identity_sha256=sorted({'%064x' % i for i in range(9)}), metadata_sha256=sorted('%064x' % i for i in range(9)), record_sha256=sorted('%064x' % (i + 100) for i in range(9)))
     result = verdict(Council(page2='greater'), fresh(tmp_path), wrong)
-    assert result['verdict'] == 'UNRECONCILED' and result['historical_application'] == 'WITHHELD_DRIFT'
+    assert result['verdict'] == 'UNRECONCILED' and result['historical_application'] == 'WITHHELD_NO_ESTABLISHED_SIGNAL'
 
 
 @pytest.mark.parametrize('refs,proposal,applicable', [
@@ -353,7 +359,7 @@ def test_the_registration_cannot_be_tampered_or_used_outside_its_window():
 
 def test_the_cli_renders_from_the_consumed_audit_as_hashes_and_run_and_worker_take_the_approved_registrations_hashes(tmp_path, monkeypatch):
     import verification.stage26b_l1.actions_runner as runner
-    audit = dict(records=[dict(reference=r, source_key='SK%d' % i, fields={k: dict(value=None) for k in ('proposal', 'address', 'received_date', 'validated_date')}) for i, r in enumerate(REFS)])
+    audit = original_audit()
     audit_path = tmp_path / 'source-0.json'
     audit_path.write_text(json.dumps(audit))
     out = tmp_path / 'reg.json'
@@ -402,3 +408,75 @@ def test_interruption_is_cancellation_and_leaves_the_claim_consumed(tmp_path, mo
 
 def test_the_probe_reuses_the_reviewed_machinery_rather_than_duplicating_it():
     assert pr.ProbeBoundary.__mro__[1] is cal.CalibrationBoundary and pr.cal.project is cal.project and pr.base._write_private is d._write_private
+
+
+# ------------------------------------------------------------------------------------------------------------------------- review findings
+def test_a_control_that_shows_a_stamped_total_on_a_page_with_rows_is_not_distinct(tmp_path):
+    council = Council()
+    council.special_original = council.special
+    council.special = lambda kind, c=council: Resp(single_page(pager=True, total=5)) if kind == 'http500' else c.special_original(kind)
+    # the control (page=0) is clamped to a real results page that carries rows AND a `Showing 1 - 5 of 5` marker
+    result = verdict(council, fresh(tmp_path))
+    assert result['verdict'] == 'INCONCLUSIVE' and 'CONTROL_NOT_DISTINCT_FROM_THE_SIGNAL' in result['reasons']
+
+
+def test_historical_application_is_only_ever_applicable_after_an_established_signal_on_an_unchanged_set(tmp_path):
+    assert verdict(Council(), fresh(tmp_path))['historical_application'] == 'APPLICABLE'
+    for name, council in (('greater', Council(page2='greater')), ('smaller', Council(page2='smaller')), ('missing', Council(page2='missing')), ('repeat', Council(page2='repeat_page1')),
+                          ('abort', Council(page1=single_page(['R%03d/26' % (50 - i) for i in range(10)], pager=True, total=14, next_page=2)))):
+        out = run(council, fresh(tmp_path, name), seen_expected() if name != 'abort' else None)
+        res = pr.classify_probe(out)
+        assert res['verdict'] != 'ESTABLISHED' and res['historical_application'] == 'WITHHELD_NO_ESTABLISHED_SIGNAL', (name, res)
+
+
+def test_a_drifted_set_never_changes_the_verdict_only_the_application(tmp_path):
+    drifted = Council(page1=single_page(REFS[:-1] + ['R099/26']), page2='greater')
+    result = pr.classify_probe(run(drifted, fresh(tmp_path), seen_expected()))
+    assert result['verdict'] == 'UNRECONCILED' and result['historical_application'] == 'WITHHELD_NO_ESTABLISHED_SIGNAL' and result['drift']['identity_extra'] == 1
+
+
+@pytest.mark.parametrize('mutate', [lambda a: a.update(council='bury'), lambda a: a.update(date_semantics='VALIDATED'), lambda a: a.update(requested_interval=['2026-10-08', '2026-10-14']),
+                                    lambda a: a.update(failure='X'), lambda a: a.update(records=[]), lambda a: a['records'].append(dict(a['records'][0])), lambda a: a.pop('records')])
+def test_render_refuses_an_audit_that_is_not_the_oldham_received_15_21_october_observation(mutate):
+    audit = original_audit()
+    mutate(audit)
+    with pytest.raises(ValueError, match='ORIGINAL_AUDIT_SCOPE'):
+        pr.expected_from_audit(audit, '1' * 64)
+    with pytest.raises(ValueError, match='ORIGINAL_AUDIT_SCOPE'):
+        pr.expected_from_audit([], '1' * 64)
+
+
+def test_swapping_metadata_between_identities_is_drift_because_records_are_hashed_jointly(tmp_path):
+    base_page = single_page()
+    swapped = base_page.replace(b'Thu 15 Oct 2026', b'Fri 16 Oct 2026', 1)      # first record's received date differs: identities unchanged, one record's metadata changed
+    out = run(Council(page1=swapped), fresh(tmp_path), seen_expected())
+    cmp_ = out['original_comparison']
+    assert cmp_['identity_missing'] == 0 and cmp_['identity_extra'] == 0 and cmp_['record_matches'] == 4 and cmp_['metadata_matches'] == 4
+    # a pure swap keeps the identity set and the metadata multiset equal, but the joint per-record hashes still differ
+    a = original_audit()
+    a['records'][0]['fields']['proposal']['value'], a['records'][1]['fields']['proposal']['value'] = 'ALPHA', 'BETA'
+    exp = pr.expected_from_audit(a, '1' * 64)
+    b = original_audit()
+    b['records'][0]['fields']['proposal']['value'], b['records'][1]['fields']['proposal']['value'] = 'BETA', 'ALPHA'
+    other = pr.expected_from_audit(b, '1' * 64)
+    assert exp['identity_sha256'] == other['identity_sha256'] and exp['metadata_sha256'] == other['metadata_sha256'] and exp['record_sha256'] != other['record_sha256']
+
+
+def test_page_1_without_unique_identities_or_with_another_page_size_stops_before_page_2(tmp_path):
+    duplicated = single_page(['R001/26', 'R001/26', 'R003/26'])
+    wrong_size = single_page().replace(b'<option value="10" selected>10</option>', b'<option value="20" selected>20</option>', 1)
+    for name, body in (('dup', duplicated), ('size', wrong_size)):
+        council = Council(page1=body)
+        out = run(council, fresh(tmp_path, name))
+        assert (out['abort'] == 'PAGE_1_NOT_RECOGNISED' or out['failure'] is not None) and out['resource']['requests_attempted'] == 3 and not any('searchCriteria.page=' in u for _, u in council.calls), name
+        assert pr.classify_probe(out)['verdict'] == 'INCONCLUSIVE'
+
+
+def test_the_classifier_rechecks_the_request_count_and_page_1_pager_facts(tmp_path):
+    out = run(Council(), fresh(tmp_path))
+    assert pr.classify_probe(out)['verdict'] == 'ESTABLISHED'
+    for mutate, reason in ((lambda a: a['resource'].update(requests_attempted=7), 'ACCOUNTING_DISQUALIFIES'), (lambda a: a['page1'].update(pager_elements=2), 'PAGE_1_NOT_THE_SINGLE_PAGE_SHAPE'),
+                           (lambda a: a['page1'].update(next_controls=1), 'PAGE_1_NOT_THE_SINGLE_PAGE_SHAPE'), (lambda a: a['page1'].update(page_size=20), 'PAGE_1_NOT_RECOGNISED_SORTED_AND_UNIQUE')):
+        broken = json.loads(json.dumps(out))
+        mutate(broken)
+        assert reason in pr.classify_probe(broken)['reasons']
