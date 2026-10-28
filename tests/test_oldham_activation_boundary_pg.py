@@ -30,7 +30,10 @@ def gate(b):
 @pytest.mark.parametrize('recovery',['absent','dormant','enabled','super','extra_role','direct_write','column_read'])
 def test_recovery_and_both_latent_views(world,recovery):
     b=world['boot']
-    if recovery=='absent':b.execute('DROP OWNED BY ingestion_recovery_login');b.execute('DROP ROLE ingestion_recovery_login')
+    if recovery=='absent':
+        grants=b.execute("SELECT grantor::regrole::text FROM pg_database d CROSS JOIN LATERAL aclexplode(d.datacl) a WHERE d.datname=current_database() AND a.grantee='ingestion_recovery_login'::regrole").fetchall()
+        for (grantor,) in grants:b.execute(sql.SQL('REVOKE ALL ON DATABASE ingestion_provisioning_test FROM ingestion_recovery_login GRANTED BY {}').format(sql.Identifier(grantor)))
+        b.execute('DROP OWNED BY ingestion_recovery_login');b.execute('DROP ROLE ingestion_recovery_login')
     elif recovery=='enabled':b.execute('ALTER ROLE ingestion_recovery_login LOGIN')
     elif recovery=='super':b.execute('ALTER ROLE ingestion_recovery_login SUPERUSER')
     elif recovery=='extra_role':b.execute('GRANT pg_read_all_stats TO ingestion_recovery_login')
@@ -43,6 +46,7 @@ def test_recovery_and_both_latent_views(world,recovery):
         for r in ('ingestion_worker_login','ingestion_effect_login'):
             assert b.execute("SELECT has_table_privilege(%s,'extensions.pg_stat_statements','SELECT'),has_table_privilege(%s,'extensions.pg_stat_statements_info','SELECT'),has_schema_privilege(%s,'extensions','USAGE')",(r,r,r)).fetchone()==(True,True,False)
     finally:
+        if recovery=='absent':b.execute('CREATE ROLE ingestion_recovery_login NOLOGIN')
         if recovery=='super':b.execute('ALTER ROLE ingestion_recovery_login NOSUPERUSER')
         if recovery=='extra_role':b.execute('REVOKE pg_read_all_stats FROM ingestion_recovery_login')
         if recovery=='column_read':b.execute('REVOKE SELECT(reference) ON public.applications FROM ingestion_recovery_login')
@@ -84,7 +88,7 @@ def test_latent_acl_is_not_usable_information_access(world):
 def test_changed_extension_c_symbol_refuses(world):
     b=world['boot']
     original=b.execute("SELECT pg_get_functiondef('extensions.pg_stat_statements_info()'::regprocedure)").fetchone()[0]
-    changed=original.replace("'pg_stat_statements_info'", "'pg_stat_statements_1_11'")
+    changed=original.replace("$function$pg_stat_statements_info$function$", "$function$pg_stat_statements_1_11$function$")
     assert changed!=original
     try:
         b.execute(changed)

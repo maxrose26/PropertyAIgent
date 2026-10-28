@@ -77,7 +77,7 @@ def capture_screening_gate(text):
       (has_table_privilege(r.oid,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_any_column_privilege(r.oid,c.oid,'INSERT,UPDATE,REFERENCES')
        OR ((has_table_privilege(r.oid,c.oid,'SELECT') OR has_any_column_privilege(r.oid,c.oid,'SELECT')) AND NOT (n.nspname='extensions' AND c.relname IN ('pg_stat_statements','pg_stat_statements_info')))))
     OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S'
-      AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_sequence_privilege(r.oid,c.oid,'USAGE,SELECT,UPDATE'))
+      AND n.nspname NOT IN ('pg_catalog','information_schema') AND CASE WHEN c.relkind='S' THEN has_sequence_privilege(r.oid,c.oid,'USAGE,SELECT,UPDATE') ELSE false END)
     OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege(r.oid,p.oid,'EXECUTE')
       AND p.oid IS DISTINCT FROM to_regprocedure('public.ingestion_recover_abandoned(text,integer,boolean)'))
