@@ -62,12 +62,16 @@ def _write_private(directory, name, raw):
         handle.write(raw)
 
 
+def _private_directory_check(directory):
+    if directory.is_symlink() or not directory.is_dir() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
+        raise ValueError('PRIVATE_DIRECTORY')
+
+
 def capture(dispatch, cfg, directory):
     """Request 1: the search form. Request 2: the exact date search, once. Then stop. Raw bodies go to `directory` (mode 0700) as 0600 files; the return value holds only hashes, sizes,
     statuses and accounting."""
     directory = Path(directory)
-    if directory.is_symlink() or not directory.is_dir() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
-        raise ValueError('PRIVATE_DIRECTORY')
+    _private_directory_check(directory)
     b = DiagnosticBoundary(dispatch, cfg)
     out = dict(kind=KIND, council=cfg.council, requested_interval=[cfg.start.isoformat(), cfg.end.isoformat()], date_semantics=cfg.semantics, collection_observation=False, persistence=False,
                raw_html_published=False, responses=[], failure=None, cleanup='UNKNOWN')
@@ -284,6 +288,12 @@ def inspect_html(raw, cfg=None):
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ registration and run
+def default_profile():
+    """What distinguishes one bounded, owner-attended source diagnostic from another: its registration kind, identity pattern, exact scope and limits, extra hash-bound registration fields, the module that
+    runs its worker and the worker's capture function. Everything else (hash, expiry, checkout, scope containment, single-use claim, supervision) is shared and unchanged."""
+    return dict(kind=KIND, identity=IDENTITY, scope=SCOPE, limits=LIMITS, extra={}, module='verification.discovery.idox_response_diagnostic', live=lambda directory: live(config(), directory))
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':')).encode()
 
@@ -292,25 +302,26 @@ def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
-def render(identity, revision, tree, issued, expires):
+def render(identity, revision, tree, issued, expires, profile=None):
     """An INACTIVE local proposal. It authorises nothing until the owner approves its exact hash; rendering starts no clock and makes no request."""
-    if not IDENTITY.fullmatch(identity) or not re.fullmatch('[0-9a-f]{40}', revision) or not re.fullmatch('[0-9a-f]{40}', tree):
+    profile = profile or default_profile()
+    if not profile['identity'].fullmatch(identity) or not re.fullmatch('[0-9a-f]{40}', revision) or not re.fullmatch('[0-9a-f]{40}', tree):
         raise ValueError('IDENTITY_OR_GIT_BINDING')
     a, b = datetime.fromisoformat(issued), datetime.fromisoformat(expires)
     if a.tzinfo is None or b.tzinfo is None or not timedelta(0) < b - a <= timedelta(hours=LIMITS['max_registration_hours']):
         raise ValueError('EXPIRY_INTERVAL')
-    return dict(kind=KIND, identity=identity, scope=dict(SCOPE), revision=revision, tree=tree, limits=dict(LIMITS), issued_at=issued, expires_at=expires, stop_treatment=PERMIT,
+    return dict(profile['extra'], kind=profile['kind'], identity=identity, scope=dict(profile['scope']), revision=revision, tree=tree, limits=dict(profile['limits']), issued_at=issued, expires_at=expires, stop_treatment=PERMIT,
                 preserved_stops=list(PRESERVED), database_synchronised=False, publication='NONE', raw_html='PRIVATE_OWNER_LOCAL_0600', collection_observation=False,
                 containment=dict(scope_unit=SCOPE_UNIT, memory_max_bytes=MEMORY_BYTES, memory_swap_max_bytes=0))
 
 
-def validate(registration, registration_sha256, raw, *, git, clock=lambda: datetime.now(timezone.utc)):
+def validate(registration, registration_sha256, raw, *, git, clock=lambda: datetime.now(timezone.utc), profile=None):
     """The exact bytes, the exact content, the clock AND the checkout are all required: `git` has no default and a missing one fails closed."""
     if not isinstance(git, dict) or set(git) != {'head', 'tree', 'dirty'}:
         raise ValueError('CHECKOUT_BINDING')
     if sha(raw) != registration_sha256 or canonical(registration) != raw or len(raw) > 16384:
         raise ValueError('REGISTRATION_HASH')
-    if registration != render(registration.get('identity', ''), registration.get('revision', ''), registration.get('tree', ''), registration.get('issued_at', ''), registration.get('expires_at', '')):
+    if registration != render(registration.get('identity', ''), registration.get('revision', ''), registration.get('tree', ''), registration.get('issued_at', ''), registration.get('expires_at', ''), profile):
         raise ValueError('REGISTRATION_CHANGED')
     now = clock()
     if not datetime.fromisoformat(registration['issued_at']) <= now < datetime.fromisoformat(registration['expires_at']):
@@ -351,21 +362,22 @@ def _state_root():
     return STATE_ROOT
 
 
-def _verified_claim(directory, registration_sha256):
+def _verified_claim(directory, registration_sha256, profile=None):
     """What the worker requires before any request: the parent's fresh claim directory, holding the validated registration and nothing else."""
     directory = Path(directory)
     if directory.is_symlink() or directory.parent != _state_root() or sorted(x.name for x in directory.iterdir()) != ['registration.json']:
         raise ValueError('CLAIM_REQUIRED')
     raw = (directory / 'registration.json').read_bytes()
-    registration = validate(json.loads(raw), registration_sha256, raw, git=_git())
+    registration = validate(json.loads(raw), registration_sha256, raw, git=_git(), profile=profile)
     if registration['identity'] != directory.name:
         raise ValueError('CLAIM_IDENTITY')
     containment()
     return registration
 
 
-def main(argv=None):
+def main(argv=None, profile=None):
     import argparse
+    profile = profile or default_profile()
     from verification.stage26b_l1.actions_runner import supervise
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest='mode', required=True)
@@ -387,7 +399,7 @@ def main(argv=None):
     i.add_argument('--file', required=True, type=Path)
     a = p.parse_args(argv)
     if a.mode == 'render':
-        value = render(a.identity, a.revision, a.tree, a.issued_at, a.expires_at)
+        value = render(a.identity, a.revision, a.tree, a.issued_at, a.expires_at, profile)
         raw = canonical(value)
         fd = os.open(a.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'wb') as handle:
@@ -400,15 +412,15 @@ def main(argv=None):
     if any(any(s in k.upper() for s in FORBIDDEN_ENV) for k in os.environ):
         raise ValueError('OWNER_CREDENTIAL_CONTEXT')
     if a.mode == 'worker':
-        _verified_claim(a.directory, a.registration_sha256)      # no registration, claim, hash, expiry, checkout or scope: no request
-        result = live(config(), a.directory)
+        _verified_claim(a.directory, a.registration_sha256, profile)      # no registration, claim, hash, expiry, checkout or scope: no request
+        result = profile['live'](a.directory)
         raw = canonical(result)
         if len(raw) > 65536:
             raise ValueError('AUDIT_BOUND')
         _write_private(a.directory, 'audit.json', raw)
         return 0 if result['failure'] is None else 1
     raw = a.registration.read_bytes()
-    registration = validate(json.loads(raw), a.registration_sha256, raw, git=_git())
+    registration = validate(json.loads(raw), a.registration_sha256, raw, git=_git(), profile=profile)
     if not a.enable_reviewed_source_only_diagnostic:
         raise ValueError('DIAGNOSTIC_NOT_ENABLED')
     containment()      # before the claim is consumed and before any request
@@ -420,8 +432,8 @@ def main(argv=None):
     def cancel(signum, frame):
         raise KeyboardInterrupt('SIGTERM')      # supervise() kills the worker's whole process group on any interruption
     signal.signal(signal.SIGTERM, cancel)
-    code, expired = supervise([sys.executable, '-m', 'verification.discovery.idox_response_diagnostic', 'worker', '--directory', str(directory), '--registration-sha256', a.registration_sha256],
-                              env={'HOME': str(Path.home()), 'PATH': '/usr/bin:/bin', 'PYTHONDONTWRITEBYTECODE': '1'}, deadline=LIMITS['supervisor_seconds'])
+    code, expired = supervise([sys.executable, '-m', profile['module'], 'worker', '--directory', str(directory), '--registration-sha256', a.registration_sha256],
+                              env={'HOME': str(Path.home()), 'PATH': '/usr/bin:/bin', 'PYTHONDONTWRITEBYTECODE': '1'}, deadline=profile['limits']['supervisor_seconds'])
     audit_path = directory / 'audit.json'
     summary = json.loads(audit_path.read_bytes()) if audit_path.is_file() and audit_path.stat().st_size <= 65536 else None
     print(json.dumps(dict(identity=registration['identity'], worker_exit=code, expired=expired, private_directory=str(directory), audit=summary), sort_keys=True))
