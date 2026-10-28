@@ -46,3 +46,10 @@ actual known fixture grantor connection. No production permission semantics or
 assertions changed. The preceding production sequence fix and all other cases
 passed. Full failed log is retained. Third head also adds a real recovery-session
 held across NOLOGIN test; a dormant role must not hide a surviving session.
+
+The added recovery-session predicate exposed an alias collision with the original
+DO's declared record `a` (run40789118289, job123169623515). PostgreSQL interpreted
+`a.usesysid` as an unassigned PL/pgSQL record. Renamed only the SQL alias to
+`recovery_session`; no condition or assertion removed. The full failed log and
+failed heads remain preserved. This is a correction defect, not the historical
+production failure's root cause.
