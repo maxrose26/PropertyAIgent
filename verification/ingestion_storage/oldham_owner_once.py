@@ -228,6 +228,9 @@ class Operation:
         from app.ingestion.ledger import UncertainPersistence
         if isinstance(exc,UncertainPersistence) or self.stage=='FRESH_DETAIL_ADMISSION' or self.caller is not None and self.caller.allocation.failed:self.runtime_uncertain=True
         failure=safe_failure(exc,'EXECUTION');failure.setdefault('stage',self.stage)
+        from .activation_boundary import GATE_CODES
+        if self.stage=='ACCESS_ACTIVATION' and type(exc) is Denied and len(exc.args)==1 and exc.args[0] in GATE_CODES:
+            failure.update(reason_code=exc.args[0],classification_source='FIXED_ACTIVATION_GATE_CODE')
         self.result.update(status='STOP_RECONCILE_NO_RETRY',failure=failure,cleanup='UNCERTAIN')
         certain=not self.runtime_uncertain and self.owner is not None and not self.owner.effect_uncertain and not self.github.mutation_uncertain and (self.life is None or self.life.state not in ('UNCERTAIN','CLOSED'))
         if certain:

@@ -36,6 +36,8 @@ def activation_gate(capture_screening_only=False):
         last=" IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_recovery_login'"
         if text.count(first)!=1 or text.count(last)!=1:raise Denied('OLDHAM_ACTIVATION_DERIVATION')
         start=text.index(first);end=text.index(last);text=text[:start]+text[end:]
+        from .activation_boundary import capture_screening_gate
+        text=capture_screening_gate(text)
     return text+'ROLLBACK;'
 
 
@@ -85,7 +87,15 @@ class Lifecycle:
                 for role,cap in self.roles.items():o.q(c,sql.SQL('GRANT {} TO {} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE').format(sql.Identifier(cap),sql.Identifier(role)),effect=True)
                 o.q(c,'COMMIT',effect=True)
                 gate=activation_gate(self.capture_screening_only)
-                for q in split_sql(gate):o.q(c,q)
+                for q in split_sql(gate):
+                    try:o.q(c,q)
+                    except BaseException as exc:
+                        from .activation_boundary import fixed_gate_reason
+                        reason=fixed_gate_reason(exc)
+                        if reason is not None:
+                            o.emit('activation_gate_refused',dict(reason_code=reason,message_exported=False))
+                            raise Denied(reason) from None
+                        raise
                 for role,name in self.secrets.items():
                     password=secrets.token_urlsafe(48)
                     verifier=c.pgconn.encrypt_password(password.encode(),role.encode(),algorithm=b'scram-sha-256').decode()

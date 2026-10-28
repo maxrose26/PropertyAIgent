@@ -1,0 +1,6 @@
+--- diagnostic.py (inactive historical reconciliation source)
++++ diagnostic.py (corrected inactive successor)
+@@
+-        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] and r[4] is True and r[8]=='sql' and r[9]=='s' for r in funcs)
++        # Authoritative worker.sql omits volatility: PostgreSQL defaults to VOLATILE.
++        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] and r[4] is True and r[8]=='sql' and r[9]=='v' for r in funcs)
