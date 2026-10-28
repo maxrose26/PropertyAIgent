@@ -1,0 +1,38 @@
+name: Oldham activation read-only diagnostic OFFLINE
+on:
+  push:
+    branches: ['stage4/oldham-activation-readonly-verification-20261028']
+permissions:
+  contents: read
+jobs:
+  fixed-readonly-diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: provisioning_bootstrap
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: ingestion_provisioning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U provisioning_bootstrap -d ingestion_provisioning_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing disposable dependency setup
+        run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/diagnostic-venv"
+      - name: Fixed diagnostic units and exact gate comparison, disposable PostgreSQL17 only
+        run: |
+          mkdir -p "$RUNNER_TEMP/readonly-diagnostic" "$RUNNER_TEMP/diagnostic-home"
+          timeout --kill-after=2s 300s env -i HOME="$RUNNER_TEMP/diagnostic-home" PATH=/usr/bin:/bin PYTHONPATH="$GITHUB_WORKSPACE" PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/diagnostic-venv/bin/python" -m pytest docs/design/oldham-activation-reconciliation-20261028/test_diagnostic.py docs/design/oldham-activation-reconciliation-20261028/test_predicates_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/readonly-diagnostic/junit.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oldham-readonly-diagnostic-${{ github.sha }}
+          path: ${{ runner.temp }}/readonly-diagnostic/
+          retention-days: 14
