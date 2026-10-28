@@ -79,7 +79,7 @@ def test_every_other_historical_reviewed_state_is_recognised_but_not_called_the_
     for name,inventory in e()['pre_oldham'].items():
         if name=='GENERATION3_SCREENING_V3_APPLIED':continue
         got=oi.classify_functions(rows_for(inventory))
-        if got['state']=='RECOGNISED_PRE_OLDHAM':assert got['recognised']==name and got['is_the_retained_v3_state'] is False
+        assert got['state']=='RECOGNISED_PRE_OLDHAM' and e()['pre_oldham'][got['recognised']]==inventory and got['is_the_retained_v3_state'] is False
 
 
 def test_the_exact_reviewed_oldham_installation_is_recognised():
@@ -94,7 +94,7 @@ def test_nothing_installed_is_reported_as_not_installed_not_as_a_failure():
 def test_missing_objects_are_distinguished_from_unexpected_content():
     inventory=dict(e()['pre_oldham']['GENERATION3_SCREENING_V3_APPLIED']);inventory.pop('ingestion_register_bolton_exception')
     got=oi.classify_functions(rows_for(inventory))
-    assert (got['state'],got['reason'])==('MISSING_OBJECTS','PARTIAL_OF_ONE_REVIEWED_STATE')
+    assert (got['state'],got['reason'],got['recognised'],got['missing'])==('MISSING_OBJECTS','PARTIAL_OF_ONE_REVIEWED_STATE','GENERATION3_SCREENING_V3_APPLIED',['ingestion_register_bolton_exception'])
     changed=dict(e()['pre_oldham']['GENERATION3_SCREENING_V3_APPLIED']);changed['ingestion_bolton_allowed']='0'*64
     assert oi.classify_functions(rows_for(changed))['state']=='UNEXPECTED_OR_MIXED'
 
@@ -140,7 +140,7 @@ def test_function_privilege_discrepancies_are_reported_as_fixed_codes(index,logi
 
 def test_table_privilege_discrepancies_and_missing_objects_are_distinguished():
     functions,tables=reviewed_privileges()
-    widened=[row if (row[0],row[1])!=('ingestion_application_login','applications') else (row[0],row[1],True,True,False,False,True,True) for row in tables]
+    widened=[row if (row[0],row[1])!=('ingestion_application_login','applications') else (row[0],row[1],True,True,False,False,True,True,True) for row in tables]
     assert oi.evaluate_privileges(functions,widened)['discrepancies']==['TABLE_PRIVILEGE_DIFFERS:ingestion_application_login:applications']
     result=oi.evaluate_privileges([f for f in functions if f[0]!='ingestion_oldham_allowed'],tables)
     assert result['discrepancies']==[] and [r for r in result['function_execute'] if r[0]=='ingestion_oldham_allowed' and r[2] is None]      # an absent object is not a grant either way
@@ -224,3 +224,33 @@ def test_the_package_manifest_is_complete_and_the_registration_renders_offline()
     text=(d/'PACKAGE.md').read_text()
     for _,statement,_ in oi.planned():assert statement in text      # the package lists exactly the statements the controller can send
     assert 'NOT AUTHORISED FOR EXECUTION' in text and 'NOT AUTHORISED FOR EXECUTION' in (d/'owner-run.sh').read_text()
+
+
+def test_a_partial_installation_that_fits_several_reviewed_states_names_all_and_chooses_none():
+    lone=e()['pre_oldham']['GENERATION3_SCREENING_V3_APPLIED']['ingestion_bolton_allowed']
+    got=oi.classify_functions(rows_for({'ingestion_bolton_allowed':lone}))
+    assert got['state']=='MISSING_OBJECTS' and got['recognised'] is None and got['reason']=='PARTIAL_CONSISTENT_WITH_SEVERAL_REVIEWED_STATES' and len(got['candidates'])>1 and 'GENERATION3_SCREENING_V3_APPLIED' in got['candidates']
+    shared=oi.classify_functions(rows_for({'ingestion_raise_stop':e()['pre_oldham']['ORIGINAL']['ingestion_raise_stop']})) if 'ingestion_raise_stop' in e()['pre_oldham']['ORIGINAL'] else got
+    assert shared['recognised'] is None
+
+
+def test_the_verdict_states_what_it_checked_and_what_it_did_not():
+    got=oi.classify_functions(rows_for(e()['oldham']))
+    assert got['reason']=='BODY_OWNER_SEARCH_PATH_MATCH' and 'volatility' in got['not_checked'] and 'body_sha256_equals_reviewed' in got['checked']
+
+
+def test_free_text_from_the_database_is_never_echoed():
+    out=oi.reviewed_settings(['statement_timeout=10s','application_name=canary-77','lock_timeout=postgresql://u:p@h/db','search_path=canary'])
+    assert out=={'reviewed':{'statement_timeout':'10s'},'other_settings_count':3} and 'canary' not in json.dumps(out)
+    roles=[('ingestion_worker_login',True,True,None,1,False,False,False,False,False)]
+    got=oi.project_roles(roles,[('ingestion_worker_login',['application_name=canary-77'],0)],[('ingestion_worker_login','canary-role',False,True,False)],True)
+    assert 'canary' not in json.dumps(got) and got[0]['memberships']==[['OTHER_ROLE',False,True,False]]
+    sess=oi.project_sessions([('canary_user','canary state','client backend'),('ingestion_worker_login','idle','client backend')],True)
+    assert 'canary' not in json.dumps(sess) and ['OTHER_ROLE','OTHER_STATE',1] in sess['by_login_and_state']
+
+
+def test_the_reviewed_privilege_matrix_covers_seven_functions_and_four_tables_with_source_backed_expectations():
+    assert len(oi.FUNCTIONS_OF_INTEREST)==7 and len(oi.TABLES_OF_INTEREST)==4
+    assert oi.expected_function_execute('ingestion_raise_stop','ingestion_worker_login') is True and oi.expected_function_execute('ingestion_raise_stop','ingestion_effect_login') is False
+    assert oi.expected_function_execute('ingestion_recover_abandoned','ingestion_worker_login') is False
+    assert oi.expected_table('ingestion_worker_login','ingestion_work_attempts')==(True,False,False,False,False,False,True)

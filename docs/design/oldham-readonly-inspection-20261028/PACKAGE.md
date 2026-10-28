@@ -4,11 +4,11 @@ Specification: `specifications/038-oldham-readonly-inspection.md`. Controller: `
 Nothing here has run against production. No production connection, credential entry, installation, registration, stop change, council request or model call is authorised by this package.
 
 ## What it establishes (and does not)
-Whether the existing environment supports the authentic Oldham capture and screening: installed function state (pre-Oldham / exact Oldham / missing / mixed), runtime EXECUTE and table privileges, the four logins (flags, password-presence boolean, settings, memberships), sessions, and the stop fields the installed control function exposes.
+Whether the existing environment supports the authentic Oldham capture and screening: installed function state (pre-Oldham / exact Oldham / missing / mixed; by body hash, owner, search_path, overloads and the helper's signature and SECURITY DEFINER flag only), EXECUTE on seven named functions and table privileges on four named tables for the three runtime logins, the four logins (flags, password-presence boolean, settings, memberships), sessions, and the stop fields the installed control function exposes.
 It does **not** prove uncertainty barriers absent: `ingestion_acceptance_control()` returns only `global_stop`, `manual_stop`, `hard_stop_generation` and a count of `unexpired_grants`. It does not return `last_hard_stop`, the stop-state digest, WRITE_INTENT rows, Oldham allowances or per-grant detail, and the migration identity has no table privilege on the ledger. Those remain unobserved by design (no GRANT is permitted).
 
 ## Identity (stated honestly)
-The existing administrative `postgres` migration account, URL entered at the hidden prompt only. At the last accepted readback (2026-10-22, retained in the owner-local audit) it was not a superuser but held CREATEROLE, CREATEDB and BYPASSRLS, was a member of `pg_read_all_stats` and `pg_signal_backend` (which can terminate other backends), and held neither `ingestion_storage_owner` nor `ingestion_barrier_releaser`. This is a broad administrative account; this inspection issues none of those powers. `BEGIN READ ONLY` is a guard on the transaction, **not** a restricted account. No restricted read credential exists and none is created or discovered.
+The existing administrative `postgres` migration account, URL entered at the hidden prompt only. At the last accepted readback (2026-10-22, from the owner-local audit file `~/.local/state/propertyaigent/operational-bolton-screening-v3-retained-successor-once-20261030/events.jsonl`, sha256 `e9c42e3d9aedef790cf7341558a6b9f1bd463add6c2ab4aeebe03c20941ce129`; that file is not in the repository) it was not a superuser but held CREATEROLE, CREATEDB and BYPASSRLS, was a member of `pg_read_all_stats` and `pg_signal_backend` (which can terminate other backends), and held neither `ingestion_storage_owner` nor `ingestion_barrier_releaser`. This is a broad administrative account; this inspection issues none of those powers. `BEGIN READ ONLY` is a guard on the transaction, **not** a restricted account. No restricted read credential exists and none is created or discovered.
 
 ## Fixed statements (one connection; the complete list)
 1. `begin` — —
@@ -17,7 +17,7 @@ BEGIN READ ONLY
 ```
 2. `identity` — —
 ```sql
-SELECT current_user,session_user,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_storage_owner'),'USAGE'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_storage_owner'),'SET'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_barrier_releaser'),'USAGE'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_barrier_releaser'),'SET'),pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE'),pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT'),pg_catalog.has_function_privilege(current_user,pg_catalog.to_regprocedure('public.ingestion_acceptance_control()'),'EXECUTE'),pg_catalog.to_regprocedure('public.ingestion_acceptance_control()') IS NOT NULL FROM pg_catalog.pg_roles r WHERE r.rolname=current_user
+SELECT current_user,session_user,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_storage_owner'),'USAGE'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_storage_owner'),'SET'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_barrier_releaser'),'USAGE'),pg_catalog.pg_has_role(current_user,(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='ingestion_barrier_releaser'),'SET'),pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE'),pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT') AND pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT'),pg_catalog.has_function_privilege(current_user,pg_catalog.to_regprocedure('public.ingestion_acceptance_control()'),'EXECUTE'),pg_catalog.to_regprocedure('public.ingestion_acceptance_control()') IS NOT NULL FROM pg_catalog.pg_roles r WHERE r.rolname=current_user
 ```
 3. `control` — —
 ```sql
@@ -43,13 +43,13 @@ SELECT usename,state,backend_type FROM pg_catalog.pg_stat_activity WHERE usename
 ```sql
 SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),r.rolname,p.proconfig,p.prosecdef,pg_catalog.pg_get_function_identity_arguments(p.oid) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace JOIN pg_catalog.pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY p.proname,p.oid
 ```
-9. `function_privileges` — fixed list(s): 5 names; 3 names
+9. `function_privileges` — fixed list(s): 7 names; 3 names
 ```sql
 SELECT p.proname,r.rolname,pg_catalog.has_function_privilege(r.oid,p.oid,'EXECUTE') FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace CROSS JOIN pg_catalog.pg_roles r WHERE n.nspname='public' AND p.proname=ANY(%s) AND r.rolname=ANY(%s) ORDER BY 1,2
 ```
-10. `table_privileges` — fixed list(s): 3 names; 3 names
+10. `table_privileges` — fixed list(s): 4 names; 3 names
 ```sql
-SELECT r.rolname,c.relname,pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT'),pg_catalog.has_table_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_table_privilege(r.oid,c.oid,'UPDATE'),pg_catalog.has_table_privilege(r.oid,c.oid,'DELETE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'UPDATE') FROM pg_catalog.pg_roles r CROSS JOIN pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relname=ANY(%s) AND r.rolname=ANY(%s) ORDER BY 1,2
+SELECT r.rolname,c.relname,pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT'),pg_catalog.has_table_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_table_privilege(r.oid,c.oid,'UPDATE'),pg_catalog.has_table_privilege(r.oid,c.oid,'DELETE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'UPDATE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'SELECT') FROM pg_catalog.pg_roles r CROSS JOIN pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relname=ANY(%s) AND r.rolname=ANY(%s) ORDER BY 1,2
 ```
 11. `rollback` — —
 ```sql

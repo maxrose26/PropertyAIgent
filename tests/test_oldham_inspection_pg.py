@@ -41,10 +41,11 @@ def visibility(world):
 
 class Recording:
     """A driver-level recorder: every statement text and parameters, the close, and an optional injected failure."""
-    def __init__(self,connection,log,fail_on=None,close_first=False):
-        self.connection=connection;self.log=log;self.fail_on=fail_on;self.close_first=close_first
+    def __init__(self,connection,log,fail_on=None,close_first=False,slow=0):
+        self.connection=connection;self.log=log;self.fail_on=fail_on;self.close_first=close_first;self.slow=slow
     def execute(self,statement,params=None):
         self.log.append(statement)
+        if self.slow:time.sleep(self.slow)
         if self.fail_on and statement==self.fail_on:
             if self.close_first:self.connection.close()
             raise RuntimeError('injected failure with private text postgresql://u:SECRETVALUE@h/db')
@@ -54,10 +55,10 @@ class Recording:
     def closed(self):return self.connection.closed
 
 
-def run(world,tmp_path,*,fail_on=None,close_first=False,bound=None,monkeypatch=None):
+def run(world,tmp_path,*,fail_on=None,close_first=False,bound=None,monkeypatch=None,slow=0):
     log=[];holder={}
     def connect():
-        holder['raw']=world['connect'](MIGRATOR);holder['rec']=Recording(holder['raw'],log,fail_on,close_first);return holder['rec']
+        holder['raw']=world['connect'](MIGRATOR);holder['rec']=Recording(holder['raw'],log,fail_on,close_first,slow);return holder['rec']
     j=Journal(tmp_path/('i%d'%time.monotonic_ns()))
     runner=oi.InspectionRunner(j,connect,Progress(),Memory(),baseline=owned_resources(),started=time.monotonic())
     if bound and monkeypatch:
@@ -183,6 +184,9 @@ def test_statement_and_output_and_time_bounds_are_enforced_before_the_overrun(wo
     result,*_=run(world,tmp_path,bound=dict(database_seconds=0),monkeypatch=monkeypatch)
     assert result['failure']['reason_code']=='ACTIVE_WINDOW_EXHAUSTED'
     monkeypatch.undo()
+    result,log,*_=run(world,tmp_path,bound=dict(database_seconds=0.5),monkeypatch=monkeypatch,slow=0.3)      # a real overrun: each statement takes 0.3 s, the bound trips partway through
+    assert result['failure']['reason_code']=='ACTIVE_WINDOW_EXHAUSTED' and 2<=len([x for x in log if x!='ROLLBACK'])<=6
+    monkeypatch.undo()
     assert oi.BOUND['driver_statements']==12 and oi.BOUND['planned_statements']==11
 
 
@@ -219,7 +223,7 @@ def test_the_result_has_only_the_fixed_fields(world,tmp_path):
     assert set(i)=={'identity','control','logins','sessions','functions','privileges'}
     assert set(i['identity'])=={'current_user','session_user','is_the_expected_administrative_migration_account','superuser','createrole','createdb','bypassrls','holds_ingestion_storage_owner','holds_ingestion_barrier_releaser',
                                 'pg_read_all_stats','pg_signal_backend','pg_authid_password_presence_visible','character'}
-    assert i['identity']['is_the_expected_administrative_migration_account'] is False      # the disposable account is not 'postgres'; the report says so rather than assuming
+    assert i['identity']['is_the_expected_administrative_migration_account'] is False and i['identity']['current_user']=='OTHER_ACCOUNT'      # the disposable account is not 'postgres'; the report says so and does not echo the name
     assert 'READ_ONLY_IS_A_PER_TRANSACTION_GUARD' in i['identity']['character'] and 'NOT_A_RESTRICTED_ACCOUNT' in i['identity']['character']
 
 
@@ -246,3 +250,34 @@ def test_the_whole_session_path_hidden_input_to_final_result_uses_the_disposable
     assert result['outcome']['tls_verification'].startswith('PERFORMED_BY_THE_EXISTING_ROUTE_MECHANISM') and result['outcome']['worker_authentication_qualified'] is False
     blob=j.file.read_text()+(j.root/'final-result.json').read_text()+''.join(lines)
     for forbidden in (SECRET,'postgresql://','Traceback','192.0.2.','aws-0-eu-west-2.pooler.supabase.com:5432'):assert forbidden not in blob,forbidden
+
+
+def test_the_twelve_statement_ceiling_holds_when_the_last_select_fails(world,tmp_path):
+    install_v3(world);visibility(world)      # the full 11-statement variant: 10 sent before the last SELECT fails, plus the one counted rollback
+    result,log,*_=run(world,tmp_path,fail_on=oi.TABLE_PRIVILEGES)
+    assert result['status']=='STOP_RECONCILE_NO_RETRY' and len(log)==11 and log[-1]=='ROLLBACK' and result['accounting']['administration']['driver_statements']['value']==11<=oi.BOUND['driver_statements']
+
+
+def test_an_absent_control_sentinel_is_a_report_not_a_lost_inspection(world,tmp_path):
+    install_v3(world);world['boot'].execute("DELETE FROM public.ingestion_work_items WHERE key=repeat('0',64)")
+    result,*_=run(world,tmp_path)
+    assert result['status']=='OLDHAM_READONLY_INSPECTION_COMPLETE' and result['inspection']['control']['status']=='SENTINEL_ABSENT' and result['inspection']['control']['absence_of_uncertainty_barriers']=='NOT_ESTABLISHED_BY_THIS_INSPECTION'
+
+
+def test_partial_pg_authid_visibility_falls_back_instead_of_losing_the_run(world,tmp_path):
+    install_v3(world);world['boot'].execute('GRANT SELECT (rolpassword) ON pg_authid TO provisioning_migrator')
+    result,*_=run(world,tmp_path)
+    assert result['status']=='OLDHAM_READONLY_INSPECTION_COMPLETE' and result['inspection']['identity']['pg_authid_password_presence_visible'] is False
+    assert {l['password_present'] for l in result['inspection']['logins'] if l['exists']}=={'UNKNOWN'}
+
+
+def test_database_free_text_never_reaches_the_report_or_the_journal(world,tmp_path):
+    install_v3(world);boot=world['boot']
+    boot.execute("ALTER ROLE ingestion_worker_login SET application_name='canary-setting-77'")
+    boot.execute('CREATE ROLE "canary-role-88" NOLOGIN');boot.execute('GRANT "canary-role-88" TO ingestion_worker_login')
+    try:
+        result,log,j,_=run(world,tmp_path)
+        blob=json.dumps(result,default=str)+j.file.read_text()
+        assert 'canary' not in blob
+    finally:
+        boot.execute('REVOKE "canary-role-88" FROM ingestion_worker_login');boot.execute('DROP ROLE "canary-role-88"')

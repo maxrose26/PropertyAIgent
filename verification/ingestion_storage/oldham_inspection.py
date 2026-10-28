@@ -28,8 +28,8 @@ EVIDENCE_DIRECTORY='docs/design/oldham-readonly-inspection-20261028'
 EXPECTED_ADMIN='postgres'
 LOGINS=('ingestion_worker_login','ingestion_effect_login','ingestion_application_login','ingestion_storage_login')
 RUNTIME_LOGINS=('ingestion_worker_login','ingestion_effect_login','ingestion_application_login')
-FUNCTIONS_OF_INTEREST=('ingestion_worker_step','ingestion_oldham_allowed','ingestion_acceptance_control','ingestion_bolton_allowed','ingestion_register_bolton_exception')
-TABLES_OF_INTEREST=('applications','application_lifecycle_events','ingestion_work_items')
+FUNCTIONS_OF_INTEREST=('ingestion_worker_step','ingestion_oldham_allowed','ingestion_acceptance_control','ingestion_bolton_allowed','ingestion_register_bolton_exception','ingestion_raise_stop','ingestion_recover_abandoned')
+TABLES_OF_INTEREST=('applications','application_lifecycle_events','ingestion_work_items','ingestion_work_attempts')
 OLDHAM_HELPER='ingestion_oldham_allowed'
 OLDHAM_HELPER_ARGUMENTS='ctl jsonb, authority text, work_key text, subject jsonb'
 CONTROL_FIELDS=('global_stop','manual_stop','hard_stop_generation','unexpired_grants')
@@ -38,7 +38,7 @@ KNOWN_MANUAL_STOPS=('STORAGE_TEST_STOP','IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAI
 BOUND=dict(connection_attempts=1,driver_statements=12,planned_statements=11,rollbacks=1,commits=0,returned_data_value_bytes=32768,database_seconds=30,dns_subprocesses=1,dns_seconds=3,
            hidden_input_seconds=120,active_seconds=45,final_report_seconds=5,controller_memory_bytes=256*1024**2,aggregate_memory_bytes=1536*1024**2,persisted_evidence_bytes=65536,terminal_json_bytes=32768)
 TIMING=dict(input_seconds=BOUND['hidden_input_seconds'],active_seconds=BOUND['active_seconds'],work_seconds=35,diagnostic_seconds=5,report_seconds=BOUND['final_report_seconds'],outer_seconds=180)
-ABSENT_CAPABILITIES=tuple(ABSENT_CAPABILITIES)+('grant','set_role','function_installation','ledger_read','arbitrary_sql')
+ABSENT_CAPABILITIES=tuple(ABSENT_CAPABILITIES)+('grant','set_role','function_installation','ledger_table_select','arbitrary_sql')      # the control row is read only through the installed SECURITY DEFINER control function
 
 # --- the closed statement list (each entry: name, SQL, fixed parameters). Nothing else can ever be sent. -------------------------------------------------------------------------------------
 _ROLE_OID="(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='%s')"
@@ -46,7 +46,7 @@ IDENTITY=("SELECT current_user,session_user,r.rolsuper,r.rolcreaterole,r.rolcrea
           "pg_catalog.pg_has_role(current_user,"+_ROLE_OID%'ingestion_storage_owner'+",'USAGE'),pg_catalog.pg_has_role(current_user,"+_ROLE_OID%'ingestion_storage_owner'+",'SET'),"
           "pg_catalog.pg_has_role(current_user,"+_ROLE_OID%'ingestion_barrier_releaser'+",'USAGE'),pg_catalog.pg_has_role(current_user,"+_ROLE_OID%'ingestion_barrier_releaser'+",'SET'),"
           "pg_catalog.pg_has_role(current_user,'pg_read_all_stats','USAGE'),pg_catalog.pg_has_role(current_user,'pg_signal_backend','USAGE'),"
-          "pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT'),"
+          "pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT') AND pg_catalog.has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT'),"
           "pg_catalog.has_function_privilege(current_user,pg_catalog.to_regprocedure('public.ingestion_acceptance_control()'),'EXECUTE'),"
           "pg_catalog.to_regprocedure('public.ingestion_acceptance_control()') IS NOT NULL "
           "FROM pg_catalog.pg_roles r WHERE r.rolname=current_user")
@@ -64,7 +64,7 @@ FUNCTIONS=("SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),r
 FUNCTION_PRIVILEGES=("SELECT p.proname,r.rolname,pg_catalog.has_function_privilege(r.oid,p.oid,'EXECUTE') FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace "
                      "CROSS JOIN pg_catalog.pg_roles r WHERE n.nspname='public' AND p.proname=ANY(%s) AND r.rolname=ANY(%s) ORDER BY 1,2")
 TABLE_PRIVILEGES=("SELECT r.rolname,c.relname,pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT'),pg_catalog.has_table_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_table_privilege(r.oid,c.oid,'UPDATE'),"
-                  "pg_catalog.has_table_privilege(r.oid,c.oid,'DELETE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'UPDATE') "
+                  "pg_catalog.has_table_privilege(r.oid,c.oid,'DELETE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'INSERT'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'UPDATE'),pg_catalog.has_any_column_privilege(r.oid,c.oid,'SELECT') "
                   "FROM pg_catalog.pg_roles r CROSS JOIN pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') "
                   "AND c.relname=ANY(%s) AND r.rolname=ANY(%s) ORDER BY 1,2")
 BEGIN='BEGIN READ ONLY'
@@ -113,6 +113,10 @@ def expected_states():
     return _EXPECTED
 
 
+CLASSIFICATION_CHECKS=['body_sha256_equals_reviewed','owner','search_path','no_overloads','oldham_helper_signature_and_security_definer']
+CLASSIFICATION_NOT_CHECKED=['security_definer_of_other_functions','volatility','strictness','function_acl_beyond_the_runtime_logins_in_privileges']
+
+
 def classify_functions(rows):
     """Distinguish a recognised pre-Oldham installation, the exact reviewed Oldham installation, missing objects and an unexpected or mixed installation. Pure; rows are fixed-shape tuples."""
     expected=expected_states()
@@ -131,22 +135,24 @@ def classify_functions(rows):
     if exact is not None:
         state='RECOGNISED_PRE_OLDHAM'
         if not detail['owner_and_search_path_as_reviewed']:return dict(detail,state='UNEXPECTED_OR_MIXED',reason='OWNER_OR_SEARCH_PATH_CHANGED',recognised=exact)
-        return dict(detail,state=state,reason='EXACT_MATCH',recognised=exact,is_the_retained_v3_state=exact=='GENERATION3_SCREENING_V3_APPLIED')
+        return dict(detail,state=state,reason='BODY_OWNER_SEARCH_PATH_MATCH',recognised=exact,is_the_retained_v3_state=exact=='GENERATION3_SCREENING_V3_APPLIED',checked=CLASSIFICATION_CHECKS,not_checked=CLASSIFICATION_NOT_CHECKED)
     if observed==expected['oldham']:
         if not detail['owner_and_search_path_as_reviewed'] or detail['oldham_helper_signature_and_definer_as_reviewed'] is not True:
             return dict(detail,state='UNEXPECTED_OR_MIXED',reason='OWNER_OR_SEARCH_PATH_OR_SIGNATURE_CHANGED',recognised='OLDHAM_EXACT')
-        return dict(detail,state='OLDHAM_EXACT_INSTALLATION',reason='EXACT_MATCH',recognised='OLDHAM_EXACT')
-    # A strict subset whose every present body belongs to ONE reviewed state is "missing objects"; anything else is unexpected or mixed.
+        return dict(detail,state='OLDHAM_EXACT_INSTALLATION',reason='BODY_OWNER_SEARCH_PATH_MATCH',recognised='OLDHAM_EXACT',checked=CLASSIFICATION_CHECKS,not_checked=CLASSIFICATION_NOT_CHECKED)
+    # A strict subset whose every present body is consistent with a reviewed state is "missing objects". Several reviewed states share most bodies, so EVERY consistent state is named and none is chosen.
     candidates=dict(expected['pre_oldham'],OLDHAM_EXACT=expected['oldham'])
-    for key,inventory in candidates.items():
-        if set(observed)<set(inventory) and all(inventory[n]==h for n,h in observed.items()):return dict(detail,state='MISSING_OBJECTS',reason='PARTIAL_OF_ONE_REVIEWED_STATE',recognised=key,missing=sorted(set(inventory)-set(observed)))
+    fits={key:sorted(set(inventory)-set(observed)) for key,inventory in candidates.items() if set(observed)<set(inventory) and all(inventory[n]==h for n,h in observed.items())}
+    if len(fits)==1:
+        (key,missing),=fits.items();return dict(detail,state='MISSING_OBJECTS',reason='PARTIAL_OF_ONE_REVIEWED_STATE',recognised=key,missing=missing)
+    if fits:return dict(detail,state='MISSING_OBJECTS',reason='PARTIAL_CONSISTENT_WITH_SEVERAL_REVIEWED_STATES',recognised=None,candidates=sorted(fits),missing_by_candidate=fits)
     return dict(detail,state='UNEXPECTED_OR_MIXED',reason='CONTENT_NOT_A_REVIEWED_STATE',recognised=None)
 
 
-EXPECTED_FUNCTION_EXECUTE={('ingestion_worker_step','ingestion_worker_login'):True,('ingestion_worker_step','ingestion_effect_login'):True,('ingestion_worker_step','ingestion_application_login'):False}
+EXPECTED_FUNCTION_EXECUTE={('ingestion_raise_stop','ingestion_worker_login'):True,('ingestion_worker_step','ingestion_worker_login'):True,('ingestion_worker_step','ingestion_effect_login'):True,('ingestion_worker_step','ingestion_application_login'):False}
 # Reviewed grants: application-writer.sql (applications: SELECT, column-level INSERT/UPDATE; lifecycle events: column SELECT(id) and INSERT) and install.sql (the worker may SELECT the work-item ledger). Everything else: none.
-EXPECTED_TABLES={('ingestion_application_login','applications'):(True,False,False,False,True,True),('ingestion_application_login','application_lifecycle_events'):(False,True,False,False,True,False),
-                 ('ingestion_worker_login','ingestion_work_items'):(True,False,False,False,False,False)}
+EXPECTED_TABLES={('ingestion_application_login','applications'):(True,False,False,False,True,True,True),('ingestion_application_login','application_lifecycle_events'):(False,True,False,False,True,False,True),
+                 ('ingestion_worker_login','ingestion_work_items'):(True,False,False,False,False,False,True),('ingestion_worker_login','ingestion_work_attempts'):(True,False,False,False,False,False,True)}
 
 
 def expected_function_execute(function,login):
@@ -154,7 +160,7 @@ def expected_function_execute(function,login):
 
 
 def expected_table(login,table):
-    return EXPECTED_TABLES.get((login,table),(False,)*6)
+    return EXPECTED_TABLES.get((login,table),(False,)*7)
 
 
 def evaluate_privileges(function_rows,table_rows):
@@ -174,7 +180,7 @@ def evaluate_privileges(function_rows,table_rows):
     for login in RUNTIME_LOGINS:
         for table in TABLES_OF_INTEREST:
             if (login,table) not in seen_tables:table_matrix.append([login,table,None,list(expected_table(login,table))])
-    return dict(function_execute=function_matrix,table_privileges=table_matrix,columns_of_table_privileges=['select','insert','update','delete','any_column_insert','any_column_update'],discrepancies=sorted(set(discrepancies)))
+    return dict(function_execute=function_matrix,table_privileges=table_matrix,columns_of_table_privileges=['select','insert','update','delete','any_column_insert','any_column_update','any_column_select'],discrepancies=sorted(set(discrepancies)))
 
 
 def project_control(raw):
@@ -193,17 +199,34 @@ def project_control(raw):
                         'per-grant detail or Oldham allowances, so this inspection cannot prove those absent.')
 
 
+KNOWN_ROLE_NAMES=frozenset(LOGINS)|{'ingestion_worker','ingestion_effect_broker','ingestion_application_writer','ingestion_storage_operator','ingestion_recovery_operator','ingestion_storage_owner','ingestion_barrier_releaser'}
+KNOWN_SETTINGS=('statement_timeout','lock_timeout','idle_in_transaction_session_timeout')
+KNOWN_STATES=frozenset({'active','idle','idle in transaction','idle in transaction (aborted)','fastpath function call','disabled'})
+import re as _re
+_DURATION=_re.compile(r'^\d{1,9}(ms|s|min|h)?$')
+
+
+def reviewed_settings(config):
+    """Only the three reviewed timeout settings, and only a plain duration value; everything else is a count, never text."""
+    shown={};other=0
+    for item in config or []:
+        name,_,value=str(item).partition('=')
+        if name in KNOWN_SETTINGS and _DURATION.match(value):shown[name]=value
+        else:other+=1
+    return dict(reviewed=shown,other_settings_count=other)
+
+
 def project_roles(role_rows,setting_rows,membership_rows,password_visible):
     roles={r[0]:r for r in role_rows};settings={r[0]:r for r in setting_rows}
     members={}
-    for member,role,admin,inherit,set_ in membership_rows:members.setdefault(member,[]).append([role,admin,inherit,set_])
+    for member,role,admin,inherit,set_ in membership_rows:members.setdefault(member,[]).append([role if role in KNOWN_ROLE_NAMES else 'OTHER_ROLE',admin,inherit,set_])
     out=[]
     for login in LOGINS:
         r=roles.get(login)
         if r is None:out.append(dict(login=login,exists=False));continue
         s=settings.get(login)
         out.append(dict(login=login,exists=True,can_login=r[1],password_present=r[2] if password_visible else 'UNKNOWN',valid_until=r[3].isoformat() if r[3] else None,connection_limit=r[4],
-                        superuser=r[5],createrole=r[6],createdb=r[7],bypassrls=r[8],replication=r[9],settings=sorted(s[1] or []) if s else [],database_level_settings=s[2] if s else None,
+                        superuser=r[5],createrole=r[6],createdb=r[7],bypassrls=r[8],replication=r[9],settings=reviewed_settings(s[1]) if s else reviewed_settings([]),database_level_settings=s[2] if s else None,
                         memberships=sorted(members.get(login,[]))))
     return out
 
@@ -213,7 +236,7 @@ def project_sessions(rows,visible):
     counts={};unattributed=0
     for usename,state,backend in rows:
         if usename is None:unattributed+=1;continue
-        counts[(usename,state)]=counts.get((usename,state),0)+1
+        key=(usename if usename in LOGINS else 'OTHER_ROLE',state if state in KNOWN_STATES else 'OTHER_STATE');counts[key]=counts.get(key,0)+1
     return dict(visibility='PROVEN_BY_PG_READ_ALL_STATS',by_login_and_state=[[u,s,n] for (u,s),n in sorted(counts.items(),key=lambda kv:(str(kv[0][0]),str(kv[0][1])))],unattributed_client_backends=unattributed)
 
 
@@ -252,7 +275,8 @@ class InspectionRunner(ProbeRunner):
         password_visible=identity[12] is True;sessions_visible=identity[10] is True;control_function_exists=identity[14] is True;control_executable=control_function_exists and identity[13] is True
         control=None
         if control_executable:
-            raw=s('control',CONTROL)[0][0];control=project_control(raw if isinstance(raw,dict) else json.loads(raw))
+            got=s('control',CONTROL);raw=got[0][0] if got and got[0] else None
+            control=project_control(raw if isinstance(raw,dict) else json.loads(raw)) if raw is not None else dict(status='SENTINEL_ABSENT',exposed_fields=[],not_exposed_by_this_function=list(NOT_EXPOSED_BY_CONTROL_FUNCTION),absence_of_uncertainty_barriers='NOT_ESTABLISHED_BY_THIS_INSPECTION')
         else:control=dict(status='UNKNOWN',reason='CONTROL_FUNCTION_ABSENT' if not control_function_exists else 'CONTROL_FUNCTION_NOT_EXECUTABLE_BY_THIS_IDENTITY',exposed_fields=[],not_exposed_by_this_function=list(NOT_EXPOSED_BY_CONTROL_FUNCTION),absence_of_uncertainty_barriers='NOT_ESTABLISHED_BY_THIS_INSPECTION')
         roles=s('roles',ROLES_WITH_PASSWORD_PRESENCE if password_visible else ROLES_WITHOUT_PASSWORD_PRESENCE,[list(LOGINS)])
         settings=s('role_settings',ROLE_SETTINGS,[list(LOGINS)]);members=s('memberships',MEMBERSHIPS,[list(LOGINS)])
@@ -264,7 +288,7 @@ class InspectionRunner(ProbeRunner):
         names=('current_user','session_user','superuser','createrole','createdb','bypassrls','storage_owner_usage','storage_owner_set','barrier_releaser_usage','barrier_releaser_set','pg_read_all_stats','pg_signal_backend',
                'pg_authid_password_presence_visible','control_function_executable','control_function_exists')
         view=dict(zip(names,identity))
-        about=dict(identity=dict(current_user=view['current_user'],session_user=view['session_user'],is_the_expected_administrative_migration_account=view['current_user']==EXPECTED_ADMIN and view['session_user']==EXPECTED_ADMIN,
+        about=dict(identity=dict(current_user=view['current_user'] if view['current_user']==EXPECTED_ADMIN else 'OTHER_ACCOUNT',session_user=view['session_user'] if view['session_user']==EXPECTED_ADMIN else 'OTHER_ACCOUNT',is_the_expected_administrative_migration_account=view['current_user']==EXPECTED_ADMIN and view['session_user']==EXPECTED_ADMIN,
                                  superuser=view['superuser'],createrole=view['createrole'],createdb=view['createdb'],bypassrls=view['bypassrls'],
                                  holds_ingestion_storage_owner=dict(usage=view['storage_owner_usage'],set=view['storage_owner_set']),holds_ingestion_barrier_releaser=dict(usage=view['barrier_releaser_usage'],set=view['barrier_releaser_set']),
                                  pg_read_all_stats=view['pg_read_all_stats'],pg_signal_backend=view['pg_signal_backend'],pg_authid_password_presence_visible=password_visible,
