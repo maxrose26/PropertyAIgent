@@ -133,6 +133,10 @@ class WindowEvidence:
     capped: bool = False
     failure: str | None = None
     accounting_complete: bool = True
+    # What makes a COMPLETE window complete. SOURCE_TERMINAL: the source's own terminal evidence (the only basis that ever advances coverage). OWNER_ACCEPTED_SINGLE_PAGE: an explicit,
+    # hash-bound owner acceptance of one named window (specification 037); the source terminal stays null and nothing is inferred from it.
+    completeness_basis: str = 'SOURCE_TERMINAL'
+    owner_acceptance_sha256: str | None = None
 
     def __post_init__(self):
         if self.council not in COUNCILS or not self.run_id:
@@ -150,6 +154,12 @@ class WindowEvidence:
             raise ValueError('invalid duration')
         if self.explicit_zero and self.unique_references:
             raise ValueError('zero/result conflict')
+        if self.completeness_basis not in ('SOURCE_TERMINAL', 'OWNER_ACCEPTED_SINGLE_PAGE'):
+            raise ValueError('completeness basis')
+        owner = self.completeness_basis == 'OWNER_ACCEPTED_SINGLE_PAGE'
+        if owner != (self.owner_acceptance_sha256 is not None) or (owner and (self.terminal_evidence is not None or self.explicit_zero
+                or not (isinstance(self.owner_acceptance_sha256, str) and len(self.owner_acceptance_sha256) == 64 and all(c in '0123456789abcdef' for c in self.owner_acceptance_sha256)))):
+            raise ValueError('owner acceptance basis')
 
     @property
     def outcome(self):
@@ -161,6 +171,10 @@ class WindowEvidence:
             return Completeness.UNKNOWN
         if (self.applied_start, self.applied_end) != (self.requested_start, self.requested_end):
             return Completeness.UNKNOWN
+        if self.completeness_basis == 'OWNER_ACCEPTED_SINGLE_PAGE':
+            if not self.pages or not self.requests:
+                return Completeness.INCOMPLETE
+            return Completeness.COMPLETE if self.unique_references else Completeness.UNKNOWN
         if not self.terminal_evidence or not self.pages or not self.requests:
             return Completeness.INCOMPLETE
         if not self.unique_references and not self.explicit_zero:
@@ -175,7 +189,7 @@ def completed_through(previous: date, windows: list[WindowEvidence], *, council:
     for w in sorted(windows, key=lambda w: w.requested_start):
         if w.council != council or w.date_semantics != date_semantics:
             raise ValueError('mixed coverage ledger')
-        if w.outcome == Completeness.COMPLETE and w.requested_start <= cursor + timedelta(days=1):
+        if w.outcome == Completeness.COMPLETE and w.completeness_basis == 'SOURCE_TERMINAL' and w.requested_start <= cursor + timedelta(days=1):      # an owner-accepted window never advances coverage
             cursor = max(cursor, w.requested_end)
     return cursor
 

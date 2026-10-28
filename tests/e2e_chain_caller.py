@@ -72,7 +72,7 @@ class Admission:
 
 
 class Chain:
-    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None, binding=None):
+    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None, binding=None, audit=None, owner_acceptance=None):
         self.w, self.family, self.tag = world, family, tag
         self.tmp = tmp_path / ('src-' + tag)      # one directory per chain: two chains in one test never share supervised-source paths
         self.tmp.mkdir()
@@ -86,7 +86,7 @@ class Chain:
         self.auth_capture, self.auth_chain = authority_name(self.binding, 'CAPTURE', self.revision), authority_name(self.binding, 'CHAIN', self.revision)
         budget = self.binding.execution_budget
         if family == 'idox':
-            self.contract, self.audit = idox_contract(self.council, START, END), idox_audit(self.council, self.entries, START, END)
+            self.contract, self.audit = idox_contract(self.council, START, END, owner_acceptance=owner_acceptance), audit if audit is not None else idox_audit(self.council, self.entries, START, END)
         else:
             self.contract, self.audit = arcus_contract(self.council, START, END, budget=budget), arcus_audit(self.council, self.entries, START, END, budget=budget)
         self.bindings = {}
