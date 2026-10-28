@@ -131,3 +131,4 @@ def test_owner_preconditions_refuse_before_the_first_membership_effect(permissio
     assert x.op.stage=='TRANSITION_OWNER_PRECONDITIONS'
     assert not any(effect for _,effect in sent) and not any(s=='BEGIN' or s.startswith('GRANT ') for s,_ in sent)
     assert any(e=='oldham_transition_owner_permissions' for e,_ in events)
+    assert any(e=='oldham_transition_self_grant' for e,_ in events)

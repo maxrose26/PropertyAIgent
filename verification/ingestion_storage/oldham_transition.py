@@ -84,9 +84,9 @@ class Transition:
         # Identity flags alone do not establish grant options or ledger ownership.
         flags=self.o.q(c,"SELECT has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION'),has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION'),has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION'),EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND admin_option),bool_and(relowner='ingestion_storage_owner'::regrole AND relrowsecurity AND relforcerowsecurity) FROM pg_class WHERE oid IN ('public.ingestion_work_items'::regclass,'public.ingestion_work_attempts'::regclass)")[0]
         self.o.emit('oldham_transition_owner_permissions',dict(schema_usage_grant_option=flags[0],schema_create_grant_option=flags[1],database_connect_grant_option=flags[2],storage_owner_admin_option=flags[3],ledger_owner_forced_rls=flags[4]))
-        if flags!=(True,True,True,True,True):raise Denied('OLDHAM_TRANSITION_INSTALL_PERMISSIONS')
         existing=self.o.q(c,"SELECT EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole AND grantor=current_user::regrole)")[0][0]
         self.o.emit('oldham_transition_self_grant',dict(preexisting_self_grant=existing))
+        if flags!=(True,True,True,True,True):raise Denied('OLDHAM_TRANSITION_INSTALL_PERMISSIONS')
         if existing is not False:raise Denied('OLDHAM_TRANSITION_PREEXISTING_SELF_GRANT')
         self.op.stage='RETIREMENT_AND_INSTALLATION'
         self.o.q(c,'BEGIN',effect=True)
