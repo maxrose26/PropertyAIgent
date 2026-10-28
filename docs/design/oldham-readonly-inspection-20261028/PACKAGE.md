@@ -56,10 +56,12 @@ SELECT r.rolname,c.relname,pg_catalog.has_table_privilege(r.oid,c.oid,'SELECT'),
 ROLLBACK
 ```
 
+4b. `roles` (fallback form without `pg_authid`; sent instead of statement 4 when `rolname` and `rolpassword` of `pg_authid` are not both readable)
+```sql
 SELECT r.rolname,r.rolcanlogin,NULL::boolean,r.rolvaliduntil,r.rolconnlimit,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication FROM pg_catalog.pg_roles r WHERE r.rolname=ANY(%s) ORDER BY r.rolname
 ```
 
-Variants: `control` is skipped if the control function is absent or not executable by the identity (reported UNKNOWN); `roles` uses the `pg_authid` form only if the identity may read both `rolname` and `rolpassword` of `pg_authid`, else the form listed after the statements (password presence reported UNKNOWN) (password presence reported UNKNOWN); `sessions` is skipped unless the identity holds `pg_read_all_stats` (reported UNKNOWN).
+Variants: `control` is skipped if the control function is absent or not executable by the identity (reported UNKNOWN); `roles` uses the `pg_authid` form only if the identity may read both `rolname` and `rolpassword` of `pg_authid`, else the fallback form 4b above (password presence reported UNKNOWN); `sessions` is skipped unless the identity holds `pg_read_all_stats` (reported UNKNOWN).
 
 ## Accounting and bounds
 Driver statements are counted as sent, including `BEGIN READ ONLY`, every SELECT and the `ROLLBACK`: **11 planned maximum, 9 minimum, ceiling 12 (unchanged)**. A failure after BEGIN attempts one counted ROLLBACK (11 + 1 = 12 at most); a dead connection is simply closed. 1 connection attempt, 0 commits, returned data ≤ 32 KiB, database seconds ≤ 30, active window 45 s after the 120 s hidden-input window, controller memory 256 MiB, aggregate 1.5 GiB, persisted evidence ≤ 64 KiB, terminal JSON ≤ 32 KiB. Server-side `statement_timeout` 10 s and `lock_timeout` 3 s come from the existing startup options.
