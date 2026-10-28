@@ -26,6 +26,7 @@ A specification is a short document that explains **what** we are building and *
 - [036 — Owner Scheme Review and Verified Corrections](036-owner-scheme-review-and-verified-corrections.md): agreed product scope, documentation-only draft; Stage 7 shared-evidence extension, not an additional Stage 4 gate. Depends on the versioned residential-count proposal [035 / PR #166](https://github.com/maxrose26/PropertyAIgent/pull/166) and sparse-observation contracts [033](033-verified-records-under-unknown-window-completeness.md) / [034 proposal, PR #164](https://github.com/maxrose26/PropertyAIgent/pull/164). Separate proposal links do not imply integration or implementation.
 
 - [037 — Owner-accepted single-page window](037-owner-accepted-single-page-window.md): one named Oldham RECEIVED window accepted by explicit owner review; closed, default-off, labelled, never a rule for other windows; coverage never advances.
+- [038 — Fixed Oldham read-only inspection](038-oldham-readonly-inspection.md): dormant, not authorised for execution; reports the installed Oldham function/privilege/control state read-only.
 
 ## What belongs here
 
