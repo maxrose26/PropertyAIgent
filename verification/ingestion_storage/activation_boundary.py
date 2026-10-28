@@ -61,7 +61,11 @@ def capture_screening_gate(text):
     text=text.replace(table,table[:-1]+"\n   AND NOT (n.nspname='extensions' AND c.relname IN ('pg_stat_statements','pg_stat_statements_info')))")
     # Missing is safe only for this non-recovery operation. Existing recovery
     # identities must have no authentication, administrative flags or extra roles.
-    text=text.replace(recovery,""" IF EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname='ingestion_recovery_login' AND
+    text=text.replace(recovery,""" IF EXISTS(SELECT 1 FROM pg_stat_activity a
+   WHERE a.usename='ingestion_recovery_login' OR
+     (a.usesysid IS NOT NULL AND NOT EXISTS(SELECT 1 FROM pg_roles r WHERE r.oid=a.usesysid)))
+ THEN RAISE EXCEPTION 'RECOVERY_MUST_REMAIN_DORMANT'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname='ingestion_recovery_login' AND
    (r.rolcanlogin OR r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication
     OR r.rolconnlimit<>1
     OR EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r.oid AND

@@ -37,3 +37,12 @@ not provider state or live operational readiness.
 Historical three-login/default gate bytes remain equal to the original SQL.
 No SQL installation, policy/stop mutation, PUBLIC revoke, role creation in
 production, limit increase or new dependency is part of this candidate.
+
+Second hosted head6a4a9e03610341f148a4576a50156160708550bf, run40788642196,
+e2e job123168038242:283 passed/1 failed/3 skipped. The sole failure was disposable
+absent-role setup: PostgreSQL17 requires GRANTED BY's grantor to be current_user,
+even for the bootstrap account. Fixture now removes each database ACL through its
+actual known fixture grantor connection. No production permission semantics or
+assertions changed. The preceding production sequence fix and all other cases
+passed. Full failed log is retained. Third head also adds a real recovery-session
+held across NOLOGIN test; a dormant role must not hide a surviving session.

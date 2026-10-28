@@ -32,7 +32,12 @@ def test_recovery_and_both_latent_views(world,recovery):
     b=world['boot']
     if recovery=='absent':
         grants=b.execute("SELECT grantor::regrole::text FROM pg_database d CROSS JOIN LATERAL aclexplode(d.datacl) a WHERE d.datname=current_database() AND a.grantee='ingestion_recovery_login'::regrole").fetchall()
-        for (grantor,) in grants:b.execute(sql.SQL('REVOKE ALL ON DATABASE ingestion_provisioning_test FROM ingestion_recovery_login GRANTED BY {}').format(sql.Identifier(grantor)))
+        for (grantor,) in grants:
+            statement='REVOKE ALL ON DATABASE ingestion_provisioning_test FROM ingestion_recovery_login'
+            if grantor==b.info.user:b.execute(statement)
+            else:
+                assert grantor=='provisioning_migrator'
+                with world['connect'](grantor) as issuer:issuer.execute(statement)
         b.execute('DROP OWNED BY ingestion_recovery_login');b.execute('DROP ROLE ingestion_recovery_login')
     elif recovery=='enabled':b.execute('ALTER ROLE ingestion_recovery_login LOGIN')
     elif recovery=='super':b.execute('ALTER ROLE ingestion_recovery_login SUPERUSER')
@@ -94,3 +99,13 @@ def test_changed_extension_c_symbol_refuses(world):
         b.execute(changed)
         with pytest.raises(Exception,match='STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED'):gate(b)
     finally:b.execute(original)
+
+
+def test_nologin_does_not_hide_existing_recovery_session(world):
+    b=world['boot'];b.execute('ALTER ROLE ingestion_recovery_login LOGIN')
+    connection=world['connect']('ingestion_recovery_login')
+    try:
+        b.execute('ALTER ROLE ingestion_recovery_login NOLOGIN')
+        with pytest.raises(Exception,match='RECOVERY_MUST_REMAIN_DORMANT'):gate(b)
+    finally:connection.close()
+    gate(b)

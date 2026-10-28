@@ -9,7 +9,10 @@ reconciliation classifications remain historical evidence, not rewritten results
 Only the explicitly selected capture/screening-only activation gate changes.
 Absent recovery login is permitted because no recovery capability is invoked.
 An existing recovery login must be NOLOGIN, unprivileged, and have only the
-reviewed non-admin, inherit-only recovery membership. Historical/admission gates
+reviewed non-admin, inherit-only recovery membership. Existing recovery sessions
+and orphaned session identities also refuse: NOLOGIN or a dropped role does not
+terminate an already-authenticated session. Existing administrative session
+visibility is required by Lifecycle.observed before this gate. Historical/admission gates
 remain unchanged and still require recovery existence.
 
 Reuse the storage ceremony's exact PG17 pg_stat_statements 1.11 latent-SELECT

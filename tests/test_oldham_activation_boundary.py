@@ -14,6 +14,7 @@ def test_historical_three_login_gate_byte_unchanged():
     gate=activation_gate(True)
     assert 'STATISTICS_BASELINE_BOUNDARY' in gate and 'pg_stat_statements' in gate
     assert "NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_recovery_login'" not in gate
+    assert "a.usename='ingestion_recovery_login'" in gate and 'a.usesysid IS NOT NULL' in gate
     assert 'pg_read_all_stats' in gate and "e.extversion='1.11'" in gate
 
 
