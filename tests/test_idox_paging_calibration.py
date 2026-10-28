@@ -114,8 +114,14 @@ class Council:
             return Resp(listing(self.total + 1, self.total + 3, self.total, refs(5, 3), prefix='Z'))
         if kind == 'redirect':
             return Resp(b'', status=302, headers={'Content-Type': 'text/html', 'Location': BASE + '/search.do'})
-        if kind == 'http500':
-            return Resp(b'<html>boom</html>', status=500)
+        if kind in ('http400', 'http404', 'http500'):
+            return Resp(results_shell('<p>Sorry</p>', heading='<h1>Error</h1>'), status=int(kind[4:]))
+        if kind == 'clamped_hidden':      # the last page's marker again, its rows not in a recognised element
+            return Resp(results_shell('<p class="pager">Showing %d-%d of %d</p><ul id="searchresults"></ul>' % ((self.pages - 1) * 10 + 1, self.total, self.total)))
+        if kind == 'rows_beyond_unrecognised':
+            return Resp(listing(self.total + 1, self.total + 3, 999, refs(5, 3), prefix='Z'))
+        if kind == 'download':
+            return Resp(b'%PDF', headers={'Content-Type': 'application/pdf'})
         return Resp(SHAPES[kind])
 
 
@@ -156,17 +162,43 @@ def test_the_limits_are_the_existing_readers_ceilings_and_the_request_cap_follow
 
 def test_only_the_two_special_urls_are_admitted_and_only_once_each():
     from verification.stage26b_l1.request_boundary import BoundaryFailure
-    b = c.CalibrationBoundary(lambda *a, **k: Resp(listing(1, 2, 2, ['R002/26', 'R001/26'])), c.config())
-    b.phase = 'BEYOND_END'
-    b.extra['BEYOND_END'] = BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3'
-    for other in (BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=4', BASE + '/applicationDetails.do?keyVal=X', BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3&x=1'):
+    special = BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3'
+
+    def boundary():
+        b = c.CalibrationBoundary(lambda *a, **k: Resp(listing(1, 2, 2, ['R002/26', 'R001/26'])), c.config())
+        b.phase = 'BEYOND_END'
+        b.extra['BEYOND_END'] = special
+        return b
+    for other in (BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=4', BASE + '/applicationDetails.do?keyVal=X', special + '&x=1', special.replace('https', 'http')):
+        b = boundary()
         with pytest.raises(BoundaryFailure):
             b.observe(other)
-        b.budget.failure = None
-    status, _, _ = b.observe(BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3')
-    assert status == 200 and 'BEYOND_END' not in b.extra
+        assert b.requests == 0      # refused before any dispatch
+    b = boundary()
+    status, _, _ = b.observe(special)
+    assert status == 200 and 'BEYOND_END' not in b.extra and b.requests == 1
     with pytest.raises(BoundaryFailure):
-        b.observe(BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3')      # single use
+        b.observe(special)      # single use
+    assert b.requests == 1
+
+
+def test_observe_returns_error_and_redirect_answers_with_their_bodies_and_keeps_the_budget_alive():
+    for status, headers in ((400, None), (404, None), (500, None), (302, {'Content-Type': 'text/html', 'Location': BASE + '/search.do'})):
+        b = c.CalibrationBoundary(lambda *a, **k: Resp(b'<html>body</html>', status=status, headers=headers), c.config())
+        b.phase = 'BEYOND_END'
+        b.extra['BEYOND_END'] = BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3'
+        got, ctype, data = b.observe(BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=3')
+        assert got == status and data == b'<html>body</html>' and b.budget.failure is None and b.requests == 1 and b.received_bytes == len(data) and b.redirects == 0
+
+
+def test_observe_still_refuses_a_download_and_an_oversize_body():
+    from verification.stage26b_l1.request_boundary import BoundaryFailure
+    for resp in (Resp(b'%PDF', headers={'Content-Type': 'application/pdf'}), Resp(b'x' * 500_001)):
+        b = c.CalibrationBoundary(lambda *a, **k: resp, c.config())
+        b.phase = 'CONTROL'
+        b.extra['CONTROL'] = BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=0'
+        with pytest.raises(BoundaryFailure):
+            b.observe(BASE + '/pagedSearchResults.do?action=page&searchCriteria.page=0')
 
 
 @pytest.mark.parametrize('council,reason,requests', [
@@ -186,6 +218,8 @@ def test_raw_bodies_are_private_and_the_export_holds_no_record_text_or_keys(priv
     import re
     assert not re.search(r'R\d{3}/26', exported) and not re.search(r'P\dK\d', exported) and 'keyVal=' not in exported and '<html' not in exported.lower() and '"_keys"' not in exported
     for step in out['steps']:
+        proj = step['projection']
+        assert all(set(h) == {'results_heading', 'sha256'} for h in proj.get('headings', [])) and all(set(m) == {'exhaustion_wording', 'sha256'} for m in proj.get('messages', []))
         f = private / step['private_file']
         assert stat.S_IMODE(f.stat().st_mode) == 0o600 and f.read_bytes() and step['sha256']
 
@@ -205,7 +239,8 @@ def test_a_valid_advance_and_a_specific_exhaustion_response_establish_the_signal
 
 @pytest.mark.parametrize('beyond,reason', [
     ('repeat_first', 'REPEATED_PAGE'), ('repeat_last', 'REPEATED_PAGE'), ('empty', 'AMBIGUOUS_OR_GENERIC_RESPONSE'), ('error', 'AMBIGUOUS_OR_GENERIC_RESPONSE'),
-    ('login', 'AMBIGUOUS_OR_GENERIC_RESPONSE'), ('wrong_total', 'TOTAL_CONTRADICTED'), ('redirect', None), ('http500', None)])
+    ('login', 'AMBIGUOUS_OR_GENERIC_RESPONSE'), ('wrong_total', 'TOTAL_CONTRADICTED'), ('redirect', 'TRANSPORT_OR_REDIRECT_OR_NOT_HTML'), ('http400', 'TRANSPORT_OR_REDIRECT_OR_NOT_HTML'),
+    ('http404', 'TRANSPORT_OR_REDIRECT_OR_NOT_HTML'), ('http500', 'TRANSPORT_OR_REDIRECT_OR_NOT_HTML'), ('clamped_hidden', 'AMBIGUOUS_OR_GENERIC_RESPONSE'), ('download', None)])
 def test_generic_repeated_ambiguous_or_failed_responses_stay_inconclusive(tmp_path, beyond, reason):
     private = tmp_path / 'p'
     private.mkdir(mode=0o700)
@@ -215,8 +250,13 @@ def test_generic_repeated_ambiguous_or_failed_responses_stay_inconclusive(tmp_pa
         assert reason in result['reasons']
 
 
-def test_rows_beyond_the_portals_own_total_contradict_the_total(private):
-    assert verdict(Council(beyond='rows_beyond'), private)['verdict'] == 'CONTRADICTED'
+def test_rows_beyond_a_recognised_results_page_with_the_same_total_contradict_it_but_unrecognised_rows_do_not(tmp_path):
+    a, b = tmp_path / 'a', tmp_path / 'b'
+    a.mkdir(mode=0o700)
+    b.mkdir(mode=0o700)
+    assert verdict(Council(beyond='rows_beyond'), a)['verdict'] == 'CONTRADICTED'
+    unvalidated = verdict(Council(beyond='rows_beyond_unrecognised'), b)
+    assert unvalidated['verdict'] == 'INCONCLUSIVE' and unvalidated['reasons'] == ['UNVALIDATED_ROWS_BEYOND_END']
 
 
 def test_an_ignored_page_parameter_is_inconclusive_not_a_terminal_signal(private):
@@ -352,3 +392,42 @@ def test_the_worker_needs_the_parents_fresh_claim(tmp_path, monkeypatch):
     bare.mkdir(mode=0o700)
     with pytest.raises(ValueError, match='CLAIM_REQUIRED'):
         d.main(['worker', '--directory', str(bare), '--registration-sha256', '0' * 64], profile=c.profile())
+
+
+# ----------------------------------------------------------------------------------------------------------------- error answers are observed
+@pytest.mark.parametrize('control', ['http400', 'http404', 'http500', 'redirect', 'error'])
+def test_an_error_or_redirect_answer_to_the_invalid_page_control_is_observed_and_differs_from_the_signal(tmp_path, control):
+    private = tmp_path / 'p'
+    private.mkdir(mode=0o700)
+    out = run(Council(control=control), private)
+    assert out['failure'] is None and names(out)[-1] == 'control-invalid-page' and out['resource']['requests_attempted'] == 7 and out['resource']['redirects'] == 0
+    assert c.classify(out)['verdict'] == 'ESTABLISHED'
+
+
+@pytest.mark.parametrize('beyond', ['http404', 'redirect'])
+def test_an_error_answer_to_the_beyond_end_request_still_lets_the_session_check_and_control_run(tmp_path, beyond):
+    private = tmp_path / 'p'
+    private.mkdir(mode=0o700)
+    out = run(Council(beyond=beyond), private)
+    assert names(out)[-3:] == ['beyond-end', 'session-check', 'control-invalid-page'] and out['failure'] is None
+    assert c.classify(out) ['verdict'] == 'INCONCLUSIVE'
+
+
+def test_classify_is_total_over_incomplete_or_unparseable_exports():
+    out = run_audit()
+    broken = json.loads(json.dumps(out))
+    broken['steps'] = [s for s in broken['steps'] if s['name'] != 'page-2']
+    assert c.classify(broken)['reasons'] == ['UNPARSEABLE_EXPORT']
+    non_html = json.loads(json.dumps(out))
+    end = next(s for s in non_html['steps'] if s['name'] == 'beyond-end')
+    end['projection'] = c.project(b'\xff\xfe')
+    result = c.classify(non_html)
+    assert result['verdict'] == 'INCONCLUSIVE' and 'TRANSPORT_OR_REDIRECT_OR_NOT_HTML' in result['reasons']
+    assert c.classify({})['verdict'] == 'INCONCLUSIVE'
+
+
+@pytest.mark.parametrize('marker,expected', [([0, 0, 20], True), ([21, 20, 20], True), ([25, 24, 20], True), ([11, 20, 20], False), ([1, 10, 20], False), ([15, 20, 20], False)])
+def test_a_marker_must_describe_an_empty_range_that_no_earlier_page_showed(marker, expected):
+    step = dict(http_status=200, media_type='text/html', redirect='NONE', projection=dict(html=True, headings=[dict(results_heading=True, sha256='x')], rows=0, password_inputs=0, results_containers=1,
+                                                                                         pager_markers=[marker], messages=[]))
+    assert (c._shape(step, 20, [(1, 10), (11, 20)]) is not None) is expected

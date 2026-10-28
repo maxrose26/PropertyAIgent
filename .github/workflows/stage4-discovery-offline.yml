@@ -42,6 +42,7 @@ on:
       - 'tests/test_idox_response_diagnostic.py'
       - 'tests/test_idox_paging_calibration.py'
       - 'docs/design/oldham-response-diagnostic-20261028/**'
+      - 'docs/design/oldham-paging-calibration-20261028/**'
       - 'tests/storage_gh_fixture.py'
       - 'tests/four_council_release_fixture_cli.py'
       - 'docs/design/four-council-release-20261022/**'

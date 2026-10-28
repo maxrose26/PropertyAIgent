@@ -65,11 +65,42 @@ class CalibrationBoundary(WindowBoundary):
         return super().validate(method, url, body)
 
     def observe(self, url):
-        """One GET whose ANY answer (including a redirect or an HTML error page) is an observation: status, content type and body, never an exception for the shape alone."""
+        """One admitted GET whose ANY answer is an observation: a 4xx/5xx, a redirect (never followed, its target never requested) or an HTML error page is returned with its (bounded) body instead of
+        ending the run, because the distinction this calibration exists to test is exactly how the portal answers a page it cannot serve. The same admission, request and byte charging as `Boundary.request`
+        apply; a download content type, a transport failure and any exhausted bound still fail."""
+        import time
+        import requests
         self.last_response = None
-        status, headers, data = self.request('GET', url)
-        self.extra.pop(self.phase, None)      # single use
-        return status, headers.get('Content-Type', ''), data
+        phase = self.phase
+        self.validate('GET', url)
+        self.extra.pop(phase, None)      # single use, even if the request then fails
+        self.budget.charge_request(self.policy)
+        self.requests += 1
+        response, charged = None, 0
+        try:
+            response = self.dispatch('GET', url, data=None, headers={}, stream=True, allow_redirects=False, timeout=min(15, self.budget.seconds - (time.monotonic() - self.budget.started)),
+                                     deadline=self.budget.started + self.budget.seconds)
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'attachment' in response.headers.get('Content-Disposition', '').lower() or any(t in content_type for t in ('application/pdf', 'application/zip', 'application/octet-stream')):
+                self.budget.reject('PARTIAL_RETRIEVAL', 'document response rejected')
+            payload = bytearray()
+            for chunk in response.iter_content(65536):
+                if not chunk:
+                    continue
+                payload.extend(chunk)
+                raw = getattr(response, 'raw', None)
+                wire = raw.tell() if raw is not None and hasattr(raw, 'tell') else 0
+                measured = max(len(payload), wire)
+                delta = measured - charged
+                self.received_bytes += delta
+                charged = measured
+                self.budget.charge_bytes(delta, measured)
+            return response.status_code, response.headers.get('Content-Type', ''), bytes(payload)
+        except (requests.Timeout, requests.ConnectionError):
+            self.budget.reject('TIMEOUT', 'transport failed')
+        finally:
+            if response is not None:
+                response.close()
 
 
 def _keys_of(soup):
@@ -91,6 +122,7 @@ def project(raw, prior_pages=()):
     soup = BeautifulSoup(html, 'html.parser')
     out['html'] = True
     h1 = [re.sub(r'\s+', ' ', h.get_text()).strip() for h in soup.select('h1')]
+    digest = lambda text: hashlib.sha256(text.encode()).hexdigest()[:16]
     keys = _keys_of(soup)
     prior = [set(p) for p in prior_pages]
     markers = []
@@ -99,10 +131,10 @@ def project(raw, prior_pages=()):
         markers.append(list(map(int, m.groups())) if m else None)
     messages = [re.sub(r'\s+', ' ', li.get_text()).strip()[:TEXT] for box in soup.select('div.messagebox') for li in box.select('li')]
     out.update(
-        headings=[dict(results_heading=bool(RESULTS_HEADING.fullmatch(t)), text=t[:80]) for t in h1][:5],
-        title=[re.sub(r'\s+', ' ', t.get_text()).strip()[:80] for t in soup.select('title')][:2],
+        headings=[dict(results_heading=bool(RESULTS_HEADING.fullmatch(t)), sha256=digest(t)) for t in h1][:5],      # a flag and a hash: portal text is never copied into the export
+        title=[digest(re.sub(r'\s+', ' ', t.get_text()).strip()) for t in soup.select('title')][:2],
         results_containers=len(soup.select('#searchresults')), rows=len(keys), pager_markers=markers[:4], next_controls=len(soup.select('p.pager a.next')),
-        messages=messages[:5], forms=sorted({f.get('id') or '' for f in soup.select('form')})[:5], password_inputs=len(soup.select('input[type=password]')),
+        messages=[dict(exhaustion_wording=bool(EXHAUSTION_WORDING.search(m)), sha256=digest(m)) for m in messages[:5]], forms=sorted({f.get('id') or '' for f in soup.select('form')})[:5], password_inputs=len(soup.select('input[type=password]')),
         overlap_with_prior_pages=[len(set(keys) & p) for p in prior])
     out['fingerprint'] = hashlib.sha256(json.dumps([out['headings'], out['title'], out['results_containers'], out['rows'], out['pager_markers'], out['messages'], out['forms'], out['password_inputs']],
                                                   sort_keys=True).encode()).hexdigest()
@@ -240,17 +272,22 @@ def live(cfg, directory):
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------- classify
-def _shape(step):
-    """The predeclared exhaustion shapes, read from a projection. None means 'not a specific exhaustion shape'."""
-    p = step['projection']
+def _shape(step, total=None, earlier=()):
+    """The predeclared exhaustion shapes, read from a projection; None means 'not a specific exhaustion shape'. A marker must describe an EMPTY range (0-0, or a start beyond the total, or an end before
+    its start) and must not repeat the (first, last) of any earlier page: a clamped last page whose rows merely are not recognised is therefore not accepted."""
+    p = step.get('projection') or {}
     if step.get('http_status') != 200 or step.get('media_type') != 'text/html' or step.get('redirect') != 'NONE' or not p.get('html'):
         return None
-    if not any(h['results_heading'] for h in p['headings']) or p['rows'] != 0 or p['password_inputs']:
+    if not any(h['results_heading'] for h in p['headings']) or p['rows'] != 0 or p['password_inputs'] or p['results_containers'] != 1:
         return None
     markers = [m for m in p['pager_markers'] if m]
     if markers:
-        return ('EXPLICIT_TOTAL_WITH_NO_ROWS', markers[0][2])
-    if any(EXHAUSTION_WORDING.search(m) for m in p['messages']):
+        first, last, marker_total = markers[0]
+        empty = (first, last) == (0, 0) or (total is not None and first > total) or last < first
+        if empty and [first, last] not in [list(e) for e in earlier]:
+            return ('EXPLICIT_TOTAL_WITH_NO_ROWS', marker_total)
+        return None
+    if any(m['exhaustion_wording'] for m in p['messages']):
         return ('NO_MORE_RESULTS_MESSAGE', None)
     return None
 
@@ -282,7 +319,15 @@ def _advance(pages):
 
 
 def classify(audit):
-    """ESTABLISHED only if every predeclared condition holds; CONTRADICTED if the portal returns rows beyond its own explicit total; otherwise INCONCLUSIVE with the reasons. Pure function of the export."""
+    """ESTABLISHED only if every predeclared condition holds; CONTRADICTED only if a recognised results page beyond the end carries NEW rows; otherwise INCONCLUSIVE with the reasons. A pure function of the
+    export that is total: a missing or unparseable step is INCONCLUSIVE, never an exception."""
+    try:
+        return _classify(audit)
+    except (KeyError, TypeError, IndexError, AttributeError):
+        return dict(verdict='INCONCLUSIVE', advance=None, terminal=None, reasons=['UNPARSEABLE_EXPORT'])
+
+
+def _classify(audit):
     if audit.get('abort') or audit.get('failure'):
         return dict(verdict='INCONCLUSIVE', advance=None, terminal=None, reasons=[audit.get('abort') or 'FAILURE:' + str((audit['failure'] or {}).get('stage'))])
     adv = _advance(audit['pages'])
@@ -294,24 +339,28 @@ def classify(audit):
     t = result['terminal']['reasons']
     if end is None:
         return dict(result, verdict='INCONCLUSIVE', reasons=['NO_BEYOND_END_OBSERVATION'])
-    pages_hashes = {p['response_sha256'] for p in audit['pages']}
-    if end.get('http_status') != 200 or end.get('media_type') != 'text/html' or end.get('redirect') != 'NONE':
-        t.append('TRANSPORT_OR_REDIRECT')
-    elif end['projection']['rows'] > 0 and not any(end['projection']['overlap_with_prior_pages']):
-        return dict(result, verdict='CONTRADICTED', reasons=['ROWS_BEYOND_EXPLICIT_TOTAL'])
-    elif end['projection']['rows'] > 0 or end['sha256'] in pages_hashes or end['projection']['fingerprint'] in {steps['page-%d' % p['ordinal']]['projection']['fingerprint'] for p in audit['pages']}:
+    total = audit['pages'][0]['total']
+    earlier = [(p['first'], p['last']) for p in audit['pages']]
+    proj = end['projection']
+    page_fingerprints = {steps['page-%d' % p['ordinal']]['projection']['fingerprint'] for p in audit['pages']}
+    if end.get('http_status') != 200 or end.get('media_type') != 'text/html' or end.get('redirect') != 'NONE' or not proj.get('html'):
+        t.append('TRANSPORT_OR_REDIRECT_OR_NOT_HTML')
+    elif proj['rows'] > 0 and not any(proj['overlap_with_prior_pages']):
+        recognised = any(h['results_heading'] for h in proj['headings']) and proj['results_containers'] == 1 and [m for m in proj['pager_markers'] if m and m[2] == total]
+        return dict(result, verdict='CONTRADICTED' if recognised else 'INCONCLUSIVE', reasons=['ROWS_BEYOND_EXPLICIT_TOTAL' if recognised else 'UNVALIDATED_ROWS_BEYOND_END'])
+    elif proj['rows'] > 0 or end['sha256'] in {p['response_sha256'] for p in audit['pages']} or proj['fingerprint'] in page_fingerprints:
         t.append('REPEATED_PAGE')
-    shape = _shape(end)
+    shape = _shape(end, total, earlier)
     result['terminal']['shape'] = shape[0] if shape else None
     if shape is None and not t:
         t.append('AMBIGUOUS_OR_GENERIC_RESPONSE')
-    if shape and shape[1] is not None and shape[1] != audit['pages'][0]['total']:
+    if shape and shape[1] is not None and shape[1] != total:
         t.append('TOTAL_CONTRADICTED')
     if not (audit.get('session_check') or {}).get('criteria_echo_matches') or session is None or session['projection'].get('password_inputs'):
         t.append('SESSION_NOT_ALIVE_OR_CRITERIA_CHANGED')
     if control is None:
         t.append('NO_INVALID_REQUEST_CONTROL')
-    elif _shape(control) is not None or control['projection'].get('fingerprint') == end['projection'].get('fingerprint') and control.get('http_status') == end.get('http_status'):
+    elif _shape(control, total, earlier) is not None or (control['projection'].get('fingerprint') == proj.get('fingerprint') and control.get('http_status') == end.get('http_status')):
         t.append('SIGNAL_NOT_SPECIFIC_TO_EXHAUSTION')
     return dict(result, verdict='ESTABLISHED' if not t else 'INCONCLUSIVE', reasons=sorted(set(t)))
 
