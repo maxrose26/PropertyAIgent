@@ -124,7 +124,12 @@ class Backend:
                 w['boot'].execute('REVOKE GRANT OPTION FOR CREATE ON SCHEMA public FROM provisioning_migrator')
             if self.scenario=='cs_self_grant':
                 with w['connect']('provisioning_migrator') as c:
-                    c.execute('GRANT ingestion_storage_owner TO CURRENT_USER WITH ADMIN TRUE, INHERIT FALSE, SET FALSE')
+                    # A legal self-granted row with no inherited/SET capability.
+                    # ADMIN TRUE would create a circular administration dependency
+                    # during fixture setup, before the actual command guard runs.
+                    c.execute('GRANT ingestion_storage_owner TO CURRENT_USER WITH ADMIN FALSE, INHERIT FALSE, SET FALSE')
+                    row=c.execute("SELECT admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole AND grantor=current_user::regrole").fetchone()
+                    assert row==(False,False,False)
         if self.scenario=='existing':
             from sqlalchemy.orm import Session
             from app.db.models import Application
@@ -225,7 +230,7 @@ class Backend:
                 assert self.names=={'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}
                 if self.scenario=='cs_self_grant':
                     row=boot.execute("SELECT admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member='provisioning_migrator'::regrole AND grantor='provisioning_migrator'::regrole").fetchone()
-                    assert row==(True,False,False)
+                    assert row==(False,False,False)
             changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
             if self.capture_screening_only:assert not changed and self.source_calls==0
             else:assert changed<={'applications','application_lifecycle_events'}
