@@ -95,3 +95,55 @@ def test_partial_source_accounting_never_becomes_zero_or_complete():
     assert op.source_totals()['totals'] is None and op.source_totals()['attempts']==1
     op.source_receipts.insert(0,dict(status='RETURNED_ACCOUNTING_VALIDATED',worker=dict(requests=1,received_body_bytes=123,elapsed_seconds=.5,supervisor_seconds=.7)))
     total=op.source_totals();assert total['totals'] is None and total['known_subtotal']['requests']==1
+
+
+# --------------------------------------------------------------- owner acceptance (specification 037): the later exact owner-approved package binds it
+@pytest.fixture
+def accepted_inputs(tmp_path,monkeypatch):
+    original=pkg.git
+    monkeypatch.setattr(pkg,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
+    return packet(tmp_path/'accepted',single_page=True,accept=monkeypatch,tag='accepted')
+
+
+def test_v1_packages_and_the_default_contract_are_unchanged(inputs,tmp_path,monkeypatch):
+    path,sha=inputs
+    data=pkg.validate(path,sha,disposable=True)
+    assert data['package']['version']==pkg.VERSION and data['contract'].owner_acceptance is None and 'owner_acceptance' not in data['package']
+    single=packet(tmp_path/'single',single_page=True,tag='single')      # a single-page TOTAL_UNKNOWN source in a V1 package: refused, as before
+    with pytest.raises(Denied,match='IDOX_WINDOW_BINDING_OR_COMPLETENESS'):pkg.validate(single[0],single[1],disposable=True)
+    p=json.loads(path.read_bytes());p['owner_acceptance']='X'
+    with pytest.raises(Denied,match='PACKAGE_FIELDS'):pkg.validate(path,rewrite(path,p),disposable=True)      # V1 never carries the field
+
+
+def test_v2_seals_the_exact_acceptance_and_builds_the_contract_with_the_key(accepted_inputs):
+    path,sha=accepted_inputs
+    data=pkg.validate(path,sha,disposable=True)
+    p=data['package']
+    assert p['version']==pkg.VERSION_ACCEPTED and data['contract'].owner_acceptance==p['owner_acceptance']
+    from app.ingestion import owner_acceptance
+    assert p['qualification_binding']['owner_acceptance_sha256']==owner_acceptance.require(p['owner_acceptance']).sha256
+    projected=data['contract'].project(data['source'],data['outer'],__import__('app.ingestion.ledger',fromlist=['x']).DEFAULT_LIMITS,source_bytes_limit=512*1024)
+    assert projected['completeness_basis']=='OWNER_ACCEPTED_SINGLE_PAGE' and projected['segments'][0]['terminal'] is None
+
+
+@pytest.mark.parametrize('change,code',[
+    (lambda p:p.pop('owner_acceptance'),'PACKAGE_FIELDS'),
+    (lambda p:p.update(owner_acceptance=None),'OWNER_ACCEPTANCE_UNKNOWN'),
+    (lambda p:p.update(owner_acceptance='INVENTED_KEY'),'OWNER_ACCEPTANCE_UNKNOWN'),
+    (lambda p:p.update(owner_acceptance={'key':'x'}),'OWNER_ACCEPTANCE_UNKNOWN'),
+    (lambda p:p['qualification_binding'].pop('owner_acceptance_sha256'),'CARRY_FORWARD_BINDING'),
+    (lambda p:p['qualification_binding'].update(owner_acceptance_sha256='0'*64),'CARRY_FORWARD_BINDING'),
+    (lambda p:p.update(version='OLDHAM_OWNER_WRAPPER_V3'),'PACKAGE_FIELDS'),
+    (lambda p:p['scope'].update(council='bury'),'PACKAGE_SCOPE')])
+def test_v2_refuses_a_missing_forged_or_mismatched_acceptance_field(accepted_inputs,change,code):
+    path,_=accepted_inputs;p=json.loads(path.read_bytes());change(p)
+    with pytest.raises((Denied,KeyError,ValueError),match=code):pkg.validate(path,rewrite(path,p),disposable=True)
+
+
+def test_a_v2_package_cannot_be_validated_without_the_registry_entry(tmp_path,monkeypatch):
+    original=pkg.git
+    monkeypatch.setattr(pkg,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
+    path,sha=packet(tmp_path/'noreg',single_page=True,accept=monkeypatch,tag='noreg')
+    monkeypatch.undo()      # the test-only registry installation ends with the test's patch scope: a caller cannot keep an entry the registry does not hold
+    monkeypatch.setattr(pkg,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
+    with pytest.raises(Denied,match='OWNER_ACCEPTANCE_UNKNOWN'):pkg.validate(path,sha,disposable=True)

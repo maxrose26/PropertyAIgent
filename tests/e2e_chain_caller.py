@@ -10,7 +10,7 @@ All data are synthetic; archives are labelled test artefacts; no council or prod
 import copy
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 
 from app.db.models import Base
@@ -72,7 +72,7 @@ class Admission:
 
 
 class Chain:
-    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None, binding=None):
+    def __init__(self, world, tmp_path, family, tag, entries=None, *, council=None, publisher_mode='ok', stop_file=None, contract_revision=None, binding=None, audit=None, owner_acceptance=None, window=None, qualification=None):
         self.w, self.family, self.tag = world, family, tag
         self.tmp = tmp_path / ('src-' + tag)      # one directory per chain: two chains in one test never share supervised-source paths
         self.tmp.mkdir()
@@ -82,13 +82,17 @@ class Chain:
         self.rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
         self.publisher = IsolatedTestPublisher(tmp_path, publisher_mode)
         self.revision = contract_revision or tag
+        self.start, self.end = window or (START, END)
         self.item_limits = BROWSER_SOURCE_V2_ITEM_LIMITS if self.binding.execution_budget else DEFAULT_LIMITS
         self.auth_capture, self.auth_chain = authority_name(self.binding, 'CAPTURE', self.revision), authority_name(self.binding, 'CHAIN', self.revision)
         budget = self.binding.execution_budget
         if family == 'idox':
-            self.contract, self.audit = idox_contract(self.council, START, END), idox_audit(self.council, self.entries, START, END)
+            self.contract = idox_contract(self.council, self.start, self.end, owner_acceptance=owner_acceptance)
+            if qualification is not None:      # the real accepted qualification identity, for the opt-in real-evidence check only
+                self.contract = replace(self.contract, qualification_sha256=qualification)
+            self.audit = audit if audit is not None else idox_audit(self.council, self.entries, self.start, self.end)
         else:
-            self.contract, self.audit = arcus_contract(self.council, START, END, budget=budget), arcus_audit(self.council, self.entries, START, END, budget=budget)
+            self.contract, self.audit = arcus_contract(self.council, self.start, self.end, budget=budget), arcus_audit(self.council, self.entries, self.start, self.end, budget=budget)
         self.bindings = {}
         self.caller = ChainCaller(self.binding, self.contract, self.rule, world['urls'], revision=self.revision, bindings=self.bindings, capture_authority=self.auth_capture,
                                   chain_authority=self.auth_chain, stop_file=stop_file, allow_test_evidence=True)
@@ -138,7 +142,7 @@ class Chain:
         return self
 
     def owner_registers_capture(self, *, ttl=1800, capture_only=False, outcomes=None, source_calls=None, stop=None, item_limits=None):
-        reg = capture_registration(self._owner(ttl), self.binding, self.contract, START.isoformat(), END.isoformat(), revision=self.revision, item_limits=item_limits or self.item_limits)
+        reg = capture_registration(self._owner(ttl), self.binding, self.contract, self.start.isoformat(), self.end.isoformat(), revision=self.revision, item_limits=item_limits or self.item_limits)
         grant = copy.deepcopy(reg.grant)      # fixture forgeries are applied to a COPY of what production prepared
         if capture_only:
             grant['capture_only'] = True

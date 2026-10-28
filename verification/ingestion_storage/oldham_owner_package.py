@@ -4,16 +4,19 @@ import hashlib,importlib.metadata,json,re,subprocess
 from pathlib import Path
 from app.ingestion.ledger import Denied,DEFAULT_LIMITS,digest
 from app.ingestion.idox_adapter import IdoxListingContract
+from app.ingestion import owner_acceptance
 from .scope_binding import binding_for,scope_for
 from .oldham_allocation import capacity
 from .operational_publication import canonical
 from verification.discovery.idox_window import WindowConfig
 
 VERSION='OLDHAM_OWNER_WRAPPER_V1'
+VERSION_ACCEPTED='OLDHAM_OWNER_WRAPPER_V2'      # V1 plus an explicit, sealed `owner_acceptance` key (specification 037); V1 packages are validated exactly as before
 RISK='ACCEPT_POSSIBLE_PROVIDER_SCRAM_RETENTION_WORKER_EFFECT_APPLICATION_ONCE'
 QUALIFICATION=Path('docs/design/stage4-discovery/evidence/idox-family1-oldham.json')
 PACKAGES=('psycopg','SQLAlchemy','cryptography','requests','beautifulsoup4','psutil','PyYAML')
 FIELDS={'version','mode','release_id','revision','tree','dependencies','packages','scope','source','outer','qualification','qualification_binding','control_sha256','evidence_head','origin','expires_at','risk_acceptance'}
+FIELDS_ACCEPTED=FIELDS|{'owner_acceptance'}
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
@@ -45,7 +48,7 @@ def validate(path,expected_sha,*,disposable=False,now=None):
     raw=path.read_bytes()
     if sha(raw)!=expected_sha:raise Denied('OLDHAM_PACKAGE_HASH')
     p=json.loads(raw)
-    if not isinstance(p,dict) or set(p)!=FIELDS or p['version']!=VERSION:raise Denied('OLDHAM_PACKAGE_FIELDS')
+    if not isinstance(p,dict) or p.get('version') not in (VERSION,VERSION_ACCEPTED) or set(p)!=(FIELDS_ACCEPTED if p['version']==VERSION_ACCEPTED else FIELDS):raise Denied('OLDHAM_PACKAGE_FIELDS')
     if p['mode']!=('DISPOSABLE_TEST' if disposable else 'LIVE'):raise Denied('OLDHAM_TEST_MODE_BOUNDARY')
     if not isinstance(p['release_id'],str) or not re.fullmatch(r'oldham-owner-[a-z0-9-]{1,60}',p['release_id']):raise Denied('OLDHAM_RELEASE_ID')
     if p['revision']!=git('rev-parse','HEAD') or p['tree']!=git('rev-parse','HEAD^{tree}') or git('status','--porcelain'):raise Denied('OLDHAM_CHECKOUT_BINDING')
@@ -74,9 +77,13 @@ def validate(path,expected_sha,*,disposable=False,now=None):
     else:
         if qraw!=canonical(json.loads(QUALIFICATION.read_bytes())):raise Denied('OLDHAM_ACCEPTED_QUALIFICATION_REQUIRED')
         if any(k in source or k in outer for k in ('evidence_label','test_evidence','test_only')):raise Denied('OLDHAM_SYNTHETIC_NOT_LIVE')
-    expected=dict(qualification_sha256=sha(qraw),source_sha256=digest(source),outer_sha256=digest(outer),scope=scope,dependencies_sha256=digest(p['dependencies']))
+    accepted_key=None;expected=dict(qualification_sha256=sha(qraw),source_sha256=digest(source),outer_sha256=digest(outer),scope=scope,dependencies_sha256=digest(p['dependencies']))
+    if p['version']==VERSION_ACCEPTED:
+        accepted_key=p['owner_acceptance'];acc=owner_acceptance.require(accepted_key);d=acc.data      # a KEY STRING of the closed in-code registry; null, an object or an unknown key is refused
+        if (d['council'],d['semantics'],d['start'],d['end'])!=(scope['council'],scope['semantics'],scope['start'],scope['end']):raise Denied('OLDHAM_OWNER_ACCEPTANCE_SCOPE')
+        expected=dict(expected,owner_acceptance_sha256=acc.sha256)      # the owner-approved package seals the exact acceptance, beside the code hashes that already cover the registry module
     if p['qualification_binding']!=expected:raise Denied('OLDHAM_QUALIFICATION_CARRY_FORWARD_BINDING')
-    contract=IdoxListingContract('oldham-owner-complete-v1',WindowConfig('oldham','RECEIVED',date.fromisoformat(scope['start']),date.fromisoformat(scope['end']),max_transport_retries=0),sha(qraw))
+    contract=IdoxListingContract('oldham-owner-complete-v1',WindowConfig('oldham','RECEIVED',date.fromisoformat(scope['start']),date.fromisoformat(scope['end']),max_transport_retries=0),sha(qraw),owner_acceptance=accepted_key)
     projected=contract.project(source,outer,DEFAULT_LIMITS,source_bytes_limit=512*1024)
     capacity(len(projected['records']),0)
     # Known input/publication costs must leave the unchanged reporting reserve.

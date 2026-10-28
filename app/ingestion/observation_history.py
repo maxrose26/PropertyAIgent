@@ -106,6 +106,7 @@ def link_complete_capture(history,receipt,*,observed_at):
     if receipt.get('kind')!='LISTING_RECEIPT_V1':raise Denied('COMPLETE_RECEIPT_REQUIRED')
     _utc(observed_at)
     receipt=stored(receipt)
+    if receipt.get('completeness_basis') is not None:raise Denied('SOURCE_RECONCILED_RECEIPT_REQUIRED')      # an owner-accepted single page is not a source-reconciled complete capture: no presence/absence links or conflicts
     if (receipt.get('window') or {}).get('date_semantics','RECEIVED')!='RECEIVED':raise Denied('RECEIVED_SEMANTICS_REQUIRED')      # observations compare on the council's received date only
     lo,hi=receipt['interval'];present={r['reference'] for r in receipt['records']};receipt_digest=digest(receipt)
     out=copy.deepcopy(history);seen={(l['identity']['reference'],l['observation_evidence_digest'],l['complete_receipt_digest']) for l in history['links']}

@@ -15,10 +15,12 @@ CASES=[]
     ('export_boundary',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('export_overflow',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('deadline',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('application_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('ledger_ack_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('b2_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
-    ('publication_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('uncertain_commit',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN')])
-def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup):
+    ('publication_uncertain',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),('uncertain_commit',2,1,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('accepted_zero',5,0,'COMPLETED','CLOSED'),('accepted_success',3,1,'COMPLETED','CLOSED')])      # owner-accepted single page (specification 037): the V2 package, a TEST-ONLY acceptance installed by the disposable backend
+def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup,monkeypatch):
     settings() # refuses anything except the existing fixed loopback fixture
-    path,sha=packet(tmp_path/'input',records=records,nominees=nominees,tag=scenario)
+    accepted=scenario.startswith('accepted')
+    path,sha=packet(tmp_path/'input',records=records,nominees=nominees,tag=scenario,single_page=accepted,accept=monkeypatch if accepted else None)
     home=tmp_path/'home';home.mkdir()
     env={**os.environ,'HOME':str(home),'DATABASE_URL':'sqlite:///:memory:','PYTHONDONTWRITEBYTECODE':'1','OLDHAM_WRAPPER_SCENARIO':scenario}
     command=[sys.executable,'-m','verification.ingestion_storage.oldham_owner_once','--package',str(path),'--package-sha256',sha,'--disposable-test']
@@ -34,7 +36,9 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
     assert result['exported_bytes']==result['persisted_evidence_bytes']+result['terminal_json_bytes']+result.get('attempted_publication_bytes',0)
     assert result['accounting']['github_requests']<=40
     assert result['accounting']['total_command_seconds']>=result['accounting']['preflight_seconds']>=0
-    if scenario=='success':assert len(result['nominee_results'])==1 and result['nominee_results'][0]['application_id'] is not None
+    if scenario in ('success','accepted_success'):assert len(result['nominee_results'])==1 and result['nominee_results'][0]['application_id'] is not None
+    if accepted:
+        assert json.loads(path.read_bytes())['version']=='OLDHAM_OWNER_WRAPPER_V2' and result['source_listing_requests']==0
     admin=result['accounting']['administration'];assert admin['commands']<=240 and admin['connections']<=13 and admin['returned_data_value_bytes']<=1024**2
     runtime=result['accounting']['runtime'];assert runtime['commands']<=1040 and runtime['connections']<=40 and runtime['returned_bytes']<=4*1024**2
     if scenario in ('export_boundary','export_overflow'):
@@ -53,7 +57,7 @@ def test_actual_owner_command(tmp_path,scenario,records,nominees,status,cleanup)
         assert all(x['source_outcome']=='PROJECTED_OBSERVATION' and len(x['target_sha256'])==64 for x in source['receipts'])
         assert all(x['worker']['requests']==1 and x['worker']['received_body_bytes']>0 and x['worker']['cleanup_state']=='CLOSED' for x in source['receipts'])
     if scenario=='five':assert result['detail_attempts']==5 and len(result['nominee_results'])==5 and all(n['application_id'] is not None for n in result['nominee_results'])
-    if scenario in ('zero','zero19'):
+    if scenario in ('zero','zero19','accepted_zero'):
         assert result['outcome']=='SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' and result['detail_attempts']==0
         assert result['accounting']['source']['status']=='NOT_STARTED' and result['accounting']['source']['attempts']==0
         assert result['accounting']['source']['totals']['requests']==0

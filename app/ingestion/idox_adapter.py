@@ -8,6 +8,7 @@ from datetime import datetime,timezone
 import re
 from .ledger import Denied,bounded,digest
 from .coordinator import validate_outer
+from . import owner_acceptance
 from app.pipeline.discovery_contract import WindowEvidence,Completeness,Literal
 from app.scrapers.discovery_idox import source_url
 
@@ -40,10 +41,14 @@ class IdoxListingContract:
     config: object
     qualification_sha256: str
     partial_observation: bool = False      # default OFF: a source without an explicit total keeps stopping exactly as before
+    owner_acceptance: str | None = None      # default OFF: a KEY STRING naming a closed in-code registry entry (specification 037); never an object, file or hash
 
     def __post_init__(self):
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256) or self.config.max_transport_retries!=0:
             raise Denied('EXACT_IDOX_QUALIFICATION_AND_ZERO_RETRY_REQUIRED')
+        if self.owner_acceptance is not None:
+            d=owner_acceptance.require(self.owner_acceptance).data;c=self.config
+            if (c.council,c.semantics,c.start.isoformat(),c.end.isoformat())!=(d['council'],d['semantics'],d['start'],d['end']):raise Denied('OWNER_ACCEPTANCE_SCOPE')
 
     def scope(self):
         """The exact discovery scope this contract captures (the ledger task subject)."""
@@ -51,11 +56,19 @@ class IdoxListingContract:
         return {'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}
 
     def admission_window(self,receipt,council_code):
-        """The window proof shared admission re-derives from the exact retained receipt (logic moved unchanged from the controller)."""
-        c=self.config;r=receipt['resources']
+        """The window proof shared admission re-derives from the exact retained receipt (logic moved unchanged from the controller). A receipt that carries an owner-acceptance basis is re-validated against THIS contract's own
+        registry entry; a receipt without one is derived exactly as before, from its source terminal."""
+        c=self.config;r=receipt['resources'];extra={}
+        basis=receipt.get('completeness_basis')
+        if basis is not None or 'owner_acceptance' in receipt:
+            if self.owner_acceptance is None or basis!=owner_acceptance.BASIS:raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')
+            acc=owner_acceptance.require(self.owner_acceptance);s=acc.data['source']
+            if (receipt.get('owner_acceptance')!=acc.binding() or receipt['source_sha256']!=s['audit_sha256'] or len(receipt['records'])!=s['record_count']
+                or receipt['segments']!=s['pages']):raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')
+            extra=dict(completeness_basis=owner_acceptance.BASIS,owner_acceptance_sha256=acc.sha256)
         return WindowEvidence(council_code,'manual-ingestion-controller',c.start,c.end,c.start,c.end,c.semantics,
             receipt['contract'],receipt['source_sha256'],receipt['segments'][-1]['terminal'],len(receipt['segments']),len(receipt['records']),
-            r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'])
+            r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'],**extra)
 
     def record_body_sha256(self,record):
         return record['provenance']['body_sha256']
@@ -69,10 +82,12 @@ class IdoxListingContract:
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
         validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
+        # Owner acceptance (specification 037) is consulted ONLY for a TOTAL_UNKNOWN source and ONLY by a contract constructed with a registry key; it must be the exact bound audit. A source with a count signal uses the normal rule.
+        accepted=owner_acceptance.require(self.owner_acceptance).verify_source(source,c) if (self.owner_acceptance is not None and source.get('enumeration_evidence')=='TOTAL_UNKNOWN') else None
         if (source.get('council')!=c.council or source.get('date_semantics')!=c.semantics
             or source.get('requested_interval')!=interval or source.get('applied_interval')!=interval
             or source.get('failure') is not None or source.get('capped') is not False
-            or source.get('enumeration_evidence')!='COUNT_RECONCILED' or source.get('cleanup') not in {'BOUNDARY_CLOSED','SESSION_BOUNDARY_CLOSED'}):
+            or (source.get('enumeration_evidence')!='COUNT_RECONCILED' and accepted is None) or source.get('cleanup') not in {'BOUNDARY_CLOSED','SESSION_BOUNDARY_CLOSED'}):
             raise Denied('IDOX_WINDOW_BINDING_OR_COMPLETENESS')
         pages=source['pages'];records=source['records'];r=source['resource']
         if not 1<=len(pages)<=limits['pages'] or len(records)>limits['rows'] or r.get('budget_exhaustion') is not False:
@@ -99,23 +114,25 @@ class IdoxListingContract:
             if p['ordinal']!=i or not re.fullmatch('[a-f0-9]{64}',p['body_sha256']):raise Denied('IDOX_SEGMENT')
             if zero:
                 if len(pages)!=1 or p['total']!=0 or p['rows']!=0 or p['terminal']!='EXPLICIT_ZERO_RESULTS':raise Denied('IDOX_ZERO')
-            elif p['first']!=seen+1 or p['last']-p['first']+1!=p['rows'] or p['total']!=len(records):raise Denied('IDOX_COUNTS')
+            elif accepted is None and (p['first']!=seen+1 or p['last']-p['first']+1!=p['rows'] or p['total']!=len(records)):raise Denied('IDOX_COUNTS')
             seen+=p['rows']
-        if seen!=len(records) or source['unique_references']!=len(records) or (not zero and pages[-1]['terminal']!='EXPLICIT_LAST_EQUALS_TOTAL'):raise Denied('IDOX_TERMINAL')
+        if seen!=len(records) or source['unique_references']!=len(records) or (not zero and accepted is None and pages[-1]['terminal']!='EXPLICIT_LAST_EQUALS_TOTAL'):raise Denied('IDOX_TERMINAL')
         projected=[];keys=set();refs=set()
         for row in records:
             url,key,fields=self._row(row,keys,refs)
-            segment=next(p for p in pages if p['first']<=len(projected)+1<=p['last'])
+            segment=pages[0] if accepted is not None else next(p for p in pages if p['first']<=len(projected)+1<=p['last'])
             projected.append(dict(reference=row['reference'],source_record_id=key,source_url=url,fields=fields,
                 provenance=dict(parser='app.scrapers.discovery_idox.parse_page',body_sha256=segment['body_sha256'],row_ordinal=len(projected)+1),
                 field_capture_scope=['reference',*fields]))
         window=WindowEvidence(c.council,'coordinator-retained',c.start,c.end,c.start,c.end,c.semantics,
-            self.name,source['applied_evidence_sha256'],pages[-1]['terminal'],len(pages),len(projected),r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'],explicit_zero=zero)
+            self.name,source['applied_evidence_sha256'],pages[-1]['terminal'],len(pages),len(projected),r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'],explicit_zero=zero,
+            **(dict(completeness_basis=owner_acceptance.BASIS,owner_acceptance_sha256=accepted.sha256) if accepted is not None else {}))
         if window.outcome!=Completeness.COMPLETE:raise Denied('IDOX_QUALIFIED_WINDOW_REQUIRED')
         receipt=dict(kind='LISTING_RECEIPT_V1',contract=self.name,council=c.council,interval=interval,records=projected,
             segments=pages,source_sha256=digest(source),qualification_sha256=self.qualification_sha256,
             applied_interval=interval,cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,
-            resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.__dict__)
+            resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.receipt_dict())
+        if accepted is not None:receipt.update(completeness_basis=owner_acceptance.BASIS,owner_acceptance=accepted.binding())      # separate evidence: the segments above keep the source's own pagination facts (terminal is null)
         if c.semantics!='RECEIVED':receipt['date_semantics']=c.semantics      # historical receipts carry no date basis and their digests are pinned, so only a non-default basis (Stockport VALIDATED) is named here; retained_capture always names it
         return receipt
 

@@ -28,6 +28,7 @@ class NomineeSet:
     retained:tuple      # (council, reference, outcome) for every identity-ineligible record: kept as evidence, nominated for nothing
     conflicts:tuple     # same reference observed with different content: withheld
     sha256:str
+    completeness_bases:tuple=()      # (council, capture_sha256, basis, owner_acceptance_sha256) for every receipt whose completeness is OWNER-accepted rather than source-terminal; empty means every receipt is source-terminal
 
 
 def derive_nominees(receipts,rule,*,allow_test_evidence=False):
@@ -54,4 +55,6 @@ def derive_nominees(receipts,rule,*,allow_test_evidence=False):
             nominees.append(Nominee(council,reference,r['source_url'],r['source_record_id'],digest(r),assessment_identity(r,rule)[3],capture,outcome))
         else:retained.append((council,reference,outcome))
     sealed=dict(configuration=digest(rule.config()),nominees=[asdict(n) for n in nominees],retained=[list(x) for x in retained],conflicts=conflicts)
-    return NomineeSet(tuple(nominees),tuple(retained),tuple(conflicts),digest(sealed))
+    bases=tuple(sorted({(rc['council'],digest(rc),rc['completeness_basis'],rc['owner_acceptance']['sha256']) for rc in receipts if rc.get('completeness_basis')}))
+    if bases:sealed['completeness_bases']=[list(b) for b in bases]      # named in the seal only when non-default, so every historical nominee-set digest is unchanged
+    return NomineeSet(tuple(nominees),tuple(retained),tuple(conflicts),digest(sealed),bases)

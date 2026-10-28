@@ -101,7 +101,7 @@ def _idox_form(semantics, start='', end=''):
             '<input type="submit" name="action" value="Search"/>\n</form></body></html>').encode()
 
 
-def _idox_page(council, entries, start, end, *, first=1, total=None):
+def _idox_page(council, entries, start, end, *, first=1, total=None, pager=True):
     when = mid(start, end)
     rows = ''.join(
         f'<li class="searchresult"><a class="summaryLink" href="applicationDetails.do?keyVal={idox_key(council, e)}&amp;activeTab=summary">{escape(e["proposal"])}</a>'
@@ -110,8 +110,9 @@ def _idox_page(council, entries, start, end, *, first=1, total=None):
     n = len(entries);total=n if total is None else total;last=first+n-1
     nxt=f'<a class="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={(first-1)//10+2}">Next</a>' if last<total else ''
     sort = SORT.replace(b'/online-applications/', (IDOX_PREFIX[council] + '/').encode())
+    pager_html = f'<p class="pager">Showing {first}-{last} of {total}{nxt}</p>' if pager else ''      # a single page shows none
     page = (f'<html><h1>Planning – Results for Application Search</h1><select id="resultsPerPage"><option value="10" selected>10</option></select>'
-            f'<p class="pager">Showing {first}-{last} of {total}{nxt}</p><ul id="searchresults">{rows}</ul></html>').encode()
+            f'{pager_html}<ul id="searchresults">{rows}</ul></html>').encode()
     return page.replace(b'</html>', sort + b'</html>')
 
 
@@ -119,18 +120,19 @@ def idox_config(council, start, end):
     return WindowConfig(council=council, semantics=SEMANTICS[council], start=start, end=end, max_transport_retries=0)
 
 
-def idox_audit(council, entries, start, end):
-    """The PRODUCTION Idox reader run over synthetic pages; returns the audit it produced."""
+def idox_audit(council, entries, start, end, *, single_page_no_pager=False):
+    """The PRODUCTION Idox reader run over synthetic pages; returns the audit it produced. `single_page_no_pager` reproduces the Oldham single-page SHAPE (one page, no pager, no total): the real reader then reports TOTAL_UNKNOWN."""
     cfg = idox_config(council, start, end)
     echo = _idox_form(cfg.semantics, start.strftime('%d/%m/%Y'), end.strftime('%d/%m/%Y'))
-    pages=[_idox_page(council,entries[i:i+10],start,end,first=i+1,total=len(entries)) for i in range(0,len(entries),10)]
+    assert not single_page_no_pager or len(entries) <= 10
+    pages=[_idox_page(council,entries[i:i+10],start,end,first=i+1,total=len(entries),pager=not single_page_no_pager) for i in range(0,len(entries),10)]
     page=pages[0]
     bodies = iter([_idox_form(cfg.semantics), page, page, *pages[1:], echo])
     return run(lambda *args, **kwargs: _Response(next(bodies)), cfg)
 
 
-def idox_contract(council, start, end, *, name=None):
-    return IdoxListingContract(name or f'e2e-idox-{council}', idox_config(council, start, end), TEST_QUALIFICATION)
+def idox_contract(council, start, end, *, name=None, owner_acceptance=None):
+    return IdoxListingContract(name or f'e2e-idox-{council}', idox_config(council, start, end), TEST_QUALIFICATION, owner_acceptance=owner_acceptance)
 
 
 def idox_detail_target(council, record, case='e2e_idox_detail'):
@@ -284,3 +286,28 @@ def arcus_slot_supervised(tmp_path, audit, scope, *, mode='ok', peak_text=None, 
     if getattr(runner, 'last_outer', None) is not None:      # exactly the line `Release.execute` adds
         receipt['outer_supervisor'] = runner.last_outer
     return source, outer_from_slot_receipt(receipt, source), receipt
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------- TEST-ONLY owner acceptance
+TEST_ACCEPTANCE_KEY = 'TEST_ONLY_OWNER_ACCEPTANCE_V1'      # explicitly labelled: never the production registry entry, never reachable outside a test that installs it
+
+
+def make_test_acceptance(audit, council, start, end, **override):
+    """A TEST-ONLY acceptance entry for a synthetic single-page audit, built from the audit itself (so it matches exactly) with any one expected field overridable to isolate a mismatch. It has the production entry's
+    structure but is installed only by the test that asks for it; the closed production registry is never touched."""
+    import json
+    from app.ingestion.ledger import digest
+    from app.ingestion.owner_acceptance import OwnerAcceptance, record_set_digest
+    source = dict(audit_sha256=digest(audit), enumeration_evidence=audit['enumeration_evidence'], applied_evidence_sha256=audit['applied_evidence_sha256'], pages=audit['pages'], record_count=len(audit['records']),
+                  record_set_sha256=record_set_digest(audit['records']))
+    source.update({k: v for k, v in override.items() if k in source})
+    entry = dict(kind='TEST_ONLY_OWNER_ACCEPTED_SINGLE_PAGE_WINDOW', key=TEST_ACCEPTANCE_KEY, basis='OWNER_ACCEPTED_SINGLE_PAGE', council=override.get('council', council), semantics=audit['date_semantics'],
+                 start=override.get('start', start.isoformat()), end=override.get('end', end.isoformat()), source=source)
+    return OwnerAcceptance(json.dumps(entry, sort_keys=True, separators=(',', ':')))
+
+
+def install_test_acceptance(monkeypatch, acceptance):
+    from types import MappingProxyType
+    from app.ingestion import owner_acceptance
+    monkeypatch.setattr(owner_acceptance, 'ACCEPTANCES', MappingProxyType({acceptance.key: acceptance}))
+    return acceptance
