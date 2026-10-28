@@ -64,7 +64,7 @@ class IdoxListingContract:
             if self.owner_acceptance is None or basis!=owner_acceptance.BASIS:raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')
             acc=owner_acceptance.require(self.owner_acceptance);s=acc.data['source']
             if (receipt.get('owner_acceptance')!=acc.binding() or receipt['source_sha256']!=s['audit_sha256'] or len(receipt['records'])!=s['record_count']
-                or [x.get('terminal') for x in receipt['segments']]!=[None]):raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')
+                or receipt['segments']!=s['pages']):raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')
             extra=dict(completeness_basis=owner_acceptance.BASIS,owner_acceptance_sha256=acc.sha256)
         return WindowEvidence(council_code,'manual-ingestion-controller',c.start,c.end,c.start,c.end,c.semantics,
             receipt['contract'],receipt['source_sha256'],receipt['segments'][-1]['terminal'],len(receipt['segments']),len(receipt['records']),
@@ -131,7 +131,7 @@ class IdoxListingContract:
         receipt=dict(kind='LISTING_RECEIPT_V1',contract=self.name,council=c.council,interval=interval,records=projected,
             segments=pages,source_sha256=digest(source),qualification_sha256=self.qualification_sha256,
             applied_interval=interval,cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,
-            resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.__dict__)
+            resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.receipt_dict())
         if accepted is not None:receipt.update(completeness_basis=owner_acceptance.BASIS,owner_acceptance=accepted.binding())      # separate evidence: the segments above keep the source's own pagination facts (terminal is null)
         if c.semantics!='RECEIVED':receipt['date_semantics']=c.semantics      # historical receipts carry no date basis and their digests are pinned, so only a non-default basis (Stockport VALIDATED) is named here; retained_capture always names it
         return receipt

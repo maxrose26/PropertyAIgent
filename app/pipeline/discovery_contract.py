@@ -161,6 +161,12 @@ class WindowEvidence:
                 or not (isinstance(self.owner_acceptance_sha256, str) and len(self.owner_acceptance_sha256) == 64 and all(c in '0123456789abcdef' for c in self.owner_acceptance_sha256)))):
             raise ValueError('owner acceptance basis')
 
+    def receipt_dict(self):
+        """The window as receipts carry it. The two basis fields appear only for a non-default basis, so every source-reconciled receipt (and its pinned digest) is byte-identical to what it was before owner acceptance existed."""
+        d=dict(self.__dict__)
+        if d.get('completeness_basis')=='SOURCE_TERMINAL':d.pop('completeness_basis');d.pop('owner_acceptance_sha256',None)
+        return d
+
     @property
     def outcome(self):
         if self.failure:

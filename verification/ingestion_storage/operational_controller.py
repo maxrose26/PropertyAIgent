@@ -11,6 +11,7 @@ from sqlalchemy.pool import QueuePool
 from app.ingestion.ledger import Denied,digest,bounded,Ledger
 from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.listing_screening import screen_row,identity_admission_eligible,assessment_identity,qualifier_output_of,RULE_V1
+from app.ingestion import owner_acceptance
 
 
 def runtime_principal(url, ssl, route=None):
@@ -332,6 +333,9 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
     screens=[dict(reference=r['reference'],**rule.screen(r)) for r in receipt['records']]
     matches=[r for r in receipt['records'] if r['reference']==binding.reference]
     owner_basis=receipt.get('completeness_basis')      # an owner-accepted single page is never reported as a source-complete enumeration
+    if owner_basis is not None:
+        accepted=getattr(contract,'owner_acceptance',None)
+        if accepted is None or receipt.get('owner_acceptance')!=owner_acceptance.require(accepted).binding():raise Denied('OWNER_ACCEPTANCE_RECEIPT_BINDING')      # the label is only ever taken from a receipt this contract's own registry entry vouches for
     result=dict(enumeration='COMPLETE_METADATA_RETAINED' if not owner_basis else owner_basis+'_METADATA_RETAINED',screening=screens,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',other_candidates_retrieved=0,
                 **(dict(completeness_basis=owner_basis,owner_acceptance=receipt['owner_acceptance']) if owner_basis else {}))
     if not matches:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_NOMINEE_NOT_RETURNED')

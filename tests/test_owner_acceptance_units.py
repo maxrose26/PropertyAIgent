@@ -323,3 +323,32 @@ def test_the_owner_accepted_set_digest_differs_from_a_source_terminal_set_with_t
     for k in ('completeness_basis', 'owner_acceptance'):
         stripped.pop(k)
     assert derive_nominees([receipt], RULE, allow_test_evidence=True).sha256 != derive_nominees([stripped], RULE, allow_test_evidence=True).sha256
+
+
+# ------------------------------------------------------------------------------------------------------------------- review follow-ups
+def test_a_default_receipts_window_carries_no_basis_fields_so_its_digest_is_what_it_was(monkeypatch):
+    counted = idox_audit('oldham', [entry('E2E/%d/26' % i, SCHEME) for i in range(1, 13)], START, END)
+    window = project(idox_contract('oldham', START, END), counted)['window']
+    assert 'completeness_basis' not in window and 'owner_acceptance_sha256' not in window
+    _, contract, source = accepted(monkeypatch)
+    owner_window = project(contract, source)['window']
+    assert owner_window['completeness_basis'] == BASIS_NAME and len(owner_window['owner_acceptance_sha256']) == 64
+
+
+BASIS_NAME = 'OWNER_ACCEPTED_SINGLE_PAGE'
+
+
+def test_the_observation_history_refuses_to_treat_an_owner_accepted_receipt_as_a_complete_capture(monkeypatch):
+    from app.ingestion.observation_history import link_complete_capture
+    _, contract, source = accepted(monkeypatch)
+    receipt = archived(project(contract, source))
+    with pytest.raises(Denied, match='SOURCE_RECONCILED_RECEIPT_REQUIRED'):
+        link_complete_capture(dict(applications={}, links=[], conflicts=[]), receipt, observed_at='2026-11-16T00:00:00+00:00')
+
+
+def test_a_receipt_whose_segments_differ_from_the_entrys_pages_is_refused_at_admission(monkeypatch):
+    _, contract, source = accepted(monkeypatch)
+    receipt = project(contract, source)
+    receipt['segments'][0]['rows'] = 99
+    with pytest.raises(Denied, match='OWNER_ACCEPTANCE_RECEIPT_BINDING'):
+        contract.admission_window(receipt, 'oldham')

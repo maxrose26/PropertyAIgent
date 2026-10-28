@@ -70,7 +70,7 @@ class ArcusListingContract:
             date_semantics='VALIDATED')
         window=self.admission_window(receipt,c.council)
         if window.outcome!=Completeness.COMPLETE:raise Denied('ARCUS_QUALIFIED_WINDOW_REQUIRED')
-        receipt['window']=window.__dict__
+        receipt['window']=window.receipt_dict()
         return receipt
 
     def admission_window(self,receipt,council_code):
