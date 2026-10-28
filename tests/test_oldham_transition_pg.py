@@ -15,6 +15,8 @@ RESULTS=[]
     ('cs_retire_ack',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('cs_install_ack',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('cs_install_readback',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('cs_self_grant',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('cs_missing_create_grant',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
 ])
 def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanup):
     settings()
@@ -46,11 +48,14 @@ def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanu
         assert all(not any(e['payload']['flags']) for e in events if e['event']=='oldham_install_capabilities')
         assert any(e['event']=='oldham_two_login_teardown' and e['payload']['cleanup']=='CLOSED' for e in events)
     else:
-        assert result['failure']['stage']=='RETIREMENT_AND_INSTALLATION'
+        assert result['failure']['stage']==('TRANSITION_OWNER_PRECONDITIONS' if scenario in ('cs_self_grant','cs_missing_create_grant') else 'RETIREMENT_AND_INSTALLATION')
         assert 'oldham_install_committed' not in audit
         assert not any(e['event']=='oldham_two_login_activation' for e in events)
         # No compensating rollback, issuance or replay after an uncertain effect.
         assert not any(e['event']=='oldham_install_committed' for e in events)
+        if scenario in ('cs_self_grant','cs_missing_create_grant'):
+            assert not any(e['event']=='admin_effect_intent' for e in events)
+            assert not any(e['event']=='oldham_standing_disabled' for e in events)
 
 
 def teardown_module():

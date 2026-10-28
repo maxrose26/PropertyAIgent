@@ -75,10 +75,20 @@ class Transition:
         if flags!=(False,False,False,False,False):raise Uncertain('OLDHAM_INSTALL_CAPABILITY_READBACK')
 
     def check_before_retirement(self,c):
+        self.op.stage='TRANSITION_OWNER_PRECONDITIONS'
         identity=self.o.q(c,"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=current_user")[0]
         self.o.emit('oldham_transition_owner_identity',dict(identity=identity[0],session_user=identity[1],superuser=identity[2],createrole=identity[3],createdb=identity[4],bypassrls=identity[5]))
         if tuple(identity)!=(self.o.identity,self.o.identity,False,True,True,True):raise Denied('OLDHAM_TRANSITION_OWNER_IDENTITY')
         self.capabilities_absent(c)
+        # Reuse the accepted migration preflight contract BEFORE retirement.
+        # Identity flags alone do not establish grant options or ledger ownership.
+        flags=self.o.q(c,"SELECT has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION'),has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION'),has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION'),EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND admin_option),bool_and(relowner='ingestion_storage_owner'::regrole AND relrowsecurity AND relforcerowsecurity) FROM pg_class WHERE oid IN ('public.ingestion_work_items'::regclass,'public.ingestion_work_attempts'::regclass)")[0]
+        self.o.emit('oldham_transition_owner_permissions',dict(schema_usage_grant_option=flags[0],schema_create_grant_option=flags[1],database_connect_grant_option=flags[2],storage_owner_admin_option=flags[3],ledger_owner_forced_rls=flags[4]))
+        if flags!=(True,True,True,True,True):raise Denied('OLDHAM_TRANSITION_INSTALL_PERMISSIONS')
+        existing=self.o.q(c,"SELECT EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole AND grantor=current_user::regrole)")[0][0]
+        self.o.emit('oldham_transition_self_grant',dict(preexisting_self_grant=existing))
+        if existing is not False:raise Denied('OLDHAM_TRANSITION_PREEXISTING_SELF_GRANT')
+        self.op.stage='RETIREMENT_AND_INSTALLATION'
         self.o.q(c,'BEGIN',effect=True)
         try:
             self.o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
