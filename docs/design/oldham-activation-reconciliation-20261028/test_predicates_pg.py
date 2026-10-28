@@ -83,12 +83,12 @@ def test_native_baseline_and_all_fixed_statements_parse(world):
 def test_native_predicate_matches_exact_failed_run_gate(world,code,setup,cleanup):
     b=world['boot']
     try:
-        for s in split_sql(setup):b.execute(s)
+        for s in split_sql(setup+';'):b.execute(s)
         rows=selected(b);assert any(r['code']==code and r['failing'] is True for r in rows)
         first=next(r['code'] for r in rows if r['failing'])
         assert gate_code(b)==first
     finally:
-        for s in split_sql(cleanup):b.execute(s)
+        for s in split_sql(cleanup+';'):b.execute(s)
     assert b.info.transaction_status==psycopg.pq.TransactionStatus.IDLE
 
 

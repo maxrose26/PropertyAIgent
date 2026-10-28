@@ -16,7 +16,7 @@ AUTHORITY='AUTHORISE_OLDHAM_ACTIVATION_READONLY_RECONCILIATION_ONCE_20261028'
 MODE='OLDHAM_ACTIVATION_READONLY_RECONCILIATION'
 STATUS='OWNER_APPROVED_OLDHAM_ACTIVATION_READONLY_RECONCILIATION_ONCE'
 Q=json.loads((ROOT/'queries.json').read_bytes())
-EXPECTED_QUERY_SHA='4dc1b5947ea9f26187d66663d4a00a84dbd6d96dd1ab0e224baf26ceefd76366'
+EXPECTED_QUERY_SHA='0815ac4e65b2e1a56aad4eedf7244a2753c48b9eb11969b8e60106a528b86357'
 sha=lambda b:hashlib.sha256(b).hexdigest()
 assert sha((ROOT/'queries.json').read_bytes())==EXPECTED_QUERY_SHA
 PRIMARY=['begin','identity','roles','memberships','sessions','functions','gate_predicates','gate_offenders','control','ledger','barriers','rollback']
@@ -83,12 +83,12 @@ class Reconciliation(old.InspectionRunner):
         funcs=s('functions',[old.function_names()])
         if len(funcs)>16:raise ProbeDenied('RESPONSE_BOUND')
         self.inspection['functions']=old.classify_functions([tuple(r[:6]) for r in funcs])
-        self.inspection['function_identities']=[dict(name=r[0],body_sha256=r[1],owner_matches=r[2]=='ingestion_storage_owner',search_path_matches=r[3]==['search_path=pg_catalog'],security_definer=r[4],signature_sha256=sha(r[5].encode()),worker_execute=r[6],effect_execute=r[7]) for r in funcs]
+        self.inspection['function_identities']=[dict(name=r[0],body_sha256=r[1],owner_matches=r[2]=='ingestion_storage_owner',search_path_matches=r[3]==['search_path=pg_catalog'],security_definer=r[4],signature_sha256=sha(r[5].encode()),worker_execute=r[6],effect_execute=r[7],language=r[8] if r[8] in ('sql','plpgsql') else 'OTHER_LANGUAGE',volatility=r[9] if r[9] in ('i','s','v') else 'OTHER_VOLATILITY') for r in funcs]
         self.inspection['gate_predicates']=s('gate_predicates')[0][0]
         self.inspection['gate_offenders']=s('gate_offenders')[0][0]
         if len(canonical(self.inspection))>16000:raise ProbeDenied('RESPONSE_BOUND')
         expected=old.expected_states()['oldham'].get('ingestion_acceptance_control')
-        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] for r in funcs)
+        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] and r[4] is True and r[8]=='sql' and r[9]=='s' for r in funcs)
         self.inspection['control']={'status':'UNKNOWN_FUNCTION_NOT_VERIFIED'}
         if safe and ident[13] is True:self.inspection['control']=old.project_control(s('control')[0][0])
         access=ident[18] or {}

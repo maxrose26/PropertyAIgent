@@ -39,7 +39,7 @@ class Memory:
 def world(tmp_path,monkeypatch):
     monkeypatch.setattr(d,'originals',lambda:[dict(file='final-result.json',exists=True,sha256='0'*64,mode=420)])
     monkeypatch.setattr(base,'early_closure',lambda baseline,proof,progress:dict(process=dict(status='CLOSED',live_child_count=0,new_socket_count=0,memory={'proof':'SYNTHETIC_NOT_KERNEL'})))
-    funcs=[(n,h,'ingestion_storage_owner',['search_path=pg_catalog'],True,d.old.OLDHAM_HELPER_ARGUMENTS if n=='ingestion_oldham_allowed' else '',True,n=='ingestion_worker_step') for n,h in d.old.expected_states()['oldham'].items()]
+    funcs=[(n,h,'ingestion_storage_owner',['search_path=pg_catalog'],True,d.old.OLDHAM_HELPER_ARGUMENTS if n=='ingestion_oldham_allowed' else '',True,n=='ingestion_worker_step','sql' if n=='ingestion_acceptance_control' else 'plpgsql','s') for n,h in d.old.expected_states()['oldham'].items()]
     roles=[(n,False,False,None,1,False,False,False,False,False) for n in d.old.LOGINS[:2]]
     codes=json.loads((ROOT/'gate-mapping.json').read_bytes())['codes']
     predicates=[dict(ordinal=i,login=role,code=code,inputs_present=True,failing=False) for i,code in enumerate(codes) for role in (d.old.LOGINS[:2] if i<7 else ['GLOBAL'])]
