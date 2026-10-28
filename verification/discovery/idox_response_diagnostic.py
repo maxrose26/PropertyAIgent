@@ -344,7 +344,7 @@ def containment(proc='/proc/self/cgroup', sys_root='/sys/fs/cgroup'):
 
 
 def _state_root():
-    STATE_ROOT.mkdir(mode=0o700, exist_ok=True)
+    STATE_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     st = STATE_ROOT.lstat()
     if STATE_ROOT.is_symlink() or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid() or stat.S_IMODE(st.st_mode) != 0o700:
         raise ValueError('STATE_ROOT')

@@ -31,6 +31,11 @@ def no_credentials(monkeypatch):
             monkeypatch.delenv(key, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def isolated_state_root(tmp_path, monkeypatch):
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'default-state')      # no test may create anything under the real home
+
+
 @pytest.fixture
 def private(tmp_path):
     p = tmp_path / 'private'
@@ -327,6 +332,7 @@ def mkclaim(tmp_path, monkeypatch, *, extra=None):
 
 
 def test_the_worker_cannot_make_a_request_without_the_parents_validated_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(d, 'STATE_ROOT', tmp_path / 'state0')      # tests never touch the real home
     monkeypatch.setattr(d, 'live', lambda *a, **k: (_ for _ in ()).throw(AssertionError('a request would have been made')))
     bare = tmp_path / 'bare'
     bare.mkdir(mode=0o700)
