@@ -51,13 +51,18 @@ class Transition:
 
     def barriers(self,c):
         ctl=self.o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
-        stop_identity(ctl)
-        if digest(ctl)!=self.op.p['control_sha256']:raise Denied('OLDHAM_INSTALL_CONTROL_CHANGED')
+        sid=stop_identity(ctl)
+        if sid!=self.op.p['control_stop_sha256']:raise Denied('OLDHAM_INSTALL_STOP_CHANGED')
+        if self.o.require_control_sha256 is not None and digest(ctl)!=self.o.require_control_sha256:raise Denied('OLDHAM_INSTALL_CONTROL_CHANGED')
         counts=self.o.q(c,"SELECT count(*) FILTER (WHERE state='PERSISTENCE_UNCERTAIN'),count(*) FILTER (WHERE phase='WRITE_INTENT') FROM public.ingestion_work_items")[0]
         active=any(g.get('expires_at',0)>__import__('time').time() for g in ctl.get('grants',{}).values())
         deferred=ctl.get('council_deferred_until',{}).get('oldham',0)>__import__('time').time()
         self.o.emit('oldham_install_barriers',dict(persistence_uncertain=counts[0],write_intents=counts[1],active_grants=active,oldham_deferred=deferred,control_sha256=digest(ctl)))
         if counts!=(0,0) or active or deferred:raise Denied('OLDHAM_INSTALL_BARRIER')
+        # The capability-free inspection cannot expose the full control digest.
+        # Bind its first actual observation here, then require it unchanged at
+        # installation and every existing issuance/preflight boundary.
+        self.o.require_control_sha256=digest(ctl)
 
     def capabilities_absent(self,c):
         flags=self.o.q(c,READBACK_SQL['capability_absent'])[0]
@@ -65,6 +70,10 @@ class Transition:
         if flags!=(False,False,False,False,False):raise Uncertain('OLDHAM_INSTALL_CAPABILITY_READBACK')
 
     def check_before_retirement(self,c):
+        identity=self.o.q(c,"SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=current_user")[0]
+        self.o.emit('oldham_transition_owner_identity',dict(identity=identity[0],session_user=identity[1],superuser=identity[2],createrole=identity[3],createdb=identity[4],bypassrls=identity[5]))
+        if tuple(identity)!=(self.o.identity,self.o.identity,False,True,True,True):raise Denied('OLDHAM_TRANSITION_OWNER_IDENTITY')
+        self.capabilities_absent(c)
         self.o.q(c,'BEGIN',effect=True)
         try:
             self.o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
@@ -123,6 +132,9 @@ class Transition:
                         self.predecessor(c);self.barriers(c)
                     self.o.q(c,statement,effect=True)
                 verify_inventory(self.o,c,capture_screening_only=True)
+                helper=self.o.q(c,"SELECT prosecdef,provolatile,pg_get_function_identity_arguments(oid) FROM pg_proc WHERE oid='public.ingestion_oldham_allowed(jsonb,text,text,jsonb)'::regprocedure")[0]
+                self.o.emit('oldham_install_helper_readback',dict(security_definer=helper[0],volatility=helper[1],arguments=helper[2]))
+                if helper!=(True,'s','ctl jsonb, authority text, work_key text, subject jsonb'):raise Uncertain('OLDHAM_INSTALL_HELPER_READBACK')
                 self.capabilities_absent(c)
                 self.installed=True
                 self.o.emit('oldham_install_committed',dict(installation_sha256=hashlib.sha256(install.encode()).hexdigest(),rollback_executed=False))
@@ -132,5 +144,5 @@ class Transition:
             self.life.state='UNCERTAIN';raise
 
     def run(self):
-        self.retire();self.install()
+        with self.o.admin_phase():self.retire();self.install()
         self.op.result['transition']=dict(retirement='VERIFIED',installation='VERIFIED',predecessor=self.sealed['predecessor'],rollback='NOT_EXECUTED')

@@ -12,6 +12,9 @@ RESULTS=[]
     ('cs_barrier',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('cs_predecessor',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
     ('cs_secret_ack',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('cs_retire_ack',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('cs_install_ack',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
+    ('cs_install_readback',0,'STOP_RECONCILE_NO_RETRY','UNCERTAIN'),
 ])
 def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanup):
     settings()
@@ -29,6 +32,7 @@ def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanu
     assert result['exported_bytes']<=2*1024**2
     state=home/'.local/state/propertyaigent'/('oldham-owner-test-'+scenario.replace('_','-'))
     audit=(state/'events.jsonl').read_text()
+    events=[json.loads(s) for s in audit.splitlines()]
     assert 'INGESTION_APPLICATION_DATABASE_URL' not in audit and 'oldham_three_login_activation' not in audit
     # Active mode receives no application URL, and the fixture's url_factory asserts this.
     if status=='COMPLETED':
@@ -36,8 +40,13 @@ def test_command_transition(tmp_path,monkeypatch,scenario,nominees,status,cleanu
         assert result['outcome']==('SCREENING_COMPLETE_NO_ADMISSION_REQUIRED' if not nominees else 'SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE')
         assert result['process_closure']['live_children']==result['process_closure']['new_sockets']==0
         assert 'oldham_install_committed' in audit and 'oldham_retirement_closed' in audit
+        assert all(not any(e['payload']['flags']) for e in events if e['event']=='oldham_install_capabilities')
+        assert any(e['event']=='oldham_two_login_teardown' and e['payload']['cleanup']=='CLOSED' for e in events)
     else:
         assert 'oldham_install_committed' not in audit
+        assert not any(e['event']=='oldham_two_login_activation' for e in events)
+        # No compensating rollback, issuance or replay after an uncertain effect.
+        assert not any(e['event']=='oldham_install_committed' for e in events)
 
 
 def teardown_module():

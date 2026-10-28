@@ -34,6 +34,7 @@ def test_sealed_two_login_packet(inputs):
     lambda p:p['transition'].update(installation_sha256='0'*64),
     lambda p:p['transition'].update(rollback_sha256='0'*64),
     lambda p:p.update(risk_acceptance=pkg.RISK),
+    lambda p:p.update(control_stop_sha256='0'*64),
 ])
 def test_substitutions_refuse_before_credentials(inputs,mutation):
     path,_=inputs;p=json.loads(path.read_bytes());mutation(p)
@@ -80,3 +81,37 @@ def test_caller_constructs_only_two_engines_and_refuses_admission():
     assert seen==['worker','effect']
     for f,args in [(caller.prepare,(None,)),(caller.admit,(None,None)),(caller.closed_idox_detail,(None,))]:
         with pytest.raises(Denied,match='CAPTURE_SCREENING_NO_'):f(*args,**({'root':None} if f==caller.closed_idox_detail else {}))
+
+
+def test_barrier_observation_pins_full_control_without_invented_inspection_hash():
+    from copy import deepcopy
+    from app.ingestion.ledger import digest
+    from verification.ingestion_storage.oldham_authority import STOP_STATE
+    ctl=dict(STOP_STATE,grants={});counts=(0,0);events=[]
+    owner=SimpleNamespace(require_control_sha256=None,q=lambda c,s,*a:[(ctl,)] if 'SELECT outcome' in s else [counts],emit=lambda e,v:events.append((e,v)))
+    x=object.__new__(t.Transition);x.o=owner;x.op=SimpleNamespace(p={'control_stop_sha256':digest(STOP_STATE)})
+    x.barriers(None)
+    assert owner.require_control_sha256==digest(ctl) and len(events)==1
+    ctl['unrelated_change']=True
+    with pytest.raises(Denied,match='CONTROL_CHANGED'):x.barriers(None)
+    ctl.pop('unrelated_change');owner.require_control_sha256=None;counts=(1,0)
+    with pytest.raises(Denied,match='INSTALL_BARRIER'):x.barriers(None)
+    assert owner.require_control_sha256 is None
+    counts=(0,0);ctl['hard_stop_generation']=4
+    with pytest.raises(Denied,match='UNKNOWN_STOP'):x.barriers(None)
+
+
+def test_capture_reuses_exact_immutable_archive_with_committed_readback():
+    import base64,hashlib
+    from verification.ingestion_storage.oldham_owner_once import Operation
+    raw=b'{"synthetic":true}';calls=[]
+    op=object.__new__(Operation);op.capture_screening_only=True;op.backend=None;op.data={'source_raw':raw}
+    op.p={'origin':{'commit':'a'*40,'source_path':'docs/design/ingestion-operational-execution-test/slot-0/source.json'}}
+    blob=dict(content=base64.b64encode(raw).decode(),sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest())
+    op.github=SimpleNamespace(call=lambda method,path:calls.append((method,path)) or blob)
+    op.publish=lambda *a:pytest.fail('no duplicate publication or extra ceiling')
+    result=op.archive(raw)
+    assert result['readback_verified'] is True and result['commit']=='a'*40 and len(calls)==1
+    assert calls[0][0]=='GET' and calls[0][1].endswith('?ref='+'a'*40)
+    blob['sha']='0'*40
+    with pytest.raises(Exception):op.archive(raw)

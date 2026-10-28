@@ -18,7 +18,7 @@ QUALIFICATION=Path('docs/design/stage4-discovery/evidence/idox-family1-oldham.js
 PACKAGES=('psycopg','SQLAlchemy','cryptography','requests','beautifulsoup4','psutil','PyYAML')
 FIELDS={'version','mode','release_id','revision','tree','dependencies','packages','scope','source','outer','qualification','qualification_binding','control_sha256','evidence_head','origin','expires_at','risk_acceptance'}
 FIELDS_ACCEPTED=FIELDS|{'owner_acceptance'}
-FIELDS_CAPTURE_SCREENING=FIELDS_ACCEPTED|{'operation','transition'}
+FIELDS_CAPTURE_SCREENING=(FIELDS_ACCEPTED-{'control_sha256'})|{'operation','transition','control_stop_sha256'}
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
@@ -70,7 +70,11 @@ def validate(path,expected_sha,*,disposable=False,now=None):
         if t['installation_sha256']!=sha(install.encode()) or t['rollback_sha256']!=sha(rollback.encode()):raise Denied('OLDHAM_INSTALLATION_BINDING')
     expiry=datetime.fromisoformat(p['expires_at'])
     if expiry.tzinfo is None or not now+timedelta(seconds=480)<expiry<=now+timedelta(hours=24):raise Denied('OLDHAM_PACKAGE_EXPIRY')
-    if any(not isinstance(p[k],str) or not re.fullmatch('[a-f0-9]{'+str(n)+'}',p[k]) for k,n in [('control_sha256',64),('evidence_head',40)]):raise Denied('OLDHAM_PACKAGE_IDENTITIES')
+    control_key='control_stop_sha256' if capture_screening_only else 'control_sha256'
+    if any(not isinstance(p[k],str) or not re.fullmatch('[a-f0-9]{'+str(n)+'}',p[k]) for k,n in [(control_key,64),('evidence_head',40)]):raise Denied('OLDHAM_PACKAGE_IDENTITIES')
+    if capture_screening_only:
+        from .oldham_authority import STOP_STATE
+        if p['control_stop_sha256']!=digest(STOP_STATE):raise Denied('OLDHAM_TRANSITION_STOP_BINDING')
     origin=p['origin']
     if not isinstance(origin,dict) or set(origin)!={'commit','source_path','slot_path'} or not re.fullmatch('[a-f0-9]{40}',origin['commit']):raise Denied('OLDHAM_ORIGIN_BINDING')
     if not re.fullmatch(r'docs/design/ingestion-operational-execution-[a-z0-9-]+/slot-[0-9]+/source.json',origin['source_path']) or origin['slot_path']!=origin['source_path'].rsplit('/',1)[0]+'/receipt.json':raise Denied('OLDHAM_ORIGIN_PATH')

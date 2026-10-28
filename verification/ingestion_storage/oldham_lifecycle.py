@@ -130,6 +130,7 @@ class Lifecycle:
                 for _ in range(3):
                     if not sessions:break
                     o.sleep(0.5);sessions=o.q(c,'SELECT pid,usename,state,backend_start FROM pg_stat_activity WHERE usename=ANY(%s) ORDER BY pid',(list(self.roles),))
+            if self.capture_screening_only and sessions:raise Uncertain('OLDHAM_SESSIONS_REMAIN')
             for name in self.secrets.values():self.github.call('DELETE','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets/'+name)
             names=self.github.names()
             if any(n in names for n in self.secrets.values()) or 'DATABASE_URL' not in names:raise Uncertain('OLDHAM_SECRET_READBACK')

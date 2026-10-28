@@ -49,6 +49,7 @@ def packet(root,*,records=2,nominees=1,tag='success',supervised=True,single_page
         install,rollback=t.texts(t.PREDECESSOR)
         p.update(version=pkg.VERSION_CAPTURE_SCREENING,operation=t.OPERATION,risk_acceptance=t.RISK,
             transition=dict(inspection=dict(name='inspection.json',sha256=pkg.sha(raw)),predecessor=t.PREDECESSOR,retire_standing=True,external_consumers_confirmed=True,installation_sha256=pkg.sha(install.encode()),rollback_sha256=pkg.sha(rollback.encode())))
+        p.pop('control_sha256');p['control_stop_sha256']=digest(STOP_STATE)
     raw=canonical(p);path=root/'package.json';path.write_bytes(raw)
     return path,pkg.sha(raw)
 
@@ -129,7 +130,25 @@ class Backend:
         def url_factory(role,password):
             if self.capture_screening_only:assert role in ('ingestion_worker_login','ingestion_effect_login')
             return make_url(w['urls'][role]).set(password=password).render_as_string(hide_password=False)
-        return dict(connect=lambda:w['connect']('provisioning_migrator'),identity='provisioning_migrator',url_factory=url_factory)
+        connector=lambda:w['connect']('provisioning_migrator')
+        if self.scenario in ('cs_retire_ack','cs_install_ack','cs_install_readback'):
+            commits=[];lost=[];original=connector;scenario=self.scenario
+            class Proxy:
+                def __init__(self,c):self.c=c
+                def __getattr__(self,n):return getattr(self.c,n)
+                def execute(self,q,params=None):
+                    result=self.c.execute(q,params)
+                    text=q if isinstance(q,str) else q.as_string(self.c)
+                    if text.strip()=='COMMIT':
+                        commits.append(True)
+                        target=1 if scenario=='cs_retire_ack' else 2
+                        if scenario!='cs_install_readback' and len(commits)==target and not lost:
+                            lost.append(True);raise ConnectionError('SYNTHETIC_COMMIT_ACK_LOSS')
+                    if scenario=='cs_install_readback' and len(commits)==2 and 'SELECT p.proname,p.prosrc' in text and not lost:
+                        lost.append(True);raise ConnectionError('SYNTHETIC_INSTALL_READBACK_LOSS')
+                    return result
+            connector=lambda:Proxy(original())
+        return dict(connect=connector,identity='provisioning_migrator',url_factory=url_factory)
 
     def after_screening(self,op):
         w=self.world
@@ -194,7 +213,9 @@ class Backend:
         self.closed=True
         for p in reversed(self.patchers):p.stop()
         if self.world is not None:
-            assert set(changed_tables(self.before,snapshot(self.world['boot'])))<={'applications','application_lifecycle_events'}
+            changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
+            if self.capture_screening_only:assert not changed and self.source_calls==0
+            else:assert changed<={'applications','application_lifecycle_events'}
         if self.gen is not None:
             try:next(self.gen)
             except StopIteration:pass

@@ -92,7 +92,7 @@ class Operation:
         self.owner=OldhamOwner(config['connect'],self.journal.emit,self.check,identity=config['identity'],expiry=self.data['expiry'],bindings=bindings)
         self.owner.package_started=started
         self.owner.capture_screening_only=self.capture_screening_only
-        self.owner.require_control_sha256=self.p['control_sha256']
+        self.owner.require_control_sha256=self.p.get('control_sha256')
         self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only)
         return self
 
@@ -109,7 +109,7 @@ class Operation:
                 o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
                 ctl=o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0][0]
                 stop_identity(ctl)
-                if digest(ctl)!=self.p['control_sha256']:raise Denied('OLDHAM_CONTROL_CHANGED')
+                if digest(ctl)!=(self.owner.require_control_sha256 if self.capture_screening_only else self.p['control_sha256']):raise Denied('OLDHAM_CONTROL_CHANGED')
                 o.original_control=ctl
             finally:o.q(c,'ROLLBACK',effect=True)
 
@@ -122,8 +122,16 @@ class Operation:
 
     def archive(self,raw):
         if raw!=self.data['source_raw']:raise Denied('OLDHAM_ARCHIVE_SOURCE_BINDING')
-        commit=self.publish({'source.json':raw},'capture')
-        result=dict(commit=commit,path=self.directory+'/capture/source.json',sha256=pkg.sha(raw),bytes=len(raw),readback_verified=True)
+        if self.capture_screening_only:
+            # Reuse the immutable archive already verified by preflight, with a
+            # fresh exact committed-path readback at capture. A duplicate commit
+            # would spend publication capacity needed for retirement/closure.
+            origin=self.p['origin'];commit=origin['commit'];path=origin['source_path']
+            observed=blob_bytes(self.github.call('GET',REPO+'/contents/'+path+'?ref='+commit))
+            if observed!=raw:raise Denied('OLDHAM_ARCHIVE_READBACK_CHANGED')
+        else:
+            commit=self.publish({'source.json':raw},'capture');path=self.directory+'/capture/source.json'
+        result=dict(commit=commit,path=path,sha256=pkg.sha(raw),bytes=len(raw),readback_verified=True)
         if self.backend:result['label']='TEST_ARCHIVE_NOT_LIVE_EVIDENCE'
         return result
 
