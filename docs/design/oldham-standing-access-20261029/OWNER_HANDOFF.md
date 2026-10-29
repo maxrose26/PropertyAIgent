@@ -128,3 +128,42 @@ Standing batch measurements remain76 calls,87 with11 reserved preparation calls.
 Historical cleanup/complete first-transition costs remain unmeasured. Neither the
 inspection nor development publication resets or approves an operational allowance.
 Stage4 remains OPEN; this handoff remains INACTIVE.
+
+## Provider inspection result, search_path correction and current status (INACTIVE)
+
+**Verified provider MATCH (inspection only).** The consumed one-use inspection `oldham-provider-comparison-once-20261029` ran at commit `48e61e636f76380c36e2f758baae4a00ddd7b2e8` /
+tree `2e58da1710a269bf1f1ba2a1e889908f8b27e3b4` with registration SHA256 `99098f1f3df01a9c71729d3c5018262e1024c33cd5efce9019e27637752d2759` and fixed SQL
+`532842a74601f5f2d8bd4df60cf407aae7d618132abb2e6d7a546a958889fc6a`. Verified original files: events.jsonl `8c432a092592439fccc6df46d8625ca0caa5e744b008b2260bec0be6f06de87f`
+(5-event chain, head `9e345d134f6b9c8fd11c369519ac57570ca13a44ef2cd63789cd84b5166cabf5`), final-result.json `6d71c48ebb6ba466de82b65e7b9368a5eace5562dfe21ae3544625bc42fbb51a`.
+Result `PROVIDER_COMPARISON_MATCH`: 85 observations (4 view/role groups of 10, 3 function groups of 15), no mismatch or incomplete; 7 statements, 1 connection, 1 rollback, 0 commits, CLOSED.
+This is current-metadata evidence for those predicate groups only. It is NOT full provider/recovery/access-gate acceptance, does not cover `pg_read_all_stats`/`pg_monitor` membership of
+the logins or EXECUTE on `pg_stat_statements_reset`, and proves nothing about the historical cause.
+
+**Historical cause: UNKNOWN.** The failed run `oldham-owner-installed-capture-screening-20261029` refused at stage `INSTALLED_POLICY_CLEANUP` with `STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED` before any
+cleanup effect (`historical_cleanup: NOT_ATTEMPTED`). A demonstrated session difference exists: the inspection pins `search_path=pg_catalog`; the owner route did not, and the session value that run
+used was never recorded. `md5(pg_get_viewdef(...))` depends on the session search_path (shown on a disposable server). That is a supported hypothesis, not a finding: a metadata change between the runs is
+not excluded and today's MATCH does not establish one. Control digests are not comparable across controllers (jsonb-text hash versus canonical-JSON `digest`); the 28-29 October difference in the
+comparable pair is explained by the intervening authority issuance.
+
+**Correction in this PR.** `activation_boundary.capture_screening_gate` now pins `pg_catalog` for the provider block only (`set_config(...,true)` before it, caller value restored after it). Reason: that block
+contains the only search_path-sensitive construct (`pg_get_viewdef`); every other gate reference is schema-qualified or a role name. It is applied through the single derivation that every capture/screening
+route uses: `Lifecycle.gate` (non-atomic and atomic), `InstalledReuse` cleanup/probe gates, standing provisioning, and `standing_gate`. The historical three-login gate and the stored `activate.sql` files
+are byte-unchanged. The two reviewed view hashes and every raise condition are unchanged; no hash was added and no predicate weakened. Tests: offline derivation checks, a reduced local PostgreSQL pattern test,
+and real-pg_stat_statements 1.11 tests on the actual derived gate (rendering differs by search_path; corrected gate consistent and restores the caller path; the unpinned form refuses; real changes
+still refuse under each path). The real-extension tests run only on the hosted PostgreSQL 17 job; they do not reproduce the historical production failure.
+
+**Original files** (all present under `$HOME/.local/state/propertyaigent/`, unmodified; neither publication journal exists):
+`oldham-owner-capture-screening-once-20261028` (events `cc522abd417e27ff7639cd6c37041cf0a381e32461f35147a88834c805140391`, result `99b372576e2addd6e7b263653d09ed9556a3f4058e9b0d059e58cb46648166b8`);
+`oldham-owner-installed-capture-screening-20261029` (events `81c3bde7334600d415ad63c6cc5ab9c062afe1b5daa44b4eb2bc9a351d4f98dc`, result `207dea6fbed80cbf0ec28636a3f1f63347e5f2bc542a4b7c8a1fcb0167aa9a7d`);
+`oldham-activation-reconciliation-once-20261028` (events `2becdfc80cbf23cd12b73cb7dde2fad6625c14dcdcbeed5b472997550cf46220`, result `f077a77ff516ddff21aa29bc08c174864599512d2e8fafed3513d9f54185b6a2`).
+Both consumed identities stay consumed. A new run needs a new, unused identity.
+
+**File-mode finding.** `final-result.json` is mode 0644 where it was written under a 022 umask (`Journal.save` creates it with the process umask; `events.jsonl` and the directory are explicitly 0600/0700).
+No requirement or test governs that file's mode; the containing directory is 0700 (no access by other users) and the content is secret-free (hashes, counters, fixed codes). Disposition: documented and
+closed as non-blocking. The smallest hardening, if later wanted, is creating the temporary file in `Journal.save` with `os.open(..., 0o600)`; it would touch every journal consumer's new files and was not made.
+No original was altered.
+
+**Remaining before any first transition** (none authorised here): the full provider/recovery/access gate under the corrected path including the uncovered baseline and reset-EXECUTE predicates and a
+fresh readback of logins, memberships, policy and stored authority (the last full observation is from 28 October); cleanup of the historical authority (expired is not revoked); a new unused release
+identity; one-time standing provisioning and qualification; sealed CAPTURE_SCREENING_ONLY manifest. Accounting: standing batch measurement 76 GitHub calls, 87 with 11 reserved preparation calls;
+historical cleanup, provisioning and qualification costs remain unmeasured and held. Stage 4 remains OPEN; this handoff remains INACTIVE.

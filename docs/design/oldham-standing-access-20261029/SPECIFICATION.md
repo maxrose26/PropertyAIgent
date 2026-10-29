@@ -19,3 +19,5 @@ The historical authority `INGESTION_CHAIN_OLDHAM_STAGED_CAPTURE_E9D12874CFB5` re
 ## Validation boundaries
 
 Synthetic five-record source packets, fixture qualification and loopback source effects prove caller compatibility only. Disposable PostgreSQL uses actual restricted roles and SQL issuance/claims; a separate runtime child receives no owner credential. Hosted native tests exercise real kernel containment, distinct from synthetic source/API responses. No fixture supplies historical supervisor evidence or live qualification. No production connection, credential provisioning, grant, release or expiry is authorised by this document.
+
+The reviewed view-definition comparison in the derived capture/screening gate is made independent of the session search_path by pinning `pg_catalog` for the provider block only (restored afterwards); expected hashes and predicates are unchanged.

@@ -58,12 +58,15 @@ def capture_screening_gate(text):
 """
     if stats.count(marker)!=1:raise Denied('ACTIVATION_BOUNDARY_DERIVATION')
     stats=stats.replace(marker,marker+'\n'+extra)
+    # pg_get_viewdef (hence the reviewed MD5) renders extension-schema function names unqualified when that schema is on the session search_path. Pin pg_catalog for
+    # this provider block ONLY, restoring the caller's value afterwards: every other reference in the gate is schema-qualified or a role name, so nothing else changes.
+    stats="  stats_path:=current_setting('search_path');\n  PERFORM set_config('search_path','pg_catalog',true);\n"+stats+"  PERFORM set_config('search_path',stats_path,true);\n"
     declaration='allowed_update text[];'
     insertion="  IF EXISTS(SELECT 1 FROM pg_namespace n WHERE"
     table="   AND NOT (login='ingestion_application_login' AND c.oid IN ('public.applications'::regclass,'public.application_lifecycle_events'::regclass)))"
     recovery=" IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='ingestion_recovery_login' AND NOT rolcanlogin) THEN RAISE EXCEPTION 'RECOVERY_MUST_REMAIN_DORMANT'; END IF;"
     if any(text.count(x)!=1 for x in (declaration,insertion,table,recovery)):raise Denied('ACTIVATION_BOUNDARY_DERIVATION')
-    text=text.replace(declaration,declaration+' stats record;').replace(insertion,stats+insertion)
+    text=text.replace(declaration,declaration+' stats record; stats_path text;').replace(insertion,stats+insertion)
     text=text.replace(table,table[:-1]+"\n   AND NOT (n.nspname='extensions' AND c.relname IN ('pg_stat_statements','pg_stat_statements_info')))")
     # Missing is safe only for this non-recovery operation. Existing recovery
     # identities must have no authentication, administrative flags or extra roles.
