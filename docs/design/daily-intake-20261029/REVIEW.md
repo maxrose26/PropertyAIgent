@@ -120,6 +120,11 @@ requirements change). Initial CI 40919759973 failed YAML parsing because an
 unquoted disposable sqlite URL ended in a colon. Fixed quoting; failure preserved.
 Hosted run40919971866/job123610226069 at 5c35c473c8fcc64800cfb4175438f8a095ca963e
 passed 14 tests, including connected Idox/Arcus PG17 capture/screening/projection.
+Subsequent candidate 7960d2f passed 22 focused tests. Broader CI correctly caught
+an application import of verification-only date constants and a missing explicit
+v3-consumer inventory entry (jobs123613130928/123613165982). Reuse application
+council configuration and add only the authorised inactive intake projection to
+that inventory; preserve both architectural checks.
 That result precedes later cumulative-limit and negative-control additions and
 must not be represented as final-head validation. Final results are in the PR.
 

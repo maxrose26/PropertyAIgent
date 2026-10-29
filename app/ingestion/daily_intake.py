@@ -20,16 +20,17 @@ def current_windows(now, councils, *, overlap_days=7):
     Source dates are not public-availability dates. This does not declare recall
     or freshness, nor refresh decisions on older applications.
     """
-    from verification.discovery.finite_acceptance import SEMANTICS
+    from app.pipeline.discovery_contract import COUNCILS
+    from app.config import get_council
     if now.tzinfo is None or type(overlap_days) is not int or not 1 <= overlap_days <= 28:
         raise Denied('INTAKE_DATE_BOUND')
     councils=tuple(councils)
     if not 1 <= len(councils) <= MAX_SLOTS or len(set(councils)) != len(councils):
         raise Denied('INTAKE_SLOT_BOUND')
-    if any(c not in SEMANTICS or c == 'trafford' for c in councils):
+    if any(c not in COUNCILS for c in councils):
         raise Denied('INTAKE_COUNCIL')
     end=now.astimezone(ZoneInfo('Europe/London')).date()-timedelta(days=1)
-    return [dict(council=c,semantics=SEMANTICS[c],start=(end-timedelta(days=overlap_days-1)).isoformat(),end=end.isoformat()) for c in councils]
+    return [dict(council=c,semantics=get_council(c).date_field_mode.upper(),start=(end-timedelta(days=overlap_days-1)).isoformat(),end=end.isoformat()) for c in councils]
 
 
 def intake_slot(caller, root_key, collect, archive, prepare_screening, *, check=lambda:None):
