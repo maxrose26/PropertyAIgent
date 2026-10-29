@@ -45,6 +45,15 @@ def stop_snapshot(ctl):
     return {k:ctl.get(k,0 if k=='hard_stop_generation' else None) for k in ('global_stop','manual_stop','last_hard_stop','hard_stop_generation')}
 
 
+def require_source_context(councils,*,disposable):
+    # The existing Arcus proof reader requires the dedicated owner-host cgroup
+    # and exact credential-free environment. This controller does not establish
+    # them; refuse BEFORE registration or any council source effect. A Render
+    # container plan alone is not that kernel containment contract.
+    if not disposable and 'manchester' in councils:
+        raise Denied('ARCUS_INTAKE_EXECUTION_CONTEXT_UNSUPPORTED')
+
+
 def registration_payload(period,reg,binding):
     rows=reg.rows if reg.kind=='CAPTURE' else [r for r in reg.rows if r['key']!=reg.root_key]
     if reg.kind=='CAPTURE':reg.grant['source_calls']=1
@@ -163,7 +172,7 @@ class Runtime:
         from verification.discovery.arcus_ui_audit import validate
         from verification.discovery.arcus_ui_window import qualify_segment
         case='discovery_'+row['council']+'_ui_window'
-        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True)
+        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True,compact_retained=True)
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
@@ -211,6 +220,7 @@ class Runtime:
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
+            require_source_context(self.policy['councils'],disposable=self.test)
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)

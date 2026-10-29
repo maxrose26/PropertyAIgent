@@ -28,6 +28,7 @@ class ArcusListingContract:
     qualification_sha256:str
     execution_budget:str|None=None
     retain_explicit_zero:bool=False  # opt-in intake; historical empty-window refusal unchanged
+    compact_retained:bool=False  # raw label captures remain in the bound source archive
 
     def __post_init__(self):
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256):raise Denied('EXACT_ARCUS_QUALIFICATION_REQUIRED')
@@ -62,7 +63,13 @@ class ArcusListingContract:
         for n,row in enumerate(rows,1):
             seg=next((s for s in segments if s['first']<=n<=s['last']),None)
             if seg is None or not re.fullmatch('[a-f0-9]{64}',str(seg.get('evidence_sha256',''))):raise Denied('ARCUS_SEGMENT_PROVENANCE')
-            records.append(dict(row,provenance=dict(parser='app.ingestion.arcus_adapter',segment_ordinal=seg['ordinal'],body_sha256=seg['evidence_sha256'],row_ordinal=n)))
+            projected=dict(row)
+            if self.compact_retained:
+                # Validation above used the original complete row. Preserve all
+                # projected fields and the raw capture digest; the duplicated
+                # label array remains in source_sha256's durable source archive.
+                projected.pop('assessment_capture')
+            records.append(dict(projected,provenance=dict(parser='app.ingestion.arcus_adapter',segment_ordinal=seg['ordinal'],body_sha256=seg['evidence_sha256'],row_ordinal=n)))
         resources=dict(metric='ARCUS_UI_COMBINED_BYTES',requests=source['requests'],decoded_bytes=source['decoded_bytes'],encoded_bytes=source['encoded_bytes'],
             outbound_payload_bytes=source['outbound_payload_bytes'],combined_bytes=combined_bytes(source),supervisor_seconds=source['supervisor_seconds'],
             peak_owned_rss=source['peak_owned_rss'],redirects=source.get('redirects'))

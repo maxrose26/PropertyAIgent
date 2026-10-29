@@ -151,7 +151,8 @@ def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world
     if fault=='run_limit':
         world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,ARRAY['intake_periods',%s,'days'],%s::jsonb)::json WHERE key=repeat('0',64)",(name,json.dumps({str(date(2000,1,1)+timedelta(days=i)):{} for i in range(7)})))
     with world['connect']('ingestion_worker_login') as c:
-        with pytest.raises(Exception):c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
+        with pytest.raises(Exception,match='INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED)'):
+            c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
     assert world['boot'].execute('SELECT count(*) FROM ingestion_work_items').fetchone()[0]==1
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
     assert ctl['grants']=={} and ctl['global_stop'] is None
@@ -194,6 +195,26 @@ def test_intake_reuses_only_the_existing_qualified_manchester_zero():
     assert receipt['records']==[] and receipt['explicit_zero'] is True
     source['explicit_zero_evidence']=''
     with pytest.raises(Denied):replace(contract,retain_explicit_zero=True).project(source,outer(),DEFAULT_LIMITS)
+
+
+def test_compact_arcus_projection_preserves_fields_and_raw_archive_identity():
+    from dataclasses import replace
+    from tests.e2e_connection_support import arcus_contract,outer
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from verification.ingestion_storage.daily_intake_runtime import require_source_context
+    start,end=date(2026,10,22),date(2026,10,28)
+    audit=arcus_audit('manchester',[entry('DAILY/1/26',SCHEME)],start,end)
+    contract=arcus_contract('manchester',start,end)
+    full=contract.project(audit,outer(),DEFAULT_LIMITS)
+    compact=replace(contract,compact_retained=True).project(audit,outer(),DEFAULT_LIMITS)
+    assert compact['source_sha256']==full['source_sha256']==digest(audit)
+    assert compact['records']==[{k:v for k,v in full['records'][0].items() if k!='assessment_capture'}]
+    assert audit['listing_records'][0]['assessment_capture']  # unchanged original, archived by Coordinator
+    assert RULE.screen(compact['records'][0])==RULE.screen(full['records'][0])
+    require_source_context(['tameside','manchester'],disposable=True)
+    require_source_context(['tameside'],disposable=False)
+    with pytest.raises(Denied,match='ARCUS_INTAKE_EXECUTION_CONTEXT_UNSUPPORTED'):
+        require_source_context(['tameside','manchester'],disposable=False)
 
 
 def test_invoked_two_scope_maximum_sixty_each_has_one_shared_envelope(world,tmp_path,record_property):

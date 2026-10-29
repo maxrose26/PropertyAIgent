@@ -11,7 +11,7 @@ Approved continuation base: PR #206 head
 hosted checks and measured usage are recorded in the PR handoff. Historical
 partial-delivery text below is superseded by this section, not erased.
 
-The daily command now connects the existing expiring registration function,
+In disposable acceptance, the daily command connects the existing expiring registration function,
 restricted worker/effect principals, qualified supervised listing readers,
 Coordinator retained capture, archive readback, frozen v3 screening, paginated
 backlog and authority invalidation/readback. No argument means no effects; the
@@ -21,7 +21,9 @@ admission, document downloading, enrichment, opportunity processing or AI consum
 First supported intake allowance: Tameside RECEIVED (Idox) and Manchester VALIDATED
 (Arcus), at most two scopes. This does not establish nine-council capacity or
 complete GM coverage. The period may allow either or both; no arbitrary council.
-Existing metadata/reader qualification is still required for live use.
+Existing metadata/reader qualification is still required for live use. The two-council
+Render route is BLOCKED by the execution-context requirement described below;
+this candidate refuses it before registration or source work.
 
 ### Existing issuer and stops
 
@@ -80,7 +82,16 @@ Manchester's existing qualified exact-zero UI result can be retained through an
 explicit intake opt-in, without creating screening children. Historical default
 empty-window refusal is preserved. Tameside zero-result markup has NOT acquired
 new qualification: unrecognised empty/error pages still stop rather than becoming
-complete coverage. Raw partial evidence can remain archived, never a full-window
+complete coverage. The intake-only Arcus projection omits the duplicate assessment_capture label
+array from checkpoint records only AFTER validating the complete original. All
+projected fields, capture hash and provenance remain; the full label array stays
+in the source_sha256-bound, readback-verified archive. Historical adapter defaults
+are unchanged. This keeps the tested 60-row receipt inside the existing128KiB
+checkpoint cap without truncating rows, increasing the cap or adding a table.
+Longer real metadata can still exceed the cap: retain the source archive and stop,
+never claim complete capture or refetch automatically.
+
+Raw partial evidence can remain archived, never a full-window
 pass. Current intake does not wait for historical catch-up and never advances a
 complete-coverage watermark across incomplete windows.
 
@@ -161,7 +172,7 @@ snapshots, connection closure, consumption, failure settlement and cross-run
 pagination are checked. Hosted logs/artifacts preserve failed candidates and
 corrections; the final PR report identifies which candidate each result tested.
 
-## INACTIVE actual-Render acceptance proposal
+## INACTIVE actual-Render acceptance proposal — BLOCKED
 
 Read-only service metadata checked29October2026: existing daily service
 crn-d9sv93vavr4c73f98rb0 remains suspended, autoDeploy off, startCommand /bin/true.
@@ -171,6 +182,37 @@ https://render.com/docs/one-off-jobs and
 https://api-docs.render.com/reference/post-job . One-off jobs snapshot the base
 service's latest successful build/environment; verify that build's exact commit
 BEFORE creating a job. No new service or workflow system is required.
+
+### Concrete source execution-context decision (not a credential problem)
+
+The profiled Arcus reader's existing finite_acceptance.read requires
+four-council-owner-local. instrumented_probe.supervised then calls
+four_council_release.owner_source_context, which requires an exact source child
+cgroup under propertyaigent-operational-once.scope, kernel1.5GiB/2GiB caps,
+swap0, group OOM and an exact source-only environment. OperationalMemory creates
+that layout only within the delegated owner systemd scope. This intake controller
+uses the existing owned-process supervisor but does NOT establish that layout;
+its private environment also differs. The historical render-disposable mode
+allows only Trafford, not Manchester, and is not a supported profile substitute.
+The browser package path also needs explicit propagation through the existing
+credential-free environment allowlist. Fixture child success cannot prove any
+of these live browser requirements.
+
+require_source_context therefore refuses a non-disposable Manchester period
+BEFORE any issuer, source or archive effect, even if Idox would run first.
+Read-only backlog remains available. No runner impersonation or containment
+relaxation is implemented. A2GiB Render plan alone is insufficient.
+
+Exact proposed policy decision: accept, for an explicitly bound Render intake
+service/build only, the Render container's aggregate2GiB ceiling plus the existing
+owned source-tree1.5GiB RSS/75s monitor instead of the owner-host delegated source
+cgroup. Then authorise the narrow existing-reader/profile/environment adaptation
+and its negative controls. This is a proposed exception, NOT an accepted rule.
+Risk: sampled RSS is not a kernel source-only ceiling; transient growth/aggregate
+OOM can kill the controller and make closure uncertain. Required evidence and
+stops still apply. Alternative: preserve the exact kernel rule; then the proposed
+Render acceptance remains NO-GO until that existing containment can actually be
+provided. No new diagnostic controller or access framework is proposed.
 
 Prerequisites needing separate production authority/evidence:
 1. REVIEW accepts final code/checks, exact policy/worker fingerprints and this
@@ -194,14 +236,18 @@ Prerequisites needing separate production authority/evidence:
    least960s of authority remaining. No additional daily owner permit is required
    within a later explicitly accepted recurring period (at most7days/7dated runs).
 
-After those permissions, the proposed one-off API operation is:
+Only after resolving the source-context decision AND those permissions, the
+proposed one-off API operation is:
 POST /v1/services/crn-d9sv93vavr4c73f98rb0/jobs with fields
 planId=plan-crn-005 (2GB cron-job plan) and startCommand:
 
     timeout --signal=INT --kill-after=5s 960s python -u -m scripts.run_daily_councils --period REVIEW_APPROVED_PERIOD --hostaddr REVIEWED_IPV4 --output /tmp/propertyaigent-intake-UNIQUE_RUN
 
 REVIEW_APPROVED_PERIOD, REVIEWED_IPV4 and UNIQUE_RUN are release-time bindings,
-not active values. Restricted URLs and GitHub input stay in the existing secure
+not active values. This exact command currently refuses the live two-council
+period with ARCUS_INTAKE_EXECUTION_CONTEXT_UNSUPPORTED; it is not an executable
+release promise until the narrowly scoped decision/adaptation above is resolved.
+Restricted URLs and GitHub input stay in the existing secure
 route, never arguments/chat. The base cron remains suspended. Do not create the
 job now, do not Trigger Run, and never retry an attempted/uncertain job.
 
