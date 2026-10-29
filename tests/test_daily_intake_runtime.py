@@ -164,6 +164,45 @@ def test_run_budget_refuses_before_unfit_scope_and_preserves_closure():
     run=IntakeRun();run.used['github_calls']=51
     with pytest.raises(Denied,match='PUBLICATION_RESERVE'):run.publication(1,10)
     assert run.used['github_calls']==51
+
+
+@pytest.mark.parametrize('fault',['cleanup_null','missing_delay','missing_hash','unknown_reason','wrong_http_status'])
+def test_trusted_failure_settlement_rejects_incomplete_or_unrecognised_receipt(world,tmp_path,fault):
+    from sqlalchemy import create_engine
+    from app.ingestion.sql_ledger import SQLLedger
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from verification.ingestion_storage.chain_registration import capture_registration
+    from verification.ingestion_storage.scope_binding import binding_for
+    from tests.e2e_connection_support import idox_contract
+    reset(world);name='bad-settlement-'+fault;p=authorise(world,name)
+    row=current_windows(datetime.now(timezone.utc),['tameside'])[0]
+    contract=idox_contract('tameside',date.fromisoformat(row['start']),date.fromisoformat(row['end']),name=p['councils']['tameside']['contract'])
+    owner=Owner(None,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc)+timedelta(minutes=20),bindings=execution_binding())
+    reg=capture_registration(owner,binding_for('tameside'),contract,row['start'],row['end'],revision='settlement',item_limits=DEFAULT_LIMITS)
+    request=registration_payload(name,reg,execution_binding())
+    with world['connect']('ingestion_worker_login') as c:
+        c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
+    engines=[create_engine(world['urls'][r]) for r in ('ingestion_worker_login','ingestion_effect_login')]
+    try:
+        ledger=SQLLedger(engines[0],owner='required_once',authority=reg.authority,bindings=reg.bindings,broker_engine=engines[1])
+        claim=ledger.claim(reg.root_key);ledger.intent(claim,'source_calls')
+        receipt=dict(cleanup='CLOSED',accounting_complete=True,failure='RATE_LIMIT',source_sha256='a'*64,
+                     durable_archive=dict(readback_verified=True,sha256='a'*64),
+                     source_audit=dict(failure_diagnostic=dict(transport=dict(http_status=429))))
+        payload=dict(outcome=dict(outcome='RATE_LIMIT'),state='DEFERRED',reason='RATE_LIMIT',delay=3600,council_defer_seconds=3600,resolved_receipt=receipt)
+        if fault=='cleanup_null':receipt['cleanup']=None
+        if fault=='missing_delay':payload.pop('delay')
+        if fault=='missing_hash':receipt.pop('source_sha256');receipt['durable_archive'].pop('sha256')
+        if fault=='unknown_reason':payload['reason']=receipt['failure']=payload['outcome']['outcome']='UNSUPPORTED_CONTRACT'
+        if fault=='wrong_http_status':receipt['source_audit']['failure_diagnostic']['transport']['http_status']=500
+        # Call the actual trusted operation: the client intentionally rejects a
+        # missing kwarg even earlier, so test the SQL boundary directly as well.
+        with engines[1].begin() as c:
+            with pytest.raises(Exception,match='INTAKE_FAILURE_SETTLEMENT'):
+                ledger._step('settle_failure',claim.key,claim.fence,payload,connection=c)
+        assert ledger.get(claim.key)['phase']=='SOURCE_INTENT'
+    finally:
+        for engine in engines:engine.dispose()
     run.closing=True;run.publication(1,10)
     assert run.used['github_calls']==61
     run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=84,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]

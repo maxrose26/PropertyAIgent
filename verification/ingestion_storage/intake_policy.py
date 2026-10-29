@@ -169,16 +169,20 @@ SETTLEMENT = r"""
   IF p_op='settle_failure' THEN
    IF w.phase NOT IN ('SOURCE_INTENT','CLAIMED','CHECKPOINTED') OR w.task<>'DISCOVERY'
     OR w.subject->>'kind'<>'DISCOVERY_SCOPE' OR g->>'intake_period' IS NULL
-    OR p_payload->>'reason' NOT IN ('RATE_LIMIT','SOURCE_UNAVAILABLE','UNSUPPORTED_CONTRACT','NO_SUPPORTED_FACTS')
-    OR p_payload->'resolved_receipt'->>'cleanup'<>'CLOSED'
+    OR coalesce(p_payload->>'reason','') NOT IN ('RATE_LIMIT','SOURCE_UNAVAILABLE')
+    OR p_payload->'resolved_receipt'->>'cleanup' IS DISTINCT FROM 'CLOSED'
     OR p_payload->'resolved_receipt'->'accounting_complete' IS DISTINCT FROM 'true'::jsonb
     OR p_payload->'resolved_receipt'->>'failure' IS DISTINCT FROM p_payload->>'reason'
     OR p_payload->'resolved_receipt'->'durable_archive'->'readback_verified' IS DISTINCT FROM 'true'::jsonb
+    OR jsonb_typeof(p_payload->'resolved_receipt'->'source_sha256') IS DISTINCT FROM 'string'
+    OR p_payload->'resolved_receipt'->>'source_sha256' !~ '^[a-f0-9]{64}$'
     OR p_payload->'resolved_receipt'->>'source_sha256' IS DISTINCT FROM p_payload->'resolved_receipt'->'durable_archive'->>'sha256'
     OR p_payload->'outcome'->>'outcome' IS DISTINCT FROM p_payload->>'reason'
-    OR (CASE WHEN p_payload->>'reason' IN ('RATE_LIMIT','SOURCE_UNAVAILABLE') THEN
-      p_payload->>'state'<>'DEFERRED' OR p_payload->'delay'<>'3600'::jsonb OR p_payload->'council_defer_seconds'<>'3600'::jsonb
-     ELSE p_payload->>'state'<>'UNSUPPORTED_CONTRACT' OR p_payload->'delay'<>'0'::jsonb OR p_payload->'council_defer_seconds'<>'0'::jsonb END)
+    OR p_payload->'resolved_receipt'->'source_audit'->'failure_diagnostic'->'transport'->'http_status'
+       IS DISTINCT FROM (CASE WHEN p_payload->>'reason'='RATE_LIMIT' THEN '429'::jsonb ELSE '503'::jsonb END)
+    OR p_payload->>'state' IS DISTINCT FROM 'DEFERRED'
+    OR p_payload->'delay' IS DISTINCT FROM '3600'::jsonb
+    OR p_payload->'council_defer_seconds' IS DISTINCT FROM '3600'::jsonb
    THEN RAISE EXCEPTION 'INTAKE_FAILURE_SETTLEMENT'; END IF;
    UPDATE public.ingestion_work_items SET state=p_payload->>'state',reason=p_payload->>'reason',outcome=(p_payload->'outcome')::json,
     checkpoint=(p_payload->'resolved_receipt')::json,eligible_at=t+(p_payload->>'delay')::integer,
