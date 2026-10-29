@@ -27,6 +27,7 @@ BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/in
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/chain_caller.py',
+             'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
              'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
 
 def execution_binding():

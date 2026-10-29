@@ -58,7 +58,7 @@ def env_and_sources(world,tmp_path,*,failed=False,count=1):
             audit=idox_audit('tameside',records,start,end)
             if failed:
                 audit.update(failure='SOURCE_CONTRACT_REJECTED',completeness='FAILED',
-                             failure_diagnostic=dict(transport=dict(http_status=429)))
+                             failure_diagnostic=dict(transport=dict(http_status=503 if failed==503 else 429)))
         else:
             chunks=[arcus_audit('manchester',records[i:i+10],start,end,budget='BROWSER_SOURCE_V2') for i in range(0,len(records),10)]
             audit=chunks[0];all_rows=[r for a in chunks for r in a['listing_records']]
@@ -87,7 +87,7 @@ def invoke(world,tmp_path,name,*,failed=False,count=1):
     return run,result,command
 
 
-@pytest.mark.parametrize('failed',[False,True])
+@pytest.mark.parametrize('failed',[False,429,503])
 def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(world,tmp_path,failed,record_property):
     reset(world);name='command-contained' if failed else 'command-complete';authorise(world,name)
     before=snapshot(world['boot'])
@@ -101,12 +101,22 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     assert len(result['backlog']['records'])==(1 if failed else 2)
     assert all(r['fields'] and r['source_url'] and r['source_record_id'] and r['archive']['readback_verified'] for r in result['backlog']['records'])
     assert changed_tables(before,snapshot(world['boot']))==[] and restricted_sessions(world['boot'])==0
+    # Actual retained checkpoints supply nomination inputs. Do NOT run an
+    # admission writer: its current validator still expects unbound revisions.
+    from app.ingestion.nomination import derive_nominees
+    captures=[r[0] for r in world['boot'].execute("SELECT checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchall()]
+    nominees=derive_nominees(captures,RULE,allow_test_evidence=True)
+    assert len(nominees.nominees)==(1 if failed else 2)
+    assert all(n.source_url and n.source_record_id and n.capture_sha256 for n in nominees.nominees)
+    for n in nominees.nominees:
+        actual=world['boot'].execute("SELECT revision FROM ingestion_work_items WHERE task='SCREENING' AND subject->>'council'=%s AND subject->>'reference'=%s",(n.council,n.reference)).fetchone()[0]
+        assert actual!=n.screening_revision  # documented, still-disconnected consumer contract
     control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
     assert control['global_stop'] is None and control['manual_stop'] is None
     assert all(g['expires_at']==0 for g in control['grants'].values())
     if failed:
         settled=world['boot'].execute("SELECT state,checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND subject->>'council'='tameside'").fetchone()
-        assert settled[0]=='DEFERRED' and settled[1]['failure']=='RATE_LIMIT' and settled[1]['durable_archive']['readback_verified']
+        assert settled[0]=='DEFERRED' and settled[1]['failure']==('SOURCE_UNAVAILABLE' if failed==503 else 'RATE_LIMIT') and settled[1]['durable_archive']['readback_verified']
         assert any(s['council']=='manchester' and s['status']=='RETAINED_AND_SCREENED' for s in result['scopes'])
     record_property('command',json.dumps(command));record_property('usage',json.dumps(result['usage'],sort_keys=True))
 
@@ -120,6 +130,31 @@ def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation
     with world['connect']('ingestion_worker_login') as c:
         with pytest.raises(Exception,match='OWNER_DISPOSITION_REQUIRED'):
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(operation='intake_period',period='self',policy=policy(world))),))
+
+
+@pytest.mark.parametrize('fault',['date','council','writes','expiry','run_limit'])
+def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world,tmp_path,fault):
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from verification.ingestion_storage.chain_registration import capture_registration
+    from verification.ingestion_storage.scope_binding import binding_for
+    from tests.e2e_connection_support import idox_contract
+    reset(world);name='boundary-'+fault;p=authorise(world,name)
+    row=current_windows(datetime.now(timezone.utc),['tameside'])[0]
+    contract=idox_contract('tameside',date.fromisoformat(row['start']),date.fromisoformat(row['end']),name=p['councils']['tameside']['contract'])
+    owner=Owner(None,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc)+timedelta(minutes=20),bindings=execution_binding())
+    reg=capture_registration(owner,binding_for('tameside'),contract,row['start'],row['end'],revision='boundary',item_limits=DEFAULT_LIMITS)
+    request=registration_payload(name,reg,execution_binding())
+    if fault=='date':request['rows'][0]['subject']['start']='2000-01-01'
+    if fault=='council':request['rows'][0]['subject']['council']='oldham'
+    if fault=='writes':request['grant']['writes']=1
+    if fault=='expiry':request['grant']['expires_at']=time.time()+1900
+    if fault=='run_limit':
+        world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,ARRAY['intake_periods',%s,'days'],%s::jsonb)::json WHERE key=repeat('0',64)",(name,json.dumps({str(date(2000,1,1)+timedelta(days=i)):{} for i in range(7)})))
+    with world['connect']('ingestion_worker_login') as c:
+        with pytest.raises(Exception):c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
+    assert world['boot'].execute('SELECT count(*) FROM ingestion_work_items').fetchone()[0]==1
+    ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+    assert ctl['grants']=={} and ctl['global_stop'] is None
 
 
 def test_run_budget_refuses_before_unfit_scope_and_preserves_closure():
@@ -227,6 +262,13 @@ def test_policy_preserves_historical_registration_branch_text():
     assert old[start:finish] in intake_policy.policy_sql()
 
 
+def test_cumulative_intake_lifetime_keeps_historical_batch_reservation():
+    from verification.ingestion_storage.limit_reconciliation import pending_grant_problems
+    assert pending_grant_problems(1500,phase='SCREENING',batches=12)
+    assert pending_grant_problems(1500,phase='SCREENING',batches=12,cumulative_screening=True)==[]
+    assert pending_grant_problems(329,phase='SCREENING',batches=12,cumulative_screening=True)
+
+
 @pytest.mark.parametrize('fault',['unknown_source_failure','publication_failure'])
 def test_shared_failure_stops_next_council_and_never_claims_capture(world,tmp_path,fault):
     reset(world);authorise(world,'shared-failure')
@@ -258,7 +300,9 @@ def test_stop_during_owned_source_closes_worker_and_preserves_original_stop(worl
         end=time.monotonic()+10
         while not (output/'tameside-owned').exists() and time.monotonic()<end:time.sleep(.025)
         assert (output/'tameside-owned').exists()
-        with world['connect']('ingestion_worker_login') as c:c.execute("SELECT public.ingestion_raise_stop('DISPOSABLE_ATTENDED_STOP')")
+        # Separate disposable owner acts as the attended stop operator. Opening
+        # another worker login would itself violate the real one-connection cap.
+        world['boot'].execute("SELECT public.ingestion_raise_stop('DISPOSABLE_ATTENDED_STOP')")
         process.communicate(timeout=20)
     finally:
         if process.poll() is None:process.kill();process.communicate(timeout=5)

@@ -15,6 +15,13 @@ from tests.e2e_connection_support import entry, SCHEME
 from verification.ingestion_storage.chain_registration import screening_registration
 
 
+def assert_closed_sessions(world):
+    """Observe server teardown within a finite bound, not just client.closed."""
+    until=time.monotonic()+1
+    while restricted_sessions(world['boot']) and time.monotonic()<until:time.sleep(.025)
+    assert restricted_sessions(world['boot'])==0
+
+
 @pytest.fixture(scope='module')
 def world():
     from verification.ingestion_storage import screening_v3_worker_sql as v3
@@ -124,7 +131,8 @@ def test_lost_checkpoint_acknowledgement_stops_without_recollection(world,tmp_pa
     assert saved['checkpoint']['durable_archive']['readback_verified'] and saved['state']=='CLAIMED'
     with pytest.raises(Denied,match='RECONCILE_NO_SOURCE_REPLAY'):
         intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
-    assert calls==[1] and restricted_sessions(world['boot'])==0
+    assert calls==[1]
+    assert_closed_sessions(world)
 
 
 def test_changed_observations_have_distinct_assessment_identity(world,tmp_path):
@@ -173,7 +181,8 @@ def test_actual_sql_worker_refuses_capture_binding_forgery(world,tmp_path,monkey
     monkeypatch.setattr(SQLLedger,'checkpoint',forge)
     with pytest.raises(Exception,match=refusal):
         intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
-    assert calls==[1] and restricted_sessions(world['boot'])==0
+    assert calls==[1]
+    assert_closed_sessions(world)
     assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE'").fetchone()[0]==0
 
 

@@ -201,15 +201,23 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                 s=matches[0] if matches else None;result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
                 if result:
                     from .observation_screening import observation_revision
-                    base=assessment_identity(record,rule)
-                    if (s['revision']!=observation_revision(base[3],digest(capture)) or result.get('record_sha256')!=base[0]
-                        or result.get('config_sha256')!=base[2] or result.get('capture_checkpoint_sha256')!=digest(capture)
+                    config=result.get('config')
+                    if not isinstance(config,dict):raise Denied('BACKLOG_SCREENING_CONFIG')
+                    record_sha=digest(record);config_sha=digest(config)
+                    base_revision=digest(dict(record_sha256=record_sha,config_sha256=config_sha))
+                    # History is verified against its ORIGINAL frozen config,
+                    # not re-screened or invalidated by today's threshold/code.
+                    if (s['revision']!=observation_revision(base_revision,digest(capture)) or result.get('record_sha256')!=record_sha
+                        or result.get('config_sha256')!=config_sha or result.get('capture_checkpoint_sha256')!=digest(capture)
+                        or result.get('assessment_revision')!=s['revision'] or result.get('capture_bound') is not True
                         or result.get('source_sha256')!=capture['source_sha256']):raise Denied('BACKLOG_SCREENING_PROVENANCE')
                 records.append(dict(council=capture['council'],reference=record['reference'],source_record_id=record['source_record_id'],
                     source_url=record['source_url'],fields=record['fields'],observed_at=capture.get('observed_at'),
                     capture_key=root['key'],capture_sha256=digest(capture),source_sha256=capture['source_sha256'],archive=capture['durable_archive'],
                     screening_key=s['key'] if s else None,screening_state=s['state'] if s else 'NOT_PREPARED',
                     screening_outcome=routing_of(result)[1] if result else None,
+                    screening_config_sha256=result.get('config_sha256') if result else None,
+                    screening_matches_current_rule=result.get('config_sha256')==digest(rule.config()) if result else None,
                     processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
                     application_admitted=None,extraction_complete=None,downstream_state='NOT_TRACKED_BY_INTAKE'))
     captures=[dict(capture_key=r['key'],council=r['subject']['council'],scope=r['subject'],

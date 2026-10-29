@@ -19,7 +19,7 @@ from app.ingestion.ledger import Denied, digest
 from app.ingestion.listing_screening import V3_CONTRACT, code_binding
 from app.ingestion.nomination import derive_nominees
 from app.pipeline.discovery_contract import DiscoveryEnvelope, WindowEvidence
-from .limit_reconciliation import reconcile_items
+from .limit_reconciliation import reconcile_items,INTAKE_SCOPE_SECONDS
 from .operational_controller import AcceptanceBinding, ControllerLedger, DatabaseBudget, execute
 from .v3_admission import V3AdmissionBinding, factual_binding
 
@@ -68,7 +68,7 @@ class ChainCaller:
             statements=sum(b.statements for b in self.budgets)
             attempts=sum(b.attempts for b in self.budgets)
             returned=sum(b.returned_bytes for b in self.budgets)
-            left=300-(time.monotonic()-self.intake_started)-30
+            left=INTAKE_SCOPE_SECONDS-(time.monotonic()-self.intake_started)-30
             if statements>1040-36 or attempts>40-3 or returned>=4*1024**2 or left<=0:
                 raise Denied('INTAKE_AGGREGATE_CLOSURE_RESERVE')
             kw.update(statements=min(kw.get('statements',120),1040-statements-16),
@@ -79,7 +79,7 @@ class ChainCaller:
         if self.intake_run is not None:kw=self.intake_run.database_limits(kw)
         budget = DatabaseBudget(stop_file=self.stop_file, **kw) if self.stop_file else DatabaseBudget(**kw)
         if self.intake_run is not None:self.intake_run.budgets.append(budget)
-        if self.intake_only:budget.hard_stop_at=self.intake_started+270
+        if self.intake_only:budget.hard_stop_at=self.intake_started+INTAKE_SCOPE_SECONDS-30
         self.budgets.append(budget)
         return budget
 

@@ -116,7 +116,7 @@ def screening_registration(owner,binding,contract,root,receipt,rule,*,revision,i
     _capture_inputs(binding,contract,root,receipt,item_limits)
     if receipt.get('evidence_label') and not allow_test_evidence:raise Denied('TEST_EVIDENCE_NOT_LIVE')
     batches,screens=_screen_items(binding,root,receipt,rule,item_limits,capture_bound=capture_bound)
-    if not _completed and pending_grant_problems((owner.grant_expiry or owner.expiry).timestamp()-time.time(),phase='SCREENING',batches=len(batches)):
+    if not _completed and pending_grant_problems((owner.grant_expiry or owner.expiry).timestamp()-time.time(),phase='SCREENING',batches=len(batches),cumulative_screening=capture_bound):
         raise Denied('SCREENING_INSUFFICIENT_LIFETIME')
     rows=[root,*batches,*screens.values()]
     bindings,grant=owner.build_grant(rows,[],capture_key=root['key'],source_calls=0,capture_only=False,screening=rule)

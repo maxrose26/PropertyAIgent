@@ -83,9 +83,16 @@ def reconcile(binding, item_limits, *, lifetime_seconds, batches, nominees):
     return layers(binding, item_limits, lifetime_seconds=lifetime_seconds)
 
 
-def pending_grant_problems(lifetime_seconds,*,phase,batches=0,nominees=0):
+INTAKE_SCOPE_SECONDS = 300
+
+
+def pending_grant_problems(lifetime_seconds,*,phase,batches=0,nominees=0,cumulative_screening=False):
     """New staged path only: completed stages consume no second expiry reservation."""
     pending={'CAPTURE':1,'SCREENING':batches,'ADMISSION':nominees}
     if phase not in pending:raise Denied('STAGED_PHASE')
-    required=STAGE_LEASE_SECONDS*pending[phase]+30  # unchanged closure reserve
+    if type(cumulative_screening) is not bool or cumulative_screening and phase!='SCREENING':raise Denied('STAGED_PHASE')
+    # Intake's explicit mode enforces ONE cumulative scope deadline through the
+    # production DatabaseBudget, rather than granting 165s anew to every batch.
+    # Historical callers retain their original per-item lifetime calculation.
+    required=(INTAKE_SCOPE_SECONDS if cumulative_screening else STAGE_LEASE_SECONDS*pending[phase])+30
     return [] if isinstance(lifetime_seconds,(int,float)) and required<=lifetime_seconds<=GRANT_MAX_SECONDS else ['grant.pending_lifetime_seconds']
