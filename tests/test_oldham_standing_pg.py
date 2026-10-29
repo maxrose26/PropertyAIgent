@@ -138,14 +138,19 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
             return original_failed(exc)
         op.failed=test_failed
         result=op.execute()
+        from verification.ingestion_storage.operational_outcome import finalise
+        terminal=[]
+        result=finalise(op.journal,result,input_seconds=0,active_started=op.started,external_bytes=op.published+op.runtime_packet_bytes,output=lambda line,**kw:terminal.append(json.loads(line)))
+        owner_terminal=terminal[-1]
         print('FIXTURE_RESULT:',json.dumps(result,sort_keys=True),flush=True)
         if worker:worker.join(timeout=125)
         assert not errors,errors
         assert worker is None or not worker.is_alive()
-        RESULTS.append(dict(scenario=scenario,owner=result,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs'],actual_loopback_http_requests=len(requests)-http_started,fixture_transport_initialization_requests=http_started))
+        RESULTS.append(dict(scenario=scenario,owner=result,owner_terminal=owner_terminal,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs'],actual_loopback_http_requests=len(requests)-http_started,fixture_transport_initialization_requests=http_started))
         success=scenario in ('standing_success','standing_nominee','standing_delayed')
         if success:
             assert result['status']=='COMPLETED' and result['cleanup']=='CLOSED',result
+            assert owner_terminal['exported_bytes']<=2*1024**2-8192
             sealed=json.loads((tmp_path/'runtime-output/final-result.json').read_text())
             assert sealed['published_cleanup']==('PENDING_MEMORY_SCOPE_CLOSURE' if os.environ.get('OLDHAM_STANDING_NATIVE')=='1' else 'CLOSED')
             assert result['records']==5 and result['nominees']==int(scenario=='standing_nominee')
