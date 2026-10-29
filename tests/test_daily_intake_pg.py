@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 import pytest
 from app.ingestion.daily_intake import intake_slot, backlog
-from app.ingestion.ledger import Denied
+from app.ingestion.ledger import Denied, UncertainPersistence
 from tests.e2e_pg_world import disposable_world
 from tests.e2e_chain_caller import Chain, snapshot, changed_tables, restricted_sessions
 from tests.e2e_connection_support import entry, SCHEME
@@ -104,6 +104,23 @@ def test_required_publication_failure_leaves_no_completed_capture(world,tmp_path
     with pytest.raises(Denied,match='RECONCILE_NO_SOURCE_REPLAY'):
         intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
     assert calls==[1]
+
+
+def test_lost_checkpoint_acknowledgement_stops_without_recollection(world,tmp_path,monkeypatch):
+    chain,collect,prepare,calls=setup_intake(world,tmp_path,'idox','daily-lost-ack')
+    from app.ingestion.sql_ledger import SQLLedger
+    original=SQLLedger.checkpoint
+    def lose_ack(self,claim,receipt):
+        original(self,claim,receipt)  # real restricted SQL commit, then injected ack loss
+        raise UncertainPersistence('SYNTHETIC_ACK_LOSS')
+    with monkeypatch.context() as m:
+        m.setattr(SQLLedger,'checkpoint',lose_ack)
+        with pytest.raises(UncertainPersistence):intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
+    saved=chain.caller.read_intake_items([chain.root['key']])[0]
+    assert saved['checkpoint']['durable_archive']['readback_verified'] and saved['state']=='CLAIMED'
+    with pytest.raises(Denied,match='RECONCILE_NO_SOURCE_REPLAY'):
+        intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
+    assert calls==[1] and restricted_sessions(world['boot'])==0
 
 
 def test_changed_observations_have_distinct_assessment_identity(world,tmp_path):
