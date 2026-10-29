@@ -153,3 +153,13 @@ def test_stored_screening_package_projection_keeps_full_provenance():
     assert p.screening_authority_digest(r)!=expected
     r['targets']={'unexpected':{}}
     with pytest.raises(Denied):p.screening_authority_digest(r)
+
+
+def test_runtime_handoff_preserves_owner_active_clock(monkeypatch):
+    from verification.ingestion_storage import oldham_standing_owner as module
+    r=object.__new__(module.StandingOperation);r.started=100
+    monkeypatch.setattr(module.time,'monotonic',lambda:175)
+    observed=datetime.fromisoformat(r.original_active_start())
+    assert 74<=(datetime.now(timezone.utc)-observed).total_seconds()<76
+    monkeypatch.setattr(module.time,'monotonic',lambda:550)
+    with pytest.raises(Denied):r.original_active_start()

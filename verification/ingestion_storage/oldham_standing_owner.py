@@ -4,7 +4,7 @@ All SQL issuance/revocation remains in OldhamOwner. No provision, installation,
 retirement or compensating rollback is invoked by a batch operation.
 """
 from copy import deepcopy
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
 import hashlib,io,json,time,zipfile,re
 from pathlib import Path
@@ -197,10 +197,15 @@ class StandingOperation(Operation):
             if self.published+persisted-self.runtime_copied_bytes+size>self.export_reservation['owner_limit']:raise Denied('OLDHAM_STANDING_OWNER_EXPORT_RESERVE')
         return super().publish(files,part)
 
+    def original_active_start(self):
+        elapsed=time.monotonic()-self.started
+        if not 0<=elapsed<450:raise Denied('OLDHAM_STANDING_ORIGINAL_CLOCK')
+        return (datetime.now(timezone.utc)-timedelta(seconds=elapsed)).isoformat()
+
     def execute(self):
         try:
             self.preflight_standing()
-            claim=plan.public_claim(self.selection,self.data,datetime.now(timezone.utc).isoformat())
+            claim=plan.public_claim(self.selection,self.data,self.original_active_start())
             from .standing_access import export_reservation
             base=self.published+sum(f.stat().st_size for f in self.journal.root.rglob('*') if f.is_file())
             for _ in range(10):
