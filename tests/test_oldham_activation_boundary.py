@@ -78,3 +78,27 @@ def test_actual_diagnostic_patch_predicate_and_changed_attributes():
     for field,value in ((9,'s'),(9,'i'),(8,'plpgsql'),(4,False),(2,'OTHER_OWNER'),(1,'b'*64),(3,[])):
         changed=list(good);changed[field]=value
         assert not check(changed)
+
+
+def test_search_path_pin_is_confined_to_the_provider_block_and_adds_nothing_else():
+    gate=activation_gate(True);pin="PERFORM set_config('search_path','pg_catalog',true);";restore="PERFORM set_config('search_path',stats_path,true);"
+    assert gate.count(pin)==1 and gate.count(restore)==1 and gate.count("stats_path:=current_setting('search_path');")==1 and 'stats_path text;' in gate
+    start,end=gate.index("stats_path:=current_setting('search_path');"),gate.index(restore)+len(restore)
+    block=gate[start:end]
+    assert "md5(pg_get_viewdef(stats.oid,true))<>stats.expected" in block and "RAISE EXCEPTION 'STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED'" in block and "RAISE EXCEPTION 'STATISTICS_FUNCTION_BOUNDARY'" in block
+    assert "RAISE EXCEPTION 'STATISTICS_BASELINE_BOUNDARY'" in block and gate.count('pg_get_viewdef')==1      # the only search_path-sensitive construct is inside the pinned block
+    outside=gate[:start]+gate[end:]
+    assert "set_config(" not in outside and 'pg_get_viewdef' not in outside and 'search_path' not in outside.replace("current_setting('search_path')",'')
+    assert "e.extversion='1.11'" in block and 'ad1495ce5b4c54e4501e907a1f6aae8c' in block and '1807985dc152d2828720e1272d549775' in block      # reviewed hashes unchanged, none added
+    assert gate.count('md5(')==1 and gate.count('ad1495ce5b4c54e4501e907a1f6aae8c')==1 and gate.count('1807985dc152d2828720e1272d549775')==1
+
+
+def test_pin_does_not_alter_the_other_gate_codes_or_the_historical_gates():
+    import re
+    gate=activation_gate(True)
+    for code in ('LOGIN_FLAGS_OR_PARTIAL_ACTIVATION','EXACT_RUNTIME_MEMBERSHIP','FORBIDDEN_RUNTIME_MEMBERSHIP','AMBIENT_SCHEMA_CREATE','AMBIENT_UNRELATED_TABLE_ACCESS','AMBIENT_UNRELATED_SEQUENCE','AMBIENT_UNREVIEWED_DEFINER',
+                 'WORKER_DIRECT_LEDGER_MUTATION','REQUIRED_RUNTIME_FUNCTION_MISSING','RECOVERY_MUST_REMAIN_DORMANT','STATISTICS_BASELINE_BOUNDARY','STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED','STATISTICS_FUNCTION_BOUNDARY'):
+        assert "RAISE EXCEPTION '%s'"%code in gate,code
+    unpinned=re.sub(r"  stats_path:=current_setting\('search_path'\);\n  PERFORM set_config\('search_path','pg_catalog',true\);\n",'',gate).replace("  PERFORM set_config('search_path',stats_path,true);\n",'').replace(' stats_path text;','')
+    assert 'set_config' not in unpinned and 'stats_path' not in unpinned and len(gate)-len(unpinned)<400      # removing exactly the pin yields the previous gate text
+    assert activation_gate()==ACTIVATION.read_text().split('ALTER ROLE ingestion_worker_login LOGIN;')[0]+'ROLLBACK;'      # the historical three-login gate is byte-unchanged

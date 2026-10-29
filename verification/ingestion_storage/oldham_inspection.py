@@ -243,26 +243,30 @@ def project_sessions(rows,visible):
 
 class InspectionRunner(ProbeRunner):
     """Capability-free, like the probe it extends: a connect closure, a journal, a progress record and the native-memory object. Every statement passes `send`."""
+    bounds=BOUND
+    allowed_statements=staticmethod(allowed)
+    statement_plan=staticmethod(planned)
+
     def __init__(self,*a,**kw):
         super().__init__(*a,**kw)
         self.rollbacks=0;self.commits=0;self.inspection=None;self.sent=[];self.in_transaction=False
 
     def check(self):
         if self.memory is not None:self.memory.snapshot()
-        if time.monotonic()-self.started>=BOUND['active_seconds']:raise ProbeDenied('ACTIVE_WINDOW_EXHAUSTED')
+        if time.monotonic()-self.started>=self.bounds['active_seconds']:raise ProbeDenied('ACTIVE_WINDOW_EXHAUSTED')
         if self.stop_file.exists():raise ProbeDenied('OWNER_STOP')
 
     def send(self,connection,name,statement,params=None):
-        if statement not in allowed():raise ProbeDenied('STATEMENT_UNEXPECTED')           # nothing but the reviewed constants can ever be sent
-        if self.statements>=BOUND['driver_statements']:raise ProbeDenied('STATEMENT_BOUND')
+        if statement not in self.allowed_statements():raise ProbeDenied('STATEMENT_UNEXPECTED')           # nothing but the reviewed constants can ever be sent
+        if self.statements>=self.bounds['driver_statements']:raise ProbeDenied('STATEMENT_BOUND')
         self.check()
-        if self.database_seconds_used()>=BOUND['database_seconds']:raise ProbeDenied('ACTIVE_WINDOW_EXHAUSTED')
+        if self.database_seconds_used()>=self.bounds['database_seconds']:raise ProbeDenied('ACTIVE_WINDOW_EXHAUSTED')
         self.statements+=1;self.sent.append(name)
         cursor=connection.execute(statement,params) if params is not None else connection.execute(statement)
         rows=cursor.fetchall() if cursor.description else []
         result=cursor.pgresult
         if result is not None:self.returned_bytes+=sum(len(result.get_value(r,k) or b'') for r in range(result.ntuples) for k in range(result.nfields))
-        if self.returned_bytes>BOUND['returned_data_value_bytes']:raise ProbeDenied('RESPONSE_BOUND')
+        if self.returned_bytes>self.bounds['returned_data_value_bytes']:raise ProbeDenied('RESPONSE_BOUND')
         return rows
 
     def database_seconds_used(self):
@@ -300,11 +304,11 @@ class InspectionRunner(ProbeRunner):
         return about
 
     def common(self,components):
-        return dict(super().common(components),mode=MODE,inspection_bound=BOUND)
+        return dict(super().common(components),mode=MODE,inspection_bound=self.bounds)
 
     def rollback_after_failure(self,connection):
         """One bounded ROLLBACK attempt on the failure path, counted like any statement; a broken connection is simply closed (the server aborts an open transaction when the session ends)."""
-        if connection is None or not self.in_transaction or getattr(connection,'closed',True) or self.statements>=BOUND['driver_statements']:return
+        if connection is None or not self.in_transaction or getattr(connection,'closed',True) or self.statements>=self.bounds['driver_statements']:return
         try:
             self.statements+=1;self.sent.append('rollback_after_failure');connection.execute(ROLLBACK);self.rollbacks+=1
         except BaseException:pass
@@ -312,9 +316,9 @@ class InspectionRunner(ProbeRunner):
 
     def execute(self):
         try:
-            self.emit('inspection_intent',dict(bound=BOUND,planned_statements=[n for n,_,_ in planned()],statement_sha256s={n:hashlib.sha256(sql.encode()).hexdigest() for n,sql,_ in planned()},absent_capabilities=list(ABSENT_CAPABILITIES)))
+            self.emit('inspection_intent',dict(bound=self.bounds,planned_statements=[n for n,_,_ in self.statement_plan()],statement_sha256s={n:hashlib.sha256(sql.encode()).hexdigest() for n,sql,_ in self.statement_plan()},absent_capabilities=list(ABSENT_CAPABILITIES)))
             self.check()
-            if self.attempts>=BOUND['connection_attempts']:raise ProbeDenied('CONNECTION_ATTEMPT_BOUND')
+            if self.attempts>=self.bounds['connection_attempts']:raise ProbeDenied('CONNECTION_ATTEMPT_BOUND')
             self.attempts+=1;begun=time.monotonic();self.phase='DRIVER_CONNECT'
             try:
                 self.conn=self.connect();self.opened+=1;self.connected_at=time.monotonic()
@@ -332,7 +336,7 @@ class InspectionRunner(ProbeRunner):
     def accounting(self):
         base=super().accounting()
         admin=base['administration']
-        admin['driver_statements']=dict(value=self.statements,basis='CLIENT_COUNTED_INCLUDING_BEGIN_AND_ROLLBACK',names=list(self.sent),ceiling=BOUND['driver_statements'],planned_maximum=BOUND['planned_statements'])
+        admin['driver_statements']=dict(value=self.statements,basis='CLIENT_COUNTED_INCLUDING_BEGIN_AND_ROLLBACK',names=list(self.sent),ceiling=self.bounds['driver_statements'],planned_maximum=self.bounds['planned_statements'])
         admin['rollbacks']=measured(self.rollbacks);admin['commits']=measured(self.commits)
         admin['returned_data_value_bytes']=measured(self.returned_bytes)
         for key in ('role_changes','function_installations','grants_or_exceptions','queue_mutations','credential_generations','secret_mappings','council_requests'):admin[key]=dict(ABSENT)
@@ -346,15 +350,15 @@ class InspectionRunner(ProbeRunner):
                     **self.common(components))
 
 
-def prepare_inspection(r,raw,started,*,journal,memory,progress,baseline,dns_run=subprocess.run,dns_command=None,connect_factory=None):
-    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command)
+def prepare_inspection(r,raw,started,*,journal,memory,progress,baseline,dns_run=subprocess.run,dns_command=None,connect_factory=None,provider=False):
+    prepared=prepare_connection(r,raw,progress=progress,dns_run=dns_run,dns_command=dns_command,**({"provider_inspection":True} if provider else {}))
     connect=prepared.connect
     if connect_factory is not None:
         def connect():
             progress.database_connection_calls+=1
             return connect_factory()
     with progress.stage('RUNNER_CONSTRUCTION'):
-        try:return InspectionRunner(journal,connect,progress,memory,baseline=baseline,started=started)
+        try:return (ProviderInspection if provider else InspectionRunner)(journal,connect,progress,memory,baseline=baseline,started=started)
         except (KeyError,TypeError,ValueError,AttributeError):raise PreparationFailure('RUNNER_CONSTRUCTION','RUNNER_CONSTRUCTION_FAILED') from None
 
 
@@ -365,16 +369,17 @@ def statements_sha256():
     return hashlib.sha256(json.dumps(sorted(allowed()),sort_keys=True).encode()).hexdigest()
 
 
-def validate_registration(body,sha):
+def validate_registration(body,sha,*,provider=False):
+    mode,authority,status,state,directory,bounds=(PROVIDER_MODE,PROVIDER_AUTHORITY,PROVIDER_STATUS,PROVIDER_STATE,PROVIDER_DIRECTORY,PROVIDER_BOUND) if provider else (MODE,AUTHORITY,STATUS,STATE,EVIDENCE_DIRECTORY,BOUND)
     if hashlib.sha256(body).hexdigest()!=sha:raise ValueError('REGISTRATION_SHA256')
     r=json.loads(body)
     if not isinstance(r,dict) or set(r)!=REGISTRATION_KEYS:raise ValueError('REGISTRATION_EXACT_KEYS')
-    if r['mode']!=MODE or r['authority']!=AUTHORITY or r['status']!=STATUS or r['state_directory']!=STATE:raise ValueError('EXACT_INSPECTION_APPROVAL_REQUIRED')
-    if r['limits']!=BOUND or r['absent_capabilities']!=list(ABSENT_CAPABILITIES) or r['statements_sha256']!=statements_sha256():raise ValueError('INSPECTION_LIMITS_OR_BOUNDARY_BINDING')
+    if r['mode']!=mode or r['authority']!=authority or r['status']!=status or r['state_directory']!=state:raise ValueError('EXACT_INSPECTION_APPROVAL_REQUIRED')
+    if r['limits']!=bounds or r['absent_capabilities']!=list(ABSENT_CAPABILITIES) or r['statements_sha256']!=(provider_statements_sha256() if provider else statements_sha256()):raise ValueError('INSPECTION_LIMITS_OR_BOUNDARY_BINDING')
     expiry=datetime.fromisoformat(r['expires_at']);now=datetime.now(timezone.utc)
     if expiry.tzinfo is None or not now<expiry<=now+timedelta(hours=2):raise ValueError('INSPECTION_EXPIRY')
-    if r['evidence_directory']!=EVIDENCE_DIRECTORY or not isinstance(r['hashes'],dict) or not r['hashes']:raise ValueError('EVIDENCE_BINDING')
-    manifest=json.loads((Path(EVIDENCE_DIRECTORY)/'MANIFEST.json').read_text())
+    if r['evidence_directory']!=directory or not isinstance(r['hashes'],dict) or not r['hashes']:raise ValueError('EVIDENCE_BINDING')
+    manifest=json.loads((Path(directory)/'MANIFEST.json').read_text())
     if set(r['hashes'])!=set(manifest['bound_paths']):raise ValueError('HASHES_MUST_EQUAL_MANIFEST')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if revision!=r['revision'] or subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()!=r['tree'] or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CLEAN_REVIEWED_CHECKOUT')
@@ -384,24 +389,174 @@ def validate_registration(body,sha):
     if r['controller_sha256']!=hashlib.sha256(Path(__file__).read_bytes()).hexdigest() or r['ca_sha256']!=PEM_SHA256:raise ValueError('CONTROLLER_CA_BINDING')
     return r
 
+# Fixed provider profile of THIS inspection route. No arbitrary SQL/file input.
+PROVIDER_MODE='OLDHAM_PROVIDER_COMPARISON_ONLY'
+PROVIDER_AUTHORITY='AUTHORISE_OLDHAM_PROVIDER_COMPARISON_ONCE_20261029'
+PROVIDER_STATUS='OWNER_APPROVED_OLDHAM_PROVIDER_COMPARISON_ONCE'
+PROVIDER_STATE='oldham-provider-comparison-once-20261029'
+PROVIDER_DIRECTORY='docs/design/oldham-provider-inspection-20261029'
+PROVIDER_SQL=Path('docs/design/oldham-standing-access-20261029/provider-comparison-readonly.sql')
+PROVIDER_SQL_SHA256='532842a74601f5f2d8bd4df60cf407aae7d618132abb2e6d7a546a958889fc6a'
+PROVIDER_BOUND=dict(BOUND,driver_statements=16,planned_statements=7,returned_data_value_bytes=16384,
+                    database_seconds=30,active_seconds=30,persisted_evidence_bytes=32768,terminal_json_bytes=32768)
+PROVIDER_TIMING=dict(input_seconds=120,active_seconds=30,work_seconds=22,diagnostic_seconds=3,report_seconds=5,outer_seconds=150)
+VIEW_HASHES={'pg_stat_statements':'ad1495ce5b4c54e4501e907a1f6aae8c','pg_stat_statements_info':'1807985dc152d2828720e1272d549775'}
+PROVIDER_FUNCTIONS=('pg_stat_statements','pg_stat_statements_info','pg_stat_statements_reset')
+VIEW_COLUMNS=('object','role','present','view_kind','no_options','view_hash','reviewed_definition','extension_owner','extension_member','no_forbidden_table_privileges','no_forbidden_column_privileges','schema_denied')
+FUNCTION_COLUMNS=('object','present','extension_owner','no_configuration','reviewed_function_kind','reviewed_language','no_security_definer','reviewed_library','reviewed_symbol','reviewed_arguments','reviewed_result','reviewed_setof','extension_member','reviewed_extension_version','reviewed_extension_schema','overload_count')
+
+
+def provider_plan():
+    raw=PROVIDER_SQL.read_bytes()
+    if PROVIDER_SQL.is_symlink() or hashlib.sha256(raw).hexdigest()!=PROVIDER_SQL_SHA256:raise ValueError('PROVIDER_FIXED_SQL_BINDING')
+    # This hash-pinned file has no quoted semicolons. This is not a SQL parser
+    # or a caller-selected query interface.
+    statements=[s.strip() for s in _re.sub(r'(?m)^--[^\n]*','',raw.decode()).split(';') if s.strip()]
+    if len(statements)!=7:raise ValueError('PROVIDER_FIXED_SQL_SHAPE')
+    return [(name,s,None) for name,s in zip(('begin','statement_timeout','lock_timeout','identity','views','functions','rollback'),statements)]
+
+
+def provider_statements_sha256():
+    return hashlib.sha256(json.dumps(sorted(s for _,s,_ in provider_plan()),sort_keys=True).encode()).hexdigest()
+
+
+def evaluate_provider(views,functions):
+    """Only allowlisted identities, booleans, counts and fixed-size hashes escape.
+
+    INCOMPLETE takes precedence over MISMATCH; known mismatches are retained.
+    No truthiness coercion, NULL-as-false, or empty/all() acceptance.
+    """
+    expected_views={(v,r) for v in VIEW_HASHES for r in RUNTIME_LOGINS[:2]}
+    expected_functions=set(PROVIDER_FUNCTIONS)
+    mismatches=[];incomplete=[];observations=[]
+    for kind,rows,columns,expected,keycols in (
+        ('view',views,VIEW_COLUMNS,expected_views,2),
+        ('function',functions,FUNCTION_COLUMNS,expected_functions,1)):
+        seen=set()
+        if len(rows)!=len(expected):incomplete.append(kind+':ROW_COUNT')
+        for row in rows:
+            if not isinstance(row,(list,tuple)) or len(row)!=len(columns):incomplete.append(kind+':SHAPE');continue
+            key=tuple(row[:2]) if keycols==2 else row[0]
+            try:known=key in expected;duplicate=key in seen
+            except TypeError:incomplete.append(kind+':IDENTITY_SHAPE');continue
+            if not known:incomplete.append(kind+':UNEXPECTED_IDENTITY');continue
+            if duplicate:incomplete.append(kind+':DUPLICATE');continue
+            seen.add(key);d=dict(zip(columns,row));identity=':'.join(key) if isinstance(key,tuple) else key
+            if d['present'] is not True:incomplete.append(kind+':'+identity+':MISSING_OBJECT')
+            for column,value in d.items():
+                if column in ('object','role'):continue
+                want=True
+                if column=='view_hash':
+                    want=VIEW_HASHES[d['object']]
+                    if not isinstance(value,str) or _re.fullmatch('[a-f0-9]{32}',value) is None:incomplete.append(identity+':view_hash');continue
+                elif column=='overload_count':
+                    want=1
+                    if type(value) is not int or value<0:incomplete.append(identity+':overload_count');continue
+                    if value==0:incomplete.append(identity+':MISSING_FUNCTION')
+                elif type(value) is not bool:
+                    incomplete.append(identity+':'+column);continue
+                observations.append(dict(object=identity,predicate=column,observed=value,expected=want))
+                if value!=want:mismatches.append(dict(object=identity,predicate=column,observed=value,expected=want))
+            if kind=='view' and d['no_forbidden_table_privileges'] is None or kind=='view' and d['no_forbidden_column_privileges'] is None:incomplete.append(identity+':ROLE_OR_PRIVILEGE_UNAVAILABLE')
+        if seen!=expected:incomplete.append(kind+':MISSING_IDENTITY')
+    status='INCOMPLETE' if incomplete else 'MISMATCH' if mismatches else 'MATCH'
+    return dict(status=status,observations=observations,mismatches=mismatches,incomplete=sorted(set(incomplete)),
+                scope='CURRENT_PROVIDER_PREDICATE_GROUPS_ONLY',historical_cause='NOT_ESTABLISHED',production_continuation=False)
+
+
+class ProviderJournal(Journal):
+    """Partition 64KiB: at most 32KiB files and 32KiB terminal JSON.
+
+    Events stop at16KiB to retain result space. Overflow is a refusal, never a
+    truncated successful conclusion. Existing journal and session are reused.
+    """
+    def emit(self,event,payload):
+        from .operational_publication import canonical
+        raw=canonical(dict(sequence=self.sequence,event=event,payload=payload,previous_sha256=self.head,sha256='0'*64))+b'\n'
+        if self.file.stat().st_size+len(raw)>16384:raise ProbeDenied('RESPONSE_BOUND')
+        return super().emit(event,payload)
+
+    def save(self,name,value):
+        from .operational_publication import canonical
+        size=sum(p.stat().st_size for p in self.root.rglob('*') if p.is_file() and p.name!=name)
+        if size+len(canonical(value))>32768:raise ProbeDenied('RESPONSE_BOUND')
+        return super().save(name,value)
+
+
+def provider_output(journal,output=print):
+    def bounded(line,**kwargs):
+        size=len(line.encode())+1
+        files=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
+        if size>32768 or files+size>65536:raise ProbeDenied('RESPONSE_BOUND')
+        output(line,**kwargs)
+    return bounded
+
+
+class ProviderInspection(InspectionRunner):
+    bounds=PROVIDER_BOUND
+    statement_plan=staticmethod(provider_plan)
+    allowed_statements=staticmethod(lambda:{s for _,s,_ in provider_plan()})
+
+    def send(self,connection,name,statement,params=None):
+        if statement not in self.allowed_statements() or params is not None:raise ProbeDenied('STATEMENT_UNEXPECTED')
+        if self.statements>=self.bounds['driver_statements']-1:raise ProbeDenied('STATEMENT_BOUND') # one rollback reserved
+        self.check()
+        self.statements+=1;self.sent.append(name)
+        cursor=connection.execute(statement)
+        cap={'identity':1,'views':4,'functions':3}.get(name,0)
+        rows=cursor.fetchmany(cap+1) if cursor.description else []
+        if len(rows)>cap:raise ProbeDenied('RESPONSE_BOUND')
+        result=cursor.pgresult
+        if result is not None:self.returned_bytes+=sum(len(result.get_value(r,k) or b'') for r in range(result.ntuples) for k in range(result.nfields))
+        if self.returned_bytes>self.bounds['returned_data_value_bytes']:raise ProbeDenied('RESPONSE_BOUND')
+        self.check()
+        return rows
+
+    def observe(self,connection):
+        values={}
+        for name,statement,_ in provider_plan():
+            # Mark before sending BEGIN: even lost acknowledgement gets a
+            # bounded rollback attempt, then close in the inherited finally.
+            if name=='begin':self.in_transaction=True
+            rows=self.send(connection,name,statement)
+            if name=='rollback':self.in_transaction=False;self.rollbacks+=1
+            if name=='identity':
+                if rows!=[('postgres','postgres',True)]:raise ProbeDenied('RESPONSE_SHAPE')
+            if name in ('views','functions'):values[name]=rows
+        return evaluate_provider(values['views'],values['functions'])
+
+    def common(self,components):
+        return dict(super().common(components),mode=PROVIDER_MODE)
+
+    def finish(self):
+        components=self.closure()
+        status=self.inspection['status'] if components['overall']=='CLOSED' else 'INCOMPLETE'
+        return dict(status='PROVIDER_COMPARISON_'+status,inspection=self.inspection,**self.common(components))
+
+    def failed(self,exc):
+        result=super().failed(exc)
+        result.update(status='PROVIDER_COMPARISON_INCOMPLETE',inspection=dict(status='INCOMPLETE',production_continuation=False,historical_cause='NOT_ESTABLISHED'))
+        return result
+
+
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--registration',type=Path,required=True);p.add_argument('--registration-sha256',required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--provider-comparison',action='store_true');p.add_argument('--registration',type=Path,required=True);p.add_argument('--registration-sha256',required=True);a=p.parse_args()
     if sys.platform!='linux' or not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_LINUX_SECURE_TTY_REQUIRED')
     if any(k.startswith('PG') for k in os.environ):raise SystemExit('LIBPQ_ENVIRONMENT_OVERRIDE')
     if any(os.environ.get(k) for k in ('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN')):raise SystemExit('NO_GITHUB_CREDENTIAL_PERMITTED_IN_INSPECTION')
     if a.registration.is_symlink() or a.registration.stat().st_size>16384:raise SystemExit('REGISTRATION_BOUND')
-    r=validate_registration(a.registration.read_bytes(),a.registration_sha256)
+    r=validate_registration(a.registration.read_bytes(),a.registration_sha256,**({"provider":True} if a.provider_comparison else {}))
     from .operational_memory import OperationalMemory
     memory=OperationalMemory()                                                  # positive kernel enforcement BEFORE any credential is read
     state=Path.home()/'.local/state/propertyaigent';state.mkdir(mode=0o700,exist_ok=True,parents=True)
-    journal=Journal(state/r['state_directory'])                                 # exclusive create: a second use of the same authority cannot start
+    journal=(ProviderJournal if a.provider_comparison else Journal)(state/r['state_directory'])                                 # exclusive create: a second use of the same authority cannot start
     journal.emit('consumed',dict(authority=r['authority'],registration_sha256=a.registration_sha256))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     progress=Progress();baseline=owned_resources()
-    prepare=lambda raw,started:prepare_inspection(r,raw,started,journal=journal,memory=memory,progress=progress,baseline=baseline)
-    result=session(journal,r['expires_at'],hidden_input,prepare,memory=memory,timing=TIMING,progress=progress,baseline=baseline)
-    ok=result.get('status')=='OLDHAM_READONLY_INSPECTION_COMPLETE' and result.get('cleanup')=='CLOSED'
+    prepare=lambda raw,started:prepare_inspection(r,raw,started,journal=journal,memory=memory,progress=progress,baseline=baseline,provider=a.provider_comparison)
+    result=session(journal,r['expires_at'],hidden_input,prepare,memory=memory,timing=PROVIDER_TIMING if a.provider_comparison else TIMING,progress=progress,baseline=baseline,**({"output":provider_output(journal)} if a.provider_comparison else {}))
+    ok=result.get('status')==('PROVIDER_COMPARISON_MATCH' if a.provider_comparison else 'OLDHAM_READONLY_INSPECTION_COMPLETE') and result.get('cleanup')=='CLOSED'
     raise SystemExit(0 if ok else 1)
 
 

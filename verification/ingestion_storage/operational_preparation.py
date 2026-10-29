@@ -90,11 +90,12 @@ def resolve_addresses(progress,*,command=None,run=subprocess.run,timeout=DNS_TIM
     return sorted(str(a) for a in parsed)[0]
 
 
-def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None,restricted_host=None,restricted_dns_command=None):
+def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None,restricted_host=None,restricted_dns_command=None,provider_inspection=False):
     """The credential-dependent, connection-free preparation shared by every operational path: expiry, exact route, password presence, reviewed CA, bounded DNS, driver import.
 
     Returns the parsed route, the CA path, the selected address and a `connect` closure. No connection is made here; `connect` only counts and opens when a caller invokes it.
     The startup options are the previously reviewed values and are deliberately unchanged."""
+    if type(provider_inspection) is not bool:raise ValueError('FIXED_PROVIDER_PROFILE')
     with progress.stage('REGISTRATION_EXPIRY'):
         if datetime.now(timezone.utc)>=datetime.fromisoformat(r['expires_at']):raise PreparationFailure('REGISTRATION_EXPIRY','REGISTRATION_EXPIRED')
     with progress.stage('ROUTE_VALIDATION'):
@@ -119,5 +120,6 @@ def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None,
         except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
     def connect():
         progress.database_connection_calls+=1
-        return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options=STARTUP_OPTIONS)
+        options='-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000' if provider_inspection else STARTUP_OPTIONS
+        return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options=options)
     return SimpleNamespace(route=u,ca=ca,hostaddr=selected,restricted_hostaddr=restricted_selected,connect=connect)

@@ -281,3 +281,44 @@ def test_database_free_text_never_reaches_the_report_or_the_journal(world,tmp_pa
         assert 'canary' not in blob
     finally:
         boot.execute('REVOKE "canary-role-88" FROM ingestion_worker_login');boot.execute('DROP ROLE "canary-role-88"')
+
+
+@pytest.mark.parametrize('timeout',[False,True])
+def test_fixed_provider_profile_real_readonly_connection(world,tmp_path,timeout):
+    """Real PG + fixed SQL; absent provider extension yields INCOMPLETE, not MATCH.
+
+    The local-only role matches the production identity check. No fixture result
+    claims to identify the production mismatch. Driver failure is a real server
+    statement timeout injected before the selected fixed query completes.
+    """
+    import psycopg
+    from psycopg import sql
+    from tests.e2e_pg_world import settings
+    raw,info,_,_=settings();boot=world['boot'];password='provider_fixture_only'
+    assert not boot.execute("SELECT 1 FROM pg_roles WHERE rolname='postgres'").fetchall()
+    boot.execute(sql.SQL('CREATE ROLE postgres SUPERUSER LOGIN PASSWORD {}').format(sql.Literal(password)))
+    log=[];holder={}
+    try:
+        def connect():
+            c=psycopg.connect(**dict(info,user='postgres',password=password,connect_timeout=3),autocommit=True,prepare_threshold=None,
+                options='-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000')
+            holder['raw']=c
+            rec=Recording(c,log)
+            if timeout:
+                execute=rec.execute
+                def timed(statement,params=None):
+                    if statement==dict((n,q) for n,q,_ in oi.provider_plan())['views']:
+                        # Test-only timeout acceleration; production remains5s.
+                        c.execute("SET LOCAL statement_timeout='10ms'")
+                        c.execute('SELECT pg_sleep(1)')
+                    return execute(statement,params)
+                rec.execute=timed
+            return rec
+        runner=oi.ProviderInspection(oi.ProviderJournal(tmp_path/'provider-pg'),connect,Progress(),Memory(),baseline=owned_resources(),started=time.monotonic())
+        result=runner.execute()
+        assert holder['raw'].closed and runner.attempts==1 and runner.statements<=16
+        assert log[-1]=='ROLLBACK'
+        assert result['status']=='PROVIDER_COMPARISON_INCOMPLETE'
+        if timeout:assert result['failure']['sqlstate']=='57014'
+        else:assert result['inspection']['status']=='INCOMPLETE' and any('MISSING' in x for x in result['inspection']['incomplete'])
+    finally:boot.execute('DROP ROLE postgres')

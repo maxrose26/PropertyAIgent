@@ -40,14 +40,22 @@ def derive(owner,binding,contract,*,revision,item_limits,root=None,receipt=None,
     if phase=='CAPTURE' and root is not None or phase in ('SCREENING','ADMISSION') and root is None:raise Denied('OLDHAM_PHASE_INPUT')
     if phase=='CAPTURE':
         reg=capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
-        reg.authority=authority_name(binding,'STAGED_CAPTURE',revision);return reg
+        reg.authority=authority_name(binding,'STAGED_CAPTURE',authority_revision(owner,revision));return reg
     if phase=='SCREENING':
         if nominees or detail_targets is not None:raise Denied('OLDHAM_SCREENING_NO_FACTS')
-        return screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
+        reg=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
+        if getattr(owner,'standing_capture_screening',False):reg.authority=authority_name(binding,'SCREENING',authority_revision(owner,revision))
+        return reg
     if phase=='ADMISSION':
         return admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,screening_rows=screening_rows,allow_test_evidence=allow_test_evidence)
     if root is None:return capture_registration(owner,binding,contract,contract.scope()['start'],contract.scope()['end'],revision=revision,item_limits=item_limits)
     return chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence)
+
+def authority_revision(owner,revision):
+    if not getattr(owner,'standing_capture_screening',False):return revision
+    seal=owner.bindings.get('manifest_sha256')
+    if getattr(owner,'capture_screening_only',False) is not True or not isinstance(seal,str) or len(seal)!=64 or any(c not in '0123456789abcdef' for c in seal):raise Denied('OLDHAM_STANDING_PACKAGE_IDENTITY')
+    return seal
 
 class OldhamOwner(Owner):
     """Separate entrypoint: historical Owner.register is never called or modified."""

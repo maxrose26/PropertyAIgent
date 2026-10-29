@@ -27,11 +27,12 @@ def early_outcome(failure,closure,progress=None):
 
 TIMING=dict(input_seconds=300,active_seconds=480,work_seconds=450,diagnostic_seconds=25,report_seconds=5,outer_seconds=790)
 
-def finalise(journal,result,*,input_seconds,active_started,output=print,external_bytes=0):
+def finalise(journal,result,*,input_seconds,active_started,output=print,external_bytes=0,export_limit=2*1024**2):
+    if type(export_limit) is not int or not 8192<export_limit<=2*1024**2:raise ValueError('EXPORT_LIMIT')
     result['phase_timing']=dict(credential_input_seconds=input_seconds,
         active_seconds_before_reporting=0 if active_started is None else time.monotonic()-active_started)
     saved=False
-    if type(external_bytes) is not int or not 0<=external_bytes<=2*1024**2:raise ValueError('EXTERNAL_OUTPUT_BOUND')
+    if type(external_bytes) is not int or not 0<=external_bytes<=export_limit:raise ValueError('EXTERNAL_OUTPUT_BOUND')
     try:
         raw=canonical(result)
         current=sum(p.stat().st_size for p in journal.root.rglob('*') if p.is_file())
@@ -46,7 +47,7 @@ def finalise(journal,result,*,input_seconds,active_started,output=print,external
             if receipt['terminal_json_bytes']==size:break
             receipt['terminal_json_bytes']=size;receipt['exported_bytes']=projected+size+external_bytes
         else:raise ValueError('OUTPUT_ACCOUNTING')
-        if size>256*1024 or receipt['exported_bytes']>2*1024**2-8192:raise ValueError('COMBINED_OUTPUT_BOUND')
+        if size>256*1024 or receipt['exported_bytes']>export_limit-8192:raise ValueError('COMBINED_OUTPUT_BOUND')
         # Both persisted replacement and terminal are checked before either effect.
         journal.save('final-result.json',result);saved=True
         output(line,flush=True)
