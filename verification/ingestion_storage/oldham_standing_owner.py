@@ -6,7 +6,7 @@ retirement or compensating rollback is invoked by a batch operation.
 from copy import deepcopy
 from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
-import hashlib,io,json,time,zipfile,re
+import hashlib,io,json,time,zipfile,re,os
 from pathlib import Path
 from app.ingestion.ledger import Denied,digest,DEFAULT_LIMITS
 from . import oldham_standing_plan as plan,oldham_owner_package as pkg
@@ -180,10 +180,20 @@ class StandingOperation(Operation):
         if sealed.get('accounting',{}).get('export_reservation')!=self.export_reservation or runtime_export>self.export_reservation['runtime_limit'] or len(result_raw)+len(events)>self.export_reservation['runtime_limit']:raise Uncertain('OLDHAM_STANDING_RUNTIME_EXPORT_RESERVATION')
         self.artifact_capacity(runtime_export+len(result_raw)+len(events))
         self.runtime_packet_bytes+=runtime_export
-        self.runtime_copied_bytes+=len(result_raw)+len(events)
-        self.journal.save('runtime-final-result.json',sealed);self.journal.save('runtime-events.jsonl',events)
+        self.preserve_runtime_originals(result_raw,events)
         self.result['runtime_exported_bytes']=runtime_export
         self.artifact_verified=True;self.hosted=sealed;return sealed
+
+    def preserve_runtime_originals(self,result_raw,events):
+        # These are original artifact bytes, not another operational Journal.
+        # Fixed names, exclusive creation, private mode and positive readback.
+        for name,raw in (('runtime-final-result.json',result_raw),('runtime-events.jsonl',events)):
+            path=self.journal.root/name
+            with path.open('xb',opener=lambda p,f:os.open(p,f,0o600)) as stream:
+                stream.write(raw);stream.flush();os.fsync(stream.fileno())
+            if path.read_bytes()!=raw:raise Uncertain('OLDHAM_STANDING_ORIGINAL_READBACK')
+            self.runtime_copied_bytes+=len(raw)
+        self.journal.sync_dir()
 
     def artifact_capacity(self,additional):
         persisted=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())

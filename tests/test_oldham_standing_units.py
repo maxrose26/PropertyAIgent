@@ -175,3 +175,18 @@ def test_unsealed_published_counters_are_not_final_combined_usage(monkeypatch,ve
     assert result['github']['combined']==(28 if verified else None)
     assert result['github']['hosted']==(3 if verified else None)
     assert result['hosted']['github_requests']==3 # retained as explicitly partial evidence
+
+
+def test_original_runtime_bytes_private_immutable_readback(tmp_path):
+    import stat
+    from verification.ingestion_storage.oldham_standing_owner import StandingOperation
+    from verification.ingestion_storage.operational_journal import Journal
+    r=object.__new__(StandingOperation);r.journal=Journal(tmp_path/'originals');r.runtime_copied_bytes=0
+    raw=b'{"original": true}\n';events=b'{"event":"original"}\n'
+    r.preserve_runtime_originals(raw,events)
+    assert (r.journal.root/'runtime-final-result.json').read_bytes()==raw
+    assert (r.journal.root/'runtime-events.jsonl').read_bytes()==events
+    assert r.runtime_copied_bytes==len(raw)+len(events)
+    assert stat.S_IMODE((r.journal.root/'runtime-final-result.json').stat().st_mode)==0o600
+    with pytest.raises(FileExistsError):r.preserve_runtime_originals(b'changed',events)
+    assert (r.journal.root/'runtime-final-result.json').read_bytes()==raw
