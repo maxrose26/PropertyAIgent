@@ -4,6 +4,7 @@ Only registration INSERTs are disposable owner stand-ins. Uses the existing real
 reader/parser fixtures and source supervisors; no council/production contact.
 """
 import json
+import time
 from datetime import datetime, timezone
 import pytest
 from app.ingestion.daily_intake import intake_slot, backlog
@@ -57,6 +58,15 @@ def test_connected_capture_screen_backlog_duplicate_and_no_application_effects(w
     assert chain.caller.nominees().nominees  # retained inputs reach existing nomination, no admission
     with pytest.raises(Denied,match='INTAKE_NO_ADMISSION'):chain.caller.prepare(None)
     record_property('runtime_database',json.dumps(chain.caller.accounting,sort_keys=True))
+    totals=dict(driver_statements=sum(b.statements for b in chain.caller.budgets),
+                connection_attempts=sum(b.attempts for b in chain.caller.budgets),
+                returned_data_value_bytes=sum(b.returned_bytes for b in chain.caller.budgets),
+                elapsed_seconds=time.monotonic()-chain.caller.intake_started,
+                all_connections_closed=all(c.closed for b in chain.caller.budgets for c in b.opened),
+                delivered_records=len(result['records']),same_root_deliveries=2,source_invocations=len(calls))
+    assert totals['driver_statements']<=1040 and totals['connection_attempts']<=40
+    assert totals['returned_data_value_bytes']<=4*1024**2 and totals['elapsed_seconds']<300 and totals['all_connections_closed']
+    record_property('intake_cumulative',json.dumps(totals,sort_keys=True))
 
 
 def test_durable_capture_survives_screening_preparation_failure(world,tmp_path):
