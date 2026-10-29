@@ -58,6 +58,15 @@ REGISTRATION = r"""
    UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
    RETURN jsonb_build_object('authorities_invalidated',true,'stop_preserved',true);
   END IF;
+  IF p->>'operation'='intake_capture' AND ctl->'grants' ? (p->>'authority') THEN
+   SELECT * INTO STRICT root FROM public.ingestion_work_items WHERE key=p->'grant'->>'capture_key';
+   IF ctl->'grants'->(p->>'authority')->>'intake_period' IS DISTINCT FROM a
+    OR root.subject::jsonb IS DISTINCT FROM p->'rows'->0->'subject'
+    OR e->'days'->(root.subject->>'end')->>(root.subject->>'council') IS DISTINCT FROM root.key
+    OR root.state NOT IN ('COMPLETE','DEFERRED','UNSUPPORTED_CONTRACT')
+   THEN RAISE EXCEPTION 'INTAKE_CONSUMED_RECONCILE_NO_REPLAY'; END IF;
+   RETURN jsonb_build_object('already_consumed',true,'capture_key',root.key,'state',root.state);
+  END IF;
   g:=p->'grant';
   IF jsonb_typeof(g) IS DISTINCT FROM 'object' OR NOT (g ?& ARRAY['login','effect_login','workers','writes','detail_source_keys','capture_only','execution_binding','expires_at','bindings','keys','contracts','source_calls','capture_key','completion_outcomes']) OR jsonb_typeof(p->'authority') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'rows') IS DISTINCT FROM 'array'
    OR jsonb_array_length(p->'rows') NOT BETWEEN 1 AND 73
@@ -87,7 +96,7 @@ REGISTRATION = r"""
     OR NOT (e->'councils' ? (item->'subject'->>'council'))
     OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'
     OR g->>'capture_key' IS DISTINCT FROM item->>'key' OR item->'dependencies'<>'[]'::jsonb
-    OR (SELECT count(*) FROM jsonb_each(coalesce(e->'days','{}'::jsonb)))>=7 AND NOT (e->'days' ? item->'subject'->>'end')
+    OR (SELECT count(*) FROM jsonb_each(coalesce(e->'days','{}'::jsonb)))>=7 AND NOT (e->'days' ? (item->'subject'->>'end'))
     OR e->'days'->(item->'subject'->>'end') ? (item->'subject'->>'council')
    THEN RAISE EXCEPTION 'INTAKE_ROLLING_SCOPE_OR_CONSUMED'; END IF;
    e:=jsonb_set(e,ARRAY['days',item->'subject'->>'end'],coalesce(e->'days'->(item->'subject'->>'end'),'{}'::jsonb)||jsonb_build_object(item->'subject'->>'council',item->>'key'));
@@ -96,7 +105,7 @@ REGISTRATION = r"""
   ELSE
    SELECT * INTO STRICT root FROM public.ingestion_work_items WHERE key=g->>'capture_key' FOR SHARE;
    IF root.state<>'COMPLETE' OR root.task<>'DISCOVERY' OR root.checkpoint::jsonb->>'kind'<>'LISTING_RECEIPT_V1'
-    OR NOT (e->'councils' ? root.subject->>'council')
+    OR NOT (e->'councils' ? (root.subject->>'council'))
     OR e->'days'->(root.subject->>'end')->>(root.subject->>'council') IS DISTINCT FROM root.key
     OR g->'source_calls' IS DISTINCT FROM '0'::jsonb
     OR g->'screening_configs' IS DISTINCT FROM jsonb_build_array(e->>'screening_config')

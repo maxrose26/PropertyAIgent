@@ -88,7 +88,7 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     before=snapshot(world['boot'])
     run,result,command=invoke(world,tmp_path,name,failed=failed)
     expected='INCOMPLETE' if failed else 'RETAINED_AND_SCREENED'
-    assert result['status']==expected,result
+    assert result['status']==expected,json.dumps(result,sort_keys=True)
     assert run.returncode==(1 if failed else 0),run.stderr
     assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED'
     assert result['usage']['all_connections_closed'] and result['publication']=='TEST_LOCAL_ARCHIVE'
@@ -109,9 +109,9 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
 def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation(world,tmp_path):
     reset(world)
     p=policy(world);p['councils']['oldham']=p['councils']['tameside']
-    with pytest.raises(Exception,match='INTAKE_PERIOD_POLICY'):authorise(world,'too-wide',p)
+    with pytest.raises(Exception,match='ADMIN_EFFECT_UNCERTAIN'):authorise(world,'too-wide',p)
     p=policy(world);p['expires_at']=time.time()+604900
-    with pytest.raises(Exception,match='INTAKE_PERIOD_POLICY'):authorise(world,'too-long',p)
+    with pytest.raises(Exception,match='ADMIN_EFFECT_UNCERTAIN'):authorise(world,'too-long',p)
     with world['connect']('ingestion_worker_login') as c:
         with pytest.raises(Exception,match='OWNER_DISPOSITION_REQUIRED'):
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(operation='intake_period',period='self',policy=policy(world))),))
@@ -136,3 +136,57 @@ def test_budget_never_resets_between_councils():
     run.source(dict(requests=80,source_bytes=20971520,source_seconds=75,supervised_seconds=90))
     assert run.used['requests']==90
     with pytest.raises(Denied,match='SOURCE_BOUND'):run.source(dict(requests=1,source_bytes=0,source_seconds=0,supervised_seconds=0))
+
+
+def test_consumed_daily_invocation_does_not_recollect_or_duplicate_work(world,tmp_path):
+    reset(world);authorise(world,'duplicate-command')
+    first=tmp_path/'first';first.mkdir();run,result,_=invoke(world,first,'duplicate-command')
+    assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result)
+    before=world['boot'].execute('SELECT count(*),sum(attempt_count) FROM ingestion_work_items').fetchone()
+    second=tmp_path/'second';second.mkdir();run,result,_=invoke(world,second,'duplicate-command')
+    assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result)
+    assert all(s['status']=='ALREADY_RETAINED' for s in result['scopes'])
+    assert result['usage']['requests']==0 and result['authority_closure']=='NOT_ISSUED'
+    assert world['boot'].execute('SELECT count(*),sum(attempt_count) FROM ingestion_work_items').fetchone()==before
+
+
+def test_paginated_cross_run_backlog_survives_period_expiry(world,tmp_path):
+    reset(world)
+    for i in range(2):
+        name='history-'+str(i);authorise(world,name);target=tmp_path/name;target.mkdir()
+        _,result,_=invoke(world,target,name)
+        assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result)
+    # Simulate elapsed expiry in the fixture only; no production clock override.
+    world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,'{intake_periods,history-1,expires_at}','0'::jsonb)::json WHERE key=repeat('0',64)")
+    target=tmp_path/'read';target.mkdir();env,sources=env_and_sources(world,target)
+    cursor=None;seen=[]
+    for i in range(5):
+        output=target/('page-'+str(i))
+        command=[sys.executable,'-m','scripts.run_daily_councils','--period','history-1','--output',str(output),'--backlog','--page-size','1',
+                 '--disposable-sources',str(sources),'--disposable-archive',str(target/'archive')]
+        if cursor:command+=['--after',cursor]
+        run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=30)
+        assert run.returncode==0,run.stderr
+        page=json.loads((output/'backlog.json').read_bytes());seen.extend(page['records'])
+        assert page['source_calls']==page['registrations']==0 and page['usage']['all_connections_closed']
+        cursor=page['next_cursor']
+        if cursor is None:break
+    assert len(seen)==4 and len({(r['capture_key'],r['reference']) for r in seen})==4
+    assert all(r['screening_state']=='COMPLETE' and r['extraction_complete'] is False for r in seen)
+
+
+def test_changed_stop_prevents_supported_registration_and_preserves_history(world,tmp_path):
+    reset(world);authorise(world,'stop-guard')
+    with world['connect']('ingestion_worker_login') as c:c.execute("SELECT public.ingestion_raise_stop('DISPOSABLE_NEW_STOP')")
+    target=tmp_path/'stopped';target.mkdir();_,result,_=invoke(world,target,'stop-guard')
+    assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['scopes']==[]
+    ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+    assert ctl['manual_stop']=='DISPOSABLE_NEW_STOP' and ctl['grants']=={}
+    assert result['usage']['requests']==0
+
+
+def test_policy_preserves_historical_registration_branch_text():
+    from verification.ingestion_storage import screening_v3_worker_sql as v3
+    old=v3.original_text();start=old.index(" IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN")
+    finish=old.index('END $register$;',start)
+    assert old[start:finish] in intake_policy.policy_sql()

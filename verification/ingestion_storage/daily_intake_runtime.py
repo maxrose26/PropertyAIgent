@@ -79,10 +79,11 @@ class Runtime:
             with engine.begin() as c:yield c,budget
         finally:budget.close([])
 
-    def policy_read(self,c):
+    def policy_read(self,c,*,read_only=False):
         row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
-        if (not row.policy or row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop
-            or row.policy['expires_at']<=time.time() or row.policy['test_evidence'] is not self.test):raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
+        if (not row.policy or row.policy['test_evidence'] is not self.test or not read_only and
+            (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
+            raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
         return row.policy
 
     def issue(self,reg):
@@ -91,11 +92,17 @@ class Runtime:
         # One transaction at the actual supported issuer, no INSERT stand-in.
         with self.connection() as (c,_):
             got=c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:payload AS jsonb))'),dict(payload=json.dumps(payload))).scalar_one()
+        if got.get('already_consumed') is True:
+            self.authorities.remove(reg.authority)
+            self.emit('already_consumed_no_source',got)
+            return got
         if got!={**reg.grant,'intake_period':self.args.period}:raise Denied('INTAKE_ISSUER_READBACK')
         self.emit('supported_registration',dict(kind=reg.kind,authority=reg.authority,keys=len(reg.bindings)))
+        return None
 
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
+        with self.connection() as (c,_):self.policy_read(c)
         self.run.publication(len(raw),10)
         sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
         directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/capture-'+str(self.archive_ordinal)
@@ -139,6 +146,7 @@ class Runtime:
             outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
                             environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=self.root/(row['council']+'-owned'),
                             source=True,seconds=45,stop_file=self.root/'STOP',check=check)
+            self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
         source=json.loads(output.read_bytes());outer['observed_at']=datetime.now(timezone.utc).isoformat()
@@ -169,7 +177,10 @@ class Runtime:
                 owner=Owner(None,self.emit,self.run.check,expiry=datetime.fromtimestamp(min(self.policy['expires_at'],time.time()+1500),timezone.utc),bindings=self.binding)
                 revision=self.args.period+'-'+row['end']+'-'+row['council']
                 reg=capture_registration(owner,sb,contract,row['start'],row['end'],revision=revision,item_limits=limits)
-                self.issue(reg)
+                consumed=self.issue(reg)
+                if consumed:
+                    result['scopes'].append(dict(council=row['council'],status='ALREADY_RETAINED' if consumed['state']=='COMPLETE' else 'INCOMPLETE',records=0,failure=None))
+                    continue
                 caller=ChainCaller(sb,contract,rule,self.urls,revision=revision,bindings=dict(reg.bindings),capture_authority=reg.authority,
                                    chain_authority=reg.authority,stop_file=self.root/'STOP',allow_test_evidence=self.test,engine_options=self.options,intake_only=True,intake_run=self.run)
                 caller.contained_failure=contained_idox_failure
@@ -189,8 +200,14 @@ class Runtime:
             # Never continue another council after shared/unclassified failure.
             result['failure']=type(error).__name__
             if isinstance(error,Denied):result['reason']=str(error)[:120]
+            original=getattr(error,'orig',None)
+            if original is not None and getattr(original,'sqlstate',None)=='P0001':
+                import re
+                message=original.diag.message_primary
+                if re.fullmatch('[A-Z0-9_:]+',message):result['reason']=message
             try:
-                with self.connection() as (c,_):c.execute(text("SELECT public.ingestion_raise_stop('DAILY_INTAKE_SHARED_FAILURE')"))
+                if self.authorities:
+                    with self.connection() as (c,_):c.execute(text("SELECT public.ingestion_raise_stop('DAILY_INTAKE_SHARED_FAILURE')"))
             except BaseException:result['stop_readback']='UNCERTAIN'
         finally:
             self.run.closing=True
@@ -228,6 +245,18 @@ class Runtime:
                 with (self.root/name).open('xb') as f:os.fchmod(f.fileno(),0o600);f.write(data)
         return result
 
+    def read_backlog(self):
+        """Read only: expiry stops collection, not inspection of retained work."""
+        with self.connection() as (c,budget):
+            c.execute(text('SET TRANSACTION READ ONLY'))
+            p=self.policy_read(c,read_only=True)
+            ledger=ControllerLedger(budget.engines[0],budget=budget,owner=WORKER,authority='',bindings={})
+            page=backlog_page(ledger,sorted(p['councils']),[v['contract'] for v in p['councils'].values()],
+                              ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),after=self.args.after,limit=self.args.page_size,connection=c)
+        page.update(status='BACKLOG_READ',usage=self.run.totals(),source_calls=0,registrations=0)
+        with (self.root/'backlog.json').open('xb') as f:os.fchmod(f.fileno(),0o600);f.write(canonical(page))
+        return page
+
 
 def source_worker(args):
     if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD')) for k in os.environ):raise Denied('PRIVATE_CREDENTIAL_FREE_SOURCE')
@@ -250,8 +279,12 @@ def source_worker(args):
 def main(argv=None):
     p=argparse.ArgumentParser();p.add_argument('--period',required=True);p.add_argument('--output',required=True)
     p.add_argument('--disposable-sources');p.add_argument('--disposable-archive')
+    p.add_argument('--backlog',action='store_true');p.add_argument('--after');p.add_argument('--page-size',type=int,default=3)
     args=p.parse_args(argv)
-    result=Runtime(args).execute();print(json.dumps({k:result[k] for k in ('status','cleanup','authority_closure','publication')}))
+    runtime=Runtime(args)
+    if args.backlog:
+        result=runtime.read_backlog();print(json.dumps(dict(status=result['status'],records=len(result['records']),more=result['more'],next_cursor=result['next_cursor'])));return 0
+    result=runtime.execute();print(json.dumps({k:result[k] for k in ('status','cleanup','authority_closure','publication')}))
     return 0 if result['status']=='RETAINED_AND_SCREENED' else 1
 
 if __name__=='__main__':

@@ -451,6 +451,7 @@ class Owner:
             self.emit('temporary_owner_capability_readback',dict(flags=capability))
             if capability!=(False,False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         self.emit('owner_registration_committed',dict(authority=authority,keys=sorted(bindings),binding_sha256=digest(grant)))
+        return bindings
 
     def register_intake_period(self,name,policy):
         """Owner-only preauthorisation through the existing issuer, never runtime.
@@ -468,7 +469,6 @@ class Owner:
             flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0]
             if flags!=(False,False):raise Uncertain('INTAKE_ISSUER_CAPABILITY_REMAINS')
             return result
-        return bindings
 
     def teardown(self,github):
         """Disable access first, then resolve surviving sessions under a bounded, privilege-proven policy, then delete the temporary secrets independently once DISABLED status is verified.
