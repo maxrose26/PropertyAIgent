@@ -13,12 +13,15 @@ from verification.discovery.idox_window import WindowConfig
 VERSION='OLDHAM_OWNER_WRAPPER_V1'
 VERSION_ACCEPTED='OLDHAM_OWNER_WRAPPER_V2'      # V1 plus an explicit, sealed `owner_acceptance` key (specification 037); V1 packages are validated exactly as before
 VERSION_CAPTURE_SCREENING='OLDHAM_CAPTURE_SCREENING_V1'
+VERSION_INSTALLED='OLDHAM_CAPTURE_SCREENING_INSTALLED_V1'
+CAPTURE_SCREENING_VERSIONS=(VERSION_CAPTURE_SCREENING,VERSION_INSTALLED)
 RISK='ACCEPT_POSSIBLE_PROVIDER_SCRAM_RETENTION_WORKER_EFFECT_APPLICATION_ONCE'
 QUALIFICATION=Path('docs/design/stage4-discovery/evidence/idox-family1-oldham.json')
 PACKAGES=('psycopg','SQLAlchemy','cryptography','requests','beautifulsoup4','psutil','PyYAML')
 FIELDS={'version','mode','release_id','revision','tree','dependencies','packages','scope','source','outer','qualification','qualification_binding','control_sha256','evidence_head','origin','expires_at','risk_acceptance'}
 FIELDS_ACCEPTED=FIELDS|{'owner_acceptance'}
 FIELDS_CAPTURE_SCREENING=(FIELDS_ACCEPTED-{'control_sha256'})|{'operation','transition','control_stop_sha256'}
+FIELDS_INSTALLED=(FIELDS_CAPTURE_SCREENING-{'transition'})|{'reuse'}
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
@@ -44,22 +47,25 @@ def read_file(base,description,bound):
     if raw!=canonical(value):raise Denied('OLDHAM_CANONICAL_INPUT_REQUIRED')
     return value,raw
 
-def validate(path,expected_sha,*,disposable=False,now=None):
+def validate(path,expected_sha,*,disposable=False,now=None,inactive=False):
     path=Path(path);now=now or datetime.now(timezone.utc)
     if path.is_symlink() or not path.is_file() or path.stat().st_size>128*1024:raise Denied('OLDHAM_PACKAGE_FILE')
     raw=path.read_bytes()
     if sha(raw)!=expected_sha:raise Denied('OLDHAM_PACKAGE_HASH')
     p=json.loads(raw)
-    shapes={VERSION:FIELDS,VERSION_ACCEPTED:FIELDS_ACCEPTED,VERSION_CAPTURE_SCREENING:FIELDS_CAPTURE_SCREENING}
+    shapes={VERSION:FIELDS,VERSION_ACCEPTED:FIELDS_ACCEPTED,VERSION_CAPTURE_SCREENING:FIELDS_CAPTURE_SCREENING,VERSION_INSTALLED:FIELDS_INSTALLED}
     if not isinstance(p,dict) or p.get('version') not in shapes or set(p)!=shapes[p['version']]:raise Denied('OLDHAM_PACKAGE_FIELDS')
-    capture_screening_only=p['version']==VERSION_CAPTURE_SCREENING
+    capture_screening_only=p['version'] in CAPTURE_SCREENING_VERSIONS
     if p['mode']!=('DISPOSABLE_TEST' if disposable else 'LIVE'):raise Denied('OLDHAM_TEST_MODE_BOUNDARY')
     if not isinstance(p['release_id'],str) or not re.fullmatch(r'oldham-owner-[a-z0-9-]{1,60}',p['release_id']):raise Denied('OLDHAM_RELEASE_ID')
     if p['revision']!=git('rev-parse','HEAD') or p['tree']!=git('rev-parse','HEAD^{tree}') or git('status','--porcelain'):raise Denied('OLDHAM_CHECKOUT_BINDING')
     if p['dependencies']!=dependencies() or p['packages']!=packages():raise Denied('OLDHAM_DEPENDENCY_BINDING')
     from . import oldham_transition as transition
     if p['risk_acceptance']!=(transition.RISK if capture_screening_only else RISK):raise Denied('OLDHAM_THREE_LOGIN_RISK_ACCEPTANCE')
-    if capture_screening_only:
+    if p['version']==VERSION_INSTALLED:
+        from .oldham_reuse import validate_inputs
+        validate_inputs(p,path.parent,disposable=disposable)
+    elif capture_screening_only:
         t=p['transition']
         if p['operation']!=transition.OPERATION or not isinstance(t,dict) or set(t)!={'inspection','predecessor','retire_standing','external_consumers_confirmed','installation_sha256','rollback_sha256'}:raise Denied('OLDHAM_TRANSITION_BINDING')
         if t['retire_standing'] is not True or t['external_consumers_confirmed'] is not True:raise Denied('OLDHAM_RETIREMENT_CONFIRMATION_REQUIRED')
@@ -68,8 +74,9 @@ def validate(path,expected_sha,*,disposable=False,now=None):
         transition.validate_inspection(inspection,t['predecessor'])
         install,rollback=transition.texts(t['predecessor'])
         if t['installation_sha256']!=sha(install.encode()) or t['rollback_sha256']!=sha(rollback.encode()):raise Denied('OLDHAM_INSTALLATION_BINDING')
-    expiry=datetime.fromisoformat(p['expires_at'])
-    if expiry.tzinfo is None or not now+timedelta(seconds=480)<expiry<=now+timedelta(hours=24):raise Denied('OLDHAM_PACKAGE_EXPIRY')
+    if type(inactive) is not bool or inactive and (disposable or p['version']!=VERSION_INSTALLED or p['expires_at'] is not None):raise Denied('OLDHAM_INACTIVE_BOUNDARY')
+    expiry=None if inactive else datetime.fromisoformat(p['expires_at'])
+    if not inactive and (expiry.tzinfo is None or not now+timedelta(seconds=480)<expiry<=now+timedelta(hours=24)):raise Denied('OLDHAM_PACKAGE_EXPIRY')
     control_key='control_stop_sha256' if capture_screening_only else 'control_sha256'
     if any(not isinstance(p[k],str) or not re.fullmatch('[a-f0-9]{'+str(n)+'}',p[k]) for k,n in [(control_key,64),('evidence_head',40)]):raise Denied('OLDHAM_PACKAGE_IDENTITIES')
     if capture_screening_only:
@@ -96,7 +103,7 @@ def validate(path,expected_sha,*,disposable=False,now=None):
         if qraw!=canonical(json.loads(QUALIFICATION.read_bytes())):raise Denied('OLDHAM_ACCEPTED_QUALIFICATION_REQUIRED')
         if any(k in source or k in outer for k in ('evidence_label','test_evidence','test_only')):raise Denied('OLDHAM_SYNTHETIC_NOT_LIVE')
     accepted_key=None;expected=dict(qualification_sha256=sha(qraw),source_sha256=digest(source),outer_sha256=digest(outer),scope=scope,dependencies_sha256=digest(p['dependencies']))
-    if p['version'] in (VERSION_ACCEPTED,VERSION_CAPTURE_SCREENING):
+    if p['version'] in (VERSION_ACCEPTED,*CAPTURE_SCREENING_VERSIONS):
         accepted_key=p['owner_acceptance'];acc=owner_acceptance.require(accepted_key);d=acc.data      # a KEY STRING of the closed in-code registry; null, an object or an unknown key is refused
         if (d['council'],d['semantics'],d['start'],d['end'])!=(scope['council'],scope['semantics'],scope['start'],scope['end']):raise Denied('OLDHAM_OWNER_ACCEPTANCE_SCOPE')
         expected=dict(expected,owner_acceptance_sha256=acc.sha256)      # the owner-approved package seals the exact acceptance, beside the code hashes that already cover the registry module
@@ -106,4 +113,4 @@ def validate(path,expected_sha,*,disposable=False,now=None):
     capacity(len(projected['records']),0)
     # Known input/publication costs must leave the unchanged reporting reserve.
     if len(raw)+len(source_raw)+len(qraw)+len(outer_raw)>2*1024**2-128*1024:raise Denied('OLDHAM_INITIAL_EXPORT_CAPACITY')
-    return dict(package=p,raw=raw,source=source,source_raw=source_raw,outer=outer,slot_raw=outer_raw,qualification=qualification,qraw=qraw,contract=contract,binding=binding,expiry=expiry,sha256=expected_sha)
+    return dict(base=path.parent,package=p,raw=raw,source=source,source_raw=source_raw,outer=outer,slot_raw=outer_raw,qualification=qualification,qraw=qraw,contract=contract,binding=binding,expiry=expiry,sha256=expected_sha)

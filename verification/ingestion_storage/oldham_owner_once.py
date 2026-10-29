@@ -27,7 +27,8 @@ class Operation:
     """Thin orchestration only; policy, grants, writes, transport and supervision remain delegated."""
     def __init__(self,data,journal,memory,backend,*,started=None,command_started=None):
         self.data=data;self.p=data['package'];self.journal=journal;self.memory=memory;self.backend=backend
-        self.capture_screening_only=self.p['version']==pkg.VERSION_CAPTURE_SCREENING
+        self.capture_screening_only=self.p['version'] in pkg.CAPTURE_SCREENING_VERSIONS
+        self.installed_reuse=self.p['version']==pkg.VERSION_INSTALLED
         self.created=time.monotonic() if command_started is None else command_started;self.preflight_seconds=0;self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
         self.head=self.p['evidence_head'];self.directory='docs/design/ingestion-operational-execution-'+self.p['release_id']
         self.source_receipts=[];self.source_accounting='NOT_STARTED'
@@ -93,7 +94,7 @@ class Operation:
         self.owner.package_started=started
         self.owner.capture_screening_only=self.capture_screening_only
         self.owner.require_control_sha256=self.p.get('control_sha256')
-        self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only)
+        self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only,atomic_gate=self.installed_reuse)
         return self
 
     def owner_preflight(self):
@@ -140,11 +141,14 @@ class Operation:
             self.stage='DURABLE_CLAIM'
             claim=canonical(dict(package=self.p,package_sha256=self.data['sha256'],consumed=True))
             self.publish({'claim.json':claim},'claim');self.claimed=True
-            if self.capture_screening_only:
+            if self.installed_reuse:
+                from .oldham_reuse import InstalledReuse
+                InstalledReuse(self).run()
+            elif self.capture_screening_only:
                 self.stage='RETIREMENT_AND_INSTALLATION'
                 from .oldham_transition import Transition
                 Transition(self).run()
-            self.stage='OWNER_PREFLIGHT';self.owner_preflight()
+            if not self.installed_reuse:self.stage='OWNER_PREFLIGHT';self.owner_preflight()
             self.rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
             self.stage='CAPTURE_ISSUANCE';capture=self.issue('CAPTURE')
             self.stage='ACCESS_ACTIVATION'
@@ -228,6 +232,13 @@ class Operation:
         from app.ingestion.ledger import UncertainPersistence
         if isinstance(exc,UncertainPersistence) or self.stage=='FRESH_DETAIL_ADMISSION' or self.caller is not None and self.caller.allocation.failed:self.runtime_uncertain=True
         failure=safe_failure(exc,'EXECUTION');failure.setdefault('stage',self.stage)
+        if getattr(self,'installed_reuse',False):
+            from .connection_diagnostics import fixed_stop_reason
+            reason=fixed_stop_reason(exc)
+            if reason is not None:failure.update(reason_code=reason,classification_source='FIXED_OLDHAM_REUSE_CODE')
+        from .activation_boundary import GATE_CODES
+        if self.stage=='ACCESS_ACTIVATION' and type(exc) is Denied and len(exc.args)==1 and exc.args[0] in GATE_CODES:
+            failure.update(reason_code=exc.args[0],classification_source='FIXED_ACTIVATION_GATE_CODE')
         self.result.update(status='STOP_RECONCILE_NO_RETRY',failure=failure,cleanup='UNCERTAIN')
         certain=not self.runtime_uncertain and self.owner is not None and not self.owner.effect_uncertain and not self.github.mutation_uncertain and (self.life is None or self.life.state not in ('UNCERTAIN','CLOSED'))
         if certain:
@@ -258,7 +269,8 @@ class Operation:
             access=self.life is not None and self.life.state=='CLOSED'
             no_access=self.owner is None or not self.owner.authorities and self.life.state=='UNUSED'
             self.result['access']='DISABLED_VERIFIED' if access else 'NO_ACCESS_CREATED' if no_access else 'UNCERTAIN'
-            if positive and (access or no_access) and (self.publication=='VERIFIED' or not self.claimed) and not (self.owner and self.owner.effect_uncertain) and not self.github.mutation_uncertain and not self.runtime_uncertain:self.result['cleanup']='CLOSED'
+            historical_closed=not self.installed_reuse or self.result.get('historical_cleanup',{}).get('readback')=='VERIFIED'
+            if historical_closed and positive and (access or no_access) and (self.publication=='VERIFIED' or not self.claimed) and not (self.owner and self.owner.effect_uncertain) and not self.github.mutation_uncertain and not self.runtime_uncertain:self.result['cleanup']='CLOSED'
             self.result['outer_scope_removal']='NOT_VERIFIABLE_BEFORE_EXIT'
         except BaseException:self.result['cleanup']='UNCERTAIN'
         if self.result.get('cleanup')!='CLOSED':self.result['status']='STOP_RECONCILE_NO_RETRY'

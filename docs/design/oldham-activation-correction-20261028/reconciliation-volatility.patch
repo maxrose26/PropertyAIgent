@@ -1,0 +1,11 @@
+--- diagnostic.py
++++ diagnostic.py
+@@ -88,7 +88,7 @@
+         self.inspection['gate_offenders']=s('gate_offenders')[0][0]
+         if len(canonical(self.inspection))>16000:raise ProbeDenied('RESPONSE_BOUND')
+         expected=old.expected_states()['oldham'].get('ingestion_acceptance_control')
+-        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] and r[4] is True and r[8]=='sql' and r[9]=='s' for r in funcs)
++        safe=any(r[0]=='ingestion_acceptance_control' and r[1]==expected and r[2]=='ingestion_storage_owner' and r[3]==['search_path=pg_catalog'] and r[4] is True and r[8]=='sql' and r[9]=='v' for r in funcs)
+         self.inspection['control']={'status':'UNKNOWN_FUNCTION_NOT_VERIFIED'}
+         if safe and ident[13] is True:self.inspection['control']=old.project_control(s('control')[0][0])
+         access=ident[18] or {}
