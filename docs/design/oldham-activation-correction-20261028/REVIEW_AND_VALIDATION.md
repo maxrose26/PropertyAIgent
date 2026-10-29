@@ -68,3 +68,16 @@ uncertain supervisor accounting (73 passed,2 failed,9 fixture errors). No source
 production operation occurred; no containment assertion was relaxed. Hosted PG17/
 real-cgroup command checks are required. Final results are in the PR/handoff,
 not inferred from these local fixtures.
+
+First reuse-delta hosted run40833115550/job123311609938 failed in fixture setup
+before an operational Owner existed; failed fixture teardown then caused cascading
+role collisions. Direct setup coverage established the cause on run40834106682:
+the test backend replaced the immutable acceptance registry with only a synthetic
+key, so historical registration reconstruction correctly refused the real reviewed
+key. The reuse fixture now preserves immutable reviewed entries alongside the
+separate synthetic work key. A pure regression proves separation. Fixture teardown
+also handles partially prepared state; no production guard was weakened.
+
+Review tightened preparation size/symlink checks before reads/copies, full policy
+attributes (not just source body), original queued-work preservation and exact
+historical counters/package bindings. Prior failed logs/artifacts remain preserved.

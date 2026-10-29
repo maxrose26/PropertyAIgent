@@ -21,7 +21,7 @@ def test_reconciled_disposable_setup_is_not_an_opaque_runner_failure(tmp_path,mo
 
 
 @pytest.mark.parametrize('scenario,success',[
- ('reuse_zero',True),('reuse_nominee',True),('reuse_policy',False),('reuse_metadata',False),
+ ('reuse_zero',True),('reuse_nominee',True),('reuse_policy',False),('reuse_metadata',False),('reuse_worker_policy',False),('reuse_missing_policy',False),
  ('reuse_work',False),('reuse_counter',False),('reuse_target',False),('reuse_settings',False),('reuse_secret',False),('reuse_stop',False),('reuse_barrier',False),
  ('reuse_revoked',False),('reuse_cleanup_ack',False),('reuse_cleanup_readback',False),
 ])

@@ -94,3 +94,25 @@ def test_actual_preparation_argument_flow_refuses_symlink(tmp_path,monkeypatch):
     with pytest.raises(SystemExit,match='INPUT_FILE_BOUND'):
         module['main'](['--checkout',str(Path.cwd()),'--assets',str(assets),'--original-result',str(link),'--original-audit',str(target),'--reconciliation',str(target),'--output',str(out),'--evidence-head','a'*40,'--release-id','oldham-owner-inactive-test'])
     assert link.is_symlink() and not out.exists()
+
+
+def test_fixture_keeps_reviewed_history_key_separate_from_synthetic_work(inputs):
+    from tests.oldham_wrapper_fixture import Backend
+    from types import SimpleNamespace
+    from app.ingestion import owner_acceptance
+    path,_=inputs;backend=Backend(path)
+    assert backend.p['owner_acceptance']!='OLDHAM_RECEIVED_20261015_20261021_V1'
+    assert owner_acceptance.require(backend.p['owner_acceptance']).key==backend.p['owner_acceptance']
+    grant,allowance=r.expected_historical(SimpleNamespace(q=lambda *a:[('p'*64,)]),None)
+    assert allowance['evidence']['registration_sha256']==r.REGISTRATION and grant['source_calls']==0
+
+
+def test_reuse_failure_export_uses_existing_fixed_codes_without_raw_text():
+    from types import SimpleNamespace
+    from verification.ingestion_storage.oldham_owner_once import Operation
+    for exc,expected in ((Denied('OLDHAM_REUSE_POLICY_ATTRIBUTES'),'OLDHAM_REUSE_POLICY_ATTRIBUTES'),(RuntimeError('PRIVATE_RAW_DETAIL'), 'UNKNOWN')):
+        obj=SimpleNamespace(installed_reuse=True,stage='INSTALLED_POLICY_CLEANUP',caller=None,owner=None,life=None,runtime_uncertain=False,github=SimpleNamespace(bound=0,mutation_uncertain=False),result={})
+        obj.finish=lambda:obj.result
+        value=Operation.failed(obj,exc)
+        assert value['failure']['reason_code']==expected and value['failure']['message_exported'] is False
+        assert 'PRIVATE_RAW_DETAIL' not in str(value) and value['cleanup']=='UNCERTAIN'

@@ -104,8 +104,18 @@ class InstalledReuse(Transition):
 
     def inventory(self,c):
         verify_inventory(self.o,c,capture_screening_only=True)
-        row=self.o.q(c,"SELECT prosecdef,provolatile,(SELECT lanname FROM pg_language WHERE oid=prolang),pg_get_function_identity_arguments(oid),(SELECT count(*)=1 AND bool_and(a.grantee=p.proowner AND a.privilege_type='EXECUTE') FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) FROM pg_proc p WHERE oid='public.ingestion_oldham_allowed(jsonb,text,text,jsonb)'::regprocedure")[0]
-        if row!=(True,'s','sql','ctl jsonb, authority text, work_key text, subject jsonb',True):raise Denied('OLDHAM_REUSE_POLICY_ATTRIBUTES')
+        expected={
+          'ingestion_acceptance_control':(True,'v','sql','',3802),
+          'ingestion_bolton_allowed':(False,'s','sql','ctl jsonb, authority text, subject jsonb',16),
+          'ingestion_register_bolton_exception':(True,'v','plpgsql','p jsonb',3802),
+          'ingestion_raise_stop':(True,'v','plpgsql','p_reason text',2278),
+          'ingestion_worker_step':(True,'v','plpgsql','p_op text, p_key text, p_fence integer, p_owner text, p_authority text, p_binding jsonb, p_payload jsonb',3802),
+          'ingestion_recover_abandoned':(True,'v','plpgsql','p_key text, p_fence integer, p_closed boolean',3802),
+          'ingestion_oldham_allowed':(True,'s','sql','ctl jsonb, authority text, work_key text, subject jsonb',16)}
+        rows=self.o.q(c,"SELECT p.proname,p.prosecdef,p.provolatile,l.lanname,pg_get_function_identity_arguments(p.oid),p.prorettype,p.proisstrict,p.proleakproof,p.proparallel,p.prokind,p.proretset FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_language l ON l.oid=p.prolang WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY 1",(list(expected),))
+        if len(rows)!=len(expected) or any(tuple(row[1:])!=(*expected[row[0]],False,False,'u','f',False) for row in rows):raise Denied('OLDHAM_REUSE_POLICY_ATTRIBUTES')
+        acl=self.o.q(c,"SELECT count(*)=1 AND bool_and(a.grantee=p.proowner AND a.privilege_type='EXECUTE') FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE p.oid='public.ingestion_oldham_allowed(jsonb,text,text,jsonb)'::regprocedure")[0][0]
+        if acl is not True:raise Denied('OLDHAM_REUSE_POLICY_ACL')
 
     def historical(self,ctl,*,cleaned):
         g=ctl.get('grants',{}).get(AUTHORITY);a=ctl.get('oldham_allowances',{}).get(AUTHORITY)

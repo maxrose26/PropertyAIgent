@@ -232,6 +232,10 @@ class Operation:
         from app.ingestion.ledger import UncertainPersistence
         if isinstance(exc,UncertainPersistence) or self.stage=='FRESH_DETAIL_ADMISSION' or self.caller is not None and self.caller.allocation.failed:self.runtime_uncertain=True
         failure=safe_failure(exc,'EXECUTION');failure.setdefault('stage',self.stage)
+        if getattr(self,'installed_reuse',False):
+            from .connection_diagnostics import fixed_stop_reason
+            reason=fixed_stop_reason(exc)
+            if reason is not None:failure.update(reason_code=reason,classification_source='FIXED_OLDHAM_REUSE_CODE')
         from .activation_boundary import GATE_CODES
         if self.stage=='ACCESS_ACTIVATION' and type(exc) is Denied and len(exc.args)==1 and exc.args[0] in GATE_CODES:
             failure.update(reason_code=exc.args[0],classification_source='FIXED_ACTIVATION_GATE_CODE')

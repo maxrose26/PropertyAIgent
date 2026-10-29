@@ -80,7 +80,7 @@ class Backend:
             from app.ingestion import owner_acceptance
             from tests.e2e_connection_support import make_test_acceptance
             acceptance=make_test_acceptance(json.loads((self.path.parent/self.p['source']['name']).read_bytes()),'oldham',date.fromisoformat(self.p['scope']['start']),date.fromisoformat(self.p['scope']['end']))
-            owner_acceptance.ACCEPTANCES=MappingProxyType({acceptance.key:acceptance})
+            owner_acceptance.ACCEPTANCES=MappingProxyType({**(owner_acceptance._load() if self.reuse else {}),acceptance.key:acceptance}) # historical reconstruction still requires the immutable reviewed key; synthetic work uses its separate fixture key
         if self.capture_screening_only and not self.reuse:self.names.update(('INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'))
         raw=(self.path.parent/self.p['qualification']['name']).read_bytes()
         self.api.trees['2'*40][str(pkg.QUALIFICATION)]=self.api.blob(raw);self.patches=0
@@ -172,6 +172,8 @@ class Backend:
             if self.scenario=='reuse_revoked':ctl['oldham_allowances'][r.AUTHORITY]['revoked']=True
             b.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
             if self.scenario=='reuse_metadata':b.execute('ALTER VIEW extensions.pg_stat_statements_info SET (security_invoker=true)')
+            if self.scenario=='reuse_worker_policy':b.execute('ALTER FUNCTION public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb) SECURITY INVOKER')
+            if self.scenario=='reuse_missing_policy':b.execute('DROP FUNCTION public.ingestion_oldham_allowed(jsonb,text,text,jsonb)')
             if self.scenario=='reuse_policy':b.execute("ALTER FUNCTION public.ingestion_oldham_allowed(jsonb,text,text,jsonb) VOLATILE")
             if self.scenario=='reuse_settings':b.execute("ALTER ROLE ingestion_worker_login SET statement_timeout='11s'")
             if self.scenario=='reuse_secret':self.names.add('INGESTION_WORKER_DATABASE_URL')
