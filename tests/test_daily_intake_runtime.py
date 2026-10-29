@@ -164,6 +164,12 @@ def test_run_budget_refuses_before_unfit_scope_and_preserves_closure():
     run=IntakeRun();run.used['github_calls']=51
     with pytest.raises(Denied,match='PUBLICATION_RESERVE'):run.publication(1,10)
     assert run.used['github_calls']==51
+    run.closing=True;run.publication(1,10)
+    assert run.used['github_calls']==61
+    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=84,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]
+    with pytest.raises(Denied,match='DATABASE_RESERVE'):run.database_limits({})
+    run.closing=True
+    assert run.database_limits({})['connections']==4
 
 
 @pytest.mark.parametrize('fault',['cleanup_null','missing_delay','missing_hash','unknown_reason','wrong_http_status'])
@@ -203,12 +209,6 @@ def test_trusted_failure_settlement_rejects_incomplete_or_unrecognised_receipt(w
         assert ledger.get(claim.key)['phase']=='SOURCE_INTENT'
     finally:
         for engine in engines:engine.dispose()
-    run.closing=True;run.publication(1,10)
-    assert run.used['github_calls']==61
-    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=84,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]
-    with pytest.raises(Denied,match='DATABASE_RESERVE'):run.database_limits({})
-    run.closing=True
-    assert run.database_limits({})['connections']==4
 
 
 def test_budget_never_resets_between_councils():
