@@ -23,6 +23,8 @@ from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+             'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
+             'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/chain_caller.py',
              'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
@@ -57,10 +59,13 @@ class Runtime:
         disposable=all((u.host,u.port,u.database,u.username)==('127.0.0.1',5432,'ingestion_provisioning_test',r) for r,u in zip(self.urls,parsed))
         self.test=bool(args.disposable_sources or args.disposable_archive)
         if self.test and (not disposable or not args.disposable_sources or not args.disposable_archive):raise Denied('FIXED_DISPOSABLE_TRANSPORT_ONLY')
+        if not self.test and subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],text=True).strip():raise Denied('CLEAN_REVIEWED_CHECKOUT_REQUIRED')
         self.options={}
         if not disposable:
+            import ipaddress
+            if not args.hostaddr or ipaddress.ip_address(args.hostaddr).version!=4:raise Denied('REVIEWED_ADDRESS_REQUIRED')
             from .tls_trust import verified_trust
-            ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)}}
+            ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr}
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0
         self.policy=None
 
@@ -69,6 +74,14 @@ class Runtime:
         bounded(value,128*1024)
         self.events.append(value)
         if len(canonical(self.events))>128*1024:raise Denied('INTAKE_EVENT_EXPORT_BOUND')
+
+    def stop_run(self,reason):
+        # Preserve an already changed owner/shared stop instead of overwriting
+        # the reason that actually interrupted this run.
+        with self.connection() as (c,_):
+            observed=c.execute(text("SELECT jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
+            if self.policy is not None and observed==self.policy['expected_stop']:
+                c.execute(text('SELECT public.ingestion_raise_stop(:reason)'),dict(reason=reason))
 
     @contextmanager
     def connection(self,role='ingestion_worker_login',*,seconds=90):
@@ -81,7 +94,7 @@ class Runtime:
 
     def policy_read(self,c,*,read_only=False):
         row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
-        if (not row.policy or row.policy['test_evidence'] is not self.test or not read_only and
+        if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
             (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
             raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
         return row.policy
@@ -102,7 +115,6 @@ class Runtime:
 
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
-        with self.connection() as (c,_):self.policy_read(c)
         self.run.publication(len(raw),10)
         sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
         directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/capture-'+str(self.archive_ordinal)
@@ -113,6 +125,7 @@ class Runtime:
             commit=hashlib.sha1(b'TEST_ARCHIVE_NOT_LIVE_EVIDENCE'+raw).hexdigest()
         else:
             if self.github is None:
+                self.run.publication(0,1)
                 self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls'])
                 self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
             self.head=self.github.publish({'source.json':raw},directory=directory,expected_head=self.head);commit=self.head
@@ -129,7 +142,7 @@ class Runtime:
         from verification.discovery.arcus_ui_audit import validate
         from verification.discovery.arcus_ui_window import qualify_segment
         case='discovery_'+row['council']+'_ui_window'
-        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2')
+        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True)
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
@@ -138,14 +151,25 @@ class Runtime:
         # One persistent, metered restricted connection polls the DB stop while
         # the existing credential-free owned-process supervisor runs the reader.
         with self.connection(seconds=60) as (c,budget):
-            last=[0.0]
+            import threading
+            done=threading.Event();errors=[]
+            self.policy_read(c)
+            def poll():
+                while not done.wait(2):
+                    try:self.policy_read(c)
+                    except BaseException as error:errors.append(error);return
             def check():
                 self.run.check();budget.check()
-                if time.monotonic()-last[0]>=2:
-                    self.policy_read(c);last[0]=time.monotonic()
-            outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
-                            environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=self.root/(row['council']+'-owned'),
-                            source=True,seconds=45,stop_file=self.root/'STOP',check=check)
+                if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+            watcher=threading.Thread(target=poll,daemon=True);watcher.start()
+            try:
+                outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
+                                environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=self.root/(row['council']+'-owned'),
+                                source=True,seconds=45,stop_file=self.root/'STOP',check=check)
+            finally:
+                done.set();watcher.join(timeout=14)
+            if watcher.is_alive():raise Denied('STOP_POLL_CLOSURE_UNCERTAIN')
+            if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
             self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
@@ -184,6 +208,9 @@ class Runtime:
                 caller=ChainCaller(sb,contract,rule,self.urls,revision=revision,bindings=dict(reg.bindings),capture_authority=reg.authority,
                                    chain_authority=reg.authority,stop_file=self.root/'STOP',allow_test_evidence=self.test,engine_options=self.options,intake_only=True,intake_run=self.run)
                 caller.contained_failure=contained_idox_failure
+                def before_archive(ledger):
+                    with ledger.worker_engine.begin() as connection:self.policy_read(connection)
+                caller.before_archive=before_archive
                 def prepare(receipt):
                     root=caller.read_intake_items([reg.root_key])[0]
                     screen=screening_registration(owner,sb,contract,root,receipt,rule,revision=revision,item_limits=limits,allow_test_evidence=self.test,capture_bound=True)
@@ -207,7 +234,7 @@ class Runtime:
                 if re.fullmatch('[A-Z0-9_:]+',message):result['reason']=message
             try:
                 if self.authorities:
-                    with self.connection() as (c,_):c.execute(text("SELECT public.ingestion_raise_stop('DAILY_INTAKE_SHARED_FAILURE')"))
+                    self.stop_run('DAILY_INTAKE_SHARED_FAILURE')
             except BaseException:result['stop_readback']='UNCERTAIN'
         finally:
             self.run.closing=True
@@ -217,29 +244,35 @@ class Runtime:
                     with self.connection() as (c,_):
                         closed=c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
                     if closed.get('authorities_invalidated') is not True:raise Denied('INTAKE_AUTHORITY_CLOSURE')
+                    with self.connection() as (c,_):
+                        actual=c.execute(text("SELECT outcome::jsonb->'grants' FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
+                    if any(actual.get(a,{}).get('expires_at')!=0 for a in self.authorities):raise Denied('INTAKE_AUTHORITY_COMMITTED_READBACK')
                 result['authority_closure']='INVALIDATED' if self.authorities else 'NOT_ISSUED'
             except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',authority_closure='UNCERTAIN')
             result['usage']=self.run.totals();result['limits']=LIMITS
             result['cleanup']='CLOSED' if result['usage']['all_connections_closed'] and result['authority_closure']!='UNCERTAIN' else 'UNCERTAIN'
             if result['cleanup']!='CLOSED':result['status']='STOP_RECONCILE_NO_RETRY'
+            result['effect_reconciliation_required']=result['status']=='STOP_RECONCILE_NO_RETRY'
             result['test_evidence']=self.test;result['execution_binding']=self.binding
             raw=canonical(result);events=canonical(self.events)
             try:
                 self.run.publication(len(raw)+len(events),10)
                 if not self.test:
                     if self.github is None:
+                        self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
                     self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/final',expected_head=self.head)
                 result['publication']='TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
             except BaseException:
                 result.update(status='STOP_RECONCILE_NO_RETRY',publication='UNCERTAIN')
                 try:
-                    with self.connection() as (c,_):c.execute(text("SELECT public.ingestion_raise_stop('DAILY_INTAKE_REQUIRED_PUBLICATION_FAILURE')"))
+                    self.stop_run('DAILY_INTAKE_REQUIRED_PUBLICATION_FAILURE')
                 except BaseException:result['stop_readback']='UNCERTAIN'
             result['usage']=self.run.totals()
             result['usage']['github_actual_calls']=self.github.requests if self.github is not None else 0
             result['usage']['github_calls_are_reserved']=True
             if not result['usage']['all_connections_closed']:result.update(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN')
+            result['effect_reconciliation_required']=result['status']=='STOP_RECONCILE_NO_RETRY'
             # Preserve local originals even if required publication failed.
             for name,data in [('final-result.json',canonical(result)),('events.json',canonical(self.events))]:
                 with (self.root/name).open('xb') as f:os.fchmod(f.fileno(),0o600);f.write(data)
@@ -248,11 +281,13 @@ class Runtime:
     def read_backlog(self):
         """Read only: expiry stops collection, not inspection of retained work."""
         with self.connection() as (c,budget):
-            c.execute(text('SET TRANSACTION READ ONLY'))
-            p=self.policy_read(c,read_only=True)
-            ledger=ControllerLedger(budget.engines[0],budget=budget,owner=WORKER,authority='',bindings={})
-            page=backlog_page(ledger,sorted(p['councils']),[v['contract'] for v in p['councils'].values()],
-                              ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),after=self.args.after,limit=self.args.page_size,connection=c)
+            c.execute(text('BEGIN READ ONLY'))
+            try:
+                p=self.policy_read(c,read_only=True)
+                ledger=ControllerLedger(budget.engines[0],budget=budget,owner=WORKER,authority='',bindings={})
+                page=backlog_page(ledger,sorted(p['councils']),[v['contract'] for v in p['councils'].values()],
+                                  ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),after=self.args.after,limit=self.args.page_size,connection=c)
+            finally:c.execute(text('ROLLBACK'))
         page.update(status='BACKLOG_READ',usage=self.run.totals(),source_calls=0,registrations=0)
         with (self.root/'backlog.json').open('xb') as f:os.fchmod(f.fileno(),0o600);f.write(canonical(page))
         return page
@@ -265,6 +300,10 @@ def source_worker(args):
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
     if plan['fixture'] is not None:
         raw=Path(plan['fixture']).read_bytes()
+        fixture=json.loads(raw);delay=fixture.pop('_test_delay_seconds',0)
+        if type(delay) not in (int,float) or not 0<=delay<=4:raise Denied('DISPOSABLE_DELAY_BOUND')
+        if delay:time.sleep(delay)
+        raw=canonical(fixture)
     else:
         from verification.discovery.source_profiles import profile
         from verification.discovery.finite_acceptance import read
@@ -279,6 +318,7 @@ def source_worker(args):
 def main(argv=None):
     p=argparse.ArgumentParser();p.add_argument('--period',required=True);p.add_argument('--output',required=True)
     p.add_argument('--disposable-sources');p.add_argument('--disposable-archive')
+    p.add_argument('--hostaddr')
     p.add_argument('--backlog',action='store_true');p.add_argument('--after');p.add_argument('--page-size',type=int,default=3)
     args=p.parse_args(argv)
     runtime=Runtime(args)

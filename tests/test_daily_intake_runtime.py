@@ -37,7 +37,7 @@ def reset(world):
 
 def policy(world):
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
-    return dict(expires_at=time.time()+3600,max_runs=7,overlap_days=7,expected_stop=stop_snapshot(ctl),
+    return dict(hostaddr=None,expires_at=time.time()+3600,max_runs=7,overlap_days=7,expected_stop=stop_snapshot(ctl),
                 execution_binding=execution_binding(),test_evidence=True,screening_config=digest(RULE.config()),
                 councils={c:dict(contract='daily-intake-'+c,qualification_sha256=TEST_QUALIFICATION) for c in ('tameside','manchester')})
 
@@ -138,6 +138,24 @@ def test_budget_never_resets_between_councils():
     with pytest.raises(Denied,match='SOURCE_BOUND'):run.source(dict(requests=1,source_bytes=0,source_seconds=0,supervised_seconds=0))
 
 
+def test_intake_reuses_only_the_existing_qualified_manchester_zero():
+    import hashlib
+    from dataclasses import replace
+    from tests.e2e_connection_support import arcus_contract,outer
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    start,end=date(2026,10,22),date(2026,10,28)
+    source=arcus_audit('manchester',[entry('ZERO/1',SCHEME)],start,end)
+    source['listing_records']=[]
+    source['listing_segments']=[dict(ordinal=1,first=0,last=0,total=0,evidence_sha256=hashlib.sha256(b'No results found').hexdigest())]
+    source['explicit_zero_evidence']='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT'
+    contract=arcus_contract('manchester',start,end)
+    with pytest.raises(Denied,match='EMPTY_WINDOW'):contract.project(source,outer(),DEFAULT_LIMITS)
+    receipt=replace(contract,retain_explicit_zero=True).project(source,outer(),DEFAULT_LIMITS)
+    assert receipt['records']==[] and receipt['explicit_zero'] is True
+    source['explicit_zero_evidence']=''
+    with pytest.raises(Denied):replace(contract,retain_explicit_zero=True).project(source,outer(),DEFAULT_LIMITS)
+
+
 def test_consumed_daily_invocation_does_not_recollect_or_duplicate_work(world,tmp_path):
     reset(world);authorise(world,'duplicate-command')
     first=tmp_path/'first';first.mkdir();run,result,_=invoke(world,first,'duplicate-command')
@@ -172,7 +190,7 @@ def test_paginated_cross_run_backlog_survives_period_expiry(world,tmp_path):
         cursor=page['next_cursor']
         if cursor is None:break
     assert len(seen)==4 and len({(r['capture_key'],r['reference']) for r in seen})==4
-    assert all(r['screening_state']=='COMPLETE' and r['extraction_complete'] is False for r in seen)
+    assert all(r['screening_state']=='COMPLETE' and r['extraction_complete'] is None and r['downstream_state']=='NOT_TRACKED_BY_INTAKE' for r in seen)
 
 
 def test_changed_stop_prevents_supported_registration_and_preserves_history(world,tmp_path):
@@ -190,3 +208,45 @@ def test_policy_preserves_historical_registration_branch_text():
     old=v3.original_text();start=old.index(" IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN")
     finish=old.index('END $register$;',start)
     assert old[start:finish] in intake_policy.policy_sql()
+
+
+@pytest.mark.parametrize('fault',['unknown_source_failure','publication_failure'])
+def test_shared_failure_stops_next_council_and_never_claims_capture(world,tmp_path,fault):
+    reset(world);authorise(world,'shared-failure')
+    env,sources=env_and_sources(world,tmp_path,failed=fault=='unknown_source_failure')
+    if fault=='unknown_source_failure':
+        file=sources/'tameside.json';audit=json.loads(file.read_text());audit['failure_diagnostic']['transport']['http_status']=500;file.write_text(json.dumps(audit))
+    archive=tmp_path/'archive'
+    if fault=='publication_failure':archive.write_text('existing file refuses archive directory')
+    output=tmp_path/'result'
+    command=[sys.executable,'-m','scripts.run_daily_councils','--period','shared-failure','--output',str(output),
+             '--disposable-sources',str(sources),'--disposable-archive',str(archive)]
+    run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=30)
+    result=json.loads((output/'final-result.json').read_text())
+    assert run.returncode==1 and result['status']=='STOP_RECONCILE_NO_RETRY'
+    assert result['effect_reconciliation_required'] and result['cleanup']=='CLOSED'
+    assert not (output/'manchester-source.json').exists()
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchone()[0]==0
+    assert restricted_sessions(world['boot'])==0
+
+
+def test_stop_during_owned_source_closes_worker_and_preserves_original_stop(world,tmp_path):
+    reset(world);authorise(world,'attended-stop');env,sources=env_and_sources(world,tmp_path)
+    file=sources/'tameside.json';audit=json.loads(file.read_text());audit['_test_delay_seconds']=4;file.write_text(json.dumps(audit))
+    output=tmp_path/'result'
+    command=[sys.executable,'-m','scripts.run_daily_councils','--period','attended-stop','--output',str(output),
+             '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
+    process=subprocess.Popen(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    try:
+        end=time.monotonic()+10
+        while not (output/'tameside-owned').exists() and time.monotonic()<end:time.sleep(.025)
+        assert (output/'tameside-owned').exists()
+        with world['connect']('ingestion_worker_login') as c:c.execute("SELECT public.ingestion_raise_stop('DISPOSABLE_ATTENDED_STOP')")
+        process.communicate(timeout=20)
+    finally:
+        if process.poll() is None:process.kill();process.communicate(timeout=5)
+    result=json.loads((output/'final-result.json').read_text())
+    assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['cleanup']=='CLOSED'
+    assert restricted_sessions(world['boot'])==0 and not (output/'manchester-source.json').exists()
+    control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+    assert control['manual_stop']=='DISPOSABLE_ATTENDED_STOP'

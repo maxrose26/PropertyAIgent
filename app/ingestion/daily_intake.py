@@ -98,6 +98,7 @@ def intake_slot(caller, root_key, collect, archive, prepare_screening, *, check=
                        archive=archive,observed_at=stamp,intake_claim=claim)
         caller.read_capture()  # committed readback before screening registration
     check()
+    if not caller.capture_receipt['records']:return backlog(caller)
     if caller.registration is None:
         registration=prepare_screening(caller.capture_receipt)
         if registration.kind!='SCREENING' or registration.facts or registration.factual_contracts:
@@ -210,8 +211,12 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                     screening_key=s['key'] if s else None,screening_state=s['state'] if s else 'NOT_PREPARED',
                     screening_outcome=routing_of(result)[1] if result else None,
                     processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
-                    application_admitted=False,extraction_complete=False))
-    return bounded(dict(records=records,failures=failures,next_cursor=roots[-1]['key'] if more else None,
+                    application_admitted=None,extraction_complete=None,downstream_state='NOT_TRACKED_BY_INTAKE'))
+    captures=[dict(capture_key=r['key'],council=r['subject']['council'],scope=r['subject'],
+                   record_count=len((r['checkpoint'] or {}).get('records',[])),
+                   explicit_zero=(r['checkpoint'] or {}).get('explicit_zero',False),
+                   archive=(r['checkpoint'] or {}).get('durable_archive')) for r in roots if r['state']=='COMPLETE']
+    return bounded(dict(records=records,failures=failures,captures=captures,next_cursor=roots[-1]['key'] if more else None,
                         more=more,coverage_advance=False,extraction_consumer_connected=False),2*1024**2)
 
 

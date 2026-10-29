@@ -19,13 +19,15 @@ REGISTRATION = r"""
   IF p->>'operation'='intake_period' THEN
    IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN RAISE EXCEPTION 'OWNER_DISPOSITION_REQUIRED' USING ERRCODE='42501'; END IF;
    e:=p->'policy';
-   IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
+   IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
     OR jsonb_typeof(e->'expires_at') IS DISTINCT FROM 'number'
     OR (e->>'expires_at')::double precision<=t OR (e->>'expires_at')::double precision>t+604800
-    OR e->'max_runs' IS DISTINCT FROM '7'::jsonb OR e->'overlap_days' IS DISTINCT FROM '7'::jsonb
+    OR jsonb_typeof(e->'max_runs') IS DISTINCT FROM 'number' OR (e->>'max_runs')::numeric NOT BETWEEN 1 AND 7 OR (e->>'max_runs')::numeric<>trunc((e->>'max_runs')::numeric) OR e->'overlap_days' IS DISTINCT FROM '7'::jsonb
     OR jsonb_typeof(e->'councils') IS DISTINCT FROM 'object' OR (SELECT count(*) FROM jsonb_each(e->'councils')) NOT BETWEEN 1 AND 2
     OR (e->'councils')-ARRAY['tameside','manchester']<>'{}'::jsonb
     OR e->'expected_stop' IS DISTINCT FROM __SNAPSHOT__
+    OR ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb OR ctl->>'manual_stop' IS NOT NULL
+    OR EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN')
     OR jsonb_typeof(e->'screening_config') IS DISTINCT FROM 'string'
     OR jsonb_typeof(e->'execution_binding'->'revision') IS DISTINCT FROM 'string'
     OR jsonb_typeof(e->'execution_binding'->'workflow_sha256') IS DISTINCT FROM 'string'
@@ -34,6 +36,7 @@ REGISTRATION = r"""
     OR e->'execution_binding'->>'workflow_sha256' !~ '^[a-f0-9]{64}$'
     OR e->'execution_binding'->>'manifest_sha256' !~ '^[a-f0-9]{64}$'
     OR jsonb_typeof(e->'test_evidence') IS DISTINCT FROM 'boolean'
+    OR CASE WHEN e->'test_evidence'='true'::jsonb THEN e->'hostaddr' IS DISTINCT FROM 'null'::jsonb ELSE jsonb_typeof(e->'hostaddr') IS DISTINCT FROM 'string' OR family((e->>'hostaddr')::inet)<>4 OR masklen((e->>'hostaddr')::inet)<>32 END
     OR e->>'screening_config' !~ '^[a-f0-9]{64}$'
    THEN RAISE EXCEPTION 'INTAKE_PERIOD_POLICY'; END IF;
    FOR item IN SELECT value FROM jsonb_each(e->'councils') LOOP
@@ -67,6 +70,7 @@ REGISTRATION = r"""
    THEN RAISE EXCEPTION 'INTAKE_CONSUMED_RECONCILE_NO_REPLAY'; END IF;
    RETURN jsonb_build_object('already_consumed',true,'capture_key',root.key,'state',root.state);
   END IF;
+  IF EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN') THEN RAISE EXCEPTION 'INTAKE_UNRESOLVED_EFFECT_BARRIER'; END IF;
   g:=p->'grant';
   IF jsonb_typeof(g) IS DISTINCT FROM 'object' OR NOT (g ?& ARRAY['login','effect_login','workers','writes','detail_source_keys','capture_only','execution_binding','expires_at','bindings','keys','contracts','source_calls','capture_key','completion_outcomes']) OR jsonb_typeof(p->'authority') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'rows') IS DISTINCT FROM 'array'
    OR jsonb_array_length(p->'rows') NOT BETWEEN 1 AND 73
@@ -96,7 +100,7 @@ REGISTRATION = r"""
     OR NOT (e->'councils' ? (item->'subject'->>'council'))
     OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'
     OR g->>'capture_key' IS DISTINCT FROM item->>'key' OR item->'dependencies'<>'[]'::jsonb
-    OR (SELECT count(*) FROM jsonb_each(coalesce(e->'days','{}'::jsonb)))>=7 AND NOT (e->'days' ? (item->'subject'->>'end'))
+    OR (SELECT count(*) FROM jsonb_each(coalesce(e->'days','{}'::jsonb))) >= (e->>'max_runs')::int AND NOT (e->'days' ? (item->'subject'->>'end'))
     OR e->'days'->(item->'subject'->>'end') ? (item->'subject'->>'council')
    THEN RAISE EXCEPTION 'INTAKE_ROLLING_SCOPE_OR_CONSUMED'; END IF;
    e:=jsonb_set(e,ARRAY['days',item->'subject'->>'end'],coalesce(e->'days'->(item->'subject'->>'end'),'{}'::jsonb)||jsonb_build_object(item->'subject'->>'council',item->>'key'));

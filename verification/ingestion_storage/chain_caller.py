@@ -143,10 +143,11 @@ class ChainCaller:
 
     def settle_intake_failure(self,claim,category,source,outer,archive):
         from app.ingestion.batching import archive_capture
-        receipt=archive_capture(source,archive)
         budget=self._budget(slot_key=self.root_key)
         co=self._coordinator(budget,self.capture_authority,{self.contract.name:self.contract})
         try:
+            if getattr(self,'before_archive',None):self.before_archive(co.ledger)
+            receipt=archive_capture(source,archive)
             co.fail(claim,category,cleanup_closed=True,accounting_complete=True,council_isolated=True,
                     source_audit=source,outer=outer,failure_archive=receipt)
         finally:self.accounting['contained_failure']=budget.close([])
@@ -160,7 +161,10 @@ class ChainCaller:
         try:
             if intake_claim is not None and (not self.intake_only or intake_claim.key!=self.root_key):raise Denied('INTAKE_CLAIM_BINDING')
             claim = intake_claim if intake_claim is not None else co.ledger.claim(self.root_key, lease_seconds=LEASE_SECONDS)
-            self.capture_receipt = co.retained_capture(claim, source, outer, archive, expected_source_sha256=expected_source_sha256, evidence_label=evidence_label, observed_at=observed_at)
+            def checked_archive(raw):
+                if getattr(self,'before_archive',None):self.before_archive(co.ledger)
+                return archive(raw)
+            self.capture_receipt = co.retained_capture(claim, source, outer, checked_archive, expected_source_sha256=expected_source_sha256, evidence_label=evidence_label, observed_at=observed_at)
             return self.capture_receipt
         finally:
             self.accounting['capture'] = budget.close([])
