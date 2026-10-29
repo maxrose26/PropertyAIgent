@@ -189,7 +189,7 @@ class StandingOperation(Operation):
         # Fixed names, exclusive creation, private mode and positive readback.
         for name,raw in (('runtime-final-result.json',result_raw),('runtime-events.jsonl',events)):
             path=self.journal.root/name
-            with path.open('xb',opener=lambda p,f:os.open(p,f,0o600)) as stream:
+            with open(path,'xb',opener=lambda p,f:os.open(p,f,0o600)) as stream:
                 stream.write(raw);stream.flush();os.fsync(stream.fileno())
             if path.read_bytes()!=raw:raise Uncertain('OLDHAM_STANDING_ORIGINAL_READBACK')
             self.runtime_copied_bytes+=len(raw)
