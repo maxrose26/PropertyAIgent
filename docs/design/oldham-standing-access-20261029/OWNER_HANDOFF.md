@@ -105,98 +105,26 @@ and frozen-v3 screened using reusable restricted access. Zero nominees is valid;
 any nominees remain held. Coverage does not advance, other councils are not
 activated and Stage4 remains OPEN.
 
-## Focused review and comparison execution checkpoint (INACTIVE)
+## Fixed provider comparison profile (INACTIVE)
 
-The focused review inspected the standing owner/plan/runtime/provision adapter,
-shared publisher, authority binding, gate derivation, dormant workflow and
-standing unit/PostgreSQL tests. Persistent credentials are not batch authority.
-CAPTURE closure and independent saved-checkpoint readback precede SCREENING
-issuance; verified completion invalidates batch authorities and compares standing
-state. Uncertain effects stop for reconciliation rather than replay or automatic
-credential revocation. The standing gate changes only the expected LOGIN flag;
-provider/recovery predicates remain derived from the existing gate. Whole GitHub
-publication capacity is checked before effects, with owner/runtime closure
-shares preserved. This is a review by the recovery agent, not a separate
-independent reviewer. No new implementation defect was demonstrated.
+The previously documented execution-route gap is addressed by the explicit fixed
+`--provider-comparison` profile of the existing inspection entrypoint. See
+[the exact operation proposal](../oldham-provider-inspection-20261029/PACKAGE.md)
+for supported invocation, binding, enforced limits, result interpretation and
+prerequisites separated by purpose. No production execution/registration is
+released. Historical originals are required for historical reconciliation and
+later effects, not for this catalogue-only inspection.
 
-The SQL file SHA256 is
+The predecessor SQL hash was
 `92385277d49eb36b20764af428d3000e2fc536d92682ad2e84e9f8423f7403a4`.
-Its two projections cover both branches raising
-`STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED` in `activation_boundary.py`: view
-kind/options/definition hash, extension membership and effective forbidden
-table/column privileges; plus exact function owner/configuration/kind/language/
-signature/extension membership and view ownership. Expected view MD5 values are
-`ad1495ce5b4c54e4501e907a1f6aae8c` and
-`1807985dc152d2828720e1272d549775`. This is not the entire provider/recovery gate:
-monitoring memberships and reset-function EXECUTE are separate gate predicates.
+The fixed executable profile removes SQL LIMIT clauses and adds identity/read-only
+validation; its SQL SHA256 is
+`4e29bbf12027270cbc0e7685b8b3488a31dde84c8fa1135024046f210cb7ba93`.
+NULL/missing/duplicate/extra/malformed evidence is never a match. False predicates
+identify current differences; a match is neither historical-cause proof nor full
+provider/recovery gate acceptance. Production blocker remains unresolved.
 
-Required interpretation, NOT yet implemented by an executable result validator:
-read_only must be exactly true; exactly four unique (view,role) rows and three
-unique function-name rows must be present. Every predicate boolean must be
-exactly true, every function overload_count exactly one. NULL, absent role or
-object, duplicate key, unexpected name/shape, fifth view row, fourth function
-row, timeout, error or output overflow means INCOMPLETE/NO-GO, never PASS.
-LIMIT 5 and LIMIT 7 alone are not overflow enforcement. They may truncate
-additional function rows; overload_count exposes multiplicity, but a consumer
-must reject it. A missing role currently appears as NULL privilege predicates.
-The SQL has no aggregate PASS verdict and must not be interpreted by treating
-NULL as false or ignoring missing/extra rows. A clean comparison proves only
-current agreement for these predicates, not historical cause or full readiness.
-
-**Execution route: BLOCKED; no supported exact invocation exists.** The inspected
-`oldham_inspection` CLI accepts only `--registration` and
-`--registration-sha256`; its closed statement allowlist rejects this SQL. The
-saved activation-reconciliation adapter also accepts only its hash-pinned query
-pool and old revision/state; it is not a SQL-file runner and must not be replayed.
-Neither accepts `--sql`, `--sql-file`, or timeout/export overrides. Do not run a
-bare psql command or invent arguments to bypass these boundaries. No new
-diagnostic controller or registration was created in this review.
-
-| Required limit | Existing route / remaining gap |
-| --- | --- |
-| One read-only connection | Existing inspection counts one attempt and uses BEGIN READ ONLY, but cannot execute this file. |
-| 5s connect timeout | Existing preparation hardcodes 3s, a stricter connect ceiling; it has no 5s override. |
-| 5s statement / 1s lock | SQL SET LOCAL statements enforce these only after they run; startup defaults remain 10s/3s. No compatible runner exists. |
-| 30s overall active | Inspection has 45s active; archived adapter adds a 30s database watchdog, not the required overall active bound. |
-| At most 16 statements | SQL contains seven statements including BEGIN/ROLLBACK; inspection permits only its own fixed pool and 12-statement ceiling. No counter accepts this pool. |
-| 64KiB export, explicit overflow | SQL provides no byte limit. Existing inspection has separate evidence/terminal limits, not an established combined 64KiB comparison export. |
-| Rollback and close on every exit | Existing inspection attempts rollback on failure and closes in finally, but is not wired to this file. SQL's final ROLLBACK alone cannot cover an earlier client/server failure. |
-
-The intended non-secret administrative destination is project
-`zcikcfgpblzuzpanpdqd`, session pooler
-`aws-0-eu-west-2.pooler.supabase.com:5432`, database `postgres`, routing user
-`postgres.zcikcfgpblzuzpanpdqd`, expected current/session role `postgres`.
-The existing route validates these identities and uses verify-full TLS with the
-reviewed CA; credentials enter only through the existing hidden TTY input.
-Availability of that credential/owner host was not verified and no connection
-was attempted. REVIEW must decide whether to authorise a minimal fixed-query
-adaptation of the existing inspection route before any execution proposal can
-be made. Merely approving this SQL does not resolve the enforcement gaps.
-
-Authentic evidence availability checked during review:
-
-- Installed-policy INACTIVE archive contains source.json and slot-receipt.json
-  byte-identical to origin commit `d0eea18a7a9e1353ff4d281c68dc288dc3363196`.
-  Their SHA256 values are respectively
-  `97a3fe071da69a7fde32ee7bc663a19d8543c0e49fca5a127415c7e8c7ebc671`
-  and `946e77a942beca6096db367a666e0b864f82a957b71c124ad08209ac30d3382c`.
-- The archive qualification.json is semantically equal to accepted repository
-  Oldham qualification, but its formatting differs; do not claim byte equality.
-  Its SHA256 is `3d519c158bb35d50ad7d1472e842e40eb850dcde6ee7a6e01eda36e91589a003`.
-  Owner acceptance `OLDHAM_RECEIVED_20261015_20261021_V1` exists in repository code.
-- Published installed-operation result/audit prefixes at
-  `4700f6276203e6ba043897e1f914816e6713e6a6` remain available. The result records
-  failure in INSTALLED_POLICY_CLEANUP and historical cleanup NOT_ATTEMPTED.
-  Prefixes are not private complete original receipts.
-- The activation-reconciliation INACTIVE archive contains preparation code,
-  inactive registration and fixture validation, not the completed private result.
-  Missing: owner-host original final-result.json/events.jsonl (and publication
-  journal if present) for both consumed Oldham operations, plus the completed
-  activation-reconciliation result/events and their private modes/hashes.
-  These were not supplied by either archive and were not verified on owner host.
-
-Ordinary measured batch is 49 owner +27 runtime =76 calls; reserving all11
-preparation calls gives87/100. Historical cleanup and complete first-transition
-costs remain unmeasured; no total or allowance is reset by this review. No
-production connection/SQL, cleanup, provisioning, grant, activation, registration,
-dispatch, merge or deployment occurred. Stage4 remains OPEN.
+Standing batch measurements remain76 calls,87 with11 reserved preparation calls.
+Historical cleanup/complete first-transition costs remain unmeasured. Neither the
+inspection nor development publication resets or approves an operational allowance.
+Stage4 remains OPEN; this handoff remains INACTIVE.

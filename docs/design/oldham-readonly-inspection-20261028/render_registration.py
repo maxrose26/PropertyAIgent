@@ -11,22 +11,23 @@ from pathlib import Path
 HERE=Path(__file__).resolve().parent
 
 
-def render(root=None,minutes=90):
+def render(root=None,minutes=90,provider=False):
     root=Path(root or HERE.parents[2])
     sys.path.insert(0,str(root))
     from verification.ingestion_storage import oldham_inspection as inspection
     from verification.ingestion_storage.tls_trust import PEM_SHA256
-    manifest=json.loads((HERE/'MANIFEST.json').read_text())
+    directory=root/inspection.PROVIDER_DIRECTORY if provider else HERE
+    manifest=json.loads((directory/'MANIFEST.json').read_text())
     git=lambda *a:subprocess.check_output(['git',*a],cwd=root,text=True).strip()
     hashes={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in manifest['bound_paths']}
     expires=(datetime.now(timezone.utc)+timedelta(minutes=minutes)).replace(microsecond=0).isoformat()
-    return dict(mode=inspection.MODE,authority=inspection.AUTHORITY,status=inspection.STATUS,state_directory=inspection.STATE,expires_at=expires,revision=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}'),hashes=hashes,
+    return dict(mode=inspection.PROVIDER_MODE if provider else inspection.MODE,authority=inspection.PROVIDER_AUTHORITY if provider else inspection.AUTHORITY,status=inspection.PROVIDER_STATUS if provider else inspection.STATUS,state_directory=inspection.PROVIDER_STATE if provider else inspection.STATE,expires_at=expires,revision=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}'),hashes=hashes,
                 controller_sha256=hashlib.sha256((root/'verification/ingestion_storage/oldham_inspection.py').read_bytes()).hexdigest(),ca_sha256=PEM_SHA256,
-                evidence_directory=inspection.EVIDENCE_DIRECTORY,limits=inspection.BOUND,absent_capabilities=list(inspection.ABSENT_CAPABILITIES),statements_sha256=inspection.statements_sha256())
+                evidence_directory=inspection.PROVIDER_DIRECTORY if provider else inspection.EVIDENCE_DIRECTORY,limits=inspection.PROVIDER_BOUND if provider else inspection.BOUND,absent_capabilities=list(inspection.ABSENT_CAPABILITIES),statements_sha256=inspection.provider_statements_sha256() if provider else inspection.statements_sha256())
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--minutes',type=int,default=90);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--provider-comparison',action='store_true');parser.add_argument('--minutes',type=int,default=90);args=parser.parse_args()
     if not 1<=args.minutes<=120:raise SystemExit('EXPIRY_MINUTES_1_TO_120')
-    body=json.dumps(render(minutes=args.minutes),sort_keys=True,indent=1)+'\n'
+    body=json.dumps(render(minutes=args.minutes,provider=args.provider_comparison),sort_keys=True,indent=1)+'\n'
     sys.stdout.write(body);sys.stderr.write(hashlib.sha256(body.encode()).hexdigest()+'\n')

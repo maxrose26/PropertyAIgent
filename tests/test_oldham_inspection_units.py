@@ -255,3 +255,152 @@ def test_the_reviewed_privilege_matrix_covers_seven_functions_and_four_tables_wi
     assert oi.expected_function_execute('ingestion_raise_stop','ingestion_worker_login') is True and oi.expected_function_execute('ingestion_raise_stop','ingestion_effect_login') is False
     assert oi.expected_function_execute('ingestion_recover_abandoned','ingestion_worker_login') is False
     assert oi.expected_table('ingestion_worker_login','ingestion_work_attempts')==(True,False,False,False,False,False,True)
+
+# Fixed provider profile: no production facts are supplied by these rows.
+def provider_rows():
+    views=[(v,r,True,True,True,h,True,True,True,True,True) for v,h in oi.VIEW_HASHES.items() for r in oi.RUNTIME_LOGINS[:2]]
+    functions=[(n,True,True,True,True,True,True,True,True,1) for n in oi.PROVIDER_FUNCTIONS]
+    return views,functions
+
+
+def test_provider_exact_match_is_scoped_and_never_continuation():
+    got=oi.evaluate_provider(*provider_rows())
+    assert got['status']=='MATCH' and got['production_continuation'] is False
+    assert got['historical_cause']=='NOT_ESTABLISHED'
+
+
+@pytest.mark.parametrize('kind,index', [('view',i) for i in (2,3,4,6,7,8,9,10)]+[('function',i) for i in range(1,9)])
+def test_provider_each_false_predicate_is_identified(kind,index):
+    views,functions=provider_rows();rows=views if kind=='view' else functions
+    row=list(rows[0]);row[index]=False;rows[0]=tuple(row)
+    got=oi.evaluate_provider(views,functions)
+    assert got['status']==('INCOMPLETE' if index==(2 if kind=='view' else 1) else 'MISMATCH')
+    assert got['mismatches'] and got['production_continuation'] is False
+
+
+@pytest.mark.parametrize('change', ['null','missing_role','missing_view','missing_function','duplicate_view','duplicate_function','extra_view','extra_function','overload','bad_hash','bad_count','unexpected','malformed'])
+def test_provider_invalid_evidence_never_matches(change):
+    v,f=provider_rows()
+    if change in ('null','missing_role','bad_hash'):
+        row=list(v[0]);row[9 if change=='missing_role' else 5 if change=='bad_hash' else 3]=None;v[0]=tuple(row)
+    elif change=='missing_view':v.pop()
+    elif change=='missing_function':f.pop()
+    elif change=='duplicate_view':v[-1]=v[0]
+    elif change=='duplicate_function':f[-1]=f[0]
+    elif change=='extra_view':v.append(v[0])
+    elif change=='extra_function':f.append(f[0])
+    elif change in ('overload','bad_count'):f[0]=(*f[0][:-1],2 if change=='overload' else True)
+    elif change=='unexpected':v[0]=('unexpected',*v[0][1:])
+    else:v[0]=('broken',)
+    got=oi.evaluate_provider(v,f)
+    assert got['status']==('MISMATCH' if change=='overload' else 'INCOMPLETE')
+
+
+class ProviderCursor:
+    pgresult=None
+    def __init__(self,rows=None):self.rows=rows;self.description=bool(rows)
+    def fetchmany(self,n):return self.rows[:n]
+
+
+class ProviderConnection:
+    def __init__(self,fail=None,extra=False):self.sent=[];self.closed=False;self.fail=fail;self.extra=extra
+    def execute(self,s):
+        self.sent.append(s)
+        if s==self.fail:raise TimeoutError('private text must not escape')
+        name=next((n for n,q,_ in oi.provider_plan() if q==s),None)
+        v,f=provider_rows()
+        if self.extra:v.append(v[0])
+        return ProviderCursor({'identity':[('postgres','postgres',True)],'views':v,'functions':f}.get(name))
+    def close(self):self.closed=True
+
+
+def provider_runner(tmp_path,conn):
+    import time
+    from verification.ingestion_storage.operational_preparation import Progress
+    from verification.ingestion_storage.tls_trust import owned_resources
+    return oi.ProviderInspection(oi.ProviderJournal(tmp_path/'provider'),lambda:conn,Progress(),None,baseline=owned_resources(),started=time.monotonic())
+
+
+@pytest.mark.parametrize('fault',['none','views','begin','extra','expired','wrong_identity','rollback'])
+def test_provider_one_connection_rollback_and_close(tmp_path,fault):
+    conn=ProviderConnection(fail=dict((n,q) for n,q,_ in oi.provider_plan()).get(fault),extra=fault=='extra')
+    runner=provider_runner(tmp_path,conn)
+    if fault=='expired':runner.started-=31
+    if fault=='wrong_identity':
+        original=conn.execute
+        def execute(s):
+            c=original(s)
+            if s==dict((n,q) for n,q,_ in oi.provider_plan())['identity']:c.rows=[('other','other',True)]
+            return c
+        conn.execute=execute
+    result=runner.execute()
+    assert result['status']==('PROVIDER_COMPARISON_MATCH' if fault=='none' else 'PROVIDER_COMPARISON_INCOMPLETE')
+    assert runner.attempts==(0 if fault=='expired' else 1)
+    if fault!='expired':assert conn.closed and conn.sent[-1]=='ROLLBACK'
+    assert runner.statements<=16 and 'private text' not in json.dumps(result)
+
+
+def test_provider_capacity_and_statement_allowlist(tmp_path):
+    conn=ProviderConnection();r=provider_runner(tmp_path,conn)
+    with pytest.raises(ap.ProbeDenied):r.send(conn,'bad','SELECT 1')
+    r.statements=15
+    with pytest.raises(ap.ProbeDenied):r.send(conn,'begin','BEGIN READ ONLY')
+    assert conn.sent==[]
+
+
+def test_provider_output_and_journal_overflow_are_refusals(tmp_path):
+    from verification.ingestion_storage.operational_outcome import finalise
+    j=oi.ProviderJournal(tmp_path/'bounded');lines=[]
+    with pytest.raises(ap.ProbeDenied):j.emit('x',{'x':'a'*17000})
+    with pytest.raises(ap.ProbeDenied):j.save('final-result.json',{'x':'a'*33000})
+    with pytest.raises(ap.ProbeDenied):oi.provider_output(j,lines.append)('x'*32768)
+    result=finalise(j,dict(status='PROVIDER_COMPARISON_MATCH',inspection=oi.evaluate_provider(*provider_rows())),input_seconds=0,active_started=None,output=oi.provider_output(j,lambda s,**kw:lines.append(s)))
+    assert len(lines)==1
+    assert sum(p.stat().st_size for p in j.root.iterdir())+len(lines[0].encode())+1<=65536
+
+
+def test_provider_fixed_sql_has_no_limit_or_extra_sql():
+    plan=oi.provider_plan()
+    assert len(plan)==7 and not any('LIMIT' in s for _,s,_ in plan)
+    assert plan[0][1]=='BEGIN READ ONLY' and plan[-1][1]=='ROLLBACK'
+    assert 'PROVIDER_COMPARISON' not in oi.MODE and oi.BOUND['active_seconds']==45
+
+
+def test_provider_startup_settings_and_destination_are_fixed(monkeypatch):
+    import psycopg
+    from verification.ingestion_storage import operational_preparation as prep
+    from verification.ingestion_storage.operational_preparation import Progress
+    seen=[]
+    monkeypatch.setattr(prep,'verified_trust',lambda:(Path('/synthetic/ca'),None))
+    monkeypatch.setattr(prep,'resolve_addresses',lambda *a,**kw:'192.0.2.7')
+    monkeypatch.setattr(psycopg,'connect',lambda **kw:seen.append(kw))
+    r={'expires_at':(datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat()}
+    url='postgresql://postgres.zcikcfgpblzuzpanpdqd:fixture@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'
+    prep.prepare_connection(r,url,progress=Progress(),provider_inspection=True).connect()
+    prep.prepare_connection(r,url,progress=Progress()).connect()
+    assert seen[0]['connect_timeout']==3 and seen[0]['sslmode']=='verify-full'
+    assert seen[0]['options']=='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000'
+    assert seen[1]['options']==prep.STARTUP_OPTIONS
+    assert seen[0]['host']=='aws-0-eu-west-2.pooler.supabase.com' and seen[0]['dbname']=='postgres'
+
+
+def test_provider_readback_byte_overflow_rolls_back(tmp_path):
+    conn=ProviderConnection();original=conn.execute
+    class Oversized:
+        ntuples=1;nfields=1
+        def get_value(self,*a):return b'x'*16385
+    def execute(s):
+        cursor=original(s)
+        if s==dict((n,q) for n,q,_ in oi.provider_plan())['views']:cursor.pgresult=Oversized()
+        return cursor
+    conn.execute=execute;runner=provider_runner(tmp_path,conn);result=runner.execute()
+    assert result['status']=='PROVIDER_COMPARISON_INCOMPLETE'
+    assert result['failure']['reason_code']=='RESPONSE_BOUND' and conn.closed and conn.sent[-1]=='ROLLBACK'
+
+
+def test_provider_session_uses_thirty_second_hard_limit():
+    assert oi.PROVIDER_TIMING['active_seconds']==30
+    assert oi.PROVIDER_TIMING['work_seconds']+oi.PROVIDER_TIMING['report_seconds']<30
+    tree=ast.parse(Path(oi.__file__).read_text())
+    main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='main')
+    assert 'PROVIDER_TIMING if a.provider_comparison else TIMING' in ast.unparse(main)

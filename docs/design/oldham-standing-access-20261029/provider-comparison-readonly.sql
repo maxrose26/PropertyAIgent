@@ -1,11 +1,11 @@
 -- INACTIVE: proposed fixed comparison only. No execution is authorised.
--- Existing hidden administrative input route; one READ ONLY connection,
--- 5s connect/statement timeout,1s lock timeout,30s active,16 statements,
+-- Fixed provider profile of oldham_inspection; one READ ONLY connection,
+-- <=5s connect timeout; 5s statement,1s lock,30s active,16 statements,
 -- 64KiB export. No extension-view rows or statistics functions are read.
 BEGIN READ ONLY;
 SET LOCAL statement_timeout='5s';
 SET LOCAL lock_timeout='1s';
-SELECT current_setting('transaction_read_only')='on' AS read_only;
+SELECT current_user,session_user,current_setting('transaction_read_only')='on' AS read_only;
 WITH wanted(name,expected) AS (VALUES
  ('pg_stat_statements','ad1495ce5b4c54e4501e907a1f6aae8c'),
  ('pg_stat_statements_info','1807985dc152d2828720e1272d549775')),
@@ -28,7 +28,7 @@ LEFT JOIN pg_namespace n ON n.nspname='extensions'
 LEFT JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=w.name
 LEFT JOIN pg_roles r ON r.rolname=runtime.name
 LEFT JOIN pg_extension e ON e.extname='pg_stat_statements'
-ORDER BY w.name,runtime.name LIMIT 5;
+ORDER BY w.name,runtime.name;
 WITH wanted(name,symbol,args,result,setof) AS (VALUES
  ('pg_stat_statements','pg_stat_statements_1_11','16',2249,true),
  ('pg_stat_statements_info','pg_stat_statements_info','',2249,false),
@@ -49,5 +49,5 @@ LEFT JOIN pg_proc p ON p.pronamespace=n.oid AND p.proname=w.name
 LEFT JOIN pg_language l ON l.oid=p.prolang
 LEFT JOIN pg_extension e ON e.extname='pg_stat_statements'
 LEFT JOIN pg_namespace en ON en.oid=e.extnamespace
-ORDER BY w.name,p.oid LIMIT 7;
+ORDER BY w.name,p.oid;
 ROLLBACK;
