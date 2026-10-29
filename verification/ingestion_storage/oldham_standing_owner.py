@@ -216,7 +216,7 @@ class StandingOperation(Operation):
             self.stage='CAPTURE_RECEIPT';marker=self.await_marker('capture-retained/retained.json',also_failure=True);root,receipt=self.capture_checkpoint(marker,capture)
             self.stage='SCREENING_ISSUANCE';screen=self.issue('SCREENING',root=root,receipt=receipt)
             if isinstance(screen,dict):raise Denied('OLDHAM_STANDING_CAPACITY')
-            self.publish({'registered.json':canonical(dict(execution=self.execution,capture_sha256=digest(receipt),registration_sha256=digest(registration_value(screen)),authority=screen.authority))},'screening-authority')
+            self.publish({'registered.json':canonical(dict(execution=self.execution,capture_sha256=digest(receipt),prepared_sha256=plan.screening_authority_digest(screen),authority=screen.authority))},'screening-authority')
             self.stage='RUNTIME_RESULT';published=self.await_marker('completed/final-result.json')
             if published.get('execution')!=self.execution or published.get('capture_sha256')!=digest(receipt) or published.get('status')!='OLDHAM_STANDING_CAPTURE_SCREENING_COMPLETE':raise Uncertain('OLDHAM_STANDING_RUNTIME_OUTCOME')
             self.hosted=published;self.closing=True;self.github.bound=GITHUB['owner'];self.stage='AUTHORITY_INVALIDATION';self.owner.tearing_down=True;self.owner.revoke()

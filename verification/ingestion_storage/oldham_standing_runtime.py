@@ -80,7 +80,12 @@ class StandingRunner(HostedRunner):
                 ctl=c.execute(text("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
             stop_identity(ctl);g=ctl.get('grants',{}).get(reg.authority);a=ctl.get('oldham_allowances',{}).get(reg.authority)
             if not g or not a or any(g.get(k)!=v for k,v in reg.grant.items()) or a.get('revoked') is not False or a.get('expires_at',0)<=time.time():raise Denied('OLDHAM_STANDING_AUTHORITY')
-            if a.get('grant_binding')!={k:v for k,v in g.items() if k not in ('source_calls','writes')} or a.get('evidence',{}).get('registration_sha256')!=digest(registration_value(reg)):raise Denied('OLDHAM_STANDING_AUTHORITY_BINDING')
+            if a.get('grant_binding')!={k:v for k,v in g.items() if k not in ('source_calls','writes')}:raise Denied('OLDHAM_STANDING_AUTHORITY_BINDING')
+            observed=a.get('evidence',{}).get('registration_sha256')
+            if reg.kind=='SCREENING':
+                stored=a.get('package',{}).get('registration')
+                if digest(stored)!=observed or plan.screening_authority_digest(stored)!=plan.screening_authority_digest(reg):raise Denied('OLDHAM_STANDING_AUTHORITY_BINDING')
+            elif observed!=digest(registration_value(reg)):raise Denied('OLDHAM_STANDING_AUTHORITY_BINDING')
         finally:
             receipt=b.close([]);self.caller.accounting.setdefault('authority_reads',[]).append(receipt)
         require_closure([receipt])
@@ -99,7 +104,7 @@ class StandingRunner(HostedRunner):
         for attempt in range(POLL_ATTEMPTS):
             self.check();head=self.head();blob=self.github.probe(REPO+'/contents/'+self.EVIDENCE+'/screening-authority/registered.json?ref='+head)
             if blob is not None:
-                m=json.loads(blob_bytes(blob));expected=dict(execution=self.execution,capture_sha256=digest(self.capture),registration_sha256=digest(registration_value(reg)),authority=reg.authority)
+                m=json.loads(blob_bytes(blob));expected=dict(execution=self.execution,capture_sha256=digest(self.capture),prepared_sha256=plan.screening_authority_digest(reg),authority=reg.authority)
                 if m!=expected:raise Uncertain('OLDHAM_STANDING_SCREEN_MARKER')
                 self.evidence_head=head;self.grant_present(reg);return
             if attempt+1<POLL_ATTEMPTS:self.pipeline_sleep(POLL_SECONDS)

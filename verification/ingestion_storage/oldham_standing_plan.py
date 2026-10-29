@@ -100,3 +100,15 @@ def runtime_inputs(claim,*,disposable=False):
     start=datetime.fromisoformat(claim['package_started_at']);now=datetime.now(timezone.utc)
     if start.tzinfo is None or start>now or (now-start).total_seconds()>=450:raise Denied('OLDHAM_STANDING_ORIGINAL_CLOCK')
     return dict(package=p,manifest=value,seal=seal,export=export,description=description,binding=binding,contract=contract,capture=capture,source=source,outer=outer,source_raw=canonical(source),started=start,rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False))
+
+
+
+def screening_authority_digest(reg):
+    # The saved root's fence/lease/outcome are mutable observations, not new
+    # screening authority. Bind every inserted row, immutable grant binding and
+    # root identity; the separate capture hash pins the committed checkpoint.
+    if isinstance(reg,dict):
+        if set(reg)!={'kind','authority','rows','insert','grant','bindings','root_key','targets'} or reg['kind']!='SCREENING' or reg['targets']!={}:raise Denied('OLDHAM_STANDING_SCREENING_PACKAGE')
+        value={k:reg[k] for k in ('authority','root_key','insert','grant','bindings')}
+    else:value=dict(authority=reg.authority,root_key=reg.root_key,insert=reg.insert,grant=reg.grant,bindings=reg.bindings)
+    return digest(value)

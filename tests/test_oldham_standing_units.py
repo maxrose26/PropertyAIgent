@@ -133,3 +133,23 @@ def test_actual_final_export_respects_selected_share_before_effects(tmp_path):
         assert one['status']=='FIXTURE'
         two=finalise(journal,dict(raw),input_seconds=0,active_started=None,output=lambda value,**kw:None,export_limit=actual+8191)
         assert two['status']=='STOP_RECONCILE_NO_RETRY'
+
+
+def test_screen_marker_binds_prepared_authority_not_mutable_root_state():
+    r=SimpleNamespace(authority='exact',root_key='root',insert=[{'key':'batch','checkpoint':{'plan':'exact'}}],grant={'keys':['root','batch']},bindings={'root':{'revision':'a'*40}},rows=[{'fence':1,'lease_owner':'old'}])
+    before=p.screening_authority_digest(r)
+    r.rows[0].update(fence=2,lease_owner=None)
+    assert p.screening_authority_digest(r)==before
+    r.insert[0]['checkpoint']['plan']='substituted'
+    assert p.screening_authority_digest(r)!=before
+
+
+def test_stored_screening_package_projection_keeps_full_provenance():
+    r=dict(kind='SCREENING',authority='exact',root_key='root',rows=[{'key':'root','fence':2,'outcome':{'outcome':'ENUMERATED_METADATA_RETAINED'}}],insert=[{'key':'batch'}],grant={'keys':['root','batch']},bindings={'root':{'revision':'a'*40}},targets={})
+    expected=p.screening_authority_digest(r)
+    r['rows'][0]['fence']=3
+    assert p.screening_authority_digest(r)==expected
+    r['grant']['keys'].append('unexpected')
+    assert p.screening_authority_digest(r)!=expected
+    r['targets']={'unexpected':{}}
+    with pytest.raises(Denied):p.screening_authority_digest(r)
