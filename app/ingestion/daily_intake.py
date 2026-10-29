@@ -91,8 +91,9 @@ def backlog(caller):
     records=capture['records']
     if len(records)>60:raise Denied('INTAKE_ROW_BOUND')
     screens=caller.registration.screens if caller.registration else {}
-    keys=[x['key'] for x in screens.values()]
-    rows={r['key']:r for r in caller.read_intake_items(keys)} if keys else {}
+    batches=caller.registration.batches if caller.registration else []
+    keys=[caller.root_key,*[x['key'] for x in screens.values()],*[x['key'] for x in batches]]
+    rows={r['key']:r for r in caller.read_intake_items(keys)}
     out=[]
     for record in records:
         expected=assessment_identity(record,caller.rule)
@@ -116,7 +117,8 @@ def backlog(caller):
                         processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
                         admission_eligible=identity_admission_eligible(result) if result else False,
                         application_admitted=False,extraction_complete=False))
-    return bounded(dict(records=out,coverage_advance=False,window_claim='NONE',extraction_consumer_connected=False),2*1024**2)
+    tasks=[{k:r[k] for k in ('key','task','state','phase','reason','attempt_count','next_action')} for r in rows.values()]
+    return bounded(dict(records=out,tasks=tasks,coverage_advance=False,window_claim='NONE',extraction_consumer_connected=False),2*1024**2)
 
 
 def inactive_main():

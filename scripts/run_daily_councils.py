@@ -1,4 +1,9 @@
-"""Daily multi-council Planning Application scraper orchestrator (Pilot
+"""Scheduled intake entrypoint is INACTIVE pending supported rolling authority.
+
+The legacy implementation below is preserved for the separately authorised manual
+scripts.run_daily_councils_legacy command. main() cannot fall back to it.
+
+Historical implementation: Daily multi-council Planning Application scraper orchestrator (Pilot
 Readiness PR-2, "Production Scheduling"). This is the production entry
 point Render's Cron Job (see render.yaml) invokes once a day.
 

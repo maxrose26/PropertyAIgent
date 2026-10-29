@@ -10,6 +10,7 @@ receipt supplies the outer object (`verification.discovery.outer_evidence.outer_
 """
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import time
 
 from app.config import get_council
 from app.ingestion.batching import process_batch
@@ -50,6 +51,7 @@ class ChainCaller:
         self.bindings, self.capture_authority, self.chain_authority = bindings, capture_authority, chain_authority      # `bindings` is shared with the registration(s) that fill it
         self.stop_file, self.allow_test_evidence = stop_file, allow_test_evidence
         self.registration = None
+        self.intake_started=time.monotonic()
         self.preflighted = None
         self.budgets, self.accounting = [], {}
         self.listing_requests = []      # stays empty: no stage requests a listing
@@ -57,7 +59,23 @@ class ChainCaller:
 
     # ---------------------------------------------------------------------------------------------------------- plumbing
     def _budget(self, **kw):
+        if self.intake_only:
+            # Reuse the existing finite database envelope across ALL stages of
+            # this intake scope, including readbacks and duplicate deliveries.
+            # A caller cannot reset it by starting another logical batch.
+            statements=sum(b.statements for b in self.budgets)
+            attempts=sum(b.attempts for b in self.budgets)
+            returned=sum(b.returned_bytes for b in self.budgets)
+            left=300-(time.monotonic()-self.intake_started)-30
+            if statements>1040-36 or attempts>40-3 or returned>=4*1024**2 or left<=0:
+                raise Denied('INTAKE_AGGREGATE_CLOSURE_RESERVE')
+            kw.update(statements=min(kw.get('statements',120),1040-statements-16),
+                      connections=min(kw.get('connections',16),40-attempts-2),
+                      returned_bytes=min(kw.get('returned_bytes',4*1024**2),4*1024**2-returned),
+                      seconds=min(kw.get('seconds',165),left))
+            kw['cancel_used']=sum(b.prior_cancel_attempts+sum(e.get('cancel_attempts',0) for e in b.hard_deadline_events) for b in self.budgets)
         budget = DatabaseBudget(stop_file=self.stop_file, **kw) if self.stop_file else DatabaseBudget(**kw)
+        if self.intake_only:budget.hard_stop_at=self.intake_started+270
         self.budgets.append(budget)
         return budget
 

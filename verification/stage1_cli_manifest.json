@@ -122,5 +122,9 @@
   "scripts/v8_reonboarding_rollback.py": {
     "command": "v8_reonboarding_rollback",
     "required_scope": "launch:v8_reonboarding_rollback"
+  },
+  "scripts/run_daily_councils_legacy.py": {
+    "command": "run_daily_councils",
+    "required_scope": "launch:run_daily_councils"
   }
 }
