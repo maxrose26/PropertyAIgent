@@ -26,7 +26,7 @@ BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/in
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
-             'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/chain_caller.py',
+             'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/render_intake.py','verification/direct_reference/instrumented_probe.py','verification/ingestion_storage/chain_caller.py',
              'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
              'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
 
@@ -45,26 +45,29 @@ def stop_snapshot(ctl):
     return {k:ctl.get(k,0 if k=='hard_stop_generation' else None) for k in ('global_stop','manual_stop','last_hard_stop','hard_stop_generation')}
 
 
-def require_source_context(councils,*,disposable):
-    # The existing Arcus proof reader requires the dedicated owner-host cgroup
-    # and exact credential-free environment. This controller does not establish
-    # them; refuse BEFORE registration or any council source effect. A Render
-    # container plan alone is not that kernel containment contract.
+def require_source_context(councils,*,disposable,profile=None,binding=None):
     if not disposable and 'manchester' in councils:
-        raise Denied('ARCUS_INTAKE_EXECUTION_CONTEXT_UNSUPPORTED')
+        from .render_intake import validate_profile,MemoryMonitor,SERVICE
+        if profile is None:raise Denied('ARCUS_INTAKE_EXECUTION_CONTEXT_UNSUPPORTED')
+        if os.environ.get('RENDER_SERVICE_ID')!=SERVICE or os.environ.get('RENDER_GIT_COMMIT')!=(binding or {}).get('revision'):
+            raise Denied('RENDER_INTAKE_HOST_BINDING')
+        validate_profile(profile,revision=binding['revision'])
+        return MemoryMonitor(profile)
+    return None
 
 
-def registration_payload(period,reg,binding):
+def registration_payload(period,reg,binding,*,run_id=None):
+    run_id=run_id or hashlib.sha256(period.encode()).hexdigest()[:32]
     rows=reg.rows if reg.kind=='CAPTURE' else [r for r in reg.rows if r['key']!=reg.root_key]
     if reg.kind=='CAPTURE':reg.grant['source_calls']=1
-    return dict(operation='intake_capture' if reg.kind=='CAPTURE' else 'intake_screen',period=period,
+    return dict(run_id=run_id,publication_path=f'docs/design/ingestion-operational-execution-daily-intake/{period}/{run_id}/final/result-before-publication.json',operation='intake_capture' if reg.kind=='CAPTURE' else 'intake_screen',period=period,
                 authority=reg.authority,execution_binding=binding,grant=reg.grant,rows=rows,
                 identity_json={r['key']:canonical({k:r[k] for k in ('subject','task','contract','revision')}).decode() for r in rows})
 
 
 class Runtime:
     def __init__(self,args):
-        self.args=args;self.root=Path(args.output)
+        self.args=args;self.root=Path(args.output);self.run_id=__import__('uuid').uuid4().hex
         if self.root.exists() or self.root.is_symlink():raise Denied('FRESH_OUTPUT_REQUIRED')
         self.root.mkdir(mode=0o700,parents=True)
         self.run=IntakeRun(stop_file=self.root/'STOP');self.binding=execution_binding();self.authorities=[]
@@ -92,7 +95,7 @@ class Runtime:
             from .tls_trust import verified_trust
             ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr,'route':self.route_name}
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0
-        self.policy=None
+        self.policy=None;self.memory=None
         self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in Owner.daily_intake_inventory().items()}
 
     def emit(self,event,data):
@@ -123,14 +126,15 @@ class Runtime:
             actual=c.execute(text("SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),r.rolname,p.proconfig,p.prosecdef FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace JOIN pg_catalog.pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(:names) ORDER BY p.proname"),dict(names=list(self.expected_functions))).all()
             expected=[(n,h,'ingestion_storage_owner',['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,h in sorted(self.expected_functions.items())]
             if [tuple(r) for r in actual]!=expected:raise Denied('INTAKE_FUNCTION_INVENTORY_CHANGED')
-        row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
+        row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, outcome::jsonb->'intake_run' AS intake_run, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
         if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('route')!=self.route_name or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
             (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
             raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
+        self.durable_run=row.intake_run
         return row.policy
 
     def issue(self,reg):
-        payload=registration_payload(self.args.period,reg,self.binding)
+        payload=registration_payload(self.args.period,reg,self.binding,run_id=self.run_id)
         self.authorities.append(reg.authority)  # intent precedes a possibly lost acknowledgement
         # One transaction at the actual supported issuer, no INSERT stand-in.
         with self.connection() as (c,_):
@@ -139,7 +143,7 @@ class Runtime:
             self.authorities.remove(reg.authority)
             self.emit('already_consumed_no_source',got)
             return got
-        if got!={**reg.grant,'intake_period':self.args.period}:raise Denied('INTAKE_ISSUER_READBACK')
+        if got!={**reg.grant,'intake_period':self.args.period,'intake_run':self.run_id}:raise Denied('INTAKE_ISSUER_READBACK')
         self.emit('supported_registration',dict(kind=reg.kind,authority=reg.authority,keys=len(reg.bindings)))
         return None
 
@@ -147,7 +151,7 @@ class Runtime:
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
         self.run.publication(len(raw),10)
         sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
-        directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/capture-'+str(self.archive_ordinal)
+        directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/capture-'+str(self.archive_ordinal)
         if self.test:
             target=Path(self.args.disposable_archive);target.mkdir(exist_ok=True,parents=True)
             dest=target/(sha+'.json');dest.write_bytes(raw)
@@ -190,13 +194,17 @@ class Runtime:
                     except BaseException as error:errors.append(error);return
             def check():
                 self.run.check();budget.check()
+                if self.memory:self.memory.check()
                 if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
             watcher=threading.Thread(target=poll,daemon=True);watcher.start()
             try:
+                profile=self.policy.get('render_profile') if row['council']=='manchester' and not self.test else None
+                environment={'INGESTION_SOURCE_PRIVATE':'ONCE'}
+                if profile:environment.update(PLAYWRIGHT_BROWSERS_PATH=profile['browser_path'],INGESTION_RENDER_PROFILE=json.dumps(profile))
                 outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
-                                environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=self.root/(row['council']+'-owned'),
-                                source=True,seconds=75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
-                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None)
+                                environment=environment,root=self.root/(row['council']+'-owned'),
+                                source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
+                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile)
             finally:
                 done.set();watcher.join(timeout=14)
             if watcher.is_alive():raise Denied('STOP_POLL_CLOSURE_UNCERTAIN')
@@ -214,13 +222,29 @@ class Runtime:
         self.emit('source_closed',dict(council=row['council'],sha256=digest(source),metrics=metrics,outer=outer))
         return source,outer
 
+    def verify_screening(self,root_key):
+        """Exact expected batches AND assessments; no claim, registration or replay."""
+        from sqlalchemy import select
+        from app.ingestion.schema import WorkItem as W
+        from .chain_registration import _screen_items,completed_screening,Registration
+        with self.connection() as (c,_):
+            root=dict(c.execute(select(W).where(W.c.key==root_key)).mappings().one())
+            if root['state']!='COMPLETE':raise Denied('INTAKE_CAPTURE_INCOMPLETE')
+            receipt=root['checkpoint'];rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
+            batches,screens=_screen_items(binding_for(root['subject']['council']),root,receipt,rule,root['limits'],capture_bound=True)
+            keys=[r['key'] for r in [*batches,*screens.values()]]
+            rows=[dict(r) for r in c.execute(select(W).where(W.c.key.in_(keys))).mappings()] if keys else []
+            reg=Registration('SCREENING','',[],[],{}, {},root_key,batches=batches,screens=screens)
+            completed_screening(reg,receipt,rule,rows)
+        return len(receipt['records'])
+
     def execute(self):
         result=dict(status='STOP_RECONCILE_NO_RETRY',scopes=[],coverage_advance=False,admission_connected=False,extraction_connected=False)
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
-            require_source_context(self.policy['councils'],disposable=self.test)
+            self.memory=require_source_context(self.policy['councils'],disposable=self.test,profile=self.policy.get('render_profile'),binding=self.binding)
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)
@@ -237,6 +261,7 @@ class Runtime:
                 reg=capture_registration(owner,sb,contract,row['start'],row['end'],revision=revision,item_limits=limits)
                 consumed=self.issue(reg)
                 if consumed:
+                    if consumed['state']=='COMPLETE':self.verify_screening(reg.root_key)
                     result['scopes'].append(dict(council=row['council'],status='ALREADY_RETAINED' if consumed['state']=='COMPLETE' else 'INCOMPLETE',records=0,failure=None,already_consumed=True))
                     continue
                 caller=ChainCaller(sb,contract,rule,self.urls,revision=revision,bindings=dict(reg.bindings),capture_authority=reg.authority,
@@ -250,6 +275,7 @@ class Runtime:
                     screen=screening_registration(owner,sb,contract,root,receipt,rule,revision=revision,item_limits=limits,allow_test_evidence=self.test,capture_bound=True)
                     self.issue(screen);caller.bindings.update(screen.bindings);return screen
                 outcome=intake_slot(caller,reg.root_key,lambda _:self.collect(row),self.archive,prepare,check=self.run.check)
+                if outcome.get('status')!='INCOMPLETE':self.verify_screening(reg.root_key)
                 result['scopes'].append(dict(council=row['council'],status=outcome.get('status','RETAINED_AND_SCREENED'),records=len(outcome['records']),failure=outcome.get('failure')))
             with self.connection() as (c,budget):
                 # Existing worker SELECT access; no unknown historical key list.
@@ -289,6 +315,7 @@ class Runtime:
             if result['cleanup']!='CLOSED':result['status']='STOP_RECONCILE_NO_RETRY'
             result['effect_reconciliation_required']=result['status']=='STOP_RECONCILE_NO_RETRY'
             result['test_evidence']=self.test;result['execution_binding']=self.binding
+            if self.memory:result['memory']=self.memory.evidence()
             raw=canonical(result);events=canonical(self.events)
             try:
                 if self.authorities:self.run.publication(len(raw)+len(events),10)
@@ -296,8 +323,26 @@ class Runtime:
                     if self.github is None:
                         self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
-                    self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/final',expected_head=self.head)
+                    self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final',expected_head=self.head)
                 result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                if self.authorities and result['status'] in ('RETAINED_AND_SCREENED','INCOMPLETE'):
+                    path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
+                    if self.test:
+                        dest=Path(self.args.disposable_archive)/(self.run_id+'-final.json')
+                        dest.write_bytes(raw)
+                        if dest.read_bytes()!=raw:raise Denied('FINAL_ARCHIVE_READBACK')
+                    publication=dict(path=path,sha256=hashlib.sha256(raw).hexdigest(),
+                        commit=hashlib.sha1(b'TEST_FINAL'+raw).hexdigest() if self.test else self.head,readback_verified=True)
+                    payload=dict(operation='intake_finish',period=self.args.period,run_id=self.run_id,
+                                 execution_binding=self.binding,status=result['status'],publication=publication)
+                    with self.connection() as (c,_):
+                        c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
+                    with self.connection() as (c,_):
+                        actual=c.execute(text("SELECT outcome::jsonb->'intake_run' FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
+                    if actual.get('id')!=self.run_id or actual.get('state')!='VERIFIED' or actual.get('publication')!=publication:
+                        raise Denied('INTAKE_FINALISATION_READBACK')
+                    result['durable_finalisation']=actual
+
             except BaseException:
                 result.update(status='STOP_RECONCILE_NO_RETRY',publication='UNCERTAIN')
                 try:
@@ -323,7 +368,7 @@ class Runtime:
                 page=backlog_page(ledger,sorted(p['councils']),[v['contract'] for v in p['councils'].values()],
                                   ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),after=self.args.after,limit=self.args.page_size,connection=c)
             finally:c.execute(text('ROLLBACK'))
-        page.update(status='BACKLOG_READ',usage=self.run.totals(),source_calls=0,registrations=0)
+        page.update(unfinished_run=self.durable_run if self.durable_run and self.durable_run.get('state')!='VERIFIED' else None,status='BACKLOG_READ',usage=self.run.totals(),source_calls=0,registrations=0)
         with (self.root/'backlog.json').open('xb') as f:os.fchmod(f.fileno(),0o600);f.write(canonical(page))
         return page
 
@@ -345,7 +390,7 @@ def source_worker(args):
         from verification.discovery.finite_acceptance import read
         p=profile(row,'SCREENING_METADATA')
         audit=read(row,no_transport_retry=True,retain_proof=True,fixed_four_rows=True,execution_budget=p['execution_budget'],
-                   execution_mode='four-council-owner-local' if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p)
+                   execution_mode=('render-intake-v1' if os.environ.get('INGESTION_RENDER_PROFILE') else 'four-council-owner-local') if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p)
         raw=canonical(audit)
     if len(raw)>512*1024:raise Denied('SOURCE_EXPORT_BOUND')
     with Path(args.output).open('xb') as f:f.write(raw)

@@ -3,6 +3,83 @@
 Stage 4 OPEN. This proposal does not authorise production access, SQL installation,
 period issuance, merge, deployment, a Render job, or recurring activation.
 
+## Narrow Render adaptation — implementation review pending
+
+Owner approved implementation/disposable validation only. The new explicit
+`render-intake-v1` mode is Manchester-only and requires a frozen `render_profile`
+in the owner-issued period. It binds service crn-d9sv93vavr4c73f98rb0, exact code
+revision, pinned Playwright headless-shell executable SHA256/cache path, and
+explicit byte/time limits. No production profile is issued or approved here.
+Owner-local and historical Trafford modes retain their existing checks.
+
+Required profile keys: mode, service_id, revision, browser_path, browser_sha256,
+aggregate_bytes, source_rss_bytes, controller_rss_bytes, reserve_bytes,
+source_seconds. Runtime reads the effective finite cgroup-v2 memory.max and
+refuses mismatch. Swap settings are read/reported, never inferred from the plan
+name; changing them refuses. The source environment contains only the existing
+private-worker marker, reviewed profile, browser path and fixed harmless basics.
+No database/GitHub/model credentials enter the source.
+
+The existing source supervisor opts into Linux child-subreaper ownership only
+for this profile and only with no pre-existing children. Kernel adoption catches
+orphans that create another session, including unsampled descendants. Closure
+repeatedly kills/reaps remaining adopted children and refuses uncertainty.
+This does not promise cleanup if the controller itself receives SIGKILL: whole
+job teardown must be verified in actual Render acceptance; no closure is inferred.
+
+Memory proposal ONLY: up to the historical 1536MiB sampled source RSS threshold,
+256MiB sampled controller RSS threshold and at least256MiB aggregate headroom,
+with source+controller+reserve <= the actual aggregate byte limit (at most2048MiB).
+A marketed2GB plan is not proof of2147483648 bytes. If it exposes2000000000 bytes,
+source allowance must be lower; no automatic plan increase. Runtime also refuses
+aggregate memory.current above aggregate-reserve and new max/OOM events. These
+are samples with enumeration/scheduling latency, not hard source/controller
+caps or guaranteed peaks. Shared pages and kernel/file accounting make summed
+RSS different from memory.current. Real browser startup and workload headroom
+remain unmeasured. 75s is the maximum source-work proposal including startup;
+cleanup may take up to the existing seconds+10 refusal bound, within the90s
+Arcus supervision reservation and whole-run150s source-supervision allowance.
+
+Interruption handling reuses the existing control row: first capture registration
+atomically writes ONE bounded intake_run OPEN marker with run UUID, period, day
+and deterministic final-publication path. Other invocations/new periods cannot
+bypass OPEN, including after expiry. Capture, archive and screening checkpoints
+remain in their existing storage. Read-only backlog exposes the marker even when
+no capture exists. No automatic clearing/recovery/replay operation is added.
+Existing owner reconciliation must establish the disposition; an unresolved
+marker stays blocked until a separately reviewed correction is authorised.
+
+Both normal and repeated success require the exact expected batches and screens,
+using the existing completed_screening validator. Capture completion alone is
+insufficient. Finalisation invalidates grants, publishes/readbacks the result,
+then records VERIFIED plus the publication hash/path/commit through the existing
+trusted registration function and committed readback. A crash before that commit
+leaves OPEN; a lost acknowledgement after commit is recoverable by independent
+readback of VERIFIED and exact screening state, without source/publication replay.
+A retained/source-complete result file published before finalisation is explicitly
+not the terminal receipt: database finalisation plus archive and platform evidence
+are required. A crash before archive can lose raw observations but preserves
+incomplete intent; it never advances coverage.
+
+Acceptance remains INACTIVE. After separate production prerequisites and reviewed
+profile issuance: use the existing suspended cron's exact successful build for
+ONE separately authorised one-off job, plan-crn-005 only if verified compatible:
+
+    timeout --signal=INT --kill-after=5s 960s python -u -m scripts.run_daily_councils --period REVIEW_APPROVED_PERIOD --hostaddr REVIEWED_IPV4 --output /tmp/propertyaigent-intake-UNIQUE_RUN
+
+Obtain runtime sampled source/controller/aggregate observations, readable kernel
+peak/events/swap fields, durable run/checkpoint/archive readbacks, and independent
+Render terminal status/logs. One-off metric streams and survival of /tmp are not
+assumed. Missing terminal evidence means incomplete/reconciliation. Disposable
+whole-job kill acceptance must verify descendant teardown before live collection.
+Production access/recovery, exact installation/function inventory, credentials,
+TLS route/IP, real source qualification, machine policy and owner period remain
+separate requirements. No merge/deploy/settings/job/activation authority follows.
+
+This section supersedes the former unconditional Manchester-context refusal below
+only for the explicit validated profile; all unconfigured live invocations refuse.
+Focused validation results and final identities will be recorded in the handoff.
+
 ## Current connected path
 
 Approved continuation base: PR #206 head

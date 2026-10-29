@@ -10,7 +10,7 @@ SNAPSHOT = "jsonb_build_object('global_stop',ctl->'global_stop','manual_stop',ct
 
 # Branch is inserted before the historical owner-only registration branch.
 REGISTRATION = r"""
- IF p->>'operation' IN ('intake_period','intake_capture','intake_screen','intake_close') THEN
+ IF p->>'operation' IN ('intake_period','intake_capture','intake_screen','intake_close','intake_finish') THEN
   IF p IS NULL OR jsonb_typeof(p)<>'object' OR octet_length(p::text)>131072 THEN RAISE EXCEPTION 'INTAKE_ARGUMENT_BOUND'; END IF;
   SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
   t:=extract(epoch FROM clock_timestamp());
@@ -27,6 +27,7 @@ REGISTRATION = r"""
     OR (e->'councils')-ARRAY['tameside','manchester']<>'{}'::jsonb
     OR e->'expected_stop' IS DISTINCT FROM __SNAPSHOT__
     OR ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb OR ctl->>'manual_stop' IS NOT NULL
+    OR (ctl ? 'intake_run' AND ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED')
     OR EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN')
     OR jsonb_typeof(e->'screening_config') IS DISTINCT FROM 'string'
     OR jsonb_typeof(e->'execution_binding'->'revision') IS DISTINCT FROM 'string'
@@ -62,6 +63,35 @@ REGISTRATION = r"""
    UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
    RETURN jsonb_build_object('authorities_invalidated',true,'stop_preserved',true);
   END IF;
+  -- Single bounded unresolved-run marker in the EXISTING control record. No
+  -- expiry-based unlock, automatic retry, or worker reconciliation operation.
+  IF p->>'operation'='intake_finish' THEN
+   IF ctl->'intake_run'->>'state' IS DISTINCT FROM 'OPEN'
+    OR ctl->'intake_run'->>'id' IS DISTINCT FROM p->>'run_id'
+    OR ctl->'intake_run'->>'period' IS DISTINCT FROM a
+    OR coalesce(p->>'status','') NOT IN ('RETAINED_AND_SCREENED','INCOMPLETE')
+    OR p->'publication'->>'readback_verified' IS DISTINCT FROM 'true'
+    OR coalesce(p->'publication'->>'commit','') !~ '^[a-f0-9]{40}$'
+    OR coalesce(p->'publication'->>'sha256','') !~ '^[a-f0-9]{64}$'
+    OR p->'publication'->>'path' IS DISTINCT FROM ctl->'intake_run'->>'publication_path'
+    OR EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') x WHERE x.value->>'intake_run'=p->>'run_id' AND x.value->'expires_at' IS DISTINCT FROM '0'::jsonb)
+    OR (SELECT count(*) FROM jsonb_each(e->'days'->(ctl->'intake_run'->>'day')))<>(SELECT count(*) FROM jsonb_each(e->'councils'))
+    OR EXISTS(SELECT 1 FROM jsonb_each(e->'days'->(ctl->'intake_run'->>'day')) x
+      LEFT JOIN public.ingestion_work_items w ON w.key=x.value#>>'{}'
+      WHERE w.state IS NULL OR w.state NOT IN ('COMPLETE','DEFERRED')
+       OR (w.state='DEFERRED' AND p->>'status'<>'INCOMPLETE')
+       OR (w.state='COMPLETE' AND (
+        (SELECT count(*) FROM public.ingestion_work_items s WHERE s.task='SCREENING' AND s.dependencies::jsonb=jsonb_build_array(w.key) AND s.state='COMPLETE')<>jsonb_array_length(w.checkpoint::jsonb->'records')
+        OR (SELECT count(*) FROM public.ingestion_work_items b WHERE b.task='LISTING_METADATA' AND b.checkpoint::jsonb->'plan'->>'capture_key'=w.key AND b.state='COMPLETE')<>(jsonb_array_length(w.checkpoint::jsonb->'records')+4)/5)))
+   THEN RAISE EXCEPTION 'INTAKE_FINALISATION_UNVERIFIED'; END IF;
+   g:=ctl->'intake_run'||jsonb_build_object('state','VERIFIED','status',p->>'status','publication',p->'publication','verified_at',t);
+   ctl:=jsonb_set(ctl,'{intake_run}',g);
+   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+   RETURN g;
+  END IF;
+  IF ctl ? 'intake_run' AND ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED'
+   AND (ctl->'intake_run'->>'id' IS DISTINCT FROM p->>'run_id' OR ctl->'intake_run'->>'period' IS DISTINCT FROM a)
+   THEN RAISE EXCEPTION 'INTAKE_UNFINISHED_RUN_RECONCILE'; END IF;
   IF p->>'operation'='intake_capture' AND ctl->'grants' ? (p->>'authority') THEN
    SELECT * INTO STRICT root FROM public.ingestion_work_items WHERE key=p->'grant'->>'capture_key';
    IF ctl->'grants'->(p->>'authority')->>'intake_period' IS DISTINCT FROM a
@@ -69,6 +99,7 @@ REGISTRATION = r"""
     OR e->'days'->(root.subject->>'end')->>(root.subject->>'council') IS DISTINCT FROM root.key
     OR root.state NOT IN ('COMPLETE','DEFERRED','UNSUPPORTED_CONTRACT')
    THEN RAISE EXCEPTION 'INTAKE_CONSUMED_RECONCILE_NO_REPLAY'; END IF;
+   IF ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED' OR ctl->'intake_run'->>'period' IS DISTINCT FROM a OR ctl->'intake_run'->>'day' IS DISTINCT FROM root.subject->>'end' THEN RAISE EXCEPTION 'INTAKE_UNFINISHED_RUN_RECONCILE'; END IF;
    RETURN jsonb_build_object('already_consumed',true,'capture_key',root.key,'state',root.state);
   END IF;
   IF EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN') THEN RAISE EXCEPTION 'INTAKE_UNRESOLVED_EFFECT_BARRIER'; END IF;
@@ -158,7 +189,17 @@ REGISTRATION = r"""
    OR EXISTS(SELECT 1 FROM jsonb_each(g->'bindings') b WHERE NOT (g->'keys' ? b.key) OR NOT (g->'contracts' ? (b.value->>'contract')))
    OR (p->>'operation'='intake_screen' AND g->'bindings'->root.key IS DISTINCT FROM jsonb_build_object('subject',root.subject::jsonb,'task',root.task,'contract',root.contract,'revision',root.revision))
   THEN RAISE EXCEPTION 'INTAKE_CLOSED_KEY_SET'; END IF;
-  g:=g||jsonb_build_object('intake_period',a);
+  IF coalesce(p->>'run_id','') !~ '^[a-f0-9]{32}$'
+   OR coalesce(p->>'publication_path','') !~ '^docs/design/ingestion-operational-execution-daily-intake/[A-Za-z0-9_-]+/[a-f0-9]{32}/final/result-before-publication.json$'
+   THEN RAISE EXCEPTION 'INTAKE_RUN_IDENTITY'; END IF;
+  IF NOT (ctl ? 'intake_run') OR ctl->'intake_run'->>'state'='VERIFIED' THEN
+   IF p->>'operation'<>'intake_capture' THEN RAISE EXCEPTION 'INTAKE_RUN_CAPTURE_FIRST'; END IF;
+   ctl:=jsonb_set(ctl,'{intake_run}',jsonb_build_object('id',p->>'run_id','period',a,
+     'day',p->'rows'->0->'subject'->>'end','state','OPEN','started_at',t,
+     'publication_path',p->>'publication_path'));
+  ELSIF ctl->'intake_run'->>'publication_path' IS DISTINCT FROM p->>'publication_path' THEN RAISE EXCEPTION 'INTAKE_RUN_IDENTITY';
+  END IF;
+  g:=g||jsonb_build_object('intake_period',a,'intake_run',p->>'run_id');
   ctl:=jsonb_set(ctl,'{grants}',coalesce(ctl->'grants','{}'::jsonb)||jsonb_build_object(p->>'authority',g));
   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
   RETURN g;
