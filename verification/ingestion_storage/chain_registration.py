@@ -97,21 +97,25 @@ def _capture_inputs(binding,contract,root,receipt,item_limits):
     check_capture(binding,contract,receipt)
 
 
-def _screen_items(binding,root,receipt,rule,item_limits):
-    plans = batch_plans(root['key'], receipt, rule)
+def _screen_items(binding,root,receipt,rule,item_limits,*,capture_bound=False):
+    plans = batch_plans(root['key'], receipt, rule,capture_bound=capture_bound)
     batches = [item({k: p[k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=p['dependencies'], checkpoint=p['checkpoint'], limits=dict(item_limits)) for p in plans]
     screens = {}
     for record in receipt['records']:
         subject = dict(kind='APPLICATION', council=binding.council, reference=record['reference'])
-        screens[record['reference']] = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=assessment_identity(record, rule)[3]), dependencies=[root['key']], limits=dict(item_limits))
+        screen_revision=assessment_identity(record, rule)[3]
+        if capture_bound:
+            from app.ingestion.observation_screening import observation_revision
+            screen_revision=observation_revision(screen_revision,digest(receipt))
+        screens[record['reference']] = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=screen_revision), dependencies=[root['key']], limits=dict(item_limits))
     return batches,screens
 
 
-def screening_registration(owner,binding,contract,root,receipt,rule,*,revision,item_limits,_completed=False,allow_test_evidence=False):
+def screening_registration(owner,binding,contract,root,receipt,rule,*,revision,item_limits,_completed=False,allow_test_evidence=False,capture_bound=False):
     """Complete listing screening only: no factual rows, source calls or application writes."""
     _capture_inputs(binding,contract,root,receipt,item_limits)
     if receipt.get('evidence_label') and not allow_test_evidence:raise Denied('TEST_EVIDENCE_NOT_LIVE')
-    batches,screens=_screen_items(binding,root,receipt,rule,item_limits)
+    batches,screens=_screen_items(binding,root,receipt,rule,item_limits,capture_bound=capture_bound)
     if not _completed and pending_grant_problems((owner.grant_expiry or owner.expiry).timestamp()-time.time(),phase='SCREENING',batches=len(batches)):
         raise Denied('SCREENING_INSUFFICIENT_LIFETIME')
     rows=[root,*batches,*screens.values()]
@@ -139,6 +143,10 @@ def completed_screening(registration,receipt,rule,rows):
     for record in receipt['records']:
         saved=by_key[registration.screens[record['reference']]['key']]['checkpoint'] or {}
         sha,config,config_sha,revision=assessment_identity(record,rule)
+        if registration.batches and registration.batches[0]['checkpoint']['plan'].get('capture_bound') is True:
+            from app.ingestion.observation_screening import observation_revision
+            revision=observation_revision(revision,digest(receipt))
+            if saved.get('capture_bound') is not True:raise Denied('STAGED_CAPTURE_BOUND_RECEIPT')
         from app.ingestion.listing_screening import routing_of
         if by_key[registration.screens[record['reference']]['key']].get('outcome')!=dict(outcome=routing_of(rule.screen(record))[1],retained=True):raise Denied('STAGED_ASSESSMENT_OUTCOME')
         if (any(saved.get(k)!=v for k,v in rule.screen(record).items()) or saved.get('record_sha256')!=sha

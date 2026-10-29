@@ -1,5 +1,106 @@
 # Minimal daily intake — INACTIVE, corrections required
 
+## Continuation checkpoint — 29 October 2026
+
+Implementation parent 9f17436425fe28851e43a9e2f2f22da86c2b37c0,
+tree 436c65136e03340ed9752c26a7c60a6c15bbe64a: all 13 hosted check
+runs retrieved as completed/success. Earlier running-check snapshots below are
+historical. They do not describe this continuation candidate's validation.
+
+This continuation adds an explicit capture-bound COMPLETE-v3 screening mode.
+It reuses observation_revision(assessment_identity(record,rule)[3],digest(capture))
+without enabling partial observations or changing historical keys/default modes.
+Plans, prepared grants/items, SQL batch creation, Python screening and backlog
+readback must agree. An offline derived worker extension validates the revision
+and receipt parent/digest; its disposable PostgreSQL tests must pass before this
+correction is represented as validated. The former overlap failure remains in
+parent history and is replaced by a no-reset, two-capture regression, not erased.
+
+No rolling authority issuer has been found: Owner.register still invokes the
+fixed Bolton exception. There is no supported daily production launch. No owner
+credential, broad grant or source-only permit is substituted. No new framework is
+authorised. Generic contained-failure settlement and cross-run backlog discovery
+remain incomplete: the existing projection needs explicit bound run keys and
+does not discover earlier roots. These are delivery blockers, not successful
+features. The unchanged inactive command/Render proposal below remains held.
+
+## Accepted known-reference refresh direction — implementation DEFERRED
+
+Accepted against repository maxrose26/PropertyAIgent, PR #206 implementation
+parent 9f17436425fe28851e43a9e2f2f22da86c2b37c0 and tree
+436c65136e03340ed9752c26a7c60a6c15bbe64a, based on master
+210d09c5bf314c16baf0680df71d4ae8b30b71f4. This is a bounded specification,
+not refresh implementation or an active release. Intake corrections take priority.
+
+- Initial subjects: pending retained references and pending admitted Applications.
+  A retained reference MUST NOT require an Application to become refreshable.
+  Reuse exact-reference Idox/Arcus readers, ledger items/attempts/checkpoints,
+  archive publication and the existing qualified B2 writer for admitted records.
+  Initial validation scopes: Tameside Idox and Manchester Arcus; listing support
+  is not proof of exact-reference field qualification for either or other councils.
+- Identity: exact council/reference, verified returned source identity/URL and
+  prior accepted observation digest. Each check binds observed time, parser/field
+  contract, evidence/archive digests and supported field states. Reuse the intake
+  overlap resolution; no competing task/dependency identity. Semantic assessment
+  identity remains record/configuration-bound; capture-bound tasks use the shared
+  observation revision wrapper. Assessment reuse requires verified equal inputs,
+  configuration and eligibility, not dependency reassignment or historical rekeys.
+- Retained-only adaptation: qualified detail observation -> durable ledger/archive
+  checkpoint -> append-only history -> conditional latest-accepted projection.
+  Existing observation_history is pure and its delivery-order change label is
+  not a chronological acceptance rule. Persist old/new observations; guard prior
+  accepted digest and time so old/duplicate/conflicting delivery cannot overwrite
+  newer facts. Demonstrate existing storage supports bounded due queries and
+  atomic acceptance during implementation; no schema/service assumed here.
+- Supported facts: qualified status, decision and decision date; compare proposal,
+  address, application type and published dates only where retrieval supports them.
+  Field-level evidence scope is explicit. Missing/blank/failed evidence preserves
+  accepted facts; it is not deletion, withdrawal or unchanged verification. Store
+  last-attempted independently from last-successful and per-field verification.
+  For Applications use B2's guarded fact/event/watermark transaction; do not route
+  retained metadata through a broad legacy Application upsert or auto-admission.
+- Outcomes: unchanged supported evidence advances supported freshness only;
+  changed qualified evidence is retained and conditionally accepted; missing,
+  failed, ambiguous or unsupported results retain failure evidence and successful
+  watermark; identity/factual conflicts are withheld; stale observations remain
+  historical. Uncertain writes or required publication failure stop/reconcile,
+  never authorise replay. Repeated delivery uses its existing checkpoint.
+- Selection: bounded due query over both populations, deduplicated by exact
+  identity. Oldest due first with stable ties, reserved progress for each
+  population, rotating councils and bounded priority allocation. Retry-not-before
+  is separate from original overdue age. Report due/selected/completed/failed,
+  oldest overdue age and unsupported scope. Borrow unused selection allocation
+  ONLY within approved aggregate limits; never borrow closure reserves/authority.
+- Provisional cadence: priority pending retained 7 days, other retained 14;
+  assess/reuse existing pending Application tiers 7/14/30/60. Decided-record
+  monitoring is an explicit DEFERRED requirement, not complete lifecycle coverage.
+  Ten total checks/two councils is an acceptance cap, not production capacity.
+  Demand=sum(population_in_tier/interval_days)+retries. Illustrative populations
+  140/280/300/600 at 7/14/30/60 require 60/day before retries, approximately 72/day
+  with a provisional 20% allowance. Actual populations and per-check source,
+  DB/publication, time/memory costs remain unknown and must be measured later.
+- Routing: unchanged observations produce no screening/AI work. Changes to actual
+  screening inputs/configuration queue only affected screening. Qualified factual
+  changes use existing lifecycle/document-assessment signals; later acquired
+  material evidence may make extraction/intelligence eligible. No automatic
+  admission and no connected retained-only extraction consumer is claimed.
+  Known-reference refresh does not discover separate related applications,
+  appeals or submissions. Same-URL document revision detection is unsupported.
+- Meaningful acceptance: disposable PostgreSQL tests for unchanged/changed,
+  missing/failed/ambiguous/conflicting/out-of-order evidence; exact returned
+  identity; duplicate/overlap delivery; preserved history/facts and atomic rollback;
+  fair bounded due selection/retry; only affected downstream work. Assert no
+  automatic admission, downloads, AI or unrelated Application writes. Later
+  authorised execution must prove live field qualification, usage/aggregate
+  limits, closure/readback and attainable cadence. Existing access/recovery gate
+  applies. No scheduling/deployment/activation authority follows this acceptance.
+
+Compatibility: the capture-bound correction above supplies an observation-specific
+task identity while preserving semantic assessment inputs/configuration. Refresh
+must adopt that final shared contract and separately implement verified unchanged
+assessment reuse; intake's cheap deterministic per-capture screen is not an AI
+consumer or evidence that such refresh reuse is already implemented.
+
 Stage 4 OPEN. This is partial authorised implementation, not an executable
 production release. No production connection, collection, grant, stop release,
 Render change, merge, deployment or activation is authorised here.

@@ -28,3 +28,22 @@ def test_default_command_cannot_fall_back_to_legacy(capsys):
     result=json.loads(capsys.readouterr().out)
     assert result['database_connections']==result['source_requests']==result['application_writes']==0
     assert result['reason']=='DAILY_INTAKE_AUTHORITY_BOOTSTRAP_NOT_SUPPORTED'
+
+
+def test_capture_bound_worker_is_an_explicit_reversible_extension():
+    from verification.ingestion_storage import screening_v3_worker_sql as v3
+    historical=v3.derive()
+    current=v3.capture_bound_text(historical)
+    for old,new in reversed(v3.capture_bound_sites()):
+        assert current.count(new)==1
+        current=current.replace(new,old)
+    assert current==historical
+
+
+def test_capture_bound_revision_reuses_existing_observation_contract():
+    from app.ingestion.observation_screening import observation_revision
+    from app.ingestion.ledger import digest
+    assessment='a'*64
+    first,second=observation_revision(assessment,'b'*64),observation_revision(assessment,'c'*64)
+    assert first!=second
+    assert first==digest(dict(assessment_revision=assessment,observation_sha256='b'*64))

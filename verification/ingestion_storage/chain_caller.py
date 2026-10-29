@@ -83,7 +83,7 @@ class ChainCaller:
         worker, broker = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES[:2]]
         app=None if self.capture_screening_only or self.intake_only else budget.engine(self.urls[ROLES[2]],**self.engine_options)
         ledger = ControllerLedger(worker, budget=budget, owner=WORKER, authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
-        return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule})
+        return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule},capture_bound_screening=self.intake_only)
 
     def _contracts(self):
         facts = self.registration.factual_contracts if self.registration else {}

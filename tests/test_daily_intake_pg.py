@@ -17,7 +17,11 @@ from verification.ingestion_storage.chain_registration import screening_registra
 
 @pytest.fixture(scope='module')
 def world():
-    yield from disposable_world()
+    from verification.ingestion_storage import screening_v3_worker_sql as v3
+    for world in disposable_world():
+        # Disposable owner installs only this candidate's fixed worker extension.
+        world['boot'].execute(v3.original_function(v3.capture_bound_text()))
+        yield world
 
 
 def setup_intake(world,tmp_path,family,tag,entries=None,*,reset=True):
@@ -33,7 +37,7 @@ def setup_intake(world,tmp_path,family,tag,entries=None,*,reset=True):
         return source,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
     def prepare(receipt):
         reg=screening_registration(chain._owner(1800),chain.binding,chain.contract,dict(chain.root,checkpoint=receipt),receipt,
-                                   chain.rule,revision=chain.revision,item_limits=chain.item_limits,allow_test_evidence=True)
+                                   chain.rule,revision=chain.revision,item_limits=chain.item_limits,allow_test_evidence=True,capture_bound=True)
         chain._install(reg)
         chain.chain_registration=reg
         return reg
@@ -133,24 +137,54 @@ def test_changed_observations_have_distinct_assessment_identity(world,tmp_path):
     assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING'").fetchone()[0]==2
 
 
-def test_unchanged_record_in_another_capture_exposes_existing_parent_binding_gap(world,tmp_path):
-    """Document the exact blocker; do not hide it behind a fixture reset/rekey.
-
-    The accepted v3 task identity binds record/config while its dependency binds
-    one capture. A new capture of identical metadata collides with that dependency.
-    Changing this SQL-backed identity requires a reviewed compatibility decision.
-    """
-    original=None
+def test_unchanged_record_in_another_capture_preserves_both_bound_assessments(world,tmp_path):
+    """No reset, dependency reassignment or historical key rewrite."""
+    results=[]
     for n in range(2):
         chain,collect,prepare,calls=setup_intake(world,tmp_path,'idox','daily-overlap-'+str(n),[entry('E2E/1/26',SCHEME)],reset=n==0)
-        if n==0:
-            original=intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
-        else:
-            with pytest.raises(Exception,match='CONFLICTING_DUPLICATE'):
-                intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
-            assert calls==[1] and chain.caller.read_capture()['records']
-            assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE'").fetchone()[0]==1
-    assert original['records'][0]['screening_outcome']=='ADMIT_SCHEME'
+        result=intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
+        assert intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)==result
+        assert calls==[1]
+        results.append(result['records'][0])
+    assert results[0]['screening_key']!=results[1]['screening_key']
+    assert {r['screening_outcome'] for r in results}=={'ADMIT_SCHEME'}
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE'").fetchone()[0]==2
+    for result in results:
+        row=world['boot'].execute('SELECT dependencies,checkpoint FROM ingestion_work_items WHERE key=%s',(result['screening_key'],)).fetchone()
+        assert row[0]==[result['capture_key']] and row[1]['capture_checkpoint_sha256']==result['capture_sha256']
+
+
+@pytest.mark.parametrize('field,value,refusal',[
+    ('capture_checkpoint_sha256','f'*64,'SCREENING_V3_RECEIPT'),
+    ('capture_key','f'*64,'CAPTURE_BOUND_RECEIPT'),
+    ('capture_bound',False,'CAPTURE_BOUND_RECEIPT'),
+    ('capture_bound',None,'SCREENING_V3_RECEIPT'),
+])
+def test_actual_sql_worker_refuses_capture_binding_forgery(world,tmp_path,monkeypatch,field,value,refusal):
+    chain,collect,prepare,calls=setup_intake(world,tmp_path,'idox','daily-forge-'+field+str(value)[:5],[entry('E2E/1/26',SCHEME)])
+    from app.ingestion.sql_ledger import SQLLedger
+    original=SQLLedger.checkpoint
+    def forge(self,claim,receipt):
+        if receipt.get('capture_bound') is True:
+            receipt=dict(receipt)
+            if value is None:receipt.pop(field)
+            else:receipt[field]=value
+        return original(self,claim,receipt)
+    monkeypatch.setattr(SQLLedger,'checkpoint',forge)
+    with pytest.raises(Exception,match=refusal):
+        intake_slot(chain.caller,chain.root['key'],collect,chain.publisher,prepare)
+    assert calls==[1] and restricted_sessions(world['boot'])==0
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE'").fetchone()[0]==0
+
+
+@pytest.mark.parametrize('family',['idox','arcus'])
+def test_extended_worker_preserves_historical_unbound_chain(world,tmp_path,family):
+    chain=Chain(world,tmp_path,family,'daily-historical-'+family,[entry('E2E/1/26',SCHEME)]).owner_reset().owner_registers_capture()
+    chain.capture();chain.read_capture()
+    chain.owner_registers_chain(chain.nominees().nominees)
+    chain.screen()
+    assert chain.screening_outcome('E2E/1/26')=='ADMIT_SCHEME'
+    assert restricted_sessions(world['boot'])==0
 
 
 def test_shared_stop_prevents_persistence_and_publication(world,tmp_path):

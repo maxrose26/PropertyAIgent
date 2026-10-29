@@ -13,7 +13,7 @@ def archive_capture(source,archive):
     return receipt
 
 
-def batch_plans(capture_key,capture,screening=None,*,observation_councils=()):
+def batch_plans(capture_key,capture,screening=None,*,observation_councils=(),capture_bound=False):
     observation=capture.get('kind')=='LISTING_OBSERVATION_V1'
     if observation:
         if observation_councils!=('bolton',):raise Denied('ARCHIVED_CAPTURE_REQUIRED')
@@ -29,6 +29,9 @@ def batch_plans(capture_key,capture,screening=None,*,observation_councils=()):
         if screening is not None:
             from .listing_screening import screening_plan_binding
             plan['screening']=screening_plan_binding(screening)[0]      # explicit v3 selection: part of the plan, so part of the batch identity (new keys; the v1 batches are never touched)
+        if capture_bound:
+            if observation or screening is None:raise Denied('CAPTURE_BOUND_COMPLETE_V3_REQUIRED')
+            plan['capture_bound']=True
         interval=capture['requested_interval'] if observation else capture['interval']
         semantics=capture.get('date_semantics','RECEIVED')      # historical receipts carry no date basis and keep their RECEIVED identity; a receipt that names one (Stockport is VALIDATED) must batch under it
         if semantics not in ('RECEIVED','VALIDATED') or (observation and semantics!='RECEIVED'):raise Denied('DATE_SEMANTICS')
@@ -62,6 +65,7 @@ def _process_batch(coordinator,key,*,check=lambda:None,after_row=lambda _:None,p
     l=coordinator.ledger;check();row=l.get(key)
     if row['contract']!='listing-batch-v1' or row['task']!='LISTING_METADATA':raise Denied('BATCH_CONTRACT')
     plan=row['checkpoint']['plan']
+    if plan.get('capture_bound',False) is not getattr(coordinator,'capture_bound_screening',False):raise Denied('CAPTURE_BOUND_SELECTION')
     if digest(plan)!=row['revision'] or not 0<=plan['first']<plan['last']<=60 or plan['last']-plan['first']>5:raise Denied('EXACT_BATCH_PLAN')
     from .listing_screening import RULE_V1,screening_plan_binding
     rule=getattr(coordinator,'screening_rule',None)      # a coordinator that predates the registry (historical stubs) is v1

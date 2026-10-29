@@ -84,7 +84,7 @@ RELATED_ASSESSMENTS_CAP=50
 
 
 class Coordinator:
-    def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None,observation_councils=()):
+    def __init__(self,ledger,contracts,*,isolated_contracts=(),screening_rules=None,observation_councils=(),capture_bound_screening=False):
         self.ledger=ledger;self.contracts=dict(contracts);self.isolated_contracts=frozenset(isolated_contracts)
         # Explicit rule selection: v1 unless a rule is registered under its own contract name. ONE screening contract per run; a v3 threshold is read once, at ScreeningRule construction, and frozen here.
         rules=dict(screening_rules) if screening_rules else {V1_CONTRACT:ScreeningRule(RULE_V1)}
@@ -94,6 +94,7 @@ class Coordinator:
         self.screening_rules=rules;self.screening_contract=name;self.screening_rule=rule
         if observation_councils not in ((), ('bolton',)):raise Denied('EXACT_OBSERVATION_ENABLEMENT')
         self.observation_councils=observation_councils
+        self.capture_bound_screening=capture_bound_screening
 
     def _preflight_listing(self,claim):
         row=self.ledger.get(claim.key);subject=row['subject'];contract=self.contracts.get(row['contract'])
@@ -292,10 +293,15 @@ class Coordinator:
         else:
             # The stored identity must be exactly the one this run's frozen configuration derives from the record; a mismatch means the item was made under another record or configuration.
             record_sha,config,config_sha,revision=assessment_identity(record,rule)
+            if self.capture_bound_screening:
+                from .observation_screening import observation_revision
+                if observation or receipt.get('kind')!='LISTING_RECEIPT_V1':raise Denied('CAPTURE_BOUND_COMPLETE_V3_REQUIRED')
+                revision=observation_revision(revision,digest(receipt))
             if observation:revision=observation_revision(revision,digest(receipt))
             if revision!=row['revision']:raise Denied('SCREENING_CONFIG_BINDING')
             binding=dict(record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision)
         result=rule.screen(record)
+        if self.capture_bound_screening:result['capture_bound']=True
         if observation:
             result.update(source_kind=receipt['kind'],window_claim='NONE',observed_at=receipt['observed_at'],observation_digest=digest(receipt),record_sha256=digest(record),display_label=receipt['display_label'])
         result.update(source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type'])

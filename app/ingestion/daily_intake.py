@@ -98,13 +98,17 @@ def backlog(caller):
     out=[]
     for record in records:
         expected=assessment_identity(record,caller.rule)
+        from .observation_screening import observation_revision
+        task_revision=observation_revision(expected[3],digest(capture))
         descriptor=screens.get(record['reference'])
         row=rows.get(descriptor['key']) if descriptor else None
         result=row['checkpoint'] if row and row['state']=='COMPLETE' else None
-        if row and (row['revision']!=expected[3] or row['dependencies']!=[caller.root_key]
+        if row and (row['revision']!=task_revision or row['dependencies']!=[caller.root_key]
                     or row['subject']!={'kind':'APPLICATION','council':capture['council'],'reference':record['reference']}):
             raise Denied('INTAKE_SCREENING_IDENTITY')
         if result and (result.get('record_sha256')!=expected[0] or result.get('config_sha256')!=expected[2]
+                       or result.get('capture_bound') is not True or result.get('assessment_revision')!=task_revision
+                       or result.get('capture_checkpoint_sha256')!=digest(capture)
                        or result.get('source_sha256')!=capture['source_sha256']):
             raise Denied('INTAKE_SCREENING_PROVENANCE')
         outcome=routing_of(result)[1] if result else None
