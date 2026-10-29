@@ -212,3 +212,12 @@ def test_final_publication_refuses_unexpected_head_before_local_or_remote_effect
     r.github=SimpleNamespace(publish=lambda *a,**kw:pytest.fail('must not publish'))
     with pytest.raises(Uncertain,match='EVIDENCE_HEAD_CHANGED'):r.publish_completed({'status':'FIXTURE'})
     assert not (r.journal.root/'final-result.json').exists() and r.published==0
+
+
+def test_child_transport_file_excludes_fixture_administrative_environment():
+    from tests.storage_gh_fixture import restricted_gh_env
+    value={'PATH':'/usr/bin:/bin','HOME':'/tmp/fixture','GH_HOST':'fixture.invalid','GH_TOKEN':'disposable_fixture_only','GH_ENTERPRISE_TOKEN':'disposable_fixture_only','SSL_CERT_FILE':'/tmp/fixture-ca','INGESTION_PROVISIONING_TEST_URL':'SYNTHETIC_BOOTSTRAP_NOT_FOR_CHILD','DATABASE_URL':'SYNTHETIC_OWNER_NOT_FOR_CHILD','PGPASSWORD':'SYNTHETIC_NOT_FOR_CHILD'}
+    child=restricted_gh_env(value)
+    assert set(child)=={'PATH','HOME','GH_HOST','GH_TOKEN','GH_ENTERPRISE_TOKEN','SSL_CERT_FILE'}
+    assert 'BOOTSTRAP' not in json.dumps(child) and 'NOT_FOR_CHILD' not in json.dumps(child)
+    with pytest.raises(AssertionError):restricted_gh_env(dict(value,GH_TOKEN='not-a-fixture-token'))

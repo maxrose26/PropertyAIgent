@@ -25,6 +25,14 @@ from cryptography.x509.oid import NameOID
 import pytest
 
 
+def restricted_gh_env(env):
+    """Only loopback GitHub transport settings; never fixture DB/bootstrap access."""
+    allowed={'PATH','HOME','LANG','GH_HOST','GH_ENTERPRISE_TOKEN','GH_TOKEN','GH_CONFIG_DIR','SSL_CERT_FILE','SSL_CERT_DIR','GH_PROMPT_DISABLED','GH_DEBUG','HTTPS_PROXY','https_proxy','NO_PROXY','no_proxy'}
+    result={k:v for k,v in env.items() if k in allowed}
+    assert result.get('GH_TOKEN')==result.get('GH_ENTERPRISE_TOKEN')=='disposable_fixture_only'
+    return result
+
+
 @pytest.fixture
 def real_gh_store(tmp_path,request):
     gh = shutil.which('gh')

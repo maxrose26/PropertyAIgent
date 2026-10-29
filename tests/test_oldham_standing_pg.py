@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from psycopg import sql
 from sqlalchemy.engine import make_url
-from tests.storage_gh_fixture import real_gh_store
+from tests.storage_gh_fixture import real_gh_store,restricted_gh_env
 from tests.oldham_wrapper_fixture import packet,Backend
 from tests.e2e_pg_world import settings
 from verification.ingestion_storage import oldham_standing_plan as plan,oldham_owner_package as pkg
@@ -92,7 +92,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
                 entry=next(x for x in tree if x['path']==op.namespace+'/claim/claim.json');old=json.loads(base64.b64decode(metadata.git_objects[entry['sha']]['content']));old['manifest_sha256']='f'*64
                 raw=canonical(old);entry['sha']=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest();metadata.git_objects[entry['sha']]=dict(sha=entry['sha'],content=base64.b64encode(raw).decode())
             f=tmp_path/'runtime-fixture.json';out=tmp_path/'runtime-output'
-            f.write_text(json.dumps(dict(disposable='LOOPBACK_ONLY',gh=metadata.gh,gh_env=metadata.fixture_env(),native=os.environ.get('OLDHAM_STANDING_NATIVE')=='1')))
+            f.write_text(json.dumps(dict(disposable='LOOPBACK_ONLY',gh=metadata.gh,gh_env=restricted_gh_env(metadata.fixture_env()),native=os.environ.get('OLDHAM_STANDING_NATIVE')=='1')))
             env={k:v for k,v in os.environ.items() if k in ('PATH','HOME','LANG','SYSTEMD_EXEC_PID')}
             env.update(DATABASE_URL='sqlite:///:memory:',PYTHONDONTWRITEBYTECODE='1',INGESTION_ACCEPTANCE_DISPOSABLE='PG17_ONLY',GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',GITHUB_REF='refs/heads/master',GITHUB_SHA=p['revision'],GITHUB_WORKFLOW_SHA=p['revision'],GITHUB_RUN_ATTEMPT='1',GITHUB_RUN_NUMBER='1',GITHUB_RUN_ID='12345',OLDHAM_STANDING_AUTHORITY='OLDHAM_STANDING_CAPTURE_SCREENING_V1_OWNER_APPROVED')
             command=[sys.executable,'-I','-B','-c','import runpy,sys;sys.path.insert(0,sys.argv.pop(1));runpy.run_module("tests.oldham_standing_rehearsal",run_name="__main__")',str(Path.cwd()),str(f),'--output',str(out),'--claim-commit',payload['claim_commit'],'--release-id',p['release_id'],'--manifest-sha256',op.seal]
