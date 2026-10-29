@@ -163,3 +163,15 @@ def test_runtime_handoff_preserves_owner_active_clock(monkeypatch):
     assert 74<=(datetime.now(timezone.utc)-observed).total_seconds()<76
     monkeypatch.setattr(module.time,'monotonic',lambda:550)
     with pytest.raises(Denied):r.original_active_start()
+
+
+@pytest.mark.parametrize('verified',[False,True])
+def test_unsealed_published_counters_are_not_final_combined_usage(monkeypatch,verified):
+    from verification.ingestion_storage.oldham_standing_owner import StandingOperation,Operation
+    monkeypatch.setattr(Operation,'accounting',lambda self:{})
+    r=object.__new__(StandingOperation);r.hosted={'accounting':{'github_requests':3}};r.artifact_verified=verified
+    r.github=SimpleNamespace(requests=25);r.selection={'standing':{'credential_preparation_github_calls':0}}
+    result=r.accounting()
+    assert result['github']['combined']==(28 if verified else None)
+    assert result['github']['hosted']==(3 if verified else None)
+    assert result['hosted']['github_requests']==3 # retained as explicitly partial evidence

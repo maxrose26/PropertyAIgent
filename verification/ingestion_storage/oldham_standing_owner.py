@@ -251,7 +251,10 @@ class StandingOperation(Operation):
 
     def accounting(self):
         value=super().accounting();runtime=(self.hosted or {}).get('accounting',{})
-        value.update(hosted=runtime,github=dict(owner=self.github.requests,hosted=runtime.get('github_requests'),combined=None if runtime.get('github_requests') is None else self.github.requests+runtime['github_requests'],maximum=GITHUB['combined'],owner_current_measured=self.github.requests-self.selection['standing']['credential_preparation_github_calls'],preparation=dict(value=self.selection['standing']['credential_preparation_github_calls'],basis='RESERVED_MAXIMUM_NOT_MEASURED'),combined_basis='MEASURED_CURRENT_PLUS_RESERVED_PREPARATION'))
+        # Published-before-exit counters exclude final publication and closure.
+        # Only the verified original artifact establishes complete runtime usage.
+        count=runtime.get('github_requests') if self.artifact_verified else None
+        value.update(hosted=runtime,hosted_accounting_status='VERIFIED_FINAL_ARTIFACT' if self.artifact_verified else 'PARTIAL_OR_UNKNOWN_FINAL_USAGE',github=dict(owner=self.github.requests,hosted=count,combined=None if count is None else self.github.requests+count,maximum=GITHUB['combined'],owner_current_measured=self.github.requests-self.selection['standing']['credential_preparation_github_calls'],preparation=dict(value=self.selection['standing']['credential_preparation_github_calls'],basis='RESERVED_MAXIMUM_NOT_MEASURED'),combined_basis='MEASURED_CURRENT_PLUS_RESERVED_PREPARATION' if self.artifact_verified else 'FINAL_RUNTIME_UNKNOWN'))
         return value
 
     def failed(self,exc):
