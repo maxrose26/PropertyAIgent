@@ -131,7 +131,7 @@ class StandingRunner(HostedRunner):
             require_closure(self._phase_receipts())
             closure=self.closure('RESTRICTED_RUNTIME_NO_ACCESS_CHANGE',memory_close=False)
             return dict(status='OLDHAM_STANDING_CAPTURE_SCREENING_COMPLETE',workflow_run_id=self.workflow_run_id,execution=self.execution,records=len(self.capture['records']),nominees=len(nominees.nominees),
-                        outcome='SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE' if nominees.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',capture_sha256=digest(self.capture),screening_sha256=digest(rows),
+                        outcome='SCREENING_COMPLETE_ADMISSION_HELD_OPERATION_SCOPE' if nominees.nominees else 'SCREENING_COMPLETE_NO_ADMISSION_REQUIRED',capture_sha256=digest(self.capture),screening_sha256=plan.screening_rows_digest(rows),
                         cleanup=closure['overall'],closure_components=closure,closure_stage='PUBLISHED_BEFORE_MEMORY_SCOPE_CLOSURE',accounting=self.accounting(),credential_changes=0,
                         application_writes=0,source_observations_attempted=0,detail_requests=0,application_engine='NOT_CREATED',admission='NOT_AUTHORISED',coverage_advance=False,
                         authority_invalidation='OWNER_REQUIRED',pipeline_retry='HELD',stage4='OPEN')

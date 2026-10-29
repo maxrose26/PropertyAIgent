@@ -72,6 +72,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
         seed(metadata,prior+'events-prefix.jsonl',Path('tests/fixtures/oldham_standing/prior-events.jsonl').read_bytes(),plan.PREVIOUS_COMMIT)
         # Baseline holder correctly reflects cleanup; no new retirement/install.
         if scenario=='standing_barrier':w['boot'].execute("UPDATE ingestion_work_items SET phase='WRITE_INTENT' WHERE key=repeat('0',64)")
+        http_started=len(requests)
         op.preflight()
         def launch(event,payload):
             nonlocal child,worker
@@ -136,7 +137,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
         if worker:worker.join(timeout=125)
         assert not errors,errors
         assert worker is None or not worker.is_alive()
-        RESULTS.append(dict(scenario=scenario,owner=result,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs']))
+        RESULTS.append(dict(scenario=scenario,owner=result,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs'],actual_loopback_http_requests=len(requests)-http_started))
         success=scenario in ('standing_success','standing_nominee','standing_delayed')
         if success:
             assert result['status']=='COMPLETED' and result['cleanup']=='CLOSED',result
@@ -145,6 +146,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
             assert result['records']==5 and result['nominees']==int(scenario=='standing_nominee')
             assert result['authority_invalidation']=='VERIFIED' and result['credential_changes']==0
             assert result['accounting']['github']['combined']<=GITHUB['combined']
+            assert len(requests)-http_started==result['accounting']['github']['combined']
             assert result['accounting']['administration']['commands']<=240 and result['accounting']['administration']['connections']<=13
         else:assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['cleanup']=='UNCERTAIN',result
         after_passwords=w['boot'].execute("SELECT rolname,rolpassword FROM pg_authid WHERE rolname=ANY(%s) ORDER BY 1",(list(prelim.life.roles),)).fetchall()
@@ -201,6 +203,7 @@ def test_standing_provision_adapter(tmp_path,monkeypatch,real_gh_store,changed_p
         after=w['boot'].execute("SELECT encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('ingestion_worker_step','ingestion_oldham_allowed') ORDER BY p.proname").fetchall()
         assert before==after
         assert not any(m=='DELETE' for m,_ in requests)
+        assert len(requests)==g.requests
         assert o.opened==o.closed and not o.authorities
         RESULTS.append(dict(scenario='standing_provision_changed_provider' if changed_provider else 'standing_provision_success',administration=o.accounting(),github_requests=g.requests,policy_unchanged=True,fixture_setup=w['setup_costs']))
     finally:b.close()

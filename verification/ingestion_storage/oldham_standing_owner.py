@@ -243,7 +243,7 @@ class StandingOperation(Operation):
                     actual=[r[0] for r in self.owner.q(c,'SELECT row_to_json(w) FROM public.ingestion_work_items w WHERE key=ANY(%s) ORDER BY key',(keys,))]
                     from .chain_registration import completed_screening
                     completed_screening(screen,receipt,self.rule,actual)
-                    if digest(actual)!=sealed.get('screening_sha256'):raise Uncertain('OLDHAM_STANDING_SCREENING_READBACK')
+                    if plan.screening_rows_digest(actual)!=sealed.get('screening_sha256'):raise Uncertain('OLDHAM_STANDING_SCREENING_READBACK')
                 finally:self.owner.q(c,'ROLLBACK',effect=True)
                 after=self._observe_standing(c)
                 if after!=self.standing_before:raise Uncertain('OLDHAM_STANDING_ACCESS_CHANGED')

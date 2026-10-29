@@ -190,3 +190,14 @@ def test_original_runtime_bytes_private_immutable_readback(tmp_path):
     assert stat.S_IMODE((r.journal.root/'runtime-final-result.json').stat().st_mode)==0o600
     with pytest.raises(FileExistsError):r.preserve_runtime_originals(b'changed',events)
     assert (r.journal.root/'runtime-final-result.json').read_bytes()==raw
+
+
+def test_screening_readback_normalises_only_declared_float_columns():
+    a=[dict(key='exact',eligible_at=0,lease_until=None,state='COMPLETE',checkpoint={'count':0})]
+    b=[dict(a[0],eligible_at=0.0)]
+    assert p.screening_rows_digest(a)==p.screening_rows_digest(b)
+    assert p.screening_rows_digest(a)!=p.screening_rows_digest([dict(a[0],state='QUEUED')])
+    assert p.screening_rows_digest(a)!=p.screening_rows_digest([dict(a[0],eligible_at=1)])
+    assert p.screening_rows_digest(a)!=p.screening_rows_digest([dict(a[0],checkpoint={'count':0.0})])
+    for value in (True,float('inf'),'0'):
+        with pytest.raises(Denied):p.screening_rows_digest([dict(a[0],eligible_at=value)])

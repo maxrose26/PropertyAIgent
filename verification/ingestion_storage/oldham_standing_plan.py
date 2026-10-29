@@ -112,3 +112,21 @@ def screening_authority_digest(reg):
         value={k:reg[k] for k in ('authority','root_key','insert','grant','bindings')}
     else:value=dict(authority=reg.authority,root_key=reg.root_key,insert=reg.insert,grant=reg.grant,bindings=reg.bindings)
     return digest(value)
+
+
+
+def screening_rows_digest(rows):
+    # WorkItem defines these two columns as Float. PostgreSQL row_to_json emits
+    # zero as0 while SQLAlchemy's typed SELECT returns0.0. Normalise only those
+    # declared types; preserve every row field/value and the row order.
+    import math
+    typed=[]
+    for row in rows:
+        value=dict(row)
+        for name in ('eligible_at','lease_until'):
+            v=value[name]
+            if v is None and name=='lease_until':continue
+            if type(v) not in (int,float) or not math.isfinite(v):raise Denied('OLDHAM_STANDING_SCREENING_COLUMN_TYPE')
+            value[name]=float(v)
+        typed.append(value)
+    return digest(typed)
