@@ -146,13 +146,20 @@ class StandingRunner(HostedRunner):
         return self.evidence_head
 
     def finalise(self,result):
-        sealed=super().finalise(result)
+        original_save=self.journal.save
+        def bounded_save(name,value):
+            raw=value if isinstance(value,bytes) else canonical(value)
+            self.export_capacity(replacement=(name,raw))
+            return original_save(name,value)
+        self.journal.save=bounded_save
+        try:sealed=super().finalise(result)
+        finally:self.journal.save=original_save
         if self.allocation.failed or not self.closed:sealed['cleanup']='UNCERTAIN';sealed['status']='STOP_RECONCILE_NO_RETRY'
         sealed['accounting']=self.accounting()
         sealed['accounting']['attempted_publication_bytes']=self.published
         sealed['local_audit_path']=str(self.journal.file)
         from .operational_outcome import finalise
-        return finalise(self.journal,sealed,input_seconds=0,active_started=self.started,external_bytes=self.published)
+        return finalise(self.journal,sealed,input_seconds=0,active_started=self.started,external_bytes=self.published,export_limit=self.export_limit)
 
 
 def run_claim(claim,urls,journal,github,*,memory,ssl,hostaddr=None,disposable=False,sleep=time.sleep,check_extra=None,claim_head=None):

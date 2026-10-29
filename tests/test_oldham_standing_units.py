@@ -112,3 +112,24 @@ def test_shared_export_reservation_cannot_exceed_original_envelope():
         bad=dict(r,runtime_limit=r['runtime_limit']+1)
         with pytest.raises(Denied):a.validate_export_reservation(bad)
     with pytest.raises(Denied):a.export_reservation(2*1024**2)
+
+
+def test_actual_final_export_respects_selected_share_before_effects(tmp_path):
+    from verification.ingestion_storage.operational_outcome import finalise
+    from verification.ingestion_storage.operational_journal import Journal
+    from verification.ingestion_storage.operational_publication import canonical
+    journal=Journal(tmp_path/'report');journal.emit('fixture',{'value':True})
+    original={'status':'FIXTURE','padding':'x'*20000};outputs=[]
+    result=finalise(journal,original,input_seconds=0,active_started=None,output=lambda value,**kw:outputs.append(value),export_limit=65536)
+    assert result['status']=='FIXTURE'
+    receipt=json.loads(outputs[-1]);actual=receipt['exported_bytes']
+    assert actual<=65536-8192
+    # Repeat at the exact projected total and one byte below it, with timing
+    # frozen so the actual finalisation path exercises its exact boundary.
+    import unittest.mock
+    with unittest.mock.patch('verification.ingestion_storage.operational_outcome.time.monotonic',return_value=0):
+        raw=dict(original);raw.pop('phase_timing',None)
+        one=finalise(journal,raw,input_seconds=0,active_started=None,output=lambda value,**kw:None,export_limit=actual+8192)
+        assert one['status']=='FIXTURE'
+        two=finalise(journal,dict(raw),input_seconds=0,active_started=None,output=lambda value,**kw:None,export_limit=actual+8191)
+        assert two['status']=='STOP_RECONCILE_NO_RETRY'

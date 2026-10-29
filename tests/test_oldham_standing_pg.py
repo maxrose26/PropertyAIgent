@@ -159,3 +159,48 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
 
 def teardown_module():
     if os.environ.get('OLDHAM_STANDING_COST_PATH'):Path(os.environ['OLDHAM_STANDING_COST_PATH']).write_text(json.dumps(RESULTS,sort_keys=True))
+
+
+@pytest.mark.parametrize('real_gh_store',['operational'],indirect=True)
+@pytest.mark.parametrize('changed_provider',[False,True])
+def test_standing_provision_adapter(tmp_path,monkeypatch,real_gh_store,changed_provider):
+    from verification.ingestion_storage.oldham_standing_provision import Provisioner
+    from verification.ingestion_storage.standing_access import StandingGitHub
+    from verification.ingestion_storage.oldham_owner_once import Operation
+    metadata,secret,ciphertexts,requests=real_gh_store
+    path,sha=packet(tmp_path/'provision-input',records=5,nominees=0,single_page=True,accept=monkeypatch,reuse=True,tag='standing_provision')
+    b=Backend(path);data=pkg.validate(path,sha,disposable=True);op=Operation(data,Journal(tmp_path/'provision-owner'),None,b)
+    try:
+        op.prepare('DISPOSABLE_FIXTURE_INPUT_ONLY',time.monotonic());InstalledReuse(op).run();w=b.world
+        if changed_provider:w['boot'].execute('ALTER VIEW extensions.pg_stat_statements_info SET (security_invoker=true)')
+        before=w['boot'].execute("SELECT encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('ingestion_worker_step','ingestion_oldham_allowed') ORDER BY p.proname").fetchall()
+        o=Provisioner(op.config['connect'],op.journal.emit,lambda:None,identity=op.config['identity'],expiry=data['expiry'],bindings=op.owner.bindings)
+        o.require_control_sha256=op.owner.require_control_sha256
+        g=StandingGitHub(op.journal.emit,lambda:None,runner=metadata.cli,bound=11)
+        if changed_provider:
+            with pytest.raises(Exception):o.install()
+            assert not o.pre_mint_gate
+            assert not any(m=='PUT' for m,_ in requests)
+            assert w['boot'].execute("SELECT bool_and(NOT rolcanlogin AND rolpassword IS NULL) FROM pg_authid WHERE rolname=ANY(%s)",(list(op.life.roles),)).fetchone()[0]
+        else:
+            o.install();assert o.pre_mint_gate
+            urls={}
+            def factory(role,password):
+                value=make_url(w['urls'][role]).set(password=password).render_as_string(hide_password=False);urls[role]=value;return value
+            o.map_and_activate(g,url_factory=factory)
+            assert o.urls=={} and len(urls)==2 and g.requests<=11
+            for role,url in urls.items():
+                from sqlalchemy import create_engine,text
+                engine=create_engine(url)
+                try:
+                    with engine.connect() as c:assert c.execute(text('SELECT current_user')).scalar_one()==role
+                finally:engine.dispose()
+            flags=w['boot'].execute("SELECT rolcanlogin,rolpassword IS NOT NULL,rolvaliduntil FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(list(op.life.roles),)).fetchall()
+            assert len(flags)==2 and all(enabled and password and until==o.valid_until for enabled,password,until in flags)
+            assert set(ciphertexts)=={'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}
+        after=w['boot'].execute("SELECT encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('ingestion_worker_step','ingestion_oldham_allowed') ORDER BY p.proname").fetchall()
+        assert before==after
+        assert not any(m=='DELETE' for m,_ in requests)
+        assert o.opened==o.closed and not o.authorities
+        RESULTS.append(dict(scenario='standing_provision_changed_provider' if changed_provider else 'standing_provision_success',administration=o.accounting(),github_requests=g.requests,policy_unchanged=True,fixture_setup=w['setup_costs']))
+    finally:b.close()

@@ -89,7 +89,7 @@ class StandingOperation(Operation):
 
     def preflight_standing(self):
         o=self.owner;self.stage='STANDING_PREFLIGHT'
-        names=self.github.names()
+        names=set(self.github.names())
         if not {'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}<=names or any(n in names for n in ('INGESTION_STORAGE_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL')):raise Denied('OLDHAM_STANDING_SECRET_STATE')
         with o.connection() as c:
             identity=o.q(c,'SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=current_user')[0]
@@ -232,7 +232,7 @@ class StandingOperation(Operation):
                 finally:self.owner.q(c,'ROLLBACK',effect=True)
                 after=self._observe_standing(c)
                 if after!=self.standing_before:raise Uncertain('OLDHAM_STANDING_ACCESS_CHANGED')
-            names=self.github.names()
+            names=set(self.github.names())
             if not {'DATABASE_URL','INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}<=names:raise Uncertain('OLDHAM_STANDING_SECRETS_CHANGED')
             self.standing_verified=True;self.result.update(status='COMPLETED',records=sealed['records'],nominees=sealed['nominees'],outcome=sealed['outcome'],authority_invalidation=self.owner.invalidation,credential_changes=0,application_writes=0,detail_requests=0,source_requests=0,coverage_advance=False)
             return self.finish()
