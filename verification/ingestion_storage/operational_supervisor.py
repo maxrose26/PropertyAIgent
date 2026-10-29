@@ -9,7 +9,7 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None):
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None):
  if not 0<seconds<=(45 if source else 165):raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
@@ -34,6 +34,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   parent=psutil.Process(child.pid);seen[child.pid]=parent.create_time()
   while child.poll() is None:
    try:
+    check()
     owned=[parent]+parent.children(recursive=True);rss=0
     for p in owned:
      try:

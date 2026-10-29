@@ -97,7 +97,13 @@ class SQLLedger:
 
     def finish(self,claim,outcome,*,state='COMPLETE',reason=None,**kwargs):
         self._claim(claim)
-        if kwargs:raise Denied('UNREVIEWED_SQL_TRANSITION')
+        if kwargs:
+            if set(kwargs)!={'delay','resolved_receipt','council_defer_seconds'}:raise Denied('UNREVIEWED_SQL_TRANSITION')
+            if self.broker_engine is None:raise Denied('TRUSTED_SOURCE_BROKER_REQUIRED')
+            payload=dict(outcome=outcome,state=state,reason=reason,**kwargs)
+            with self.broker_engine.begin() as c:
+                self._limits(c)
+                return self._step('settle_failure',claim.key,claim.fence,payload,connection=c)
         if state=='COMPLETE':return self._step('complete',claim.key,claim.fence,outcome)
         if state not in {'UNSUPPORTED_CONTRACT','SAFETY_BLOCKED'}:raise Denied('OPERATOR_TRANSITION_REQUIRED')
         return self._step('block',claim.key,claim.fence,dict(state=state,reason=reason,outcome=outcome))

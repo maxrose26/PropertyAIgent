@@ -40,9 +40,11 @@ class Admission:
 
 
 class ChainCaller:
-    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None, capture_screening_only=False, intake_only=False):
+    intake_run = None  # historical callers/test adapters predate the opt-in run envelope
+    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None, capture_screening_only=False, intake_only=False,intake_run=None):
         if type(intake_only) is not bool:raise Denied('INTAKE_MODE')
         self.intake_only=intake_only
+        self.intake_run=intake_run
         if type(capture_screening_only) is not bool:raise Denied('CAPTURE_SCREENING_MODE')
         if capture_screening_only and scope_binding.council!='oldham':raise Denied('CAPTURE_SCREENING_COUNCIL')
         self.capture_screening_only=capture_screening_only
@@ -74,7 +76,9 @@ class ChainCaller:
                       returned_bytes=min(kw.get('returned_bytes',4*1024**2),4*1024**2-returned),
                       seconds=min(kw.get('seconds',165),left))
             kw['cancel_used']=sum(b.prior_cancel_attempts+sum(e.get('cancel_attempts',0) for e in b.hard_deadline_events) for b in self.budgets)
+        if self.intake_run is not None:kw=self.intake_run.database_limits(kw)
         budget = DatabaseBudget(stop_file=self.stop_file, **kw) if self.stop_file else DatabaseBudget(**kw)
+        if self.intake_run is not None:self.intake_run.budgets.append(budget)
         if self.intake_only:budget.hard_stop_at=self.intake_started+270
         self.budgets.append(budget)
         return budget
@@ -83,7 +87,8 @@ class ChainCaller:
         worker, broker = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES[:2]]
         app=None if self.capture_screening_only or self.intake_only else budget.engine(self.urls[ROLES[2]],**self.engine_options)
         ledger = ControllerLedger(worker, budget=budget, owner=WORKER, authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
-        return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule},capture_bound_screening=self.intake_only)
+        return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule},capture_bound_screening=self.intake_only,
+                           isolated_contracts=(self.contract.name,) if self.intake_run is not None else ())
 
     def _contracts(self):
         facts = self.registration.factual_contracts if self.registration else {}
@@ -130,8 +135,21 @@ class ChainCaller:
             raise Denied('INTAKE_PREFLIGHT_REQUIRED')
         budget=self._budget(slot_key=self.root_key)
         co=self._coordinator(budget,self.capture_authority,{self.contract.name:self.contract})
-        try:return co.ledger.claim(self.root_key,lease_seconds=LEASE_SECONDS)
+        try:
+            claim=co.ledger.claim(self.root_key,lease_seconds=LEASE_SECONDS)
+            if self.intake_run is not None:co.ledger.intent(claim,'source_calls')
+            return claim
         finally:self.accounting['intake_claim']=budget.close([])
+
+    def settle_intake_failure(self,claim,category,source,outer,archive):
+        from app.ingestion.batching import archive_capture
+        receipt=archive_capture(source,archive)
+        budget=self._budget(slot_key=self.root_key)
+        co=self._coordinator(budget,self.capture_authority,{self.contract.name:self.contract})
+        try:
+            co.fail(claim,category,cleanup_closed=True,accounting_complete=True,council_isolated=True,
+                    source_audit=source,outer=outer,failure_archive=receipt)
+        finally:self.accounting['contained_failure']=budget.close([])
 
     def capture(self, source, outer, *, expected_source_sha256, evidence_label, archive, observed_at=None, intake_claim=None):
         """Retained capture: validate, archive with verified readback, checkpoint, finish. No listing request, no source spend."""

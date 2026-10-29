@@ -451,6 +451,23 @@ class Owner:
             self.emit('temporary_owner_capability_readback',dict(flags=capability))
             if capability!=(False,False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         self.emit('owner_registration_committed',dict(authority=authority,keys=sorted(bindings),binding_sha256=digest(grant)))
+
+    def register_intake_period(self,name,policy):
+        """Owner-only preauthorisation through the existing issuer, never runtime.
+
+        Does not clear a stop, install SQL, provision a login or issue daily work.
+        The SQL boundary verifies expiry, council list and expected stop snapshot.
+        """
+        with self.connection() as c:
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            result=self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
+                          (json.dumps(dict(operation='intake_period',period=name,policy=policy)),),effect=True)[0][0]
+            self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+            self.q(c,'COMMIT',effect=True)
+            flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0]
+            if flags!=(False,False):raise Uncertain('INTAKE_ISSUER_CAPABILITY_REMAINS')
+            return result
         return bindings
 
     def teardown(self,github):

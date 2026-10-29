@@ -233,7 +233,8 @@ class Coordinator:
         receipt.setdefault('date_semantics',contract.scope()['semantics'])      # a retained capture always states its date basis
         if evidence_label is not None:receipt['evidence_label']=evidence_label
         bounded(receipt)
-        self.ledger.checkpoint(claim,receipt)
+        if row['phase']=='SOURCE_INTENT':self.ledger.resolve_source(claim,receipt)
+        else:self.ledger.checkpoint(claim,receipt)
         self.ledger.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=[],source_sha256=receipt['source_sha256']))
         return receipt
 
@@ -337,7 +338,7 @@ class Coordinator:
             self.ledger.stop('SOURCE_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
             raise
 
-    def fail(self,claim,category,*,cleanup_closed,accounting_complete,council_isolated=False,source_audit=None,outer=None):
+    def fail(self,claim,category,*,cleanup_closed,accounting_complete,council_isolated=False,source_audit=None,outer=None,failure_archive=None):
         """Reviewed finite policy; unknown failures and TargetClosed stop globally."""
         if not cleanup_closed or not accounting_complete or category not in {'RATE_LIMIT','SOURCE_UNAVAILABLE','UNSUPPORTED_CONTRACT','NO_SUPPORTED_FACTS'}:
             self.ledger.stop(category,claim=claim);return
@@ -346,10 +347,16 @@ class Coordinator:
             self.ledger.stop('ISOLATION_NOT_ESTABLISHED',claim=claim);return
         if row['phase']=='WRITE_INTENT':self.ledger.stop('UNCERTAIN_WRITE',claim=claim,persistence_uncertain=True);return
         if row['phase']=='SOURCE_INTENT':
-            try:validate_source_resources(source_audit or {},outer or {},row['limits'])
+            try:
+                if self.capture_bound_screening and row['contract'] in self.isolated_contracts and (source_audit or {}).get('resource') is not None:
+                    from .daily_intake import contained_idox_failure
+                    if contained_idox_failure(source_audit,outer,row)!=category:raise Denied('CONTAINED_FAILURE_CATEGORY')
+                else:validate_source_resources(source_audit or {},outer or {},row['limits'])
             except Exception:
                 self.ledger.stop('FAILURE_ACCOUNTING_OR_CLEANUP_UNKNOWN',claim=claim);raise
         receipt=dict(cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,failure=category,previous=row['checkpoint'])
+        if failure_archive is not None:
+            receipt.update(durable_archive=failure_archive,source_sha256=digest(source_audit),source_audit=source_audit)
         state='UNSUPPORTED_CONTRACT' if category in {'UNSUPPORTED_CONTRACT','NO_SUPPORTED_FACTS'} else 'DEFERRED'
         self.ledger.finish(claim,dict(outcome=category),state=state,reason=category,delay=3600 if state=='DEFERRED' else 0,resolved_receipt=receipt,council_defer_seconds=3600 if state=='DEFERRED' else 0)
 

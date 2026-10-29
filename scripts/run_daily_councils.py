@@ -509,8 +509,11 @@ def main() -> int:
     rolling Render scope. Retain the callable intake connection for disposable
     validation without inventing a credential/authority framework.
     """
-    from app.ingestion.daily_intake import inactive_main
-    return inactive_main()
+    if len(sys.argv)==1:
+        from app.ingestion.daily_intake import inactive_main
+        return inactive_main()
+    from verification.ingestion_storage.daily_intake_runtime import main as intake_main
+    return intake_main()
 
 
 def _exit_code(*, healthy: int, attempted: int) -> int:
