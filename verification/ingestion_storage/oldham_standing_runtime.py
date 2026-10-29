@@ -143,11 +143,12 @@ class StandingRunner(HostedRunner):
 
 
     def publish_completed(self,result):
+        if self.head()!=self.evidence_head:raise Uncertain('OLDHAM_STANDING_EVIDENCE_HEAD_CHANGED')
         raw=canonical(result);files={'events.jsonl':self.journal.file.read_bytes(),'final-result.json':raw}
         self.export_capacity(sum(map(len,files.values())),replacement=('final-result.json',raw))
         self.journal.save('final-result.json',result)
         self.published+=sum(map(len,files.values()))
-        self.evidence_head=self.github.publish(files,directory=self.EVIDENCE+'/completed',expected_head=self.head())
+        self.evidence_head=self.github.publish(files,directory=self.EVIDENCE+'/completed',expected_head=self.evidence_head)
         return self.evidence_head
 
     def finalise(self,result):

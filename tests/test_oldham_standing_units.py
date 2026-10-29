@@ -201,3 +201,14 @@ def test_screening_readback_normalises_only_declared_float_columns():
     assert p.screening_rows_digest(a)!=p.screening_rows_digest([dict(a[0],checkpoint={'count':0.0})])
     for value in (True,float('inf'),'0'):
         with pytest.raises(Denied):p.screening_rows_digest([dict(a[0],eligible_at=value)])
+
+
+def test_final_publication_refuses_unexpected_head_before_local_or_remote_effects(tmp_path):
+    from verification.ingestion_storage.oldham_standing_runtime import StandingRunner
+    from verification.ingestion_storage.operational_journal import Journal
+    from verification.ingestion_storage.operational_publication import Uncertain
+    r=object.__new__(StandingRunner);r.journal=Journal(tmp_path/'head-refusal');r.published=0;r.evidence_head='a'*40
+    r.head=lambda:'b'*40
+    r.github=SimpleNamespace(publish=lambda *a,**kw:pytest.fail('must not publish'))
+    with pytest.raises(Uncertain,match='EVIDENCE_HEAD_CHANGED'):r.publish_completed({'status':'FIXTURE'})
+    assert not (r.journal.root/'final-result.json').exists() and r.published==0
