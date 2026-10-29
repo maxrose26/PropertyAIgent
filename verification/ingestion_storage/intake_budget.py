@@ -7,7 +7,7 @@ import time,math
 from app.ingestion.ledger import Denied
 
 LIMITS=dict(requests=90,source_bytes=23971520,source_seconds=120,supervised_seconds=150,
-            driver_statements=2080,connection_attempts=80,returned_bytes=8*1024**2,
+            driver_statements=2080,connection_attempts=96,returned_bytes=8*1024**2,
             github_calls=80,export_bytes=2*1024**2,wall_seconds=960)
 RESERVE=dict(driver_statements=32,connection_attempts=4,github_calls=20,wall_seconds=180,export_bytes=768*1024)
 

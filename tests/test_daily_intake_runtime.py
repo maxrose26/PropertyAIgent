@@ -48,18 +48,23 @@ def authorise(world,name,p=None):
     return owner.register_intake_period(name,p or policy(world))
 
 
-def env_and_sources(world,tmp_path,*,failed=False):
+def env_and_sources(world,tmp_path,*,failed=False,count=1):
     rows=current_windows(datetime.now(timezone.utc),['tameside','manchester'])
     directory=tmp_path/'sources';directory.mkdir()
     for row in rows:
         start,end=date.fromisoformat(row['start']),date.fromisoformat(row['end'])
-        records=[entry('DAILY/1/26',SCHEME)]
+        records=[entry('DAILY/'+str(i)+'/26',SCHEME) for i in range(count)]
         if row['council']=='tameside':
             audit=idox_audit('tameside',records,start,end)
             if failed:
                 audit.update(failure='SOURCE_CONTRACT_REJECTED',completeness='FAILED',
                              failure_diagnostic=dict(transport=dict(http_status=429)))
-        else:audit=arcus_audit('manchester',records,start,end,budget='BROWSER_SOURCE_V2')
+        else:
+            chunks=[arcus_audit('manchester',records[i:i+10],start,end,budget='BROWSER_SOURCE_V2') for i in range(0,len(records),10)]
+            audit=chunks[0];all_rows=[r for a in chunks for r in a['listing_records']]
+            audit['listing_segments']=[dict(ordinal=i+1,first=i*10+1,last=min((i+1)*10,count),total=count,
+                evidence_sha256=__import__('hashlib').sha256(json.dumps(all_rows[i*10:(i+1)*10],sort_keys=True).encode()).hexdigest()) for i in range(len(chunks))]
+            audit['listing_records']=all_rows
         (directory/(row['council']+'.json')).write_text(json.dumps(audit))
     issuer='http://127.0.0.1:8765'
     machine=dict(version=1,enabled=True,environment='local',issuer=issuer,client_id='local-test',web_processes=1,web_replicas=1,
@@ -72,8 +77,8 @@ def env_and_sources(world,tmp_path,*,failed=False):
     return env,directory
 
 
-def invoke(world,tmp_path,name,*,failed=False):
-    env,sources=env_and_sources(world,tmp_path,failed=failed)
+def invoke(world,tmp_path,name,*,failed=False,count=1):
+    env,sources=env_and_sources(world,tmp_path,failed=failed,count=count)
     output=tmp_path/'result'
     command=['timeout','--signal=INT','--kill-after=5s','960s',sys.executable,'-m','scripts.run_daily_councils','--period',name,'--output',str(output),
              '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
@@ -125,7 +130,7 @@ def test_run_budget_refuses_before_unfit_scope_and_preserves_closure():
     assert run.used['github_calls']==51
     run.closing=True;run.publication(1,10)
     assert run.used['github_calls']==61
-    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=68,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]
+    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=84,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]
     with pytest.raises(Denied,match='DATABASE_RESERVE'):run.database_limits({})
     run.closing=True
     assert run.database_limits({})['connections']==4
@@ -154,6 +159,18 @@ def test_intake_reuses_only_the_existing_qualified_manchester_zero():
     assert receipt['records']==[] and receipt['explicit_zero'] is True
     source['explicit_zero_evidence']=''
     with pytest.raises(Denied):replace(contract,retain_explicit_zero=True).project(source,outer(),DEFAULT_LIMITS)
+
+
+def test_invoked_two_scope_maximum_sixty_each_has_one_shared_envelope(world,tmp_path,record_property):
+    reset(world);authorise(world,'maximum-two-scopes')
+    before=snapshot(world['boot']);run,result,command=invoke(world,tmp_path,'maximum-two-scopes',count=60)
+    assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result)
+    assert run.returncode==0 and len(result['backlog']['records'])==120
+    assert result['usage']['driver_statements']<=LIMITS['driver_statements']
+    assert result['usage']['connection_attempts']<=LIMITS['connection_attempts']
+    assert result['usage']['returned_bytes']<=LIMITS['returned_bytes'] and result['usage']['all_connections_closed']
+    assert changed_tables(before,snapshot(world['boot']))==[] and restricted_sessions(world['boot'])==0
+    record_property('maximum_two_scope_usage',json.dumps(result['usage'],sort_keys=True))
 
 
 def test_consumed_daily_invocation_does_not_recollect_or_duplicate_work(world,tmp_path):

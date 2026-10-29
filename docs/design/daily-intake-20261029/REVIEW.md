@@ -120,7 +120,7 @@ and same-URL document revisions remain deferred; ten checks is acceptance only.
 
 Across both councils and ALL stages, including issuer/control/catalogue reads:
 90 source requests;23,971,520 mixed-accounting source bytes;120 worker seconds;
-150 source-supervision seconds;2080 driver statements;80 database connection
+150 source-supervision seconds;2080 driver statements;96 database connection
 attempts INCLUDING at most8 auxiliary cancel requests;8MiB returned values;
 80 GitHub calls;2MiB combined exported evidence;960s active wall ceiling.
 No allowance resets between councils or deliveries. The existing restricted
@@ -130,7 +130,7 @@ The existing GitHub publisher refuses uncertain mutations and never force-update
 Before source work, a whole supported scope must fit the remaining aggregate.
 Protected closure reserves are32 statements,4 normal connections,20 GitHub calls,
 768KiB export and180s wall; remaining auxiliary cancel connections stay inside
-80, not on top. Work cannot borrow these reserves. Source monitors keep the
+96, not on top. Work cannot borrow these reserves. Source monitors keep the
 existing Idox envelope and opt into the existing BROWSER_SOURCE_V2 envelope for
 Arcus (75s/1.5GiB source tree). The acceptance container ceiling is2GiB; actual
 Render peak/controller/browser and platform termination remain to be measured.
