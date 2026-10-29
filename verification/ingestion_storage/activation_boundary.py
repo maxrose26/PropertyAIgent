@@ -29,6 +29,12 @@ def capture_screening_gate(text):
     last='  -- Catalog scans are bounded by statement timeout; export no object contents.'
     if original.count(first)!=1 or original.count(last)!=1:raise Denied('ACTIVATION_BOUNDARY_DERIVATION')
     stats=original[original.index(first):original.index(last)]
+    # Resolve only catalogue identities: the inspector and runtime deliberately
+    # have no USAGE on this provider schema. Name resolution via to_regclass
+    # itself checks USAGE, before any reviewed metadata predicate can run.
+    old_presence="  IF to_regclass('extensions.pg_stat_statements') IS NOT NULL\n     OR to_regclass('extensions.pg_stat_statements_info') IS NOT NULL THEN"
+    if stats.count(old_presence)!=1:raise Denied('ACTIVATION_BOUNDARY_DERIVATION')
+    stats=stats.replace(old_presence,"  IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='extensions' AND c.relname IN ('pg_stat_statements','pg_stat_statements_info')) THEN")
     # In addition to reviewed view hashes, all three C functions must be members
     # of the SAME extension, owned by its owner, with exact reviewed symbols.
     marker="   THEN RAISE EXCEPTION 'STATISTICS_FUNCTION_BOUNDARY'; END IF;"

@@ -131,6 +131,8 @@ class InstalledReuse(Transition):
 
     def run(self):
         o=self.o;self.op.stage='INSTALLED_POLICY_CLEANUP'
+        # Historical residual access is unresolved until every positive readback.
+        self.life.state='UNCERTAIN'
         self.op.result['historical_cleanup']=dict(authority=AUTHORITY,status='NOT_ATTEMPTED')
         files=original_files(self.op.p,self.op.data['base'])
         self.o.emit('oldham_supplied_original_copies', {k:{n:v[n] for n in ('sha256','bytes','mode')} for k,v in files.items()})
@@ -181,6 +183,7 @@ class InstalledReuse(Transition):
             current=original_files(self.op.p,self.op.data['base'])
             if {k:(v['sha256'],v['mode']) for k,v in current.items()}!={k:(v['sha256'],v['mode']) for k,v in files.items()}:raise Uncertain('OLDHAM_REUSE_ORIGINAL_CHANGED')
             self.cleaned=True
+            self.life.state='UNUSED'
             self.op.result['historical_cleanup']=dict(authority=AUTHORITY,grant_expiry_before=self.before['grants'][AUTHORITY]['expires_at'],grant_expiry_after=0,allowance_revoked=True,memberships='ABSENT',readback='VERIFIED',history_preserved=True)
             self.op.result['transition']=dict(retirement='NOT_REPEATED',installation='REUSED_VERIFIED',rollback='NOT_EXECUTED')
             self.o.emit('oldham_reuse_cleanup_verified',self.op.result['historical_cleanup'])

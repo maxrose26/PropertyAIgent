@@ -116,3 +116,18 @@ def test_reuse_failure_export_uses_existing_fixed_codes_without_raw_text():
         value=Operation.failed(obj,exc)
         assert value['failure']['reason_code']==expected and value['failure']['message_exported'] is False
         assert 'PRIVATE_RAW_DETAIL' not in str(value) and value['cleanup']=='UNCERTAIN'
+
+
+def test_provider_presence_uses_catalogue_without_schema_usage():
+    from verification.ingestion_storage.oldham_lifecycle import activation_gate
+    gate=activation_gate(capture_screening_only=True)
+    assert "to_regclass('extensions." not in gate
+    assert "n.nspname='extensions' AND c.relname IN ('pg_stat_statements','pg_stat_statements_info')" in gate
+    assert 'STATISTICS_OBJECT_OR_PRIVILEGE_CHANGED' in gate
+
+def test_historical_cleanup_required_for_successor_closure():
+    from pathlib import Path
+    reuse=Path('verification/ingestion_storage/oldham_reuse.py').read_text()
+    assert reuse.index("self.life.state='UNCERTAIN'") < reuse.index('names=self.op.github.names()')
+    owner=Path('verification/ingestion_storage/oldham_owner_once.py').read_text()
+    assert "historical_closed=not self.installed_reuse or self.result.get('historical_cleanup',{}).get('readback')=='VERIFIED'" in owner
