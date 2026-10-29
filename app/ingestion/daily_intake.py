@@ -2,8 +2,8 @@
 
 No credential lookup, grant issuance, source transport, admission or scheduler.
 The release supplies an authorised, supervised collector and existing registration
-callback. Production bootstrap is deliberately absent until an existing mechanism
-can express rolling Render authority. These functions do not confer that authority.
+callback. The existing restricted controller supplies rolling authority and supervision.
+These component functions cannot issue that authority themselves.
 """
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -223,6 +223,6 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
 def inactive_main():
     """No legacy fallback, dynamic plugin, administrative URL or hidden activation."""
     import json
-    print(json.dumps(dict(status='BLOCKED',reason='DAILY_INTAKE_AUTHORITY_BOOTSTRAP_NOT_SUPPORTED',
+    print(json.dumps(dict(status='BLOCKED',reason='EXPLICIT_INTAKE_PERIOD_REQUIRED',
                           database_connections=0,source_requests=0,application_writes=0)))
     return 2

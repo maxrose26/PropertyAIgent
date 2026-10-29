@@ -30,7 +30,12 @@ BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/in
              'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
 
 def execution_binding():
-    return dict(revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+    import re
+    deployed=os.environ.get('RENDER_GIT_COMMIT')
+    try:revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True,stderr=subprocess.DEVNULL).strip()
+    except (OSError,subprocess.CalledProcessError):revision=deployed
+    if not revision or not re.fullmatch('[a-f0-9]{40}',revision) or deployed and deployed!=revision:raise Denied('INTAKE_CODE_IDENTITY')
+    return dict(revision=revision,
                 workflow_sha256=hashlib.sha256(Path('.github/workflows/stage4-discovery-offline.yml').read_bytes()).hexdigest(),
                 manifest_sha256=digest({p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in BOUND_FILES}))
 
@@ -59,15 +64,26 @@ class Runtime:
         disposable=all((u.host,u.port,u.database,u.username)==('127.0.0.1',5432,'ingestion_provisioning_test',r) for r,u in zip(self.urls,parsed))
         self.test=bool(args.disposable_sources or args.disposable_archive)
         if self.test and (not disposable or not args.disposable_sources or not args.disposable_archive):raise Denied('FIXED_DISPOSABLE_TRANSPORT_ONLY')
-        if not self.test and subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],text=True).strip():raise Denied('CLEAN_REVIEWED_CHECKOUT_REQUIRED')
+        if not self.test:
+            forbidden=('DATABASE_URL','INGESTION_ADMIN_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY')
+            if any(os.environ.get(k) for k in forbidden):raise Denied('UNNEEDED_PRIVILEGED_RUNTIME_CREDENTIAL')
+            try:dirty=subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],text=True,stderr=subprocess.DEVNULL).strip()
+            except (OSError,subprocess.CalledProcessError):dirty='' if os.environ.get('RENDER_GIT_COMMIT') else 'UNVERIFIED'
+            if dirty:raise Denied('CLEAN_REVIEWED_CHECKOUT_REQUIRED')
         self.options={}
+        self.route_name='DISPOSABLE'
         if not disposable:
+            from .restricted_route import identify
+            routes=[identify(u) for u in parsed]
+            if any(r is None for r in routes) or routes[0][0]!=routes[1][0] or [r[1] for r in routes]!=list(self.urls):raise Denied('EXACT_SHARED_RESTRICTED_ROUTE')
+            self.route_name=routes[0][0]
             import ipaddress
             if not args.hostaddr or ipaddress.ip_address(args.hostaddr).version!=4:raise Denied('REVIEWED_ADDRESS_REQUIRED')
             from .tls_trust import verified_trust
-            ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr}
+            ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr,'route':self.route_name}
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0
         self.policy=None
+        self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in Owner.daily_intake_inventory().items()}
 
     def emit(self,event,data):
         value=dict(event=event,data=data)
@@ -93,8 +109,12 @@ class Runtime:
         finally:budget.close([])
 
     def policy_read(self,c,*,read_only=False):
+        if not read_only:
+            actual=c.execute(text("SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),r.rolname,p.proconfig,p.prosecdef FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace JOIN pg_catalog.pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(:names) ORDER BY p.proname"),dict(names=list(self.expected_functions))).all()
+            expected=[(n,h,'ingestion_storage_owner',['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,h in sorted(self.expected_functions.items())]
+            if [tuple(r) for r in actual]!=expected:raise Denied('INTAKE_FUNCTION_INVENTORY_CHANGED')
         row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
-        if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
+        if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('route')!=self.route_name or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
             (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
             raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
         return row.policy
@@ -150,7 +170,7 @@ class Runtime:
         output=self.root/(row['council']+'-source.json')
         # One persistent, metered restricted connection polls the DB stop while
         # the existing credential-free owned-process supervisor runs the reader.
-        with self.connection(seconds=60) as (c,budget):
+        with self.connection(seconds=90) as (c,budget):
             import threading
             done=threading.Event();errors=[]
             self.policy_read(c)
@@ -165,7 +185,8 @@ class Runtime:
             try:
                 outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
                                 environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=self.root/(row['council']+'-owned'),
-                                source=True,seconds=45,stop_file=self.root/'STOP',check=check)
+                                source=True,seconds=75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
+                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None)
             finally:
                 done.set();watcher.join(timeout=14)
             if watcher.is_alive():raise Denied('STOP_POLL_CLOSURE_UNCERTAIN')
@@ -192,6 +213,8 @@ class Runtime:
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)
+                if self.policy['expires_at']-time.time()<LIMITS['wall_seconds']-self.run.totals()['elapsed_seconds']:
+                    raise Denied('INTAKE_PERIOD_TOO_SHORT_FOR_RUN')
                 # SQL derives/checks the same London dates, rather than trusting
                 # this Python selection or permitting arbitrary historical work.
                 contract=self.contract(row);sb=binding_for(row['council'])
@@ -203,7 +226,7 @@ class Runtime:
                 reg=capture_registration(owner,sb,contract,row['start'],row['end'],revision=revision,item_limits=limits)
                 consumed=self.issue(reg)
                 if consumed:
-                    result['scopes'].append(dict(council=row['council'],status='ALREADY_RETAINED' if consumed['state']=='COMPLETE' else 'INCOMPLETE',records=0,failure=None))
+                    result['scopes'].append(dict(council=row['council'],status='ALREADY_RETAINED' if consumed['state']=='COMPLETE' else 'INCOMPLETE',records=0,failure=None,already_consumed=True))
                     continue
                 caller=ChainCaller(sb,contract,rule,self.urls,revision=revision,bindings=dict(reg.bindings),capture_authority=reg.authority,
                                    chain_authority=reg.authority,stop_file=self.root/'STOP',allow_test_evidence=self.test,engine_options=self.options,intake_only=True,intake_run=self.run)
@@ -225,6 +248,7 @@ class Runtime:
             result['status']='INCOMPLETE' if any(s['status']=='INCOMPLETE' for s in result['scopes']) else 'RETAINED_AND_SCREENED'
         except BaseException as error:
             # Never continue another council after shared/unclassified failure.
+            self.run.closing=True
             result['failure']=type(error).__name__
             if isinstance(error,Denied):result['reason']=str(error)[:120]
             original=getattr(error,'orig',None)
@@ -256,13 +280,13 @@ class Runtime:
             result['test_evidence']=self.test;result['execution_binding']=self.binding
             raw=canonical(result);events=canonical(self.events)
             try:
-                self.run.publication(len(raw)+len(events),10)
-                if not self.test:
+                if self.authorities:self.run.publication(len(raw)+len(events),10)
+                if self.authorities and not self.test:
                     if self.github is None:
                         self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
                     self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.root.name+'/final',expected_head=self.head)
-                result['publication']='TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
             except BaseException:
                 result.update(status='STOP_RECONCILE_NO_RETRY',publication='UNCERTAIN')
                 try:
@@ -296,8 +320,9 @@ class Runtime:
 def source_worker(args):
     if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD')) for k in os.environ):raise Denied('PRIVATE_CREDENTIAL_FREE_SOURCE')
     import resource
-    resource.setrlimit(resource.RLIMIT_CPU,(45,45));resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
+    resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
+    seconds=75 if row['council']=='manchester' else 45;resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
     if plan['fixture'] is not None:
         raw=Path(plan['fixture']).read_bytes()
         fixture=json.loads(raw);delay=fixture.pop('_test_delay_seconds',0)

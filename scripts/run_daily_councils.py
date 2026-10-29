@@ -503,11 +503,10 @@ def legacy_main() -> int:
 
 @authorised_cli('run_daily_councils')
 def main() -> int:
-    """Intake-only scheduled boundary; no fallback to legacy application writes.
+    """Intake-only boundary. Requires an existing expiring period; never legacy.
 
-    Live bootstrap remains held: existing grants cannot express the approved
-    rolling Render scope. Retain the callable intake connection for disposable
-    validation without inventing a credential/authority framework.
+    No arguments refuse all effects. Explicit intake arguments use only the
+    restricted rolling issuer. Legacy/manual flags cannot select a fallback.
     """
     if len(sys.argv)==1:
         from app.ingestion.daily_intake import inactive_main

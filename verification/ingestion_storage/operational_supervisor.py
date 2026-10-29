@@ -9,8 +9,14 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None):
- if not 0<seconds<=(45 if source else 165):raise ValueError('FIXED_DEADLINE')
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None):
+ if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
+ single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
+ if execution_budget is not None:
+  from app.ingestion.source_budget import select
+  selected=select(execution_budget);ceiling=selected['worker_seconds']
+  single_rss=group_rss=selected['source_memory_bytes']
+ if not 0<seconds<=ceiling:raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
  if source and not set(environment)<={'INGESTION_SOURCE_PRIVATE'}:raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
@@ -39,10 +45,10 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
     for p in owned:
      try:
       seen[p.pid]=p.create_time();n=p.memory_info().rss;rss+=n
-      if n>1024**3:reason='PROCESS_RSS'
+      if n>single_rss:reason='PROCESS_RSS'
      except psutil.NoSuchProcess:pass
     peak=max(peak,rss)
-    if rss>1536*1024**2:reason='AGGREGATE_RSS'
+    if rss>group_rss:reason='AGGREGATE_RSS'
     elif time.monotonic()-started>=seconds:reason='DEADLINE'
     elif stop_file and Path(stop_file).exists():reason='OWNER_STOP'
     elif size()>maximum-16384:reason='OUTPUT_BOUND'

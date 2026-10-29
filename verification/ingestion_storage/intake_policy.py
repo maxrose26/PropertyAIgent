@@ -19,7 +19,7 @@ REGISTRATION = r"""
   IF p->>'operation'='intake_period' THEN
    IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN RAISE EXCEPTION 'OWNER_DISPOSITION_REQUIRED' USING ERRCODE='42501'; END IF;
    e:=p->'policy';
-   IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
+   IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr','route']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
     OR jsonb_typeof(e->'expires_at') IS DISTINCT FROM 'number'
     OR (e->>'expires_at')::double precision<=t OR (e->>'expires_at')::double precision>t+604800
     OR jsonb_typeof(e->'max_runs') IS DISTINCT FROM 'number' OR (e->>'max_runs')::numeric NOT BETWEEN 1 AND 7 OR (e->>'max_runs')::numeric<>trunc((e->>'max_runs')::numeric) OR e->'overlap_days' IS DISTINCT FROM '7'::jsonb
@@ -36,7 +36,8 @@ REGISTRATION = r"""
     OR e->'execution_binding'->>'workflow_sha256' !~ '^[a-f0-9]{64}$'
     OR e->'execution_binding'->>'manifest_sha256' !~ '^[a-f0-9]{64}$'
     OR jsonb_typeof(e->'test_evidence') IS DISTINCT FROM 'boolean'
-    OR CASE WHEN e->'test_evidence'='true'::jsonb THEN e->'hostaddr' IS DISTINCT FROM 'null'::jsonb ELSE jsonb_typeof(e->'hostaddr') IS DISTINCT FROM 'string' OR family((e->>'hostaddr')::inet)<>4 OR masklen((e->>'hostaddr')::inet)<>32 END
+    OR (CASE WHEN e->'test_evidence'='true'::jsonb THEN e->>'route' IS DISTINCT FROM 'DISPOSABLE' ELSE coalesce(e->>'route','') NOT IN ('POOLER','DIRECT') END)
+    OR (CASE WHEN e->'test_evidence'='true'::jsonb THEN e->'hostaddr' IS DISTINCT FROM 'null'::jsonb ELSE jsonb_typeof(e->'hostaddr') IS DISTINCT FROM 'string' OR family((e->>'hostaddr')::inet)<>4 OR masklen((e->>'hostaddr')::inet)<>32 END)
     OR e->>'screening_config' !~ '^[a-f0-9]{64}$'
    THEN RAISE EXCEPTION 'INTAKE_PERIOD_POLICY'; END IF;
    FOR item IN SELECT value FROM jsonb_each(e->'councils') LOOP
@@ -203,14 +204,15 @@ def worker_text():
 
 
 def policy_sql():
-    text=v3.original_text()
-    start=text.index('CREATE FUNCTION public.ingestion_register_bolton_exception(')
+    from .operational_owner import GENERATION3_SCREENING_V3_POLICY
+    text=GENERATION3_SCREENING_V3_POLICY.read_text()
+    start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(')
     end=text.index('$register$;',start)+len('$register$;')
-    register=text[start:end].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1)
+    register=text[start:end]
     register=register.replace("BEGIN\n IF NOT pg_has_role", "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
-    start=text.index('CREATE FUNCTION public.ingestion_bolton_allowed(')
+    start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_bolton_allowed(')
     end=text.index('$policy$;',start)+len('$policy$;')
-    allowed=text[start:end].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1)
+    allowed=text[start:end]
     rolling="""coalesce(ctl->'grants'->authority->>'intake_period' IS NOT NULL
  AND ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->'expected_stop'=__SNAPSHOT__
  AND (ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->>'expires_at')::double precision>extract(epoch FROM statement_timestamp())

@@ -27,7 +27,7 @@ def test_default_command_cannot_fall_back_to_legacy(capsys):
     import json
     result=json.loads(capsys.readouterr().out)
     assert result['database_connections']==result['source_requests']==result['application_writes']==0
-    assert result['reason']=='DAILY_INTAKE_AUTHORITY_BOOTSTRAP_NOT_SUPPORTED'
+    assert result['reason']=='EXPLICIT_INTAKE_PERIOD_REQUIRED'
 
 
 def test_capture_bound_worker_is_an_explicit_reversible_extension():

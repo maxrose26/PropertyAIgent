@@ -37,7 +37,7 @@ def reset(world):
 
 def policy(world):
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
-    return dict(hostaddr=None,expires_at=time.time()+3600,max_runs=7,overlap_days=7,expected_stop=stop_snapshot(ctl),
+    return dict(hostaddr=None,route='DISPOSABLE',expires_at=time.time()+3600,max_runs=7,overlap_days=7,expected_stop=stop_snapshot(ctl),
                 execution_binding=execution_binding(),test_evidence=True,screening_config=digest(RULE.config()),
                 councils={c:dict(contract='daily-intake-'+c,qualification_sha256=TEST_QUALIFICATION) for c in ('tameside','manchester')})
 
@@ -75,7 +75,7 @@ def env_and_sources(world,tmp_path,*,failed=False):
 def invoke(world,tmp_path,name,*,failed=False):
     env,sources=env_and_sources(world,tmp_path,failed=failed)
     output=tmp_path/'result'
-    command=[sys.executable,'-m','scripts.run_daily_councils','--period',name,'--output',str(output),
+    command=['timeout','--signal=INT','--kill-after=5s','960s',sys.executable,'-m','scripts.run_daily_councils','--period',name,'--output',str(output),
              '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
     run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=60)
     result=json.loads((output/'final-result.json').read_bytes()) if (output/'final-result.json').exists() else dict(stdout=run.stdout,stderr=run.stderr)
@@ -125,7 +125,7 @@ def test_run_budget_refuses_before_unfit_scope_and_preserves_closure():
     assert run.used['github_calls']==51
     run.closing=True;run.publication(1,10)
     assert run.used['github_calls']==61
-    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=76,returned_bytes=0,opened=[])]
+    run=IntakeRun();run.budgets=[SimpleNamespace(statements=2040,attempts=68,returned_bytes=0,opened=[],prior_cancel_attempts=0,hard_deadline_events=[])]
     with pytest.raises(Denied,match='DATABASE_RESERVE'):run.database_limits({})
     run.closing=True
     assert run.database_limits({})['connections']==4
@@ -204,8 +204,8 @@ def test_changed_stop_prevents_supported_registration_and_preserves_history(worl
 
 
 def test_policy_preserves_historical_registration_branch_text():
-    from verification.ingestion_storage import screening_v3_worker_sql as v3
-    old=v3.original_text();start=old.index(" IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN")
+    from verification.ingestion_storage.operational_owner import GENERATION3_SCREENING_V3_POLICY
+    old=GENERATION3_SCREENING_V3_POLICY.read_text();start=old.index(" IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN")
     finish=old.index('END $register$;',start)
     assert old[start:finish] in intake_policy.policy_sql()
 

@@ -1,3 +1,228 @@
+# Daily intake — INACTIVE release candidate
+
+Stage 4 OPEN. This proposal does not authorise production access, SQL installation,
+period issuance, merge, deployment, a Render job, or recurring activation.
+
+## Current connected path
+
+Approved continuation base: PR #206 head
+1aa8d7e534b6ddf443fe05a194ae47e36032b3ba, tree
+3fb5ffe08b9f4edb42de1c03e100f55f83428e6b. The final candidate's commit/tree,
+hosted checks and measured usage are recorded in the PR handoff. Historical
+partial-delivery text below is superseded by this section, not erased.
+
+The daily command now connects the existing expiring registration function,
+restricted worker/effect principals, qualified supervised listing readers,
+Coordinator retained capture, archive readback, frozen v3 screening, paginated
+backlog and authority invalidation/readback. No argument means no effects; the
+manual legacy command remains separate. There is no Application credential,
+admission, document downloading, enrichment, opportunity processing or AI consumer.
+
+First supported intake allowance: Tameside RECEIVED (Idox) and Manchester VALIDATED
+(Arcus), at most two scopes. This does not establish nine-council capacity or
+complete GM coverage. The period may allow either or both; no arbitrary council.
+Existing metadata/reader qualification is still required for live use.
+
+### Existing issuer and stops
+
+`intake_policy.installation_script()` is offline generation of replacements for
+three EXISTING functions: ingestion_register_bolton_exception,
+ingestion_bolton_allowed and ingestion_worker_step. The original policy-v6
+registration branch remains text-identical. One EXECUTE privilege is added for
+the existing ingestion_worker role on the existing registration function; its
+historical owner branch still requires ingestion_barrier_releaser. No new role,
+table, queue, index or unrestricted SQL interface is introduced.
+
+Owner.register_intake_period performs inventory verification and a narrowly
+scoped owner-only period authorisation, revoking its temporary capability and
+reading it back. Runtime holds ONLY existing restricted worker/effect URLs.
+The owner never passes its connector or administrative credential to runtime.
+
+The trusted SQL boundary requires:
+- no active global/manual stop and no unresolved SOURCE_INTENT/WRITE_INTENT or
+  PERSISTENCE_UNCERTAIN work at period issuance; no stop is cleared or excepted;
+- a unique period name, code/workflow/file-manifest binding, frozen screening
+  configuration, qualified contract identities, a route and reviewed IPv4;
+- expiry <=7 days, max_runs an integer 1..7, London-completed-day derivation
+  (end=yesterday, start=end-6), and one source capture per allowed council/day;
+- at most73 bound keys per scope, no factual/admission tasks, source_calls=1 for
+  capture and0 for screening, writes=0, finite work limits and <=30-minute grants;
+- exact immutable capture dependencies and runtime identities. Existing named
+  historical allowances keep their historical definitions and consumption state.
+
+Runtime verifies the coherent installed function hashes, owner/search_path and
+security-definer flags. A source-free metered control reader polls during owned
+collection every2s; its bounded database wait runs outside the source supervisor
+loop. A stop/access/inventory change cancels the owned source; no retry/fallback.
+It also checks before archive publication. A STOP file in the output directory
+is an attended stop; it prevents new work while preserving protected closure.
+Ctrl+C is also terminal. Unknown/broken/uncertain closure is not a contained error.
+
+### Failure settlement and overlap
+
+Recognised contained failures are currently only fully accounted, positively
+closed Idox HTTP429/503, with exact council/window identity. The original audit
+is durably archived and a trusted effect-broker operation settles the existing
+item/attempt as DEFERRED with a one-hour council pause. The source allowance
+remains consumed and is invalidated; DEFERRED does not permit replay. Unrelated
+councils may continue. Unknown source errors, shared access/persistence failure,
+uncertain acknowledgement or required publication failure stop the run.
+No partial-observation screening is enabled or generalised.
+
+Complete-capture screening retains the accepted observation-bound revision:
+observation_revision(assessment_identity(record,rule)[3],digest(capture)). New
+observations retain their own parent/provenance; same-root delivery does not
+refetch. Historical keys/default worker modes remain valid. Duplicate completed
+daily invocation reads existing evidence and does not issue work, recollect or
+publish another remote result. Interrupted attempted work remains reconcile-only.
+
+Manchester's existing qualified exact-zero UI result can be retained through an
+explicit intake opt-in, without creating screening children. Historical default
+empty-window refusal is preserved. Tameside zero-result markup has NOT acquired
+new qualification: unrecognised empty/error pages still stop rather than becoming
+complete coverage. Raw partial evidence can remain archived, never a full-window
+pass. Current intake does not wait for historical catch-up and never advances a
+complete-coverage watermark across incomplete windows.
+
+### Backlog and later consumers
+
+`--backlog --page-size N [--after CURSOR]` uses the existing restricted SELECT
+access, primary-key cursor, <=3 roots/page and <=60 records/root. It needs no list
+of historical keys. Captures, including qualified zero, failures, provenance and
+screening state are visible across runs. Overflow/duplicate assessments refuse,
+not silently truncate a conclusion. `more`/next_cursor expose additional pages.
+New insertions behind a cursor are seen on the next scan; a page is not a frozen
+whole-database snapshot. Existing 4096-item/32MiB ledger ceilings still apply.
+No schema/index/access change is required for this bounded slice.
+
+Expired collection authority does not block read-only backlog inspection. The
+read command explicitly begins READ ONLY, rolls back and closes. It never issues
+an authority or makes a source/publication call. Completion of SCREENING is not
+completion of downstream processing: cross-run records report downstream state
+NOT_TRACKED_BY_INTAKE, with admission/extraction completion unknown, not invented.
+
+Retained records supply exact council/reference, source URL/key, literal field
+states, source/capture/config hashes, observed time and archive provenance. They
+remain usable by existing nomination. Fresh detail evidence/qualification is
+still required before admission/B2. execute_retained_v3 currently expects the
+unbound assessment revision: later adaptation must validate the shared wrapped
+revision and its capture dependency consistently in the stored screen, nominee
+and batch binding. Do not merely remove its revision checks. No admission or
+extraction consumer is implemented here.
+
+The accepted refresh specification below stays deferred and uses the same shared
+identity/dependency resolution. It must separately implement verified unchanged
+assessment reuse; repeated deterministic intake screening is not an AI consumer.
+Retained-only refresh must not create an Application. Decided-record monitoring
+and same-URL document revisions remain deferred; ten checks is acceptance only.
+
+## One run envelope (proposed for REVIEW, not production allowance)
+
+Across both councils and ALL stages, including issuer/control/catalogue reads:
+90 source requests;23,971,520 mixed-accounting source bytes;120 worker seconds;
+150 source-supervision seconds;2080 driver statements;80 database connection
+attempts INCLUDING at most8 auxiliary cancel requests;8MiB returned values;
+80 GitHub calls;2MiB combined exported evidence;960s active wall ceiling.
+No allowance resets between councils or deliveries. The existing restricted
+DatabaseBudget lowers each phase's cap and carries cumulative cancellation use.
+The existing GitHub publisher refuses uncertain mutations and never force-updates.
+
+Before source work, a whole supported scope must fit the remaining aggregate.
+Protected closure reserves are32 statements,4 normal connections,20 GitHub calls,
+768KiB export and180s wall; remaining auxiliary cancel connections stay inside
+80, not on top. Work cannot borrow these reserves. Source monitors keep the
+existing Idox envelope and opt into the existing BROWSER_SOURCE_V2 envelope for
+Arcus (75s/1.5GiB source tree). The acceptance container ceiling is2GiB; actual
+Render peak/controller/browser and platform termination remain to be measured.
+The outer GNU timeout sends INT at960s and KILL5s later if necessary;965s is the
+outer kill ceiling, not extra processing time. Closure uncertainty is a stop,
+never a continuation or automatic retry. Source/driver/GitHub accounting units
+remain separate, not falsely equated to wire traffic.
+
+## Reproducible disposable validation
+
+Existing hosted workflow job daily-intake-pg uses its fixed loopback PostgreSQL17
+service and existing pinned test requirements:
+
+    python -m pytest tests/test_daily_intake.py tests/test_daily_intake_limits.py tests/test_daily_intake_pg.py tests/test_daily_intake_runtime.py -q
+
+The runtime test installs only into disposable PG, verifies the actual owner
+period method, and invokes the real authorised command as a subprocess:
+
+    timeout --signal=INT --kill-after=5s 960s python -m scripts.run_daily_councils --period TEST_PERIOD --output FRESH_TEST_OUTPUT --disposable-sources FIXTURE_AUDIT_DIRECTORY --disposable-archive TEST_ARCHIVE_DIRECTORY
+
+The harness creates those prerequisites; this command does not bootstrap an
+arbitrary database or self-authorise a period. The two disposable switches are
+refused outside the exact loopback test database/test-evidence period. Source
+fixtures exercise existing parsers/qualification and run in credential-free owned
+processes; they are NOT live council/browser/Render acceptance. Daily rows and
+grants go through the actual SQL issuer, not fixture INSERTs. Application-table
+snapshots, connection closure, consumption, failure settlement and cross-run
+pagination are checked. Hosted logs/artifacts preserve failed candidates and
+corrections; the final PR report identifies which candidate each result tested.
+
+## INACTIVE actual-Render acceptance proposal
+
+Read-only service metadata checked29October2026: existing daily service
+crn-d9sv93vavr4c73f98rb0 remains suspended, autoDeploy off, startCommand /bin/true.
+No settings were changed. Use a ONE-OFF JOB based on its reviewed successful
+build, not cron Trigger Run and not recurring activation. Current Render docs:
+https://render.com/docs/one-off-jobs and
+https://api-docs.render.com/reference/post-job . One-off jobs snapshot the base
+service's latest successful build/environment; verify that build's exact commit
+BEFORE creating a job. No new service or workflow system is required.
+
+Prerequisites needing separate production authority/evidence:
+1. REVIEW accepts final code/checks, exact policy/worker fingerprints and this
+   initial two-council envelope. Integrate/build the exact candidate through the
+   established workflow while leaving the cron suspended/no-op.
+2. Existing production provider/recovery/access gate is satisfied. The PR205
+   search_path correction is not silently imported and fixtures do not resolve
+   that gate. Historical originals/failed operations are never rerun.
+3. Approved installation of the three existing function replacements and the one
+   EXECUTE privilege; separately qualified restricted worker/effect credentials,
+   reviewed CA/IPv4/route and authentic source-qualification hashes. No application
+   or administrative database credential is present in the intake environment.
+4. Existing named machine launch policy permits launch:run_daily_councils. The
+   reviewed build provides pinned Python/PG/browser dependencies, GNU timeout,
+   gh and the existing secure GitHub evidence-publication input. Remove inherited
+   legacy administrative/Application/AI credentials from THIS intake environment
+   only under explicit settings authority; runtime refuses them, never uses them.
+5. Owner authorises ONE period: max_runs=1, <=1-hour expiry, Tameside+Manchester,
+   rolling seven-day London windows, exact execution/config/source bindings and
+   reviewed route/IP. This is not prepared/issued by this document. Start with at
+   least960s of authority remaining. No additional daily owner permit is required
+   within a later explicitly accepted recurring period (at most7days/7dated runs).
+
+After those permissions, the proposed one-off API operation is:
+POST /v1/services/crn-d9sv93vavr4c73f98rb0/jobs with fields
+planId=plan-crn-005 (2GB cron-job plan) and startCommand:
+
+    timeout --signal=INT --kill-after=5s 960s python -u -m scripts.run_daily_councils --period REVIEW_APPROVED_PERIOD --hostaddr REVIEWED_IPV4 --output /tmp/propertyaigent-intake-UNIQUE_RUN
+
+REVIEW_APPROVED_PERIOD, REVIEWED_IPV4 and UNIQUE_RUN are release-time bindings,
+not active values. Restricted URLs and GitHub input stay in the existing secure
+route, never arguments/chat. The base cron remains suspended. Do not create the
+job now, do not Trigger Run, and never retry an attempted/uncertain job.
+
+Acceptance: source/adaptor provenance and truthful incomplete status; durable
+archive/path readback before capture completion; screening/backlog visibility;
+zero Application/document/AI/opportunity writes; measured whole-run usage inside
+all ceilings; owned-source and database-client closure; committed authority
+invalidation; required publication verified; Render job terminal status and peak
+memory/log evidence inspected independently. MATCH of fixture paths is not live
+acceptance. Any shared/uncertain failure or overflow is STOP_RECONCILE_NO_RETRY.
+Retain original JSON/events and immutable archive hashes. No cleanup, grants,
+stop clearing, admission or processing follows acceptance automatically.
+
+---
+
+## Historical checkpoints and accepted refresh specification
+
+The following records preserve earlier partial delivery and its accepted refresh
+specification. Their intake blocker/status statements are historical; use the
+current section and final PR handoff above for the release candidate.
+
 # Minimal daily intake — INACTIVE, corrections required
 
 ## Continuation checkpoint — 29 October 2026
