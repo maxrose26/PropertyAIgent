@@ -114,6 +114,11 @@ class InstalledReuse(Transition):
         if g!=wanted_g or a!=wanted_a:raise Denied('OLDHAM_REUSE_HISTORICAL_BINDING')
         if self.expected[0]['expires_at']>=time.time():raise Denied('OLDHAM_REUSE_AUTHORITY_NOT_EXPIRED')
 
+    def historical_work(self,c):
+        wanted=self.expected[1]['package']['registration']['rows']
+        rows=self.o.q(c,"SELECT row_to_json(w) FROM public.ingestion_work_items w WHERE key=ANY(%s) ORDER BY key",(self.expected[0]['keys'],))
+        if [r[0] for r in rows]!=sorted(wanted,key=lambda r:r['key']):raise Denied('OLDHAM_REUSE_HISTORICAL_WORK_CHANGED')
+
     def run(self):
         o=self.o;self.op.stage='INSTALLED_POLICY_CLEANUP'
         self.op.result['historical_cleanup']=dict(authority=AUTHORITY,status='NOT_ATTEMPTED')
@@ -134,7 +139,7 @@ class InstalledReuse(Transition):
                 o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
                 ctl=o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE")[0][0]
                 self.expected=expected_historical(o,c)
-                self.historical(ctl,cleaned=False);self.barriers(c)
+                self.historical(ctl,cleaned=False);self.historical_work(c);self.barriers(c)
                 # Expected residual membership is still present: all effective
                 # activation conditions are observed before cleanup or new authority.
                 self.life.gate(c,inside_transaction=True)
@@ -151,7 +156,7 @@ class InstalledReuse(Transition):
                 self.capabilities_absent(c);self.inventory(c);self.access(c,residual=False)
                 o.q(c,'BEGIN',effect=True);o.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
                 actual=o.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")[0][0]
-                self.historical(actual,cleaned=True)
+                self.historical(actual,cleaned=True);self.historical_work(c)
                 if actual!=ctl:raise Uncertain('OLDHAM_REUSE_CONTROL_READBACK')
                 o.require_control_sha256=digest(actual);self.barriers(c)
                 # Validate the expected effective rights with memberships restored

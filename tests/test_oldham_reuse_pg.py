@@ -6,14 +6,28 @@ from tests.e2e_pg_world import settings
 from tests.oldham_wrapper_fixture import packet
 RESULTS=[]
 
+def test_reconciled_disposable_setup_is_not_an_opaque_runner_failure(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    from tests.oldham_wrapper_fixture import Backend
+    settings()
+    path,_=packet(tmp_path/'setup',records=5,nominees=0,single_page=True,accept=monkeypatch,reuse=True,tag='reuse_setup')
+    monkeypatch.setenv('OLDHAM_WRAPPER_SCENARIO','reuse_zero')
+    backend=Backend(path)
+    try:
+        backend.prepare('DISPOSABLE_FIXTURE_INPUT_ONLY',SimpleNamespace())
+        assert backend.world['boot'].execute("SELECT count(*) FROM pg_roles WHERE rolname='ingestion_recovery_login'").fetchone()[0]==0
+        assert backend.names=={'DATABASE_URL'}
+    finally:backend.close()
+
+
 @pytest.mark.parametrize('scenario,success',[
  ('reuse_zero',True),('reuse_nominee',True),('reuse_policy',False),('reuse_metadata',False),
- ('reuse_counter',False),('reuse_target',False),('reuse_settings',False),('reuse_secret',False),('reuse_stop',False),('reuse_barrier',False),
+ ('reuse_work',False),('reuse_counter',False),('reuse_target',False),('reuse_settings',False),('reuse_secret',False),('reuse_stop',False),('reuse_barrier',False),
  ('reuse_revoked',False),('reuse_cleanup_ack',False),('reuse_cleanup_readback',False),
 ])
 def test_actual_installed_successor(tmp_path,monkeypatch,scenario,success):
     settings()
-    path,h=packet(tmp_path/'inputs',records=5,nominees=int(scenario=='reuse_nominee'),single_page=True,accept=monkeypatch,reuse=True,tag=scenario)
+    path,h=packet(tmp_path/'inputs with spaces',records=5,nominees=int(scenario=='reuse_nominee'),single_page=True,accept=monkeypatch,reuse=True,tag=scenario)
     home=tmp_path/'home';home.mkdir()
     env={**os.environ,'HOME':str(home),'DATABASE_URL':'sqlite:///:memory:','PYTHONDONTWRITEBYTECODE':'1','OLDHAM_WRAPPER_SCENARIO':scenario}
     run=subprocess.run(['bash','docs/design/oldham-activation-correction-20261028/owner-run.sh',str(Path.cwd()),sys.executable,str(path),h,'--disposable-test'],env=env,capture_output=True,text=True,timeout=180)
@@ -25,6 +39,7 @@ def test_actual_installed_successor(tmp_path,monkeypatch,scenario,success):
     names=[e['event'] for e in events]
     assert 'oldham_install_committed' not in names and 'oldham_retirement_closed' not in names
     assert v['source_listing_requests']==0 and v['detail_attempts']==0
+    assert v['accounting']['administration'] is not None,(v,run.stderr[-2000:])
     assert v['accounting']['administration']['commands']<=240 and v['accounting']['administration']['connections']<=13
     assert 'INGESTION_APPLICATION_DATABASE_URL' not in (root/'events.jsonl').read_text()
     if success:

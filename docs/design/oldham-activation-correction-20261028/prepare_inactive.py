@@ -1,11 +1,17 @@
 """Local, inactive preparation only. No DB/GitHub, credentials or expiry rendering."""
-import argparse,hashlib,json,os,re,shutil,subprocess,sys
+import argparse,hashlib,json,os,re,shutil,subprocess,sys,stat
 from pathlib import Path
+
+
+def checked_file(path,bound):
+    mode=path.lstat()
+    if path.is_symlink() or not stat.S_ISREG(mode.st_mode) or mode.st_size>bound:raise SystemExit('STOP: INPUT_FILE_BOUND')
+    return mode
 
 
 def main(argv=None):
     a=argparse.ArgumentParser();a.add_argument('--checkout',type=Path,required=True);a.add_argument('--assets',type=Path,required=True);a.add_argument('--original-result',type=Path,required=True);a.add_argument('--original-audit',type=Path,required=True);a.add_argument('--reconciliation',type=Path,required=True);a.add_argument('--output',type=Path,required=True);a.add_argument('--evidence-head',required=True);a.add_argument('--release-id',required=True);x=a.parse_args(argv)
-    for key in ('checkout','assets','original_result','original_audit','reconciliation','output'):setattr(x,key,getattr(x,key).resolve())
+    for key in ('checkout','assets','original_result','original_audit','reconciliation','output'):setattr(x,key,getattr(x,key).absolute())
     os.umask(0o077);os.chdir(x.checkout)
     sys.path.insert(0,str(x.checkout.resolve()))
     from verification.ingestion_storage import oldham_owner_package as pkg,oldham_reuse as r
@@ -15,13 +21,13 @@ def main(argv=None):
     if not re.fullmatch('oldham-owner-[a-z0-9-]{1,60}',x.release_id) or x.release_id==r.FAILED_RELEASE:raise SystemExit('STOP: RELEASE_ID')
     # Files must all exist before creating the new preparation directory.
     paths={'failed_claim':x.assets/'failed-claim.json','original_result':x.original_result,'original_audit':x.original_audit,'reconciliation':x.reconciliation}
-    for p in paths.values():
-        if p.is_symlink() or not p.is_file():raise SystemExit('STOP: REQUIRED_ORIGINAL_FILE_MISSING')
+    for key,p in paths.items():checked_file(p,r.FILES[key])
     claim=json.loads(paths['failed_claim'].read_bytes());p=claim['package']
     if claim['package_sha256']!=r.FAILED_PACKAGE or digest(p)!=r.FAILED_PACKAGE:raise SystemExit('STOP: FAILED_CLAIM_HASH')
     for key in ('source','outer','qualification'):
         f=x.assets/p[key]['name']
-        if not f.is_file() or pkg.sha(f.read_bytes())!=p[key]['sha256']:raise SystemExit('STOP: RETAINED_ASSET_HASH')
+        checked_file(f,{'source':512*1024,'outer':16*1024,'qualification':64*1024}[key])
+        if pkg.sha(f.read_bytes())!=p[key]['sha256']:raise SystemExit('STOP: RETAINED_ASSET_HASH')
     x.output.mkdir(mode=0o700,parents=False,exist_ok=False)
     descriptors={}
     for key,f in paths.items():

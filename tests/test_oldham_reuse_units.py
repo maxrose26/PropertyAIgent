@@ -71,3 +71,26 @@ def test_live_packet_guard_refuses_same_window_substitution(key):
     if key in ('source','outer','qualification'):fresh[key]['sha256']='b'*64
     else:fresh[key]='SUBSTITUTED'
     with pytest.raises(Denied,match='RETAINED_PACKET'):r.require_retained_packet(fresh,old)
+
+
+def test_inactive_preparation_enforces_existing_bounds_before_read(tmp_path):
+    import runpy
+    module=runpy.run_path('docs/design/oldham-activation-correction-20261028/prepare_inactive.py')
+    path=tmp_path/'oversized'
+    with path.open('wb') as f:f.truncate(1024**2+1)
+    with pytest.raises(SystemExit,match='INPUT_FILE_BOUND'):module['checked_file'](path,1024**2)
+    target=tmp_path/'link';target.symlink_to(path)
+    with pytest.raises(SystemExit,match='INPUT_FILE_BOUND'):module['checked_file'](target,2*1024**2)
+
+
+def test_actual_preparation_argument_flow_refuses_symlink(tmp_path,monkeypatch):
+    import runpy
+    from pathlib import Path
+    module=runpy.run_path('docs/design/oldham-activation-correction-20261028/prepare_inactive.py')
+    original=p.git;monkeypatch.setattr(p,'git',lambda *a:'' if a==('status','--porcelain') else original(*a))
+    assets=tmp_path/'assets';assets.mkdir();(assets/'failed-claim.json').write_text('{}')
+    target=tmp_path/'result.json';target.write_text('{}');link=tmp_path/'result-link.json';link.symlink_to(target)
+    out=tmp_path/'unused'
+    with pytest.raises(SystemExit,match='INPUT_FILE_BOUND'):
+        module['main'](['--checkout',str(Path.cwd()),'--assets',str(assets),'--original-result',str(link),'--original-audit',str(target),'--reconciliation',str(target),'--output',str(out),'--evidence-head','a'*40,'--release-id','oldham-owner-inactive-test'])
+    assert link.is_symlink() and not out.exists()

@@ -163,6 +163,8 @@ class Backend:
             from types import SimpleNamespace
             old_g,old_a=r.expected_historical(SimpleNamespace(q=lambda c,s,p:c.execute(s,p).fetchall()),b)
             ctl['grants'][r.AUTHORITY]=old_g;ctl['oldham_allowances']={r.AUTHORITY:old_a}
+            for row in old_a['package']['registration']['insert']:b.execute('INSERT INTO public.ingestion_work_items SELECT * FROM json_populate_record(NULL::public.ingestion_work_items,%s::json)',(json.dumps(row),))
+            if self.scenario=='reuse_work':b.execute("UPDATE public.ingestion_work_items SET checkpoint='{}'::json WHERE key=%s",(old_g['keys'][0],))
             if self.scenario=='reuse_counter':ctl['grants'][r.AUTHORITY]['source_calls']=1
             if self.scenario=='reuse_target':ctl['oldham_allowances'][r.AUTHORITY]['package']['targets']={'unexpected':{}}
             if self.scenario=='reuse_barrier':b.execute("UPDATE ingestion_work_items SET phase='WRITE_INTENT' WHERE key=repeat('0',64)")
@@ -277,13 +279,14 @@ class Backend:
                 if self.scenario=='cs_self_grant':
                     row=boot.execute("SELECT admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member='provisioning_migrator'::regrole AND grantor='provisioning_migrator'::regrole").fetchone()
                     assert row==(False,False,False)
-            changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
-            if self.capture_screening_only:assert not changed and self.source_calls==0
-            else:assert changed<={'applications','application_lifecycle_events'}
+            if hasattr(self,'before'):
+                changed=set(changed_tables(self.before,snapshot(self.world['boot'])))
+                if self.capture_screening_only:assert not changed and self.source_calls==0
+                else:assert changed<={'applications','application_lifecycle_events'}
         if self.gen is not None:
             if self.reuse:
                 self.world['boot'].execute('DROP EXTENSION IF EXISTS pg_stat_statements CASCADE; DROP SCHEMA IF EXISTS extensions CASCADE')
-                self.world['boot'].execute('CREATE ROLE ingestion_recovery_login NOLOGIN') # fixture-only recreation for the unchanged harness teardown
+                if not self.world['boot'].execute("SELECT 1 FROM pg_roles WHERE rolname='ingestion_recovery_login'").fetchone():self.world['boot'].execute('CREATE ROLE ingestion_recovery_login NOLOGIN') # fixture-only recreation for the unchanged harness teardown
             try:next(self.gen)
             except StopIteration:pass
 
