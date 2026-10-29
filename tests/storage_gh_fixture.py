@@ -46,7 +46,7 @@ def real_gh_store(tmp_path,request):
     ciphertexts={'DATABASE_URL':b'disposable-preserved'} if operational else {}; requests=[]
     names={'INGESTION_WORKER_DATABASE_URL','INGESTION_STORAGE_DATABASE_URL'}
     if operational:names|={'INGESTION_EFFECT_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL'}
-    git_objects={};git_head=['1'*40]
+    artifact_state={};git_objects={};git_head=['1'*40]
     if operational:      # the initial evidence head (its tree is '2'*40, as the commit lookup below answers) contains the branch's README.md anchor, as the real evidence branch does
         anchor=b'disposable evidence branch anchor\n';anchor_sha=hashlib.sha1(b'blob '+str(len(anchor)).encode()+b'\0'+anchor).hexdigest()
         git_objects[anchor_sha]=dict(content=base64.b64encode(anchor).decode(),encoding='base64',sha=anchor_sha)
@@ -81,6 +81,7 @@ def real_gh_store(tmp_path,request):
             if method=='GET' and path=='/user':return self.answer(200,{'login':'maxrose26'})
             if method=='GET' and path==prefix+'/public-key':return self.answer(200,{'key_id':'disposable-key','key':base64.b64encode(pub).decode()})
             if method=='GET' and path==prefix:return self.answer(200,{'total_count':len(ciphertexts),'secrets':[{'name':n} for n in sorted(ciphertexts)]})
+            if operational and method=='GET' and '/compare/' in path:return self.answer(200,{'status':'identical','base_commit':{'sha':path.split('/compare/')[1].split('...')[0]}})
             contents='/repos/maxrose26/PropertyAIgent/contents/'
             if operational and method=='GET' and path.startswith(contents):
                 revision=parse_qs(urlsplit(self.path).query)['ref'][0]
@@ -88,6 +89,12 @@ def real_gh_store(tmp_path,request):
                 entry=next((x for x in tree if x['path']==path[len(contents):]),None)
                 if entry is None:return self.answer(404,{'message':'Not Found'})
                 return self.answer(200,git_objects[entry['sha']])
+            if operational and method=='GET' and '/actions/' in path and artifact_state:
+                if path.endswith('/artifacts'):return self.answer(200,{'artifacts':[artifact_state['artifact']]})
+                if path.endswith('/zip'):
+                    body=artifact_state['zip'];self.send_response(200);self.send_header('Content-Type','application/zip');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+                if '/actions/runs/' in path:return self.answer(200,artifact_state['run'])
+            if operational and method=='GET' and '/actions/workflows/stage4-oldham-standing.yml/runs' in path:return self.answer(200,{'workflow_runs':[]})
             git_prefix='/repos/maxrose26/PropertyAIgent/git/'
             if operational and path.startswith(git_prefix):
                 target=path[len(git_prefix):]
@@ -213,7 +220,7 @@ def real_gh_store(tmp_path,request):
             raise Stop('GH_FIXTURE_'+category)
         return result
     def metadata(command,seconds=10):return cli(command).stdout
-    metadata.cli=cli;metadata.fixture_env=fixture_env;metadata.gh=gh
+    metadata.cli=cli;metadata.fixture_env=fixture_env;metadata.gh=gh;metadata.git_objects=git_objects;metadata.git_head=git_head;metadata.artifact_state=artifact_state
     def secret(operation,name,value):
         from verification.ingestion_storage import credential_mapping as mapping
         if operation=='set':mapping.put_secret(name,value,runner=cli)

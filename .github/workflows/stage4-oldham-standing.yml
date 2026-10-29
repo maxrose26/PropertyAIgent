@@ -1,0 +1,88 @@
+# Dormant spec032 adapter. No dispatch/credential/provisioning authority is
+# established by merging this file. Owner issues exact Oldham batch grants.
+name: Stage4 Oldham standing restricted operation
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha: {required: true, type: string}
+      purpose:
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, QUALIFY_STANDING_ACCESS, CAPTURE_SCREENING]
+      claim_commit: {required: false, type: string}
+      release_id: {required: false, type: string}
+      manifest_sha256: {required: false, type: string}
+permissions: {contents: write}
+concurrency:
+  group: stage4-oldham-standing
+  cancel-in-progress: false
+jobs:
+  restricted:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Exact reviewed checkout and explicit purpose
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WF: ${{ github.workflow_sha }}
+          PURPOSE: ${{ inputs.purpose }}
+        run: |
+          set -euo pipefail
+          [[ "$PIN" =~ ^[a-f0-9]{40}$ && "$PIN" == "$GITHUB_SHA" && "$PIN" == "$WF" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$PURPOSE" == QUALIFY_STANDING_ACCESS || "$PURPOSE" == CAPTURE_SCREENING ]]
+          if [[ "$PURPOSE" == QUALIFY_STANDING_ACCESS ]]; then [[ "$GITHUB_RUN_NUMBER" == 1 ]]; fi
+      - uses: actions/checkout@v4
+        with: {ref: '${{ inputs.reviewed_sha }}', persist-credentials: false}
+      - name: Existing pinned dependencies, no production secrets
+        run: timeout --kill-after=2s 120s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/oldham-standing-venv"
+      - name: Restricted standing qualification, first approved invocation only
+        if: inputs.purpose == 'QUALIFY_STANDING_ACCESS'
+        env:
+          WORKER: ${{ secrets.INGESTION_WORKER_DATABASE_URL }}
+          EFFECT: ${{ secrets.INGESTION_EFFECT_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/oldham-standing"
+          printf '%s\n%s\n%s\n' unused-job-token "$WORKER" "$EFFECT" | env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s 345s sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" "$RUNNER_TEMP/oldham-standing-venv/bin/python" -I -B -c '
+          import json,os,sys
+          from pathlib import Path
+          sys.path.insert(0,os.getcwd())
+          from verification.ingestion_storage.standing_access import credentials
+          from verification.ingestion_storage.stable_qualification import Qualification,install_cancellation
+          from verification.ingestion_storage.operational_memory import OperationalMemory
+          from verification.ingestion_storage.operational_journal import Journal
+          from verification.ingestion_storage.operational_preparation import Progress,resolve_addresses
+          from verification.ingestion_storage.tls_trust import verified_trust
+          memory=OperationalMemory();install_cancellation();_,urls=credentials(sys.stdin.buffer)
+          journal=Journal(Path(sys.argv[1]));ca,_=verified_trust();address=resolve_addresses(Progress())
+          result=Qualification(urls,emit=journal.emit,ssl={"sslmode":"verify-full","sslrootcert":str(ca)},hostaddr=address,stop_file=journal.root/"STOP").run()
+          result["owned_cleanup"]=memory.close();result["purpose"]="OLDHAM_STANDING_QUALIFICATION_ONLY";result["grants_issued"]=0
+          journal.save("final-result.json",result)
+          print(json.dumps({k:result.get(k) for k in ("status","attempts_total","stop_reason")}))
+          raise SystemExit(0 if result["status"]=="STABLE_CREDENTIALS_QUALIFIED" and result["owned_cleanup"].get("owned_groups_removed") is True else 1)
+          ' "$RUNNER_TEMP/oldham-standing/out"
+      - name: Existing Oldham caller, standing secrets and finite owner-issued authority
+        if: inputs.purpose == 'CAPTURE_SCREENING'
+        env:
+          TOKEN: ${{ github.token }}
+          WORKER: ${{ secrets.INGESTION_WORKER_DATABASE_URL }}
+          EFFECT: ${{ secrets.INGESTION_EFFECT_DATABASE_URL }}
+          CLAIM: ${{ inputs.claim_commit }}
+          RELEASE: ${{ inputs.release_id }}
+          MANIFEST: ${{ inputs.manifest_sha256 }}
+          WF: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/oldham-standing"
+          ulimit -c 0; ulimit -n 128; ulimit -f 4096
+          printf '%s\n%s\n%s\n' "$TOKEN" "$WORKER" "$EFFECT" | env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_SHA="$GITHUB_SHA" GITHUB_WORKFLOW_SHA="$WF" GITHUB_REF="$GITHUB_REF" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_RUN_ID="$GITHUB_RUN_ID" OLDHAM_STANDING_AUTHORITY=OLDHAM_STANDING_CAPTURE_SCREENING_V1_OWNER_APPROVED timeout --kill-after=5s 480s sudo -E bash verification/ingestion_storage/hosted_memory_scope.sh "$(id -u)" "$(id -g)" "$RUNNER_TEMP/oldham-standing-venv/bin/python" -I -B -c 'import os,runpy,sys;sys.path.insert(0,os.getcwd());runpy.run_module("verification.ingestion_storage.oldham_standing_runtime",run_name="__main__")' --output "$RUNNER_TEMP/oldham-standing/out" --claim-commit "$CLAIM" --release-id "$RELEASE" --manifest-sha256 "$MANIFEST"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oldham-standing-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/oldham-standing/out
+          if-no-files-found: warn
+          retention-days: 30

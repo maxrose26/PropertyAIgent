@@ -41,7 +41,8 @@ class GitHub:
     def _admit(self):
         if self.reserve is not None and (self.requests>=self.reserve['limit'] or time.monotonic()>=self.reserve['deadline']):raise ValueError('GITHUB_PUBLICATION_RESERVE_EXHAUSTED')
 
-    def call(self,method,path,body=None):
+    def call(self,method,path,body=None,*,binary=False):
+        if binary and (method!='GET' or re.fullmatch(re.escape(REPO)+r'/actions/artifacts/[1-9][0-9]*/zip',path) is None):raise ValueError('ARTIFACT_DOWNLOAD_BOUNDARY')
         self.check()
         if method!='GET' and self.mutation_uncertain:raise Uncertain('PRIOR_GITHUB_MUTATION_UNCERTAIN')
         if self.requests>=self.bound:raise ValueError('GITHUB_REQUEST_BOUND')
@@ -58,6 +59,7 @@ class GitHub:
             if method=='DELETE':
                 if re.findall(rb'^HTTP/\S+\s+(\d{3})(?:\s|$)',r.stdout,re.M)!=[b'204']:raise Uncertain('DELETE_ACK_UNCERTAIN')
                 value=None
+            elif binary:value=r.stdout
             else:value=json.loads(r.stdout) if r.stdout else None
         except BaseException:
             if method!='GET':self.mutation_uncertain=True
