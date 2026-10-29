@@ -137,7 +137,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
         if worker:worker.join(timeout=125)
         assert not errors,errors
         assert worker is None or not worker.is_alive()
-        RESULTS.append(dict(scenario=scenario,owner=result,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs'],actual_loopback_http_requests=len(requests)-http_started))
+        RESULTS.append(dict(scenario=scenario,owner=result,hosted=None if child is None else json.loads((tmp_path/'runtime-output/final-result.json').read_text()),fixture_setup=w['setup_costs'],actual_loopback_http_requests=len(requests)-http_started,fixture_transport_initialization_requests=http_started))
         success=scenario in ('standing_success','standing_nominee','standing_delayed')
         if success:
             assert result['status']=='COMPLETED' and result['cleanup']=='CLOSED',result
@@ -178,6 +178,7 @@ def test_standing_provision_adapter(tmp_path,monkeypatch,real_gh_store,changed_p
         before=w['boot'].execute("SELECT encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('ingestion_worker_step','ingestion_oldham_allowed') ORDER BY p.proname").fetchall()
         o=Provisioner(op.config['connect'],op.journal.emit,lambda:None,identity=op.config['identity'],expiry=data['expiry'],bindings=op.owner.bindings)
         o.require_control_sha256=op.owner.require_control_sha256
+        http_started=len(requests) # fixture transport authenticates once before the operation
         g=StandingGitHub(op.journal.emit,lambda:None,runner=metadata.cli,bound=11)
         if changed_provider:
             with pytest.raises(Exception):o.install()
@@ -203,7 +204,7 @@ def test_standing_provision_adapter(tmp_path,monkeypatch,real_gh_store,changed_p
         after=w['boot'].execute("SELECT encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('ingestion_worker_step','ingestion_oldham_allowed') ORDER BY p.proname").fetchall()
         assert before==after
         assert not any(m=='DELETE' for m,_ in requests)
-        assert len(requests)==g.requests
+        assert len(requests)-http_started==g.requests
         assert o.opened==o.closed and not o.authorities
-        RESULTS.append(dict(scenario='standing_provision_changed_provider' if changed_provider else 'standing_provision_success',administration=o.accounting(),github_requests=g.requests,policy_unchanged=True,fixture_setup=w['setup_costs']))
+        RESULTS.append(dict(scenario='standing_provision_changed_provider' if changed_provider else 'standing_provision_success',administration=o.accounting(),github_requests=g.requests,actual_loopback_http_requests=len(requests)-http_started,fixture_transport_initialization_requests=http_started,policy_unchanged=True,fixture_setup=w['setup_costs']))
     finally:b.close()
