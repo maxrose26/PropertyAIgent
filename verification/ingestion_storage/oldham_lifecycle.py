@@ -42,8 +42,10 @@ def activation_gate(capture_screening_only=False):
 
 
 class Lifecycle:
-    def __init__(self,owner,github,*,capture_screening_only=False):
+    def __init__(self,owner,github,*,capture_screening_only=False,atomic_gate=False):
         if type(capture_screening_only) is not bool:raise Denied('OLDHAM_LIFECYCLE_MODE')
+        if type(atomic_gate) is not bool or atomic_gate and not capture_screening_only:raise Denied('OLDHAM_LIFECYCLE_MODE')
+        self.atomic_gate=atomic_gate
         self.capture_screening_only=capture_screening_only
         self.roles=dict(list(ROLES.items())[:2]) if capture_screening_only else dict(ROLES)
         self.secrets={r:SECRETS[r] for r in self.roles}
@@ -85,17 +87,9 @@ class Lifecycle:
                 if any(m[1]!=self.roles.get(m[0]) or tuple(m[2:])!=(False,True,False) for m in before['memberships']):raise Denied('OLDHAM_MEMBERSHIPS')
                 o.q(c,'BEGIN',effect=True)
                 for role,cap in self.roles.items():o.q(c,sql.SQL('GRANT {} TO {} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE').format(sql.Identifier(cap),sql.Identifier(role)),effect=True)
+                if self.atomic_gate:self.gate(c,inside_transaction=True)
                 o.q(c,'COMMIT',effect=True)
-                gate=activation_gate(self.capture_screening_only)
-                for q in split_sql(gate):
-                    try:o.q(c,q)
-                    except BaseException as exc:
-                        from .activation_boundary import fixed_gate_reason
-                        reason=fixed_gate_reason(exc)
-                        if reason is not None:
-                            o.emit('activation_gate_refused',dict(reason_code=reason,message_exported=False))
-                            raise Denied(reason) from None
-                        raise
+                if not self.atomic_gate:self.gate(c)
                 for role,name in self.secrets.items():
                     password=secrets.token_urlsafe(48)
                     verifier=c.pgconn.encrypt_password(password.encode(),role.encode(),algorithm=b'scram-sha-256').decode()
@@ -118,6 +112,21 @@ class Lifecycle:
             self.state='ACTIVE';return self.urls
         except BaseException:
             self.state='UNCERTAIN';raise
+    def gate(self,c,*,inside_transaction=False):
+        for q in split_sql(activation_gate(self.capture_screening_only)):
+            if inside_transaction:
+                import re
+                normalized=re.sub(r'(?m)^--[^\n]*\n','',q).strip().rstrip(';')
+                if normalized in ('BEGIN','ROLLBACK'):continue
+                if not normalized.startswith(('SET LOCAL ','DO $gate$')):raise Denied('OLDHAM_ACTIVATION_DERIVATION')
+            try:self.owner.q(c,q)
+            except BaseException as exc:
+                from .activation_boundary import fixed_gate_reason
+                reason=fixed_gate_reason(exc)
+                if reason is not None:
+                    self.owner.emit('activation_gate_refused',dict(reason_code=reason,message_exported=False))
+                    raise Denied(reason) from None
+                raise
     def teardown(self):
         with self.owner.admin_phase():return self._teardown()
     def _teardown(self):

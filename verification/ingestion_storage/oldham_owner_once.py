@@ -27,7 +27,8 @@ class Operation:
     """Thin orchestration only; policy, grants, writes, transport and supervision remain delegated."""
     def __init__(self,data,journal,memory,backend,*,started=None,command_started=None):
         self.data=data;self.p=data['package'];self.journal=journal;self.memory=memory;self.backend=backend
-        self.capture_screening_only=self.p['version']==pkg.VERSION_CAPTURE_SCREENING
+        self.capture_screening_only=self.p['version'] in pkg.CAPTURE_SCREENING_VERSIONS
+        self.installed_reuse=self.p['version']==pkg.VERSION_INSTALLED
         self.created=time.monotonic() if command_started is None else command_started;self.preflight_seconds=0;self.started=started;self.stage='PREFLIGHT';self.closing=False;self.published=0;self.publication='NOT_ATTEMPTED';self.claimed=False
         self.head=self.p['evidence_head'];self.directory='docs/design/ingestion-operational-execution-'+self.p['release_id']
         self.source_receipts=[];self.source_accounting='NOT_STARTED'
@@ -93,7 +94,7 @@ class Operation:
         self.owner.package_started=started
         self.owner.capture_screening_only=self.capture_screening_only
         self.owner.require_control_sha256=self.p.get('control_sha256')
-        self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only)
+        self.life=Lifecycle(self.owner,self.github,capture_screening_only=self.capture_screening_only,atomic_gate=self.installed_reuse)
         return self
 
     def owner_preflight(self):
@@ -140,11 +141,14 @@ class Operation:
             self.stage='DURABLE_CLAIM'
             claim=canonical(dict(package=self.p,package_sha256=self.data['sha256'],consumed=True))
             self.publish({'claim.json':claim},'claim');self.claimed=True
-            if self.capture_screening_only:
+            if self.installed_reuse:
+                from .oldham_reuse import InstalledReuse
+                InstalledReuse(self).run()
+            elif self.capture_screening_only:
                 self.stage='RETIREMENT_AND_INSTALLATION'
                 from .oldham_transition import Transition
                 Transition(self).run()
-            self.stage='OWNER_PREFLIGHT';self.owner_preflight()
+            if not self.installed_reuse:self.stage='OWNER_PREFLIGHT';self.owner_preflight()
             self.rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
             self.stage='CAPTURE_ISSUANCE';capture=self.issue('CAPTURE')
             self.stage='ACCESS_ACTIVATION'

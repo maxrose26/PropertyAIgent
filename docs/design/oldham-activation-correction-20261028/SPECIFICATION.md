@@ -35,3 +35,25 @@ Correct the diagnostic expectation; never ALTER the production function to fit i
 
 No activation, authority cleanup, policy install or fresh timed registration is
 part of this change. Cleanup and execution remain separate reviewed proposals.
+
+## Explicit installed-policy successor (29 October delta)
+
+`OLDHAM_CAPTURE_SCREENING_INSTALLED_V1` is a separate sealed package shape, never
+automatically selected. It uses only the exact installed Oldham inventory and
+post-retirement state. It binds original failed-result/audit and reconciliation
+files, exact consumed authority/registration and reviewed role settings. It neither
+calls Transition.retire nor Transition.install. The original mode is unchanged.
+
+One cumulative owner clock/allocation includes explicit historical cleanup,
+committed readback, fresh CAPTURE/SCREENING issuance, runtime and teardown.
+Historical cleanup expires only the exact grant, sets only its allowance revoked,
+removes only the two exact residual memberships and preserves history. Stored
+expiry is observed; expiry alone never substitutes for revocation. Unknown state,
+changed policy/stops/barriers, active sessions/secrets or uncertain effects refuse.
+No compensation or replay. Original files are hashed and mode-observed, not edited.
+
+Before any new work issuance, the gate validates the production-equivalent
+statistics objects, effective rights and recovery state with the expected runtime
+memberships. On cleanup readback those memberships are restored only in a rollback
+transaction for gate validation. Later activation restores and validates them in
+a single transaction before COMMIT, then mints credentials. No admission access.

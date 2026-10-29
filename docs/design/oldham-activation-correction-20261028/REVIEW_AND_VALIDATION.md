@@ -53,3 +53,18 @@ DO's declared record `a` (run40789118289, job123169623515). PostgreSQL interpret
 `recovery_session`; no condition or assertion removed. The full failed log and
 failed heads remain preserved. This is a correction defect, not the historical
 production failure's root cause.
+
+## Installed-policy reuse delta
+
+Reuses the same owner command, grants, writer-free capture/screening, accounting,
+publication and containment. Explicit cleanup derives the entire immutable old
+registration, compares the exact full unused grant/allowance and preserves history.
+Review corrected partial historical validation and same-window source substitution
+risks before the first hosted candidate for this delta.
+
+Local pure/ordering/input checks pass. Attempting existing supervised-child wrapper
+units locally reported LAUNCH_OR_ACCOUNTING_UNCERTAIN, no source output and
+uncertain supervisor accounting (73 passed,2 failed,9 fixture errors). No source or
+production operation occurred; no containment assertion was relaxed. Hosted PG17/
+real-cgroup command checks are required. Final results are in the PR/handoff,
+not inferred from these local fixtures.
