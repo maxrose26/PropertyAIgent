@@ -119,7 +119,7 @@ The predecessor SQL hash was
 `92385277d49eb36b20764af428d3000e2fc536d92682ad2e84e9f8423f7403a4`.
 The fixed executable profile removes SQL LIMIT clauses and adds identity/read-only
 validation; its SQL SHA256 is
-`4e29bbf12027270cbc0e7685b8b3488a31dde84c8fa1135024046f210cb7ba93`.
+`532842a74601f5f2d8bd4df60cf407aae7d618132abb2e6d7a546a958889fc6a`.
 NULL/missing/duplicate/extra/malformed evidence is never a match. False predicates
 identify current differences; a match is neither historical-cause proof nor full
 provider/recovery gate acceptance. Production blocker remains unresolved.

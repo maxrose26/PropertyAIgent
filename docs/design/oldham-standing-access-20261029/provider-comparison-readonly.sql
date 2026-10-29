@@ -20,7 +20,9 @@ SELECT w.name AS object,runtime.name AS role,c.oid IS NOT NULL AS present,
    AND d.refobjid=e.oid) AS extension_member,
  CASE WHEN r.oid IS NOT NULL AND c.oid IS NOT NULL THEN
   NOT has_table_privilege(r.oid,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN,SELECT WITH GRANT OPTION')
-  AND NOT has_any_column_privilege(r.oid,c.oid,'INSERT,UPDATE,REFERENCES,SELECT WITH GRANT OPTION') END AS no_forbidden_privileges,
+ END AS no_forbidden_table_privileges,
+ CASE WHEN r.oid IS NOT NULL AND c.oid IS NOT NULL THEN
+  NOT has_any_column_privilege(r.oid,c.oid,'INSERT,UPDATE,REFERENCES,SELECT WITH GRANT OPTION') END AS no_forbidden_column_privileges,
  CASE WHEN r.oid IS NOT NULL AND n.oid IS NOT NULL THEN
   NOT has_schema_privilege(r.oid,n.oid,'USAGE,CREATE') END AS schema_denied
 FROM wanted w CROSS JOIN runtime
@@ -35,14 +37,15 @@ WITH wanted(name,symbol,args,result,setof) AS (VALUES
  ('pg_stat_statements_reset','pg_stat_statements_reset_1_11','26 26 20 16',1184,false))
 SELECT w.name AS object,p.oid IS NOT NULL AS present,
  p.proowner=e.extowner AS extension_owner,p.proconfig IS NULL AS no_configuration,
- p.prokind='f' AND l.lanname='c' AND NOT p.prosecdef AS reviewed_function_kind,
+ p.prokind='f' AS reviewed_function_kind,l.lanname='c' AS reviewed_language,
+ NOT p.prosecdef AS no_security_definer,
  p.probin='$libdir/pg_stat_statements' AS reviewed_library,
- p.prosrc=w.symbol AND p.proargtypes::text=w.args
-   AND p.prorettype=w.result::oid AND p.proretset=w.setof AS reviewed_signature,
+ p.prosrc=w.symbol AS reviewed_symbol,p.proargtypes::text=w.args AS reviewed_arguments,
+ p.prorettype=w.result::oid AS reviewed_result,p.proretset=w.setof AS reviewed_setof,
  EXISTS(SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass
    AND d.objid=p.oid AND d.refclassid='pg_extension'::regclass
    AND d.refobjid=e.oid AND d.deptype='e') AS extension_member,
- e.extversion='1.11' AND en.nspname='extensions' AS reviewed_extension,
+ e.extversion='1.11' AS reviewed_extension_version,en.nspname='extensions' AS reviewed_extension_schema,
  (SELECT count(*) FROM pg_proc x WHERE x.pronamespace=n.oid AND x.proname=w.name) AS overload_count
 FROM wanted w LEFT JOIN pg_namespace n ON n.nspname='extensions'
 LEFT JOIN pg_proc p ON p.pronamespace=n.oid AND p.proname=w.name

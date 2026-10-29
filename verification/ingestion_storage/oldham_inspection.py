@@ -396,14 +396,14 @@ PROVIDER_STATUS='OWNER_APPROVED_OLDHAM_PROVIDER_COMPARISON_ONCE'
 PROVIDER_STATE='oldham-provider-comparison-once-20261029'
 PROVIDER_DIRECTORY='docs/design/oldham-provider-inspection-20261029'
 PROVIDER_SQL=Path('docs/design/oldham-standing-access-20261029/provider-comparison-readonly.sql')
-PROVIDER_SQL_SHA256='4e29bbf12027270cbc0e7685b8b3488a31dde84c8fa1135024046f210cb7ba93'
+PROVIDER_SQL_SHA256='532842a74601f5f2d8bd4df60cf407aae7d618132abb2e6d7a546a958889fc6a'
 PROVIDER_BOUND=dict(BOUND,driver_statements=16,planned_statements=7,returned_data_value_bytes=16384,
                     database_seconds=30,active_seconds=30,persisted_evidence_bytes=32768,terminal_json_bytes=32768)
 PROVIDER_TIMING=dict(input_seconds=120,active_seconds=30,work_seconds=22,diagnostic_seconds=3,report_seconds=5,outer_seconds=150)
 VIEW_HASHES={'pg_stat_statements':'ad1495ce5b4c54e4501e907a1f6aae8c','pg_stat_statements_info':'1807985dc152d2828720e1272d549775'}
 PROVIDER_FUNCTIONS=('pg_stat_statements','pg_stat_statements_info','pg_stat_statements_reset')
-VIEW_COLUMNS=('object','role','present','view_kind','no_options','view_hash','reviewed_definition','extension_owner','extension_member','no_forbidden_privileges','schema_denied')
-FUNCTION_COLUMNS=('object','present','extension_owner','no_configuration','reviewed_function_kind','reviewed_library','reviewed_signature','extension_member','reviewed_extension','overload_count')
+VIEW_COLUMNS=('object','role','present','view_kind','no_options','view_hash','reviewed_definition','extension_owner','extension_member','no_forbidden_table_privileges','no_forbidden_column_privileges','schema_denied')
+FUNCTION_COLUMNS=('object','present','extension_owner','no_configuration','reviewed_function_kind','reviewed_language','no_security_definer','reviewed_library','reviewed_symbol','reviewed_arguments','reviewed_result','reviewed_setof','extension_member','reviewed_extension_version','reviewed_extension_schema','overload_count')
 
 
 def provider_plan():
@@ -457,7 +457,7 @@ def evaluate_provider(views,functions):
                     incomplete.append(identity+':'+column);continue
                 observations.append(dict(object=identity,predicate=column,observed=value,expected=want))
                 if value!=want:mismatches.append(dict(object=identity,predicate=column,observed=value,expected=want))
-            if kind=='view' and d['no_forbidden_privileges'] is None:incomplete.append(identity+':ROLE_OR_PRIVILEGE_UNAVAILABLE')
+            if kind=='view' and d['no_forbidden_table_privileges'] is None or kind=='view' and d['no_forbidden_column_privileges'] is None:incomplete.append(identity+':ROLE_OR_PRIVILEGE_UNAVAILABLE')
         if seen!=expected:incomplete.append(kind+':MISSING_IDENTITY')
     status='INCOMPLETE' if incomplete else 'MISMATCH' if mismatches else 'MATCH'
     return dict(status=status,observations=observations,mismatches=mismatches,incomplete=sorted(set(incomplete)),

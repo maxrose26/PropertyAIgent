@@ -6,10 +6,11 @@ explicit `--provider-comparison` profile. It cannot accept SQL paths or queries.
 The historical inspection default, registration namespace and SQL remain intact.
 
 The profile binds `provider-comparison-readonly.sql` SHA256
-`4e29bbf12027270cbc0e7685b8b3488a31dde84c8fa1135024046f210cb7ba93`.
+`532842a74601f5f2d8bd4df60cf407aae7d618132abb2e6d7a546a958889fc6a`.
 It replaces the prepared predecessor hash
 `92385277d49eb36b20764af428d3000e2fc536d92682ad2e84e9f8423f7403a4`:
-identity/read-only state are now returned together and LIMIT clauses were removed.
+identity/read-only state are now returned together, LIMIT clauses were removed,
+and grouped function/privilege predicates are separately identified.
 No view definitions, statistics rows, function source or secrets are exported.
 
 ## Enforced route and limits

@@ -258,8 +258,8 @@ def test_the_reviewed_privilege_matrix_covers_seven_functions_and_four_tables_wi
 
 # Fixed provider profile: no production facts are supplied by these rows.
 def provider_rows():
-    views=[(v,r,True,True,True,h,True,True,True,True,True) for v,h in oi.VIEW_HASHES.items() for r in oi.RUNTIME_LOGINS[:2]]
-    functions=[(n,True,True,True,True,True,True,True,True,1) for n in oi.PROVIDER_FUNCTIONS]
+    views=[tuple(v if c=='object' else r if c=='role' else h if c=='view_hash' else True for c in oi.VIEW_COLUMNS) for v,h in oi.VIEW_HASHES.items() for r in oi.RUNTIME_LOGINS[:2]]
+    functions=[tuple(n if c=='object' else 1 if c=='overload_count' else True for c in oi.FUNCTION_COLUMNS) for n in oi.PROVIDER_FUNCTIONS]
     return views,functions
 
 
@@ -269,7 +269,7 @@ def test_provider_exact_match_is_scoped_and_never_continuation():
     assert got['historical_cause']=='NOT_ESTABLISHED'
 
 
-@pytest.mark.parametrize('kind,index', [('view',i) for i in (2,3,4,6,7,8,9,10)]+[('function',i) for i in range(1,9)])
+@pytest.mark.parametrize('kind,index', [('view',i) for i,c in enumerate(oi.VIEW_COLUMNS) if c not in ('object','role','view_hash')]+[('function',i) for i,c in enumerate(oi.FUNCTION_COLUMNS) if c not in ('object','overload_count')])
 def test_provider_each_false_predicate_is_identified(kind,index):
     views,functions=provider_rows();rows=views if kind=='view' else functions
     row=list(rows[0]);row[index]=False;rows[0]=tuple(row)
