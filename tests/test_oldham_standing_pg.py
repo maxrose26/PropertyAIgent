@@ -97,6 +97,11 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
             env.update(DATABASE_URL='sqlite:///:memory:',PYTHONDONTWRITEBYTECODE='1',INGESTION_ACCEPTANCE_DISPOSABLE='PG17_ONLY',GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',GITHUB_REF='refs/heads/master',GITHUB_SHA=p['revision'],GITHUB_WORKFLOW_SHA=p['revision'],GITHUB_RUN_ATTEMPT='1',GITHUB_RUN_NUMBER='1',GITHUB_RUN_ID='12345',OLDHAM_STANDING_AUTHORITY='OLDHAM_STANDING_CAPTURE_SCREENING_V1_OWNER_APPROVED')
             command=[sys.executable,'-I','-B','-c','import runpy,sys;sys.path.insert(0,sys.argv.pop(1));runpy.run_module("tests.oldham_standing_rehearsal",run_name="__main__")',str(Path.cwd()),str(f),'--output',str(out),'--claim-commit',payload['claim_commit'],'--release-id',p['release_id'],'--manifest-sha256',op.seal]
             metadata.artifact_state['run']=dict(head_sha=p['revision'],run_number=1,run_attempt=1,path='.github/workflows/stage4-oldham-standing.yml',status='in_progress',conclusion=None)
+            if os.environ.get('OLDHAM_STANDING_NATIVE')=='1':
+                # Reuse the reviewed exclusive operational scope for the actual
+                # restricted runtime child. The PG/HTTPS fixture parent stays
+                # outside, with no owner credential passed into this command.
+                command=['sudo','systemd-run','--scope','--unit=propertyaigent-operational-once','-p','Delegate=memory','-p','MemoryMax=1610612736','-p','MemorySwapMax=0','-p','OOMPolicy=kill','-p','RuntimeMaxSec=145s','bash','verification/ingestion_storage/operational_ci_scope.sh',str(os.getuid()),str(os.getgid()),'env','-i',*[k+'='+v for k,v in env.items()],*command]
             child=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
             urls={r:w['urls'][r] for r in prelim.life.roles}
             if scenario=='standing_wrong_identity':urls['ingestion_worker_login']=w['urls']['ingestion_application_login']
