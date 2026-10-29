@@ -120,6 +120,6 @@ def prepare_connection(r,raw,*,progress,dns_run=subprocess.run,dns_command=None,
         except ImportError:raise PreparationFailure('DRIVER_IMPORT','DRIVER_IMPORT_FAILED') from None
     def connect():
         progress.database_connection_calls+=1
-        options='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000' if provider_inspection else STARTUP_OPTIONS
+        options='-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000' if provider_inspection else STARTUP_OPTIONS
         return psycopg.connect(host=u.host,hostaddr=selected,port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(ca),connect_timeout=3,prepare_threshold=None,autocommit=True,options=options)
     return SimpleNamespace(route=u,ca=ca,hostaddr=selected,restricted_hostaddr=restricted_selected,connect=connect)

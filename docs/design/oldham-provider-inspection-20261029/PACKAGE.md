@@ -21,7 +21,8 @@ are reused. Destination: project `zcikcfgpblzuzpanpdqd`, session pooler
 No alternate destination, URL arguments, environment override or retry is allowed.
 
 - One connection attempt, no reconnect or cancellation connection.
-- Connection timeout3s. Startup options set default_transaction_read_only=on,
+- Connection timeout3s. Startup options pin search_path=pg_catalog and set
+  default_transaction_read_only=on,
   statement_timeout=5000, lock_timeout=1000, idle_in_transaction_session_timeout=5000.
   Fixed BEGIN READ ONLY and SET LOCAL statements independently retain the guards.
 - Existing session watchdog:30s active from credential-input completion, including

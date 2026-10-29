@@ -379,7 +379,7 @@ def test_provider_startup_settings_and_destination_are_fixed(monkeypatch):
     prep.prepare_connection(r,url,progress=Progress(),provider_inspection=True).connect()
     prep.prepare_connection(r,url,progress=Progress()).connect()
     assert seen[0]['connect_timeout']==3 and seen[0]['sslmode']=='verify-full'
-    assert seen[0]['options']=='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000'
+    assert seen[0]['options']=='-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000'
     assert seen[1]['options']==prep.STARTUP_OPTIONS
     assert seen[0]['host']=='aws-0-eu-west-2.pooler.supabase.com' and seen[0]['dbname']=='postgres'
 

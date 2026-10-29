@@ -301,7 +301,7 @@ def test_fixed_provider_profile_real_readonly_connection(world,tmp_path,timeout)
     try:
         def connect():
             c=psycopg.connect(**dict(info,user='postgres',password=password,connect_timeout=3),autocommit=True,prepare_threshold=None,
-                options='-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000')
+                options='-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=5000')
             holder['raw']=c
             rec=Recording(c,log)
             if timeout:
