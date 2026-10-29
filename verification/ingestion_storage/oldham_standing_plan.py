@@ -54,6 +54,7 @@ def validate_selection(value,*,inactive=False):
         state=value['standing']
         if not isinstance(state,dict) or set(state)!={'valid_until','state_sha256','qualification_sha256','credential_preparation_github_calls'}:raise Denied('OLDHAM_STANDING_QUALIFICATION_REQUIRED')
         if type(state['credential_preparation_github_calls']) is not int or not 0<=state['credential_preparation_github_calls']<=11:raise Denied('OLDHAM_STANDING_PREPARATION_ACCOUNTING')
+        if p['mode']=='LIVE' and state['credential_preparation_github_calls']!=11:raise Denied('OLDHAM_STANDING_PREPARATION_RESERVE')
         from .standing_access import valid_credential_lifetime
         valid_credential_lifetime(state['valid_until'],expiry)
         for k in ('state_sha256','qualification_sha256'):
@@ -61,15 +62,17 @@ def validate_selection(value,*,inactive=False):
     return p
 
 
-def public_claim(value,data,started_at):
+def public_claim(value,data,started_at,*,export=None):
     p=validate_selection(value);seal=digest(value);description=GrantDescription(p,seal)
     capture=derive(description,data['binding'],data['contract'],revision=p['revision'],item_limits=DEFAULT_LIMITS,phase='CAPTURE')
     return dict(version=VERSION,manifest=value,manifest_sha256=seal,inputs=dict(source=data['source'],slot=__import__('json').loads(data['slot_raw']),qualification=data['qualification']),
-                capture_registration=registration_value(capture),package_started_at=started_at)
+                capture_registration=registration_value(capture),package_started_at=started_at,export=export)
 
 
 def runtime_inputs(claim,*,disposable=False):
-    if not isinstance(claim,dict) or set(claim)!={'version','manifest','manifest_sha256','inputs','capture_registration','package_started_at'} or claim['version']!=VERSION:raise Denied('OLDHAM_STANDING_CLAIM')
+    if not isinstance(claim,dict) or set(claim)!={'version','manifest','manifest_sha256','inputs','capture_registration','package_started_at','export'} or claim['version']!=VERSION:raise Denied('OLDHAM_STANDING_CLAIM')
+    from .standing_access import validate_export_reservation
+    export=validate_export_reservation(claim['export'])
     value=claim['manifest'];p=validate_selection(value);seal=digest(value)
     if claim['manifest_sha256']!=seal or p['revision']!=pkg.git('rev-parse','HEAD') or p['tree']!=pkg.git('rev-parse','HEAD^{tree}') or pkg.git('status','--porcelain'):raise Denied('OLDHAM_STANDING_CHECKOUT')
     if p['dependencies']!=pkg.dependencies() or p['packages']!=pkg.packages():raise Denied('OLDHAM_STANDING_DEPENDENCIES')
@@ -96,4 +99,4 @@ def runtime_inputs(claim,*,disposable=False):
     if registration_value(capture)!=claim['capture_registration']:raise Denied('OLDHAM_STANDING_CAPTURE_REGISTRATION')
     start=datetime.fromisoformat(claim['package_started_at']);now=datetime.now(timezone.utc)
     if start.tzinfo is None or start>now or (now-start).total_seconds()>=450:raise Denied('OLDHAM_STANDING_ORIGINAL_CLOCK')
-    return dict(package=p,manifest=value,seal=seal,description=description,binding=binding,contract=contract,capture=capture,source=source,outer=outer,source_raw=canonical(source),started=start,rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False))
+    return dict(package=p,manifest=value,seal=seal,export=export,description=description,binding=binding,contract=contract,capture=capture,source=source,outer=outer,source_raw=canonical(source),started=start,rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False))

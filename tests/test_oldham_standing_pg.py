@@ -106,7 +106,7 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
                     raw=(out/'final-result.json').read_bytes();events=(out/'events.jsonl').read_bytes()
                     data_zip=io.BytesIO()
                     with zipfile.ZipFile(data_zip,'w',zipfile.ZIP_DEFLATED) as z:z.writestr('final-result.json',raw);z.writestr('events.jsonl',events)
-                    blob=data_zip.getvalue();metadata.artifact_state.update(run=dict(head_sha=p['revision'],run_number=1,run_attempt=1,path='.github/workflows/stage4-oldham-standing.yml',status='completed',conclusion='success' if child.returncode==0 else 'failure'),artifact=dict(id=1,name='oldham-standing-12345-'+p['revision'],expired=False,digest='sha256:'+hashlib.sha256(blob).hexdigest()),zip=blob)
+                    blob=data_zip.getvalue();metadata.artifact_state.update(run=dict(head_sha=p['revision'],run_number=1,run_attempt=1,path='.github/workflows/stage4-oldham-standing.yml',status='completed',conclusion='success' if child.returncode==0 else 'failure'),artifact=dict(id=1,name='oldham-standing-12345-'+p['revision'],expired=False,size_in_bytes=len(blob),digest='sha256:'+hashlib.sha256(blob).hexdigest()),zip=blob)
                     op._fixture_stdout=stdout;op._fixture_stderr=stderr
                 except BaseException as e:errors.append(repr(e))
             worker=threading.Thread(target=collect);worker.start()
@@ -125,7 +125,14 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
                 if part=='screening-authority':op.github.mutation_uncertain=True;raise ConnectionError('SYNTHETIC_ACK_LOSS')
                 return result
             op.publish=lost
+        original_failed=op.failed
+        def test_failed(exc):
+            import traceback
+            print('FIXTURE_FAILURE_STACK:',[(f.name,f.lineno) for f in traceback.extract_tb(exc.__traceback__)],flush=True)
+            return original_failed(exc)
+        op.failed=test_failed
         result=op.execute()
+        print('FIXTURE_RESULT:',json.dumps(result,sort_keys=True),flush=True)
         if worker:worker.join(timeout=125)
         assert not errors,errors
         assert worker is None or not worker.is_alive()
@@ -133,6 +140,8 @@ def test_standing_command(tmp_path,monkeypatch,real_gh_store,scenario):
         success=scenario in ('standing_success','standing_nominee','standing_delayed')
         if success:
             assert result['status']=='COMPLETED' and result['cleanup']=='CLOSED',result
+            sealed=json.loads((tmp_path/'runtime-output/final-result.json').read_text())
+            assert sealed['published_cleanup']==('PENDING_MEMORY_SCOPE_CLOSURE' if os.environ.get('OLDHAM_STANDING_NATIVE')=='1' else 'CLOSED')
             assert result['records']==5 and result['nominees']==int(scenario=='standing_nominee')
             assert result['authority_invalidation']=='VERIFIED' and result['credential_changes']==0
             assert result['accounting']['github']['combined']<=GITHUB['combined']

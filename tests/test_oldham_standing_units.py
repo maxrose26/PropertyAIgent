@@ -63,3 +63,52 @@ def test_publisher_cost_lower_bound_and_40_refusal():
     for _ in range(6):g.call('GET',REPO+'/git/ref/heads/'+BRANCH)
     with pytest.raises(ValueError,match='GITHUB_REQUEST_BOUND'):g.call('GET',REPO+'/git/ref/heads/'+BRANCH)
     assert g.requests==40
+
+
+def test_runtime_export_exact_bound_and_overflow_before_publication(tmp_path):
+    from verification.ingestion_storage.oldham_standing_runtime import StandingRunner
+    r=object.__new__(StandingRunner);r.journal=SimpleNamespace(root=tmp_path);r.published=123;r.export_limit=2*1024**2
+    (tmp_path/'events.jsonl').write_bytes(b'e'*17)
+    remaining=2*1024**2-128*1024-140
+    r.export_capacity(remaining)
+    with pytest.raises(Denied,match='RUNTIME_EXPORT_RESERVE'):r.export_capacity(remaining+1)
+    r.export_capacity(remaining-1,replacement=('events.jsonl',b'e'*18))
+    with pytest.raises(Denied):r.export_capacity(remaining,replacement=('events.jsonl',b'e'*18))
+
+
+def test_owner_artifact_capacity_exact_bound_and_overflow(tmp_path):
+    from verification.ingestion_storage.oldham_standing_owner import StandingOperation
+    r=object.__new__(StandingOperation);r.journal=SimpleNamespace(root=tmp_path);r.published=100;r.runtime_packet_bytes=100
+    (tmp_path/'events.jsonl').write_bytes(b'e'*10)
+    remaining=2*1024**2-8192-210
+    r.artifact_capacity(remaining)
+    with pytest.raises(Denied,match='ARTIFACT_EXPORT_RESERVE'):r.artifact_capacity(remaining+1)
+
+
+def test_whole_publication_leaves_call_reserve_before_effects():
+    from verification.ingestion_storage.standing_access import StandingGitHub
+    g=StandingGitHub(lambda *a:None,lambda:None,runner=lambda *a,**k:pytest.fail('must not call'),bound=18)
+    g.requests=11
+    with pytest.raises(Denied,match='CAPACITY_BEFORE_EFFECTS'):g.publish({'one':b'{}'},directory='docs/design/ingestion-operational-execution-test',expected_head='1'*40)
+    assert g.requests==11
+
+
+@pytest.mark.parametrize('uncertain,attempts,stage,expected',[(False,0,'CAPTURE_RECEIPT','VERIFIED'),(False,None,'CAPTURE_ISSUANCE','VERIFIED'),(False,None,'CAPTURE_RECEIPT','RECONCILIATION_REQUIRED_NO_AUTOMATIC_MUTATION'),(True,0,'CAPTURE_RECEIPT','RECONCILIATION_REQUIRED_NO_AUTOMATIC_MUTATION')])
+def test_failure_invalidation_only_for_certain_effects(uncertain,attempts,stage,expected):
+    from verification.ingestion_storage.oldham_standing_owner import StandingOperation
+    o=SimpleNamespace(authorities=['exact'],invalidation='REQUIRED',effect_uncertain=uncertain,awaiting_verification=False)
+    def revoke():o.invalidation='VERIFIED'
+    o.revoke=revoke
+    r=object.__new__(StandingOperation);r.owner=o;r.stage=stage;r.hosted={'database_connections_attempted':attempts};r.github=SimpleNamespace(mutation_uncertain=False)
+    assert r.failure_invalidation()==expected
+
+
+def test_shared_export_reservation_cannot_exceed_original_envelope():
+    for spent in (0,4096,500000):
+        r=a.export_reservation(spent)
+        assert a.validate_export_reservation(r)==r
+        assert r['owner_limit']+3*r['runtime_limit']+r['zip_overhead']<=2*1024**2
+        assert r['owner_limit']==spent+128*1024
+        bad=dict(r,runtime_limit=r['runtime_limit']+1)
+        with pytest.raises(Denied):a.validate_export_reservation(bad)
+    with pytest.raises(Denied):a.export_reservation(2*1024**2)

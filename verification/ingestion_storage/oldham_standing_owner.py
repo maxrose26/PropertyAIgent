@@ -51,7 +51,7 @@ class StandingOperation(Operation):
         self.rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         self.github=StandingGitHub(self.journal.emit,self.check,runner=self.github.runner,bound=GITHUB['owner_work'])
         self.github.requests=value['standing']['credential_preparation_github_calls']
-        self.hosted=None;self.standing_before=None;self.standing_verified=False;self.artifact_verified=False;self.runtime_packet_bytes=0
+        self.hosted=None;self.standing_before=None;self.standing_verified=False;self.artifact_verified=False;self.runtime_packet_bytes=0;self.runtime_copied_bytes=0;self.export_reservation=None
         self.namespace='docs/design/ingestion-operational-execution-'+self.p['release_id'];self.sleep=time.sleep
 
     def prepare(self,raw,started):
@@ -115,7 +115,9 @@ class StandingOperation(Operation):
             if blob is not None:self.head=head;return json.loads(blob_bytes(blob))
             if also_failure:
                 failed=self.github.probe(REPO+'/contents/'+self.namespace+'/completed/final-result.json?ref='+head)
-                if failed is not None:raise Uncertain('OLDHAM_STANDING_RUNTIME_ENDED_BEFORE_RETENTION')
+                if failed is not None:
+                    self.hosted=json.loads(blob_bytes(failed))
+                    raise Uncertain('OLDHAM_STANDING_RUNTIME_ENDED_BEFORE_RETENTION')
             if attempt+1<POLL_ATTEMPTS:self.sleep(POLL_SECONDS)
         raise Denied('OLDHAM_STANDING_MARKER_WAIT_EXHAUSTED')
 
@@ -154,8 +156,13 @@ class StandingOperation(Operation):
         items=self.github.call('GET',REPO+'/actions/runs/'+str(rid)+'/artifacts').get('artifacts',[])
         expected='oldham-standing-'+str(rid)+'-'+self.p['revision'];items=[a for a in items if a.get('name')==expected and not a.get('expired')]
         if len(items)!=1 or not re.fullmatch('sha256:[a-f0-9]{64}',items[0].get('digest','')):raise Uncertain('OLDHAM_STANDING_ARTIFACT_IDENTITY')
-        a=items[0];raw=self.github.call('GET',REPO+'/actions/artifacts/'+str(a['id'])+'/zip',binary=True)
-        if len(raw)>MAX_EXPORT or 'sha256:'+hashlib.sha256(raw).hexdigest()!=a['digest']:raise Uncertain('OLDHAM_STANDING_ARTIFACT_HASH')
+        a=items[0];declared=a.get('size_in_bytes')
+        if type(declared) is not int or declared<1:raise Uncertain('OLDHAM_STANDING_ARTIFACT_SIZE')
+        if declared>self.export_reservation['runtime_limit']+self.export_reservation['zip_overhead']:raise Denied('OLDHAM_STANDING_ARTIFACT_SIZE')
+        self.artifact_capacity(declared)
+        raw=self.github.call('GET',REPO+'/actions/artifacts/'+str(a['id'])+'/zip',binary=True)
+        self.runtime_packet_bytes+=len(raw) # Attempted intake counts even on hash/shape failure.
+        if len(raw)!=declared or len(raw)>MAX_EXPORT or 'sha256:'+hashlib.sha256(raw).hexdigest()!=a['digest']:raise Uncertain('OLDHAM_STANDING_ARTIFACT_HASH')
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
             names=z.namelist()
             if len(names)!=len(set(names)) or not {'events.jsonl','final-result.json'}<=set(names) or not set(names)<={'events.jsonl','final-result.json','progress.json'} or sum(i.file_size for i in z.infolist())>MAX_EXPORT:raise Uncertain('OLDHAM_STANDING_ARTIFACT_BOUND')
@@ -163,7 +170,6 @@ class StandingOperation(Operation):
         if sealed.get('records')!=5 or type(sealed.get('nominees')) is not int or not 0<=sealed['nominees']<=5 or any(sealed.get(k)!=0 for k in ('application_writes','source_observations_attempted','detail_requests','credential_changes')) or sealed.get('application_engine')!='NOT_CREATED':raise Uncertain('OLDHAM_STANDING_WRITE_CONFINEMENT')
         if sealed.get('execution')!=self.execution or sealed.get('published_status')!=published['status'] or sealed.get('cleanup')!='CLOSED' or sealed.get('publication')!='PUBLISHED' or type(sealed.get('accounting',{}).get('github_requests')) is not int or sealed['accounting']['github_requests']>GITHUB['runtime']:raise Uncertain('OLDHAM_STANDING_ARTIFACT_CLOSURE')
         # Existing finalise hashes the original persisted result, not terminal copy.
-        self.journal.save('runtime-final-result.json',sealed);self.journal.save('runtime-events.jsonl',events)
         previous='0'*64
         for line in events.splitlines():
             row=json.loads(line);observed=row.pop('sha256')
@@ -171,14 +177,38 @@ class StandingOperation(Operation):
             previous=observed
         persisted=sum(i.file_size for i in z.infolist())
         runtime_export=sealed_export(sealed,result_raw,events,persisted,previous)
+        if sealed.get('accounting',{}).get('export_reservation')!=self.export_reservation or runtime_export>self.export_reservation['runtime_limit'] or len(result_raw)+len(events)>self.export_reservation['runtime_limit']:raise Uncertain('OLDHAM_STANDING_RUNTIME_EXPORT_RESERVATION')
+        self.artifact_capacity(runtime_export+len(result_raw)+len(events))
+        self.runtime_packet_bytes+=runtime_export
+        self.runtime_copied_bytes+=len(result_raw)+len(events)
+        self.journal.save('runtime-final-result.json',sealed);self.journal.save('runtime-events.jsonl',events)
         self.result['runtime_exported_bytes']=runtime_export
-        self.runtime_packet_bytes=len(raw)+runtime_export
         self.artifact_verified=True;self.hosted=sealed;return sealed
+
+    def artifact_capacity(self,additional):
+        persisted=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
+        if self.runtime_packet_bytes+self.published+persisted+additional>MAX_EXPORT-8192:raise Denied('OLDHAM_STANDING_ARTIFACT_EXPORT_RESERVE')
+
+    def publish(self,files,part):
+        # Include runtime intake/export in the existing whole-publication check.
+        size=sum(map(len,files.values()));self.artifact_capacity(size)
+        if self.export_reservation is not None:
+            persisted=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
+            if self.published+persisted-self.runtime_copied_bytes+size>self.export_reservation['owner_limit']:raise Denied('OLDHAM_STANDING_OWNER_EXPORT_RESERVE')
+        return super().publish(files,part)
 
     def execute(self):
         try:
             self.preflight_standing()
             claim=plan.public_claim(self.selection,self.data,datetime.now(timezone.utc).isoformat())
+            from .standing_access import export_reservation
+            base=self.published+sum(f.stat().st_size for f in self.journal.root.rglob('*') if f.is_file())
+            for _ in range(10):
+                reserve=export_reservation(base+len(canonical(claim)))
+                if claim.get('export')==reserve:break
+                claim['export']=reserve
+            else:raise Denied('OLDHAM_STANDING_EXPORT_RESERVATION')
+            self.export_reservation=reserve
             self.execution=dict(revision=self.p['revision'],manifest_sha256=self.seal,capture_key=claim['capture_registration']['root_key'],initial_evidence_head=self.p['evidence_head'],authority=claim['capture_registration']['authority'])
             self.stage='DURABLE_CLAIM';self.publish({'claim.json':canonical(claim)},'claim');self.claimed=True
             self.stage='CAPTURE_ISSUANCE';capture=self.issue('CAPTURE')
@@ -210,19 +240,32 @@ class StandingOperation(Operation):
 
     def check(self):
         super().check()
-        if self.runtime_packet_bytes+self.published+sum(f.stat().st_size for f in self.journal.root.rglob('*') if f.is_file())>MAX_EXPORT-8192:raise Denied('OLDHAM_STANDING_COMBINED_EXPORT')
+        persisted=sum(f.stat().st_size for f in self.journal.root.rglob('*') if f.is_file())
+        if self.export_reservation is not None and self.published+persisted-self.runtime_copied_bytes>self.export_reservation['owner_limit']:raise Denied('OLDHAM_STANDING_OWNER_EXPORT_RESERVE')
+        if self.runtime_packet_bytes+self.published+persisted>MAX_EXPORT-8192:raise Denied('OLDHAM_STANDING_COMBINED_EXPORT')
 
     def accounting(self):
         value=super().accounting();runtime=(self.hosted or {}).get('accounting',{})
-        value.update(hosted=runtime,github=dict(owner=self.github.requests,hosted=runtime.get('github_requests'),combined=None if runtime.get('github_requests') is None else self.github.requests+runtime['github_requests'],maximum=GITHUB['combined']))
+        value.update(hosted=runtime,github=dict(owner=self.github.requests,hosted=runtime.get('github_requests'),combined=None if runtime.get('github_requests') is None else self.github.requests+runtime['github_requests'],maximum=GITHUB['combined'],owner_current_measured=self.github.requests-self.selection['standing']['credential_preparation_github_calls'],preparation=dict(value=self.selection['standing']['credential_preparation_github_calls'],basis='RESERVED_MAXIMUM_NOT_MEASURED'),combined_basis='MEASURED_CURRENT_PLUS_RESERVED_PREPARATION'))
         return value
 
     def failed(self,exc):
         from .connection_diagnostics import safe_failure,fixed_stop_reason
         self.closing=True;self.github.bound=GITHUB['owner'];self.result.update(status='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN',failure=dict(safe_failure(exc,'EXECUTION'),stage=self.stage,reason_code=fixed_stop_reason(exc) or 'UNKNOWN'),credentials='RETAINED_NO_AUTOMATIC_REVOCATION')
-        # Preserve uncertain effects; do not guess compensation/replay. Finite
-        # grants expire independently; explicit reconciliation remains required.
+        self.result['authority_invalidation']=self.failure_invalidation()
         return self.finish()
+
+    def failure_invalidation(self):
+        o=self.owner
+        if o is None or not o.authorities:return 'NOT_REQUIRED_NO_AUTHORITY'
+        if o.invalidation=='VERIFIED':return 'VERIFIED'
+        known_before_runtime=self.stage in ('STANDING_PREFLIGHT','DURABLE_CLAIM','CAPTURE_ISSUANCE')
+        known_no_runtime_effects=(self.hosted or {}).get('database_connections_attempted')==0
+        if o.effect_uncertain or o.awaiting_verification or self.github.mutation_uncertain or not (known_before_runtime or known_no_runtime_effects):return 'RECONCILIATION_REQUIRED_NO_AUTOMATIC_MUTATION'
+        try:
+            o.tearing_down=True;o.revoke()
+            return o.invalidation
+        except BaseException:return 'UNCERTAIN_RECONCILIATION_REQUIRED'
 
     def finish(self):
         if self.finished:return self.result
@@ -254,7 +297,9 @@ def validate_owner(path,expected,*,inactive=False,disposable=False):
         q=path.parent/'standing-qualification.json'
         if q.is_symlink() or not q.is_file() or q.stat().st_size>128*1024:raise Denied('OLDHAM_STANDING_QUALIFICATION_REQUIRED')
         qraw=q.read_bytes();qualified=json.loads(qraw)
-        if qualified.get('credential_preparation_github_calls')!=value['standing']['credential_preparation_github_calls']:raise Denied('OLDHAM_STANDING_PREPARATION_ACCOUNTING')
+        # The original qualification artifact is unchanged. Eleven preparation
+        # calls are conservatively reserved in the live manifest, never labelled
+        # measured; ordinary owner/runtime calls remain measured separately.
         if pkg.sha(qraw)!=value['standing']['qualification_sha256'] or qualified.get('status')!='STABLE_CREDENTIALS_QUALIFIED' or qualified.get('use_blocked') is not False or set(qualified.get('roles',{}))!={'ingestion_worker_login','ingestion_effect_login'} or any(r.get('qualified') is not True for r in qualified['roles'].values()) or qualified.get('accounting',{}).get('client_closure',{}).get('status')!='VERIFIED_FOR_EVERY_ATTEMPT':raise Denied('OLDHAM_STANDING_QUALIFICATION_REQUIRED')
     return data,value
 

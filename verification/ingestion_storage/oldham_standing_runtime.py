@@ -32,7 +32,7 @@ def admitted(env,data):
 class StandingRunner(HostedRunner):
     """Reuse standing publication/closure; no Bolton capture or screening path."""
     def __init__(self,data,urls,journal,github,*,memory,ssl,hostaddr=None,disposable=False,check_extra=None,sleep=time.sleep):
-        self.data=data;self.p=data['package'];self.journal=journal;self.emit=journal.emit;self.github=github;self.memory=memory;self.ssl=ssl;self.hostaddr=hostaddr
+        self.export_limit=data['export']['runtime_limit'];self.data=data;self.p=data['package'];self.journal=journal;self.emit=journal.emit;self.github=github;self.memory=memory;self.ssl=ssl;self.hostaddr=hostaddr
         self.started=time.monotonic();self.phase='admin';self.phase_started=self.started;self.admin_seconds=0;self.runtime_seconds=0;self.expiry=datetime.fromisoformat(self.p['expires_at'])
         self.deadlines=dict(job=450,diagnostic_total=480,diagnostic_window=30,admin_diagnostic=240,admin_pre=210,admin_total=240,runtime_total=300)
         self.operation_phase='INITIALISATION';self.diagnosing=False;self.baseline=owned_resources();self.closed=True;self.matrix=None
@@ -50,8 +50,17 @@ class StandingRunner(HostedRunner):
 
     def check(self):
         super().check()
+        self.export_capacity()
         if self.check_extra:self.check_extra()
         if not self.diagnosing:self.allocation.check()
+
+    def export_capacity(self,additional=0,*,replacement=None):
+        # Project local replacements and attempted publication before effects.
+        persisted=sum(p.stat().st_size for p in self.journal.root.rglob('*') if p.is_file())
+        if replacement is not None:
+            name,raw=replacement;prior=self.journal.root/name
+            persisted+=len(raw)-(prior.stat().st_size if prior.exists() else 0)
+        if self.published+persisted+additional>self.export_limit-128*1024:raise Denied('OLDHAM_STANDING_RUNTIME_EXPORT_RESERVE')
 
     def _phase_receipts(self):
         values=[]
@@ -97,7 +106,7 @@ class StandingRunner(HostedRunner):
         raise Denied('OLDHAM_STANDING_SCREEN_WAIT_EXHAUSTED')
 
     def accounting(self):
-        return dict(runtime=self.allocation.totals(),runtime_receipts=self.caller.accounting,github_requests=self.github.requests,credential_changes=0,source_requests=0,administrative_connections=0)
+        return dict(runtime=self.allocation.totals(),runtime_receipts=self.caller.accounting,github_requests=self.github.requests,credential_changes=0,source_requests=0,administrative_connections=0,export_reservation=self.data['export'])
 
     def run(self):
         try:
@@ -107,6 +116,7 @@ class StandingRunner(HostedRunner):
             after=owned_resources()
             if after['children'] or after['socket_fds']-self.baseline['socket_fds']:raise Uncertain('OLDHAM_STANDING_CAPTURE_PROCESS_CLOSURE')
             marker=dict(execution=self.execution,capture_sha256=digest(self.capture),phase_receipts=receipts,allocation=self.allocation.totals(),phase_closure=dict(children=0,new_sockets=0))
+            self.export_capacity(len(canonical(marker)))
             self.published+=len(canonical(marker))
             self.evidence_head=self.github.publish({'retained.json':canonical(marker)},directory=self.EVIDENCE+'/capture-retained',expected_head=self.evidence_head)
             root=dict(reg.rows[0],state='COMPLETE',checkpoint=self.capture)
@@ -128,8 +138,9 @@ class StandingRunner(HostedRunner):
 
 
     def publish_completed(self,result):
+        raw=canonical(result);files={'events.jsonl':self.journal.file.read_bytes(),'final-result.json':raw}
+        self.export_capacity(sum(map(len,files.values())),replacement=('final-result.json',raw))
         self.journal.save('final-result.json',result)
-        files={'events.jsonl':self.journal.file.read_bytes(),'final-result.json':canonical(result)}
         self.published+=sum(map(len,files.values()))
         self.evidence_head=self.github.publish(files,directory=self.EVIDENCE+'/completed',expected_head=self.head())
         return self.evidence_head

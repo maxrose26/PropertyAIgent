@@ -68,3 +68,22 @@ class StandingGitHub(GitHub):
         # BEFORE invoking it; failed acknowledgements remain an upper bound.
         self.requests+=1;self.emit('standing_secret_http_reservation',dict(name=name,http_calls=2,basis='RESERVED_UNTIL_ACK'))
         return super().put_secret(name,value)
+
+EXPORT_MAX=2*1024**2
+EXPORT_OWNER_RESERVE=128*1024
+EXPORT_ZIP_OVERHEAD=64*1024
+
+
+def export_reservation(owner_base):
+    # Partition the existing envelope; runtime original output, ZIP intake and
+    # copied members each fit the derived runtime share. No replenishment.
+    if type(owner_base) is not int or owner_base<0:raise Denied('STANDING_EXPORT_RESERVATION')
+    runtime=(EXPORT_MAX-owner_base-EXPORT_OWNER_RESERVE-EXPORT_ZIP_OVERHEAD)//3
+    if runtime<=EXPORT_OWNER_RESERVE:raise Denied('STANDING_EXPORT_CAPACITY_BEFORE_EFFECTS')
+    return dict(owner_limit=owner_base+EXPORT_OWNER_RESERVE,runtime_limit=runtime,zip_overhead=EXPORT_ZIP_OVERHEAD)
+
+
+def validate_export_reservation(value):
+    if not isinstance(value,dict) or set(value)!={'owner_limit','runtime_limit','zip_overhead'}:raise Denied('STANDING_EXPORT_RESERVATION')
+    if any(type(v) is not int for v in value.values()) or value!=export_reservation(value['owner_limit']-EXPORT_OWNER_RESERVE):raise Denied('STANDING_EXPORT_RESERVATION')
+    return value
