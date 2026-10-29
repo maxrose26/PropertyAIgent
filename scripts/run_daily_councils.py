@@ -451,7 +451,7 @@ def run_one_council(
 from app.security.cli import authorised_cli
 
 @authorised_cli('run_daily_councils')
-def main() -> int:
+def legacy_main() -> int:
     args = parse_args()
     # "[mem] orchestrator.start" (Render Daily Discovery missing-runtime-
     # logs diagnosis, Part 6) - deliberately BEFORE init_db()/the council
@@ -494,6 +494,18 @@ def main() -> int:
     )
 
     return _exit_code(healthy=success_count + partial_count, attempted=len(council_codes))
+
+
+@authorised_cli('run_daily_councils')
+def main() -> int:
+    """Intake-only scheduled boundary; no fallback to legacy application writes.
+
+    Live bootstrap remains held: existing grants cannot express the approved
+    rolling Render scope. Retain the callable intake connection for disposable
+    validation without inventing a credential/authority framework.
+    """
+    from app.ingestion.daily_intake import inactive_main
+    return inactive_main()
 
 
 def _exit_code(*, healthy: int, attempted: int) -> int:

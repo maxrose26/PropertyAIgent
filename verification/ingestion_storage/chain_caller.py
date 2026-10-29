@@ -39,7 +39,9 @@ class Admission:
 
 
 class ChainCaller:
-    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None, capture_screening_only=False):
+    def __init__(self, scope_binding, contract, rule, urls, *, revision, bindings, capture_authority, chain_authority, stop_file=None, allow_test_evidence=False, engine_options=None, capture_screening_only=False, intake_only=False):
+        if type(intake_only) is not bool:raise Denied('INTAKE_MODE')
+        self.intake_only=intake_only
         if type(capture_screening_only) is not bool:raise Denied('CAPTURE_SCREENING_MODE')
         if capture_screening_only and scope_binding.council!='oldham':raise Denied('CAPTURE_SCREENING_COUNCIL')
         self.capture_screening_only=capture_screening_only
@@ -61,7 +63,7 @@ class ChainCaller:
 
     def _coordinator(self, budget, authority, contracts):
         worker, broker = [budget.engine(self.urls[r],**self.engine_options) for r in ROLES[:2]]
-        app=None if self.capture_screening_only else budget.engine(self.urls[ROLES[2]],**self.engine_options)
+        app=None if self.capture_screening_only or self.intake_only else budget.engine(self.urls[ROLES[2]],**self.engine_options)
         ledger = ControllerLedger(worker, budget=budget, owner=WORKER, authority=authority, bindings=self.bindings, broker_engine=broker, application_engine=app)
         return Coordinator(ledger, contracts, screening_rules={V3_CONTRACT: self.rule})
 
@@ -71,7 +73,7 @@ class ChainCaller:
 
     def use(self, registration):
         """Adopt the prepared CHAIN registration (its bindings must already be the ones the authority was issued against)."""
-        if self.capture_screening_only and registration.kind!='SCREENING':raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
+        if (self.capture_screening_only or self.intake_only) and registration.kind!='SCREENING':raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
         if registration.kind not in ('CHAIN','SCREENING','ADMISSION') or registration.root_key != self.root_key:
             raise Denied('CHAIN_REGISTRATION_MISMATCH')
         self.registration = registration
@@ -100,15 +102,29 @@ class ChainCaller:
         finally:
             self.accounting['preflight'] = budget.close([])
 
-    def capture(self, source, outer, *, expected_source_sha256, evidence_label, archive):
+    def claim_intake_capture(self):
+        """Check the existing DB stop/authority before an externally permitted source.
+
+        This claims retention work only. It does NOT grant a source allowance;
+        the source release must separately journal and authorise collection.
+        """
+        if not self.intake_only or self.root_key is None or self.preflighted!=self.root_key:
+            raise Denied('INTAKE_PREFLIGHT_REQUIRED')
+        budget=self._budget(slot_key=self.root_key)
+        co=self._coordinator(budget,self.capture_authority,{self.contract.name:self.contract})
+        try:return co.ledger.claim(self.root_key,lease_seconds=LEASE_SECONDS)
+        finally:self.accounting['intake_claim']=budget.close([])
+
+    def capture(self, source, outer, *, expected_source_sha256, evidence_label, archive, observed_at=None, intake_claim=None):
         """Retained capture: validate, archive with verified readback, checkpoint, finish. No listing request, no source spend."""
         if self.root_key is None or self.preflighted != self.root_key:
             raise Denied('PREFLIGHT_REQUIRED')      # no capture is stored for a root whose limits were not reconciled first
         budget = self._budget(slot_key=self.root_key)
         co = self._coordinator(budget, self.capture_authority, {self.contract.name: self.contract})
         try:
-            claim = co.ledger.claim(self.root_key, lease_seconds=LEASE_SECONDS)
-            self.capture_receipt = co.retained_capture(claim, source, outer, archive, expected_source_sha256=expected_source_sha256, evidence_label=evidence_label)
+            if intake_claim is not None and (not self.intake_only or intake_claim.key!=self.root_key):raise Denied('INTAKE_CLAIM_BINDING')
+            claim = intake_claim if intake_claim is not None else co.ledger.claim(self.root_key, lease_seconds=LEASE_SECONDS)
+            self.capture_receipt = co.retained_capture(claim, source, outer, archive, expected_source_sha256=expected_source_sha256, evidence_label=evidence_label, observed_at=observed_at)
             return self.capture_receipt
         finally:
             self.accounting['capture'] = budget.close([])
@@ -126,6 +142,29 @@ class ChainCaller:
         check_capture(self.sb,self.contract,saved)
         self.capture_receipt = saved
         return saved
+
+    def read_intake_items(self, keys):
+        """Bounded read of explicitly bound intake items, including unfinished work.
+
+        No queue scan, claim, grant or application principal. Missing child rows
+        are returned as absent, never promoted to completed screening.
+        """
+        if not self.intake_only:raise Denied('INTAKE_MODE_REQUIRED')
+        keys=list(keys)
+        if not keys or len(keys)>73 or len(set(keys))!=len(keys):raise Denied('INTAKE_READ_BOUND')
+        budget=self._budget()
+        co=self._coordinator(budget,self.chain_authority if self.registration else self.capture_authority,self._contracts())
+        try:
+            if any(k not in co.ledger.bindings for k in keys):raise Denied('TASK_NOT_BOUND')
+            from sqlalchemy import select
+            from app.ingestion.schema import WorkItem
+            from app.ingestion.ledger import bounded
+            with co.ledger.worker_engine.begin() as connection:
+                co.ledger._limits(connection)
+                rows=[dict(r) for r in connection.execute(select(WorkItem).where(WorkItem.c.key.in_(keys)).order_by(WorkItem.c.key)).mappings()]
+            bounded(rows,2*1024**2)
+            return rows
+        finally:self.accounting.setdefault('intake_reads',[]).append(budget.close([]))
 
     def nominees(self, receipts=None):
         return derive_nominees([self.capture_receipt] if receipts is None else receipts, self.rule, allow_test_evidence=self.allow_test_evidence)
@@ -168,6 +207,7 @@ class ChainCaller:
             self.accounting.setdefault('reads', []).append(budget.close([]))
 
     def prepare(self, nominee):
+        if self.intake_only:raise Denied('INTAKE_NO_ADMISSION')
         if self.capture_screening_only:raise Denied('CAPTURE_SCREENING_NO_ADMISSION')
         """Everything one admission needs, built from the restricted ledger's retained state and the nominee: nothing is taken from the caller's memory of the capture."""
         reg, receipt = self.registration, self.capture_receipt

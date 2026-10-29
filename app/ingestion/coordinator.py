@@ -205,7 +205,7 @@ class Coordinator:
             self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
             raise
 
-    def retained_capture(self,claim,source,outer,archive,*,expected_source_sha256,evidence_label=None):
+    def retained_capture(self,claim,source,outer,archive,*,expected_source_sha256,evidence_label=None,observed_at=None):
         """Capture an already published audit WITHOUT another listing request: no source call is made and none is spent.
 
         Order: the exact contract validates and projects the audit first (a tampered or unqualified audit is never archived), the audit is then archived and read back
@@ -223,6 +223,10 @@ class Coordinator:
         if evidence_label is not None and (not isinstance(evidence_label,str) or not re.fullmatch('[A-Z0-9_]{1,64}',evidence_label)):raise Denied('EVIDENCE_LABEL')
         from .batching import archive_capture
         receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024)      # validate first: a tampered or unqualified audit is never archived
+        if observed_at is not None:
+            from datetime import datetime
+            if not isinstance(observed_at,str) or datetime.fromisoformat(observed_at).tzinfo is None:raise Denied('OBSERVATION_TIME_REQUIRED')
+            receipt['observed_at']=observed_at
         saved=archive_capture(source,archive)      # then archive with a verified readback, strictly before any checkpoint
         receipt.pop('window',None);receipt['durable_archive']=saved
         receipt.setdefault('date_semantics',contract.scope()['semantics'])      # a retained capture always states its date basis

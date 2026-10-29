@@ -4,6 +4,8 @@ on:
     paths:
       - 'docs/design/ingestion-provisioning-20261016/*.sql'
       - 'app/ingestion/**'
+      - 'scripts/run_daily_councils*.py'
+      - 'tests/test_daily_intake*.py'
       - 'verification/ingestion_storage/**'
       - '.github/workflows/stage4-ingestion-storage-catalogue-once.yml'
       - 'app/pipeline/discovery_*.py'
@@ -128,6 +130,36 @@ on:
 permissions:
   contents: read
 jobs:
+  daily-intake-pg:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: provisioning_bootstrap
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: ingestion_provisioning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U provisioning_bootstrap -d ingestion_provisioning_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/daily-intake-venv"
+      - name: Connected intake through production restricted ledger, synthetic sources only
+        env:
+          DATABASE_URL: sqlite:///:memory:
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake.py tests/test_daily_intake_pg.py -q --junitxml="$RUNNER_TEMP/daily-intake.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-intake-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/daily-intake.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
