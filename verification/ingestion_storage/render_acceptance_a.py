@@ -91,6 +91,18 @@ def worker(root, hold):
         context.close(); browser.close()
 
 
+def effective_profile(profile):
+    # Fixture-only convenience: read allocation inside the ONE A job, then
+    # pass an ordinary exact-byte profile to the unchanged validator/monitor.
+    # No plan-name inference and no additional discovery job.
+    profile = dict(profile)
+    if profile.get('aggregate_bytes') is None:
+        value = r.memory_sample(r.memory_group())['memory.max']
+        if type(value) is not int: raise RuntimeError('A_EFFECTIVE_ALLOCATION_UNAVAILABLE')
+        profile['aggregate_bytes'] = value
+    return profile
+
+
 def run(profile, root, emit):
     """Production seam also exercised with synthetic effects in unit tests."""
     r.validate_profile(profile, revision=os.environ.get('RENDER_GIT_COMMIT'))
@@ -128,7 +140,9 @@ def run(profile, root, emit):
             if (directory/'ready.json').stat().st_size > 8192: raise RuntimeError('A_PROOF_BOUND')
             observed = json.loads((directory/'ready.json').read_text())
         if phase != 'normal' or observed is None or result['exit_code'] != 0 or result['limit_hit'] or result['cleanup'] != 'CLOSED':
-            emit('PHASE_REFUSED', phase_name=phase, supervisor=result)
+            failure = directory/'worker-failure.json'
+            detail = json.loads(failure.read_text()) if failure.exists() and failure.stat().st_size <= 1024 else None
+            emit('PHASE_REFUSED', phase_name=phase, supervisor=result, worker_failure=detail)
             raise RuntimeError('A_PHASE_FAILED')
         for item in [observed['worker'], observed['orphan'], *observed['descendants']]:
             try:
@@ -149,7 +163,11 @@ def main(argv=None):
     if args.worker or args.orphan:
         if os.environ.get('INGESTION_SOURCE_PRIVATE') != 'ONCE': return 2
         if args.orphan: orphan(args.orphan)
-        else: worker(args.worker, args.hold)
+        else:
+            try: worker(args.worker, args.hold)
+            except Exception as exc:
+                (args.worker/'worker-failure.json').write_text(json.dumps(dict(phase='LOCAL_BROWSER_FIXTURE', error_type=type(exc).__name__)))
+                return 2
         return 0
     emit = Log()
     try:
@@ -159,7 +177,7 @@ def main(argv=None):
         if not re.fullmatch('[a-f0-9]{40}', os.environ.get('RENDER_GIT_COMMIT', '')): raise RuntimeError('A_REVISION_BINDING')
         if args.profile is None or args.output is None or args.hold: raise RuntimeError('A_ARGUMENTS')
         if args.profile.stat().st_size > 4096: raise RuntimeError('A_PROFILE_BOUND')
-        profile = json.loads(args.profile.read_text())
+        profile = effective_profile(json.loads(args.profile.read_text()))
         if (profile['source_rss_bytes'], profile['controller_rss_bytes'], profile['reserve_bytes'], profile['source_seconds']) != (1024*r.MiB,256*r.MiB,512*r.MiB,75):
             raise RuntimeError('A_FIXED_ACCEPTANCE_LIMITS')
         args.output.mkdir(mode=0o700)  # unique, no overwrite

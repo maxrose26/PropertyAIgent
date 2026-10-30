@@ -78,13 +78,13 @@ class M:
 a.r.MemoryMonitor=M
 original=a.supervise
 def supervise(command,**kw):
- worker="import sys;from verification.ingestion_storage import render_acceptance_a as a;a.r.source_context=lambda p:True;a.worker(sys.argv[1],sys.argv[2]=='True')"
+ worker="import sys;from verification.ingestion_storage import render_acceptance_a as a;a.r.source_context=lambda p:True;raise SystemExit(a.main(['--worker',sys.argv[1]]+(['--hold'] if sys.argv[2]=='True' else [])))"
  return original([sys.executable,'-c',worker,command[4],str('--hold' in command)],**kw)
 a.supervise=supervise
 raise SystemExit(a.main(sys.argv[1:]))
 '''
     if scenario=='timeout':
-        bootstrap=bootstrap.replace('a.r.MemoryMonitor=M', 'a.r.MemoryMonitor=M\na.PHASE_SECONDS=1').replace("a.worker(sys.argv[1],sys.argv[2]=='True')", 'import time;time.sleep(10)')
+        bootstrap=bootstrap.replace('a.r.MemoryMonitor=M', 'a.r.MemoryMonitor=M\na.PHASE_SECONDS=1').replace("raise SystemExit(a.main(['--worker',sys.argv[1]]+(['--hold'] if sys.argv[2]=='True' else [])))", 'import time;time.sleep(10)')
     env=dict(PATH='/usr/bin:/bin',HOME=str(tmp_path),RENDER_SERVICE_ID=a.r.SERVICE,RENDER_GIT_COMMIT='a'*40,PLAYWRIGHT_BROWSERS_PATH=cache)
     reaper=OwnedSubreaper()
     try:
@@ -100,3 +100,13 @@ raise SystemExit(a.main(sys.argv[1:]))
             assert phases[-1]=='REFUSED' and 'CONTROLLER_SIGKILL_INTENT' not in phases
             if scenario=='timeout':assert '"limit_hit": "DEADLINE"' in result.stdout
     finally:reaper.close()  # test teardown, never reported as Render evidence
+
+
+def test_effective_allocation_uses_readback_not_plan_label(tmp_path,monkeypatch):
+    p=profile(tmp_path);p['aggregate_bytes']=None
+    monkeypatch.setattr(a.r,'memory_group',lambda:tmp_path)
+    monkeypatch.setattr(a.r,'memory_sample',lambda _: {'memory.max':2000000000})
+    got=a.effective_profile(p)
+    assert got['aggregate_bytes']==2000000000 and p['aggregate_bytes'] is None
+    monkeypatch.setattr(a.r,'memory_sample',lambda _: {'memory.max':'max'})
+    with pytest.raises(RuntimeError,match='ALLOCATION_UNAVAILABLE'):a.effective_profile(p)
