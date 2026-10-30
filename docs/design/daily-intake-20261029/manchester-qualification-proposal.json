@@ -13,11 +13,20 @@
     "verification/discovery/screening_capture.py": "5e196279346b1948339fe6c455a902c2a1f09c5350bf24e265de0f4e6241dded"
   },
   "current_receipt_refusal": "SOURCE_BINDING",
+  "full_current_adapter_projection": {
+    "envelope": "UNCHANGED_HISTORICAL_CASE_AND_LIMITS",
+    "method": "ArcusListingContract.project",
+    "outer": "AUTHENTIC_RETAINED_RESULT_OUTER_SUPERVISOR",
+    "records": 14,
+    "result": "PASS_OFFLINE_ASSESSMENT_ONLY",
+    "segments": 2
+  },
   "historical_case": "discovery_manchester_screening_20261001_03",
   "historical_interval": [
     "2026-10-01",
     "2026-10-03"
   ],
+  "historical_result_sha256": "ab29ee32e0e3da1a7786f87bf3a62fb2d8ac691d70b488cf89f93062df67bf2e",
   "historical_revalidation": "PASS_CURRENT_VALIDATOR_ROW_REQUALIFICATION_AND_SEGMENT_HASHES",
   "historical_rows": 14,
   "limitations": [

@@ -100,5 +100,31 @@ The current daily contract still refuses the same bytes with SOURCE_BINDING.
 Recommend accepting the retained evidence as support for the metadata mechanism,
 subject to REVIEW of `manchester-qualification-proposal.json`; not as a current
 B execution receipt. Proposed contract `manchester-screening-metadata-v1`.
-Proposed qualification file SHA256: 50b69796aa1a8a118edc17a76d4ef169556407859ab5efc292529cbee67381e9.
+Proposed qualification file SHA256: 4c602866c0d6f388854e85c00d2ca2bd1244eaaca1aed059cc5a20bbdd537aa1.
 No new qualification is issued automatically; its explicit limitations remain.
+
+
+## Completed disposable validation and projection assessment
+
+SQL/client implementation head: `073509e47019391a9b1bedae4eafb6d08ffac60a`.
+Hosted PostgreSQL 17.11 run 41105260374, job 124233234268:
+16 B inspection tests passed; zero errors/failures/skips (3.153 seconds).
+Existing connected intake: 84 passed; zero errors/failures/skips.
+Downloaded JUnit artifact 13000687985 ZIP SHA256 independently matched:
+`2b10c7bcaeecd44b1655a6b30cbfd0b2fff2793a7674d7202e2a0aeb9d9c8886`.
+Initial fixture failures remain in CI history; schema visibility and disposable
+server timeout setup were corrected without changing the SQL. Test provisioning
+and synthetic role changes occur only in the disposable database. Actual server
+session disappearance was observed there; production closure is not inferred.
+
+Recovered historical Manchester result from the same pinned repository package:
+`artifact/result.json`, SHA256
+`ab29ee32e0e3da1a7786f87bf3a62fb2d8ac691d70b488cf89f93062df67bf2e`.
+The current ArcusListingContract.project passed for all 14 records/two segments
+using the unchanged historical case, historical limits and the authentic retained
+outer_supervisor. No outer receipt, budget declarations or source fields were
+fabricated. This is an in-memory qualification assessment, not a published new
+capture or current B receipt. The historical artifact remains byte-identical;
+current daily binding still refuses SOURCE_BINDING. This closes the offline
+metadata-adapter projection gap; it does not prove present portal behaviour,
+current execution budgets, explicit-zero behaviour or freshness.
