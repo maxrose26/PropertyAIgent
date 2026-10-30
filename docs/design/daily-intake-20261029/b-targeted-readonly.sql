@@ -72,9 +72,17 @@ WITH ctl AS (SELECT outcome::jsonb AS c FROM public.ingestion_work_items WHERE k
  records AS (SELECT CASE WHEN length(key)<=100 THEN key ELSE NULL END AS authority,
  length(key)<=100 AS name_complete,c->'oldham_allowances' ? key AS allowance_present,
  c->'grants' ? key AS grant_present,c->'oldham_allowances'->key->'revoked' AS revoked,
- CASE WHEN (c->'oldham_allowances'->key->>'expires_at') ~ '^[0-9]{1,12}([.][0-9]{1,9})?$'
+ jsonb_typeof(c->'oldham_allowances'->key) AS allowance_type,
+ jsonb_typeof(c->'grants'->key) AS grant_type,
+ jsonb_typeof(c->'oldham_allowances'->key->'revoked') AS revoked_type,
+ jsonb_typeof(c->'oldham_allowances'->key->'grant_binding') AS grant_binding_type,
+ jsonb_typeof(c->'oldham_allowances'->key->'expires_at') AS allowance_expiry_type,
+ jsonb_typeof(c->'grants'->key->'expires_at') AS grant_expiry_type,
+ CASE WHEN jsonb_typeof(c->'oldham_allowances'->key->'expires_at')='number'
+ AND (c->'oldham_allowances'->key->>'expires_at') ~ '^[0-9]{1,12}([.][0-9]{1,9})?$'
  THEN (c->'oldham_allowances'->key->>'expires_at')::numeric ELSE NULL END AS allowance_expiry,
- CASE WHEN (c->'grants'->key->>'expires_at') ~ '^[0-9]{1,12}([.][0-9]{1,9})?$'
+ CASE WHEN jsonb_typeof(c->'grants'->key->'expires_at')='number'
+ AND (c->'grants'->key->>'expires_at') ~ '^[0-9]{1,12}([.][0-9]{1,9})?$'
  THEN (c->'grants'->key->>'expires_at')::numeric ELSE NULL END AS grant_expiry,
  (c->'oldham_allowances'->key->'grant_binding')=((c->'grants'->key)-ARRAY['source_calls','writes']) AS binding_matches
  FROM bounded CROSS JOIN ctl)

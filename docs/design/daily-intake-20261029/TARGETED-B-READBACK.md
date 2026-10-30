@@ -6,10 +6,10 @@ Stage 4 OPEN. A acceptance and both inspection attempts are preserved. This pack
 
 Base candidate: 405f77f078a64175e037bd2e735de30658c1437f; tree 7a315b6a3388737d88498e69dc43d7282f74a95f.
 
-Supplement SQL SHA-256: `03ad0a79b0d0d21ec213d72a67be406f0fdeabe748d40e064274075efbc00f62`.
-Supplement client SHA-256: `6e5f07e54fb81f151ee4ea3a9a05521b2b88a274eff388dca85c6e2dafebe0c2`.
+Supplement SQL SHA-256: `d1b27618257b6d9f00cd72ce170e02f7aaae6e6dadae326cccbd099577989346`.
+Supplement client SHA-256: `a8bda527d52ec2055935e4eacd6d6b6ff8722f35989c80032db42d0857a896a0`.
 
-The original b-readonly.sql (131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997) and repository client are untouched. The separate fixed client has exactly three string substitutions: SQL filename (including its docstring), SQL hash, and PGAPPNAME. No argument accepting arbitrary SQL, bypass, controller, lifecycle action or retry is introduced. Its capture function and all connection/password/timeout/output handling are identical to the tested original. Python syntax and exact reverse-substitution equivalence checked offline. The new SQL was reviewed against retained schema/policy originals; it has NOT been executed or validated by a PostgreSQL server in this preparation. Do not label this new SQL disposable-tested.
+The original b-readonly.sql (131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997) and repository client are untouched. The separate fixed client has exactly three string substitutions: SQL filename (including its docstring), SQL hash, and PGAPPNAME. No argument accepting arbitrary SQL, bypass, controller, lifecycle action or retry is introduced. Its capture function and all connection/password/timeout/output handling are identical to the tested original. Python syntax and exact reverse-substitution equivalence checked offline. The supplement is covered by focused disposable PostgreSQL tests in the existing daily-intake-pg job. Validation results must identify the exact published head; no production observation is inferred from fixture results.
 
 ## Preparation and inactive invocation
 
@@ -34,12 +34,12 @@ r,p=map(Path,sys.argv[1:])
 check=lambda path,h: hashlib.sha256(path.read_bytes()).hexdigest()==h
 base=r/'docs/design/daily-intake-20261029'
 assert check(base/'b-readonly.sql','131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997')
-assert check(p/'b-targeted-readonly.sql','03ad0a79b0d0d21ec213d72a67be406f0fdeabe748d40e064274075efbc00f62')
-assert check(p/'b-targeted-readonly-client.py','6e5f07e54fb81f151ee4ea3a9a05521b2b88a274eff388dca85c6e2dafebe0c2')
+assert check(p/'b-targeted-readonly.sql','d1b27618257b6d9f00cd72ce170e02f7aaae6e6dadae326cccbd099577989346')
+assert check(p/'b-targeted-readonly-client.py','a8bda527d52ec2055935e4eacd6d6b6ff8722f35989c80032db42d0857a896a0')
 ca=r/'verification/ingestion_storage/trust/supabase-prod-ca-2021.crt'
 assert check(ca,'700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7')
 s=(base/'b-readonly-client.py').read_text()
-s=s.replace('b-readonly.sql','b-targeted-readonly.sql').replace('131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997','03ad0a79b0d0d21ec213d72a67be406f0fdeabe748d40e064274075efbc00f62').replace("'propertyaigent-b-readonly'","'propertyaigent-b-targeted-readonly'")
+s=s.replace('b-readonly.sql','b-targeted-readonly.sql').replace('131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997','d1b27618257b6d9f00cd72ce170e02f7aaae6e6dadae326cccbd099577989346').replace("'propertyaigent-b-readonly'","'propertyaigent-b-targeted-readonly'")
 assert s==(p/'b-targeted-readonly-client.py').read_text()
 print('LOCAL_BINDINGS_VERIFIED; NO_DATABASE_CONNECTION_YET')
 PY
@@ -76,7 +76,7 @@ Eight labelled result sets, in order, followed by ROLLBACK:
 | recovery_access | 3 | Recovery login, recovery operator, and postgres. Role presence, login state, membership, inherited/set capability and EXECUTE are separate facts. No privilege is exercised or granted. NOLOGIN can be an expected closed state; false capability is a finding, not permission to activate. |
 | functions | 2 summaries | Exactly one overload each. Oldham body expected 091ec5ee578083b0b64431542ec02ff8a39263d345dee6a360dde68d3622900a; recovery body expected 9e7f98210c737d6f8f7fae2d98e328261ab9faf31481f041b6f63befa6686f58. Both owner ingestion_storage_owner, SECURITY DEFINER, search_path=pg_catalog. Oldham: jsonb,text,text,jsonb / SQL stable; recovery: text,integer,boolean / plpgsql volatile. PUBLIC/worker/effect EXECUTE must not unexpectedly exist. Extra/missing overload or hash mismatch requires review. |
 | stops | 1 | Exact candidate stop projection, missing-field flags, JSON types, effective intake global/manual predicates. Missing global_stop is blocking; JSON null is not. Any non-NULL manual_stop text, including an empty string, blocks intake under the candidate predicate. Last-hard-stop/generation contribute to binding; they are not independently interpreted as permission. Projection <=4096 bytes or incomplete. Hash is PostgreSQL jsonb text SHA, not Python canonical JSON digest. |
-| oldham_authorities | 1 summary | Union of allowance keys and Oldham-prefixed grant names; <=32, matching counts. Compare both expiry epochs with observed_epoch; nonrevoked/unexpired allowance AND unexpired grant is potentially live. This does not evaluate the full Oldham predicate or authorise use. Missing/malformed required fields, an unmatched grant/allowance or binding mismatch is unresolved. No full grant/package/source payload exported. |
+| oldham_authorities | 1 summary | Union of allowance keys and Oldham-prefixed grant names; <=32, matching counts. Compare both expiry epochs with observed_epoch; nonrevoked/unexpired allowance AND unexpired grant is potentially live. This does not evaluate the full Oldham predicate or authorise use. Allowance/grant/binding types must be object, revoked type boolean and both expiry types number. Numeric-looking JSON strings are not valid numeric expiry evidence. Missing/malformed required fields, an unmatched grant/allowance or binding mismatch is unresolved. No full grant/package/source payload exported. |
 | end | 1 | Fixed readonly disposition, then ROLLBACK and normal psql exit required. |
 
 Any SQL error, output/deadline limit, missing required row, NULL required comparison, unavailable visibility, truncation, or uncertain closure is INCOMPLETE. Legitimate NULL finished_at means an unfinished attempt; legitimate absent checkpoint remains explicitly absent. A complete readback with mismatches remains OBSERVATIONS_REQUIRE_REVIEW, never an automatic pass. The current state can change after this transaction; this is not an atomic recovery permission.
@@ -106,5 +106,7 @@ Original ZIP is preserved unchanged. A surplus trailing newline in its client
 was removed to make byte-for-byte reverse substitution exact. PostgreSQL tests
 reuse tests.e2e_pg_world and the existing daily-intake-pg hosted job; setup may
 install retained SQL and synthetic roles in that disposable database only.
-The original inspection SQL/client remain unchanged. This checkpoint is not
-yet a validated supplement or production execution approval.
+The original inspection SQL/client remain unchanged. Hosted validation evidence
+is recorded in PR #206 against the exact candidate. Execution remains inactive.
+
+SQL correction from original 03ad0a79…: expose authority/binding/revocation/expiry JSON types and accept numeric expiry observations only when the stored JSON type is number. The old text extraction could make a numeric-looking string indistinguishable from a JSON number. No authority predicate, bound, effect or recovery action is relaxed.
