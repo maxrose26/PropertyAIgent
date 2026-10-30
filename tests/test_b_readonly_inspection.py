@@ -61,7 +61,7 @@ def test_password_is_private_and_removed(tmp_path,monkeypatch,capsys):
         p=Path(environment['PGPASSFILE']);seen.append(p)
         assert p.stat().st_mode & 0o777==0o600
         assert 'secret' not in repr(command) and 'PGPASSWORD' not in environment
-        assert environment['PGSSLMODE']=='verify-full'
+        assert environment['PGSSLMODE']=='verify-full' and environment['PGGSSENCMODE']=='disable'
         return b'ROLLBACK\n',dict(classification='OBSERVATIONS_REQUIRE_REVIEW')
     monkeypatch.setattr(client,'capture',run)
     assert client.main()==0 and not seen[0].exists()
@@ -187,7 +187,7 @@ def test_real_psql_refuses_untrusted_or_unencrypted_route(world,tmp_path):
     info=conninfo_to_dict(os.environ['INGESTION_PROVISIONING_TEST_URL'])
     env={'PGHOST':'127.0.0.1','PGPORT':'5432','PGDATABASE':info['dbname'],
          'PGUSER':info['user'],'PGPASSWORD':info['password'],
-         'PGAPPNAME':'fixed-b-tls-refusal','PGSSLMODE':'verify-full',
+         'PGAPPNAME':'fixed-b-tls-refusal','PGSSLMODE':'verify-full','PGGSSENCMODE':'disable',
          'PGSSLROOTCERT':str(tmp_path/'unavailable-reviewed-ca.pem'),
          'PGCONNECT_TIMEOUT':'1'}
     data,status=client.capture([shutil.which('psql'),'-X','-w','-v','ON_ERROR_STOP=1',

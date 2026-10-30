@@ -105,6 +105,7 @@ def main():
         environment = {'PATH':'/usr/bin:/bin', 'HOME':private, 'LANG':'C.UTF-8',
             'PGHOST':HOST, 'PGHOSTADDR':address, 'PGPORT':'5432', 'PGDATABASE':'postgres',
             'PGUSER':USER, 'PGPASSFILE':str(passfile), 'PGSSLMODE':'verify-full',
+            'PGGSSENCMODE':'disable',
             'PGSSLROOTCERT':str(ca), 'PGCONNECT_TIMEOUT':'5', 'PGAPPNAME':'propertyaigent-b-readonly',
             'PGOPTIONS':'-c default_transaction_read_only=on -c statement_timeout=3000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=10000'}
         data, status = capture([executable,'-X','-w','--csv','-v','ON_ERROR_STOP=1',
