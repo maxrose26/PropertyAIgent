@@ -179,3 +179,20 @@ def test_real_psql_rollback_and_error_session_closure(world,tmp_path):
             if n==0: break
             time.sleep(.025)
         assert n==0 # Actual disposable server observation, not inferred from exit.
+
+
+def test_real_psql_refuses_untrusted_or_unencrypted_route(world,tmp_path):
+    """Disposable endpoint only: verify-full must fail rather than downgrade."""
+    from psycopg.conninfo import conninfo_to_dict
+    info=conninfo_to_dict(os.environ['INGESTION_PROVISIONING_TEST_URL'])
+    env={'PGHOST':'127.0.0.1','PGPORT':'5432','PGDATABASE':info['dbname'],
+         'PGUSER':info['user'],'PGPASSWORD':info['password'],
+         'PGAPPNAME':'fixed-b-tls-refusal','PGSSLMODE':'verify-full',
+         'PGSSLROOTCERT':str(tmp_path/'unavailable-reviewed-ca.pem'),
+         'PGCONNECT_TIMEOUT':'1'}
+    data,status=client.capture([shutil.which('psql'),'-X','-w','-v','ON_ERROR_STOP=1',
+                               '-c',"SELECT 'MUST_NOT_EXECUTE'"],env,seconds=3)
+    assert status['exit_code']!=0 and status['classification']=='INCOMPLETE'
+    assert b'MUST_NOT_EXECUTE' not in data
+    assert b'SSL' in data or b'certificate' in data
+    assert world['boot'].execute("SELECT count(*) FROM pg_stat_activity WHERE application_name='fixed-b-tls-refusal'").fetchone()[0]==0
