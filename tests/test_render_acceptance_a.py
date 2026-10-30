@@ -137,12 +137,12 @@ def test_safe_refusal_details(tmp_path,monkeypatch,capsys,case,check,code):
     args=[] if case=='arguments' else ['--profile',str(cfg),'--output',str(tmp_path/'run')]
     assert a.main(args)==2
     output=capsys.readouterr().out
-    record=json.loads(output)
+    record=json.loads(output.splitlines()[-1])
     assert record['reason_code']==code and record['failing_check']==check
     assert record['phase']=='REFUSED' and record['successful_intake'] is False
     assert 'SECRET_VALUE' not in output and len(output.encode())<8192
     if case=='environment':
-        assert len(record['unexpected_names'])==32 and record['names_truncated']
+        assert record['reported_count']==40 and record['inventory_complete']
         assert record['unexpected_count']==40
     if case=='allocation':assert record['memory_max']=='max'
     if case=='cgroup':assert record['readback_status']=='unavailable'
@@ -152,7 +152,78 @@ def test_unicode_environment_names_fit_log_bound(monkeypatch,capsys):
     monkeypatch.setattr(a.os,'environ',{str(i)+'\U0001f600'*200:'SECRET_VALUE' for i in range(40)})
     assert a.main([])==2
     output=capsys.readouterr().out
-    record=json.loads(output)
+    record=json.loads(output.splitlines()[-1])
     assert record['reason_code']=='A_ENVIRONMENT_NOT_ALLOWLISTED'
     assert len(output.encode())<a.OUTPUT_BYTES and 'SECRET_VALUE' not in output
-    assert all(len(n)<=64 for n in record['unexpected_names'])
+    assert 0 < record['reported_count'] < 40 and not record['inventory_complete']
+
+
+@pytest.mark.parametrize('name', sorted(a.PARENT_PLATFORM_ENV))
+def test_reviewed_platform_parent_only(name, monkeypatch, capsys):
+    monkeypatch.setattr(a.os, 'environ', {name: 'PLATFORM_VALUE_SENTINEL'})
+    assert a.main([]) == 2
+    output = capsys.readouterr().out
+    assert json.loads(output)['failing_check'] == 'service_binding'
+    assert 'PLATFORM_VALUE_SENTINEL' not in output
+
+
+@pytest.mark.parametrize('name', ['UNREVIEWED_PLATFORM_NAME', 'RENDER_UNKNOWN',
+    'DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN',
+    'APPLICATION_SECRET', 'AWS_SECRET_ACCESS_KEY', 'CUSTOM_PASSWORD'])
+def test_unknown_and_credentials_still_refuse(name, monkeypatch, capsys):
+    monkeypatch.setattr(a.os, 'environ', {'IS_PULL_REQUEST': 'false', name: 'SECRET_SENTINEL'})
+    assert a.main([]) == 2
+    output = capsys.readouterr().out
+    records = [json.loads(line) for line in output.splitlines()]
+    assert records[-1]['reason_code'] == 'A_ENVIRONMENT_NOT_ALLOWLISTED'
+    assert records[-1]['inventory_complete'] and records[-1]['reported_count'] == 1
+    assert records[0]['unexpected_names'] == [name]
+    assert 'SECRET_SENTINEL' not in output
+
+
+@pytest.mark.parametrize('count,width,complete', [(93, 64, True), (1000, 64, False), (1, 40000, False)])
+def test_inventory_complete_or_explicit_overflow(count, width, complete, monkeypatch, capsys):
+    names = sorted(f'UNKNOWN_{i:04d}_' + 'x'*width for i in range(count))
+    monkeypatch.setattr(a.os, 'environ', dict.fromkeys(names, 'SECRET_SENTINEL'))
+    assert a.main([]) == 2
+    output = capsys.readouterr().out
+    records = [json.loads(line) for line in output.splitlines()]
+    terminal = records[-1]
+    reported = [n for r in records[:-1] for n in r['unexpected_names']]
+    assert terminal['phase'] == 'REFUSED'
+    assert terminal['unexpected_count'] == count
+    assert terminal['reported_count'] == len(reported)
+    assert terminal['inventory_complete'] is complete
+    assert terminal['names_truncated'] is (not complete)
+    assert reported == names[:len(reported)]
+    if complete: assert reported == names
+    assert len(output.encode()) <= a.OUTPUT_BYTES
+    assert all(len(line.encode()) + 1 <= a.INVENTORY_CHUNK_BYTES for line in output.splitlines()[:-1])
+    assert 'SECRET_SENTINEL' not in output
+
+
+def test_parent_names_and_values_not_in_source_environment(tmp_path, monkeypatch):
+    from verification.ingestion_storage import operational_supervisor as supervisor
+    monkeypatch.setenv('IS_PULL_REQUEST', 'PARENT_PLATFORM_SENTINEL')
+    monkeypatch.setenv('OPENAI_API_KEY', 'PARENT_SECRET_SENTINEL')
+    captured = []
+    def capture(command, **kwargs):
+        captured.append(kwargs['env'])
+        raise OSError('synthetic launch failure')
+    monkeypatch.setattr(supervisor.subprocess, 'Popen', capture)
+    monkeypatch.setattr(a.r, 'validate_profile', lambda p: p)
+    class Reaper:
+        def close(self): pass
+    monkeypatch.setattr(a.r, 'OwnedSubreaper', Reaper)
+    p = profile(tmp_path/'profile')
+    result = supervisor.supervise([sys.executable, '-c', 'pass'],
+        environment={'INGESTION_SOURCE_PRIVATE':'ONCE',
+                     'PLAYWRIGHT_BROWSERS_PATH':p['browser_path'],
+                     'INGESTION_RENDER_PROFILE':json.dumps(p)},
+        root=tmp_path/'child', source=True, seconds=1,
+        execution_budget='BROWSER_SOURCE_V2', render_profile=p)
+    assert result['cleanup'] == 'UNCERTAIN'
+    assert len(captured) == 1 and set(captured[0]) <= a.r.SOURCE_ENV
+    assert 'IS_PULL_REQUEST' not in captured[0] and 'OPENAI_API_KEY' not in captured[0]
+    assert 'PARENT_PLATFORM_SENTINEL' not in json.dumps(captured)
+    assert 'PARENT_SECRET_SENTINEL' not in json.dumps(captured)

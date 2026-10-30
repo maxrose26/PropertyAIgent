@@ -1,3 +1,53 @@
+## Current parent-environment amendment — 30 October 2026
+
+Authoritative for this amendment; diagnostic history below is preserved but its
+32-name reporting cap and no-allowlist-expansion statements are superseded.
+Stage 4 OPEN. A remains unaccepted; B and recurring activation unauthorised.
+
+Base c37e7afbfa8adc33cbdf5d650709e03e329ac7dc. Job
+job-dbi8ivajnfac73d4b3tg on build dep-dbi8e4mi0phs73d570lg failed with exit 2,
+A_ENVIRONMENT_NOT_ALLOWLISTED, failing_check=environment. There were 93 unexpected
+names; only 32 were recorded. The other 61 remain UNKNOWN, not classified or
+implicitly permitted. No browser, cleanup/interruption or memory observations
+were reached. Preserve this job and its evidence. Original failed job
+job-dbi7lmh42hec73cml7e0 retains UNKNOWN historical cause.
+
+Exactly one parent-only addition: IS_PULL_REQUEST. Evidence reviewed 2026-10-30:
+https://render.com/docs/environment-variables#all-runtimes explicitly documents
+this name for all runtimes (string true/false). No other observed name has been
+approved by this amendment. No wildcard or credential exception is introduced.
+The existing ENV set remains; PARENT_PLATFORM_ENV adds this one exact name only.
+Unknown names, including credential names, still refuse before effects.
+The supervisor's fresh child environment and render_intake.SOURCE_ENV are unchanged.
+This change does not replace credential-free service configuration verification;
+a permitted name alone cannot prove that its value has safe provenance.
+
+Refusals now emit ENVIRONMENT_REFUSAL_NAMES records with whole names and a
+zero-based chunk_index, at most 4096 encoded bytes per chunk. The terminal
+REFUSED record reports unexpected_count, reported_count, inventory_complete and
+names_truncated. Total output remains within 32768 bytes, reserving 2048 bytes
+for the terminal record. An oversized name or exhausted budget leaves an
+explicitly incomplete refusal; no values or arbitrary exception text are logged.
+A later authorised execution can still refuse. This is not a complete inventory
+of the historical Render environment and does not predict acceptance.
+
+Focused validation covers the exact permitted name, unknown/credential names,
+complete synthetic 93-name inventories, Unicode/oversize/total bounds and child
+launch environment isolation, alongside existing binding/allocation/browser/
+cleanup/actual SIGKILL tests. Hosted real-browser results must be retrieved at
+the final published head. Harness-modelled whole-job teardown is not Render proof.
+
+No Render mutation/build/job/retry is authorised or performed for this amendment.
+Last verified restoration: suspended, master/original build command, auto-deploy
+off, /bin/true and unchanged schedule. Three mapping restorations remain pending
+owner confirmation and subsequent names-only verification. Retained build remains
+dep-dbi8e4mi0phs73d570lg (c37e7afb), not this new source candidate.
+
+Inactive A procedure and resource values below remain unchanged: a future separate
+approval must bind build/profile/browser hashes to the new exact source head;
+190-second GNU timeout with five-second escalation, no automatic retry. No new
+environment-discovery service or controller is added.
+
 ## Current A refusal diagnostic correction — 30 October 2026
 
 This section supersedes historical statements below that no Render A execution has occurred. It does not supersede the acceptance requirements or grant execution permission.

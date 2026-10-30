@@ -25,6 +25,49 @@ ENV = {'PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'LC_CTYPE', 'PYTHONNOUSERSITE
        'RENDER_INSTANCE_ID', 'RENDER_EXTERNAL_HOSTNAME', 'RENDER_EXTERNAL_URL', 'PORT', 'PWD', 'SHLVL', '_'}
 HTML = '<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'"><title>Render A offline</title><p id="proof">Fixed local browser proof</p>'
 
+# Parent only. Render documents this exact name for all runtimes:
+# https://render.com/docs/environment-variables#all-runtimes (reviewed 2026-10-30).
+# No platform prefix is trusted; SOURCE_ENV and child construction are unchanged.
+PARENT_PLATFORM_ENV = frozenset({'IS_PULL_REQUEST'})
+INVENTORY_CHUNK_BYTES = 4096
+REFUSAL_RESERVE_BYTES = 2048
+
+
+def environment_inventory(names, emit):
+    """Emit whole names only; reserve room for the terminal refusal record.
+
+    Never shorten a name and then claim completeness. Oversized names or total
+    output exhaustion leave an explicitly incomplete refusal, without values.
+    """
+    reported = 0
+    chunk = []
+    index = 0
+    def record(items):
+        return dict(fixture='RENDER_A_V1', phase='ENVIRONMENT_REFUSAL_NAMES',
+                    chunk_index=index, unexpected_names=items)
+    def size(items):
+        return len(json.dumps(record(items), sort_keys=True).encode()) + 1
+    def flush():
+        nonlocal reported, chunk, index
+        if not chunk: return True
+        if emit.size + size(chunk) > OUTPUT_BYTES - REFUSAL_RESERVE_BYTES:
+            return False
+        emit('ENVIRONMENT_REFUSAL_NAMES', chunk_index=index, unexpected_names=chunk)
+        reported += len(chunk)
+        chunk = []
+        index += 1
+        return True
+    for name in names:
+        if size([name]) > INVENTORY_CHUNK_BYTES:
+            break
+        if size(chunk + [name]) > INVENTORY_CHUNK_BYTES:
+            if not flush(): break
+        chunk.append(name)
+    flush()
+    return dict(unexpected_count=len(names), reported_count=reported,
+                inventory_complete=reported == len(names),
+                names_truncated=reported != len(names))
+
 
 def identity(p):
     return dict(pid=p.pid, created=p.create_time(), ppid=p.ppid(), session=os.getsid(p.pid))
@@ -193,12 +236,9 @@ def main(argv=None):
     check = 'environment'
     details = {}
     try:
-        unexpected = sorted(set(os.environ) - ENV)
+        unexpected = sorted(set(os.environ) - ENV - PARENT_PLATFORM_ENV)
         if unexpected:
-            # Names only, finite count/length; JSON encoding escapes control chars.
-            details = dict(unexpected_names=[name[:64] for name in unexpected[:32]],
-                           unexpected_count=len(unexpected),
-                           names_truncated=len(unexpected)>32 or any(len(n)>64 for n in unexpected))
+            details = environment_inventory(unexpected, emit)
             raise RuntimeError('A_ENVIRONMENT_NOT_ALLOWLISTED')
         check = 'service_binding'
         if os.environ.get('RENDER_SERVICE_ID') != r.SERVICE: raise RuntimeError('A_SERVICE_BINDING')
