@@ -190,7 +190,7 @@ REGISTRATION = r"""
    OR (p->>'operation'='intake_screen' AND g->'bindings'->root.key IS DISTINCT FROM jsonb_build_object('subject',root.subject::jsonb,'task',root.task,'contract',root.contract,'revision',root.revision))
   THEN RAISE EXCEPTION 'INTAKE_CLOSED_KEY_SET'; END IF;
   IF coalesce(p->>'run_id','') !~ '^[a-f0-9]{32}$'
-   OR coalesce(p->>'publication_path','') !~ '^docs/design/ingestion-operational-execution-daily-intake/[A-Za-z0-9_-]+/[a-f0-9]{32}/final/result-before-publication.json$'
+   OR p->>'publication_path' IS DISTINCT FROM ('docs/design/ingestion-operational-execution-daily-intake/'||a||'/'||(p->>'run_id')||'/final/result-before-publication.json')
    THEN RAISE EXCEPTION 'INTAKE_RUN_IDENTITY'; END IF;
   IF NOT (ctl ? 'intake_run') OR ctl->'intake_run'->>'state'='VERIFIED' THEN
    IF p->>'operation'<>'intake_capture' THEN RAISE EXCEPTION 'INTAKE_RUN_CAPTURE_FIRST'; END IF;

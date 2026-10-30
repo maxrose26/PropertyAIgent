@@ -132,7 +132,7 @@ def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(operation='intake_period',period='self',policy=policy(world))),))
 
 
-@pytest.mark.parametrize('fault',['date','council','writes','expiry','run_limit'])
+@pytest.mark.parametrize('fault',['date','council','writes','expiry','run_limit','publication_path'])
 def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world,tmp_path,fault):
     from app.ingestion.ledger import DEFAULT_LIMITS
     from verification.ingestion_storage.chain_registration import capture_registration
@@ -144,6 +144,7 @@ def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world
     owner=Owner(None,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc)+timedelta(minutes=20),bindings=execution_binding())
     reg=capture_registration(owner,binding_for('tameside'),contract,row['start'],row['end'],revision='boundary',item_limits=DEFAULT_LIMITS)
     request=registration_payload(name,reg,execution_binding())
+    if fault=='publication_path':request['publication_path']=request['publication_path'].replace(name,'foreign-period')
     if fault=='date':request['rows'][0]['subject']['start']='2000-01-01'
     if fault=='council':request['rows'][0]['subject']['council']='oldham'
     if fault=='writes':request['grant']['writes']=1
@@ -151,7 +152,7 @@ def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world
     if fault=='run_limit':
         world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,ARRAY['intake_periods',%s,'days'],%s::jsonb)::json WHERE key=repeat('0',64)",(name,json.dumps({str(date(2000,1,1)+timedelta(days=i)):{} for i in range(7)})))
     with world['connect']('ingestion_worker_login') as c:
-        with pytest.raises(Exception,match='INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED)'):
+        with pytest.raises(Exception,match='INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED|RUN_IDENTITY)'):
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
     assert world['boot'].execute('SELECT count(*) FROM ingestion_work_items').fetchone()[0]==1
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]

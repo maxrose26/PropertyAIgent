@@ -27,7 +27,12 @@ repeatedly kills/reaps remaining adopted children and refuses uncertainty.
 This does not promise cleanup if the controller itself receives SIGKILL: whole
 job teardown must be verified in actual Render acceptance; no closure is inferred.
 
-Memory proposal ONLY: up to the historical 1536MiB sampled source RSS threshold,
+Conservative initial acceptance proposal ONLY:1024MiB sampled source RSS,
+256MiB sampled controller RSS,512MiB aggregate headroom,75s source work. This
+fits both2000000000 and2147483648 aggregate bytes arithmetically, not empirically;
+real browser acceptance may still refuse. No profile is auto-created. The code
+allows at most the historical1536MiB source RSS ceiling under a separately
+reviewed explicit profile. Its validation bounds are:
 256MiB sampled controller RSS threshold and at least256MiB aggregate headroom,
 with source+controller+reserve <= the actual aggregate byte limit (at most2048MiB).
 A marketed2GB plan is not proof of2147483648 bytes. If it exposes2000000000 bytes,
