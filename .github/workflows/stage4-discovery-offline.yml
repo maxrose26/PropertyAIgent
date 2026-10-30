@@ -172,6 +172,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/daily-intake-venv"
+      - name: Targeted B readback, fixed disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 120s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_b_targeted_readback.py -q --junitxml="$RUNNER_TEMP/b-targeted.xml"
       - name: Connected intake through production restricted ledger, synthetic sources only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -189,6 +194,7 @@ jobs:
           path: |
             ${{ runner.temp }}/daily-intake.xml
             ${{ runner.temp }}/b-readonly.xml
+            ${{ runner.temp }}/b-targeted.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
