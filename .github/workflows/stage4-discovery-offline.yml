@@ -130,6 +130,28 @@ on:
 permissions:
   contents: read
 jobs:
+  render-a-fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/render-a-venv"
+      - name: Install disposable test browser only
+        run: timeout --kill-after=5s 180s "$RUNNER_TEMP/render-a-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Offline browser and controller interruption, synthetic runtime allocation
+        run: |
+          A_TEST_BROWSER_PATH="$HOME/.cache/ms-playwright" timeout --kill-after=5s 220s "$RUNNER_TEMP/render-a-venv/bin/python" -m pytest tests/test_render_acceptance_a.py -q --basetemp="$RUNNER_TEMP/render-a-proof" --junitxml="$RUNNER_TEMP/render-a.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: render-a-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/render-a.xml
+            ${{ runner.temp }}/render-a-proof/**/captured-log.txt
+            ${{ runner.temp }}/render-a-proof/**/supervisor.json
   daily-intake-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
