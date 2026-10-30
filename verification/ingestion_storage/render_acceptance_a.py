@@ -196,9 +196,9 @@ def main(argv=None):
         unexpected = sorted(set(os.environ) - ENV)
         if unexpected:
             # Names only, finite count/length; JSON encoding escapes control chars.
-            details = dict(unexpected_names=[name[:128] for name in unexpected[:32]],
+            details = dict(unexpected_names=[name[:64] for name in unexpected[:32]],
                            unexpected_count=len(unexpected),
-                           names_truncated=len(unexpected)>32 or any(len(n)>128 for n in unexpected))
+                           names_truncated=len(unexpected)>32 or any(len(n)>64 for n in unexpected))
             raise RuntimeError('A_ENVIRONMENT_NOT_ALLOWLISTED')
         check = 'service_binding'
         if os.environ.get('RENDER_SERVICE_ID') != r.SERVICE: raise RuntimeError('A_SERVICE_BINDING')

@@ -146,3 +146,13 @@ def test_safe_refusal_details(tmp_path,monkeypatch,capsys,case,check,code):
         assert record['unexpected_count']==40
     if case=='allocation':assert record['memory_max']=='max'
     if case=='cgroup':assert record['readback_status']=='unavailable'
+
+
+def test_unicode_environment_names_fit_log_bound(monkeypatch,capsys):
+    monkeypatch.setattr(a.os,'environ',{str(i)+'\U0001f600'*200:'SECRET_VALUE' for i in range(40)})
+    assert a.main([])==2
+    output=capsys.readouterr().out
+    record=json.loads(output)
+    assert record['reason_code']=='A_ENVIRONMENT_NOT_ALLOWLISTED'
+    assert len(output.encode())<a.OUTPUT_BYTES and 'SECRET_VALUE' not in output
+    assert all(len(n)<=64 for n in record['unexpected_names'])
