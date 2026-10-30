@@ -1,9 +1,121 @@
-# Daily intake — INACTIVE release candidate
+# Daily intake — authoritative acceptance package (2026-10-30)
+
+Stage 4 remains OPEN. Implementation direction and the conservative profile are accepted for preparation only. This document authorises no merge, build/deployment, installation, credentials/grants, period issuance, Render settings/job creation, production/source connection, stop/marker clearing or recurring activation. Refresh, extraction and Oldham expansion remain deferred.
+
+## Candidate, review and evidence
+
+Reviewed implementation: PR #206, draft/open/unmerged, commit
+`33993c92b279d0f7fc5dbbe43ebeabb579dcc42f`, tree
+`b2c585998c7e383b8ba71f5f5794180fa8ef5294`.
+This reconciliation changes only this document; its resulting commit/tree are reported in the handoff. No implementation restart or further code fix was justified by this focused review.
+
+Review is GPT self-review of the implementation and its tests. No separately performed independent review is claimed. Reviewed: exact screening validation on fresh/repeated capture; durable OPEN/VERIFIED transitions; closure/publication ordering; Linux subreaper ownership and cleanup; explicit Render identity, browser and memory enforcement.
+
+[Final implementation-head daily-intake job](https://github.com/maxrose26/PropertyAIgent/actions/runs/40977632217/job/123809482120): 84 passed, zero failures/errors/skips, 59.602 seconds on PostgreSQL 17.11/native Linux. Retrieved JUnit artifact SHA256:
+`08cfcbe1cecd02dd4f73c97c1cd638872db3d1c8270c7237b481f5daa9fda612`.
+Final implementation head has 18 successful checks and the production probe skipped. No passing suite was rerun for this documentation reconciliation; these results belong to the implementation commit above, not a claim of a new documentation-head test run.
+
+Evidence includes capture-complete/screen-incomplete repeat refusal; expiry-resistant OPEN discovery; native nested-session orphan cleanup, cancellation, deadline/RSS and monitor failure; nine actual controller SIGKILL boundaries. Sources remain synthetic. The during-source SIGKILL test's parent explicitly kills remaining children to MODEL container teardown. It does not prove Render teardown. Browser-profile fixtures use synthetic executable identity; they do not establish real Playwright startup. Maximum 60+60 synthetic fixture used 1,861/2,080 statements, 82/96 connections, 6,952,809/8,388,608 returned bytes and 487,312/2,097,152 exported bytes; these are fixture measurements, not live workload predictions.
+
+## Focused findings and recovery contract
+
+Capture COMPLETE is not screening success. Runtime reconstructs exact expected screening/batch identities and invokes the existing completed_screening validator, including on already-consumed capture. It does not recollect consumed work. Trusted finalisation additionally checks completed/deferred roots, screen/batch counts and closed run authorities.
+
+First capture registration atomically establishes intake_run OPEN in the existing control row, before source work. Source intent, capture/archive checkpoints and screening remain in existing storage. A killed run remains discoverable even before capture completion, across expiry/new periods and through source-free backlog inspection. No expiry-based unlock or automatic replay exists.
+
+Finalisation closes authorities with committed readback, publishes and reads back the final evidence, then commits VERIFIED and reads it back. A pre-finalisation publication is not a terminal receipt. The database stores the publication identity/hash; it cannot independently attest a remote GitHub readback, which is the runtime's responsibility. Independent acceptance must check both. VERIFIED may record INCOMPLETE for a positively settled deferred scope; that is not two-council successful screening.
+
+SIGKILL/OOM need not leave a graceful receipt or acknowledged rollback. Before VERIFIED commit, OPEN blocks subsequent work and requires owner reconciliation of intent, retained archive, screening, grants and publication. Raw observations lost before archive are possible; incomplete intent persists and coverage does not advance. After VERIFIED commit but lost acknowledgement, independent database/archive/platform readback can establish disposition without source replay. Missing evidence remains incomplete, never inferred success. There is no marker-clear operation added.
+
+The opt-in subreaper requires no pre-existing child processes. Kernel adoption catches session-changing orphans while the controller lives; closure repeatedly kills/reaps adopted descendants using PID/create-time checks where applicable. Sampling alone does not prove descendant containment. Controller SIGKILL removes this cleanup mechanism: A must establish whole-job teardown. A supervisor uncertainty is a refusal even if the observed survivor count is zero.
+
+## Prerequisite matrix
+
+Statuses describe evidence available now, not current production access inferred from historical records.
+
+| Prerequisite | Existing evidence | Status | Exact remaining action | Permission required |
+|---|---|---|---|---|
+| Reviewed code and focused disposable tests | Exact candidate and 84-test artifact above | Satisfied for preparation | Retain commit/tree and artifact; review any future code delta | None for read-only review |
+| Runnable A with real browser/controller interruption | Existing supervisor, Render profile and native/SIGKILL tests | Missing connection | Add one bounded offline fixture invocation reusing those mechanisms; see A | Separate narrow implementation approval; no Render execution implied |
+| Exact successful Render build | Code/workflow/file-manifest checks implemented | Unknown/not prepared | After approval, build reviewed final revision with pinned dependencies and Playwright shell; record build ID/revision and browser SHA256/path | Build/deployment approval |
+| Credential-clean one-off snapshot | Source allowlist implemented; base environment not verified | Unknown/blocker | Verify configured/inherited variable names and secret-reference classes without values; base snapshot must exclude admin, Application, AI and unrelated credentials before job creation | Read-only inspection; separate settings/credential approval for any correction |
+| Actual allocation/browser/subreaper/teardown | Native synthetic tests only | Missing | A reads effective cgroup limits, launches real browser offline, exercises normal cleanup and controller kill, then obtains independent terminal evidence | One disposable Render job approval after preparation |
+| Installed intake SQL | Disposable real-PG installation and inventory checks | Unknown in production | Compare exact installed function bodies, owner, search_path and definer flags against daily_intake_inventory; review/install only the three existing function replacements and existing worker EXECUTE addition if absent, then read back | Separate installation/grant approval |
+| Restricted runtime access and TLS | Runtime checks exact worker/effect identities, flags, timeouts, route, IPv4, verify-full CA | Unknown in production | Verify only ingestion_worker_login and ingestion_effect_login access, required restricted privileges, 10s/3s/20s timeouts, reviewed route/address/CA and finite credential validity; resolve any mismatch separately | Production connection approval; separate credential/grant approval if needed |
+| Provider/session search_path | PR #205 narrow correction reviewed; absent from this branch | Not on direct intake path; conditional preparation dependency | See applicability below; use corrected shared gate only if that preparation route is selected | Narrow code approval if required; production read-only gate separately authorised |
+| Real source qualification | Contract adapters enforce qualified identity/hash; fixtures are synthetic | Missing current live evidence | Accept exact Tameside RECEIVED/Idox and Manchester VALIDATED/Arcus contract/qualification hashes and dated listing semantics, including bounded/zero results and changed-source refusal | Separate source qualification/access approval; do not silently add jobs to A/B |
+| Stops, unresolved work and recovery ownership | SQL stop/intent guards; OPEN backlog discovery tested | Unknown current state | Read existing stops, intent/checkpoints, grant/session state and OPEN marker; accept a named owner reconciliation procedure. Any unresolved state blocks issuance; no clearing | Read-only production inspection approval; correction separately reviewed |
+| Durable archive/publication | Existing GitHub publisher and readback ordering | Unknown production capability | Verify narrowly scoped evidence-repository publication/readback credential and destination; independently retain job IDs/logs and archive commit/hash | Access/credential approval if missing; B authorises only bounded publication |
+| Bound owner period | Owner.register_intake_period and trusted SQL tested | Not issued | Freeze exact revision/workflow/manifest, two qualified councils, screening config, Render profile, route/IPv4, stop snapshot, max_runs=1 and sufficient finite expiry; owner issues/readbacks and revokes temporary capability | Separate period issuance approval after all prerequisites accepted |
+
+PR #205 applicability: its change pins pg_catalog ONLY around the provider pg_get_viewdef comparison in activation_boundary.capture_screening_gate, restoring the caller path. That derived gate is used by Lifecycle/InstalledReuse and related capture/screening preparation routes. The daily Runtime and Owner.register_intake_period do not call it: the latter calls verify_installed (function inventory), not activation_precheck or the derived gate. Runtime's required function proconfig search_path=pg_catalog is a different check and does not fix session-sensitive view rendering. Therefore PR #205 is neither a blanket runtime prerequisite nor a reason to merge/import standing-access work. If production preparation selects the shared derived gate, include its narrowly scoped pin and existing real-extension regression evidence before using that gate. A does not need a production provider gate. Do not claim the historical production refusal's cause is proven.
+
+## Reviewed build, profile and environment preparation
+
+Use the existing service identity crn-d9sv93vavr4c73f98rb0. No replacement hosting/access framework is proposed. Before any job, independently record the latest successful build ID and exact revision; Render one-off jobs select that latest successful artifact, not an arbitrary commit parameter. A later build or environment change invalidates the accepted binding and requires review.
+
+Pin installed dependencies and the actual Playwright headless-shell executable/path/hash. A must verify actual library/font/browser startup, not just hash existence. Preserve owner-local and Trafford defaults. Only Manchester explicitly selects render-intake-v1. No unsupported-context guard is removed globally.
+
+The proposed profile fields are mode, service_id, revision, browser_path, browser_sha256, aggregate_bytes, source_rss_bytes, controller_rss_bytes, reserve_bytes and source_seconds. Revision must match RENDER_GIT_COMMIT and execution_binding; workflow and bound-file hashes must match the owner period. Browser path/hash and service ID must match at runtime.
+
+Initial acceptance values: source RSS 1,073,741,824 bytes (1 GiB), controller RSS 268,435,456 bytes (256 MiB), aggregate reserve 536,870,912 bytes (512 MiB), source work 75 seconds including startup. Their sum is 1,879,048,192 bytes, so it fits either 2,000,000,000 or 2,147,483,648 arithmetically; this does not demonstrate adequate headroom. aggregate_bytes must be the effective finite runtime readback, no greater than 2,147,483,648. Allocation below the proposed sum refuses; do not automatically resize or raise ceilings. The code's maximum allowable 1.5 GiB source value is NOT the approved acceptance value.
+
+Read the tightest visible finite cgroup-v2 memory.max and memory.current, memory.events (including max/oom/oom_kill), memory.swap.max and memory.peak when available. Unreadable required counters/path or mismatched allocation refuses. Optional unavailable swap/peak data must be explicitly recorded as unavailable, not zero; acceptance must resolve whether the available evidence suffices, never infer swap policy from a plan name. No max/OOM event increase is acceptable. Runtime refuses controller threshold or aggregate current above aggregate-reserve. The 25ms supervisor loop is a target sampling interval, subject to work/scheduling delays. Source RSS sums shared pages differently from aggregate cgroup kernel/file accounting. Neither sampled peak nor configured reserve guarantees the true peak or prevents OOM overshoot. The native 24 MiB refusal test observed 35,209,216 bytes before termination, demonstrating overshoot.
+
+Account for source startup, controller, monitoring and cleanup. Source supervisor declares uncertainty beyond seconds+10; that elapsed check is not an independent hard timer if the controller stalls. Retain the existing 90s Arcus reservation, 150s total source-supervision allowance and whole-run 960s outer command with 5s INT-to-KILL escalation. Do not infer graceful finalisation from outer timeout.
+
+Render snapshots ALL base-service environment variables at job creation. Unsetting secrets inside startCommand is too late to satisfy no inheritance. A's snapshot must contain no production DB/source/publication credentials; B may contain only required restricted worker/effect and scoped evidence-publication credentials, plus reviewed nonsecret settings. Neither may inherit administrative, Application, AI or unrelated credentials. Inspect names/references and attest classifications without printing values. Existing runtime forbidden-name checks are not an exhaustive proof of a clean base environment. No currently verified clean snapshot is claimed and no base settings are changed by this package. If the existing base cannot meet this requirement without changes, stop for a separately reviewed minimal preparation change.
+
+[Render one-off documentation](https://render.com/docs/one-off-jobs) confirms latest successful build/all-environment snapshot, no base persistent-disk access, terminal status retrieval and automatic instance deprovisioning when startCommand exits. [Metrics documentation](https://render.com/docs/metrics-streams) excludes one-off metric streams. Use runtime samples, logs, durable readbacks and independent terminal API status; never depend on /tmp surviving a kill.
+
+## Single authoritative A/B procedure — INACTIVE
+
+Counts: zero jobs authorised or created now. The intended acceptance sequence is exactly ONE disposable environment/termination job A, then at most ONE live intake job B. Independent API/database/archive readbacks are checks, not additional Render jobs. Build/installation/source-qualification prerequisites are separate approvals and are not hidden extra acceptance jobs. Failure means stop, not a replacement job or automatic retry.
+
+### A — one disposable environment/browser/termination job
+
+There is NO supported complete A invocation in the reviewed candidate. Do not substitute tests/test_render_intake.py (synthetic browser identity), tests/intake_interrupt_fixture.py (fixed-loopback PostgreSQL/synthetic-source harness), or the live daily command and call it real-browser acceptance. An exact runnable A command cannot honestly be supplied until the missing connection is implemented.
+
+Smallest missing connection: one fixed offline fixture entrypoint in the existing test/acceptance machinery, calling validate_profile/MemoryMonitor and operational_supervisor.supervise with the real installed Playwright shell and local HTML only, plus the existing nested-session child pattern. No council endpoint, database connection, publisher, new diagnostic controller or new recovery service. It must exercise normal source termination first, report PID/create-time and memory/browser identity evidence to flushed Render logs, then run a fresh owned fixture child and SIGKILL its controller. The job's command must propagate that failure and exit, so Render deprovisions the instance. The interruption must not be caught and labelled success. External independent readback is outside the killed process. Specify the final exact command, finite total timeout and fixture revision in review of that small connection; do not invent a command here.
+
+Before its single future job creation: accept clean environment/build evidence, browser identity, plan-crn-005 only if allocation can support the proposal, and the offline fixture command. Within A, read allocation first and freeze/check the corresponding explicit profile before browser work. Refusal at that step ends A, with no second probe job. Emit bounded nonsecret environment-name attestation and counters to logs. Never emit environment values. A must show real browser startup, normal nested-session teardown, live child evidence at controller kill, and independent Render terminal failure/finished timestamp plus platform deprovisioning evidence consistent with the documented lifecycle. An exit code or absent heartbeat alone is not proof of teardown. If available terminal/log evidence cannot establish teardown, A fails pending provider evidence; do not fabricate a survivor-free receipt.
+
+Independent readback endpoint after the job ID is known:
+`GET https://api.render.com/v1/services/crn-d9sv93vavr4c73f98rb0/jobs/JOB_ID`,
+plus the same job's logs in Dashboard or the configured log stream. Keep job ID, build binding, timestamps, sampled observations and terminal readback outside its ephemeral filesystem. Render API credentials stay with the reviewer, never in the source or job snapshot.
+
+A's deliberate hard interruption is expected to have a non-success terminal outcome. A passes only by review of the expected interruption and teardown evidence, not by the job reporting intake success. Durable OPEN/VERIFIED correctness remains supported by the real-PG SIGKILL tests; A does not pretend to repeat those without PostgreSQL.
+
+### B — one bounded Tameside/Manchester intake job
+
+Only after A passes and every applicable production prerequisite above is explicitly accepted, separately approve ONE job, bound to the reviewed successful artifact/environment and owner-issued period (max_runs=1), using the existing command:
+
+```sh
+timeout --signal=INT --kill-after=5s 960s python -u -m scripts.run_daily_councils --period REVIEW_APPROVED_PERIOD --hostaddr REVIEWED_IPV4 --output /tmp/propertyaigent-intake-UNIQUE_RUN
+```
+
+REVIEW_APPROVED_PERIOD, REVIEWED_IPV4 and UNIQUE_RUN are mandatory review-time substitutions, not issued values. Record their actual values, exact build/profile and create-job request before execution approval. No additional daily invocation, backlog job, dispatch or recurring activation is included. Read-only reconciliation uses the existing backlog mechanism from an independently approved restricted context; it must not become an implicit extra Render job.
+
+Success requires both scopes' exact expected screening/batches, retained capture/archive hash readbacks, invalidated authorities, VERIFIED marker with successful status and matching final publication path/hash/commit, all database connections closed, acceptable measured memory/time/counters, and independent Render terminal success/finished evidence. A VERIFIED INCOMPLETE result, deferred scope or capture-only publication fails two-council success acceptance. No coverage/admission/extraction claim follows.
+
+At any unavailable required evidence, memory/deadline refusal, changed binding/stop, OPEN marker, uncertain publication, failed teardown or unexplained terminal outcome: end acceptance; no retries, recollection, marker/stop clearing or ceiling increase. Preserve known durable intent/checkpoints/publication; have the owner establish disposition from independent records. A missing graceful receipt after hard kill is permissible; false success or silently bypassed unfinished work is not.
+
+## Next decision
+
+Approve only the small A fixture connection and its focused disposable validation as the next implementation step. Review its exact invocation and bounded timeout before any build/environment preparation or A execution approval. Separately accept the concrete production prerequisites before considering B. No generic production readiness decision is requested. Stage 4 remains OPEN.
+
+---
+
+# Superseded historical record
+
+Everything below is preserved historical evidence and superseded procedure. Earlier heads, unconditional Render refusals, implementation-review-pending labels, threshold discussions and activation instructions are NOT current authority. Only the package above defines current status and A/B procedure.
+
+# Historical — Daily intake — INACTIVE release candidate
 
 Stage 4 OPEN. This proposal does not authorise production access, SQL installation,
 period issuance, merge, deployment, a Render job, or recurring activation.
 
-## Narrow Render adaptation — implementation review pending
+## Historical — Narrow Render adaptation — implementation review pending
 
 Owner approved implementation/disposable validation only. The new explicit
 `render-intake-v1` mode is Manchester-only and requires a frozen `render_profile`
@@ -92,7 +204,7 @@ passes. Final follow-up adds controller-in-flight kill, aged/expired marker chec
 source credential/controller-memory refusal and tighter cgroup path accounting.
 Final identities/results are in the consolidated handoff; no live Render claim.
 
-## Current connected path
+## Historical — Current connected path
 
 Approved continuation base: PR #206 head
 1aa8d7e534b6ddf443fe05a194ae47e36032b3ba, tree
@@ -114,7 +226,7 @@ Existing metadata/reader qualification is still required for live use. The two-c
 Render route is BLOCKED by the execution-context requirement described below;
 this candidate refuses it before registration or source work.
 
-### Existing issuer and stops
+### Historical — Existing issuer and stops
 
 `intake_policy.installation_script()` is offline generation of replacements for
 three EXISTING functions: ingestion_register_bolton_exception,
@@ -149,7 +261,7 @@ It also checks before archive publication. A STOP file in the output directory
 is an attended stop; it prevents new work while preserving protected closure.
 Ctrl+C is also terminal. Unknown/broken/uncertain closure is not a contained error.
 
-### Failure settlement and overlap
+### Historical — Failure settlement and overlap
 
 Recognised contained failures are currently only fully accounted, positively
 closed Idox HTTP429/503, with exact council/window identity. The original audit
@@ -184,7 +296,7 @@ Raw partial evidence can remain archived, never a full-window
 pass. Current intake does not wait for historical catch-up and never advances a
 complete-coverage watermark across incomplete windows.
 
-### Backlog and later consumers
+### Historical — Backlog and later consumers
 
 `--backlog --page-size N [--after CURSOR]` uses the existing restricted SELECT
 access, primary-key cursor, <=3 roots/page and <=60 records/root. It needs no list
@@ -216,7 +328,7 @@ assessment reuse; repeated deterministic intake screening is not an AI consumer.
 Retained-only refresh must not create an Application. Decided-record monitoring
 and same-URL document revisions remain deferred; ten checks is acceptance only.
 
-## One run envelope (proposed for REVIEW, not production allowance)
+## Historical — One run envelope (proposed for REVIEW, not production allowance)
 
 Across both councils and ALL stages, including issuer/control/catalogue reads:
 90 source requests;23,971,520 mixed-accounting source bytes;120 worker seconds;
@@ -239,7 +351,7 @@ outer kill ceiling, not extra processing time. Closure uncertainty is a stop,
 never a continuation or automatic retry. Source/driver/GitHub accounting units
 remain separate, not falsely equated to wire traffic.
 
-## Reproducible disposable validation
+## Historical — Reproducible disposable validation
 
 Existing hosted workflow job daily-intake-pg uses its fixed loopback PostgreSQL17
 service and existing pinned test requirements:
@@ -261,7 +373,7 @@ snapshots, connection closure, consumption, failure settlement and cross-run
 pagination are checked. Hosted logs/artifacts preserve failed candidates and
 corrections; the final PR report identifies which candidate each result tested.
 
-## INACTIVE actual-Render acceptance proposal — BLOCKED
+## Historical — INACTIVE actual-Render acceptance proposal — BLOCKED
 
 Read-only service metadata checked29October2026: existing daily service
 crn-d9sv93vavr4c73f98rb0 remains suspended, autoDeploy off, startCommand /bin/true.
@@ -272,7 +384,7 @@ https://api-docs.render.com/reference/post-job . One-off jobs snapshot the base
 service's latest successful build/environment; verify that build's exact commit
 BEFORE creating a job. No new service or workflow system is required.
 
-### Concrete source execution-context decision (not a credential problem)
+### Historical — Concrete source execution-context decision (not a credential problem)
 
 The profiled Arcus reader's existing finite_acceptance.read requires
 four-council-owner-local. instrumented_probe.supervised then calls
@@ -352,15 +464,15 @@ stop clearing, admission or processing follows acceptance automatically.
 
 ---
 
-## Historical checkpoints and accepted refresh specification
+## Historical — Historical checkpoints and accepted refresh specification
 
 The following records preserve earlier partial delivery and its accepted refresh
 specification. Their intake blocker/status statements are historical; use the
 current section and final PR handoff above for the release candidate.
 
-# Minimal daily intake — INACTIVE, corrections required
+# Historical — Minimal daily intake — INACTIVE, corrections required
 
-## Continuation checkpoint — 29 October 2026
+## Historical — Continuation checkpoint — 29 October 2026
 
 Implementation parent 9f17436425fe28851e43a9e2f2f22da86c2b37c0,
 tree 436c65136e03340ed9752c26a7c60a6c15bbe64a: all 13 hosted check
@@ -384,7 +496,7 @@ remain incomplete: the existing projection needs explicit bound run keys and
 does not discover earlier roots. These are delivery blockers, not successful
 features. The unchanged inactive command/Render proposal below remains held.
 
-## Accepted known-reference refresh direction — implementation DEFERRED
+## Historical — Accepted known-reference refresh direction — implementation DEFERRED
 
 Accepted against repository maxrose26/PropertyAIgent, PR #206 implementation
 parent 9f17436425fe28851e43a9e2f2f22da86c2b37c0 and tree
@@ -465,7 +577,7 @@ Stage 4 OPEN. This is partial authorised implementation, not an executable
 production release. No production connection, collection, grant, stop release,
 Render change, merge, deployment or activation is authorised here.
 
-## Identity and scope
+## Historical — Identity and scope
 
 Base: master 210d09c5bf314c16baf0680df71d4ae8b30b71f4,
 tree e71939ef6c07d45fb8f234c665e116f8af4e2f28. Draft PR #206, branch
@@ -477,7 +589,7 @@ correction is NOT silently imported. The accepted correction and unresolved full
 provider/recovery/access gate remain separate release dependencies; do not import
 standing-access changes merely to obtain that correction.
 
-## Implemented, deliberately without a live bootstrap
+## Historical — Implemented, deliberately without a live bootstrap
 
 - app/ingestion/daily_intake.py connects an injected, externally authorised
   supervised collector to the existing ChainCaller, Coordinator.retained_capture,
@@ -523,7 +635,7 @@ representative eligible records; detail targets, fresh factual verification,
 independent admission/B2 and consumer handoff are still required before existing
 AI processing. Unknown/truncated facts and related/low-signal records stay held.
 
-## Concrete material dependencies — stop rule applied
+## Historical — Concrete material dependencies — stop rule applied
 
 1. Existing production Owner.register issues the fixed Bolton exception via
    ingestion_register_bolton_exception. Chain registration can PREPARE other
@@ -552,7 +664,7 @@ historical diagnosis or a replacement architecture. Oldham successor and
 standing-access expansion stay deferred. A production grant alone would not fix
 (2) or (3). The default Render command remains held.
 
-## Bounds and accounting
+## Historical — Bounds and accounting
 
 Each intake caller shares the existing finite DB envelope across all stages,
 reads and same-root redelivery: 1040 driver statements, 40 connections, 4MiB
@@ -572,7 +684,7 @@ production authority or reset them between slots. Final release needs a shared
 aggregate reservation covering source, archive, DB and closure BEFORE collection.
 That production aggregate is not implemented while the bootstrap is blocked.
 
-## Validation and limitations
+## Historical — Validation and limitations
 
 Local focused unit/legacy/security regression uses the pinned existing test
 requirements, no production access. Initial local collection failed because the
@@ -596,7 +708,7 @@ owner registration INSERTs/fixture control setup are stand-ins. They prove no
 Application-schema table changed and no Application URL is present. Synthetic
 fixtures do not qualify current council markup, Render containment or live access.
 
-## Inactive actual-Render acceptance proposal — NOT executable yet
+## Historical — Inactive actual-Render acceptance proposal — NOT executable yet
 
 Reuse service crn-d9sv93vavr4c73f98rb0 (propertyaigent-daily-scrape) in the confirmed
 Render workspace. It remains suspended, auto-deploy off, start command /bin/true.
@@ -631,7 +743,7 @@ days), council allowlist and seven-day rolling source-date filter, capacity and
 run count. Derive dates mechanically within that period; no daily owner permit.
 This is an authority proposal only, not an implemented recurring mechanism.
 
-## Next decision
+## Historical — Next decision
 
 Corrections required / production blocked. Review the partial code and decide
 whether to authorise the narrow existing worker/registration compatibility changes
