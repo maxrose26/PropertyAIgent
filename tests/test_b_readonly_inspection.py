@@ -166,10 +166,12 @@ def test_real_psql_rollback_and_error_session_closure(world,tmp_path):
          'PGUSER':info['user'],'PGPASSWORD':info['password'],'PGAPPNAME':'fixed-b-fixture',
          'PGOPTIONS':'-c statement_timeout=1500 -c idle_in_transaction_session_timeout=1000'}
     for text in (SQL,'BEGIN READ ONLY; SELECT 1/0; ROLLBACK;',
-                 'BEGIN READ ONLY; SELECT pg_sleep(10); ROLLBACK;'):
+                 'BEGIN READ ONLY; SELECT pg_sleep(10); ROLLBACK;',
+                 "BEGIN READ ONLY; SELECT repeat('X',100000); ROLLBACK;"):
         f=tmp_path/'query.sql';f.write_text(text)
         data,status=client.capture([executable,'-X','-w','-v','ON_ERROR_STOP=1','-f',str(f)],env,seconds=2.5)
         if text==SQL: assert status['exit_code']==0 and b'ROLLBACK' in data
+        elif "repeat('X'" in text: assert status['reason']=='OUTPUT_OVERFLOW' and len(data)<=65536
         else: assert status['classification']=='INCOMPLETE'
         until=time.monotonic()+2
         while time.monotonic()<until:
