@@ -32,37 +32,46 @@ def capture(command, environment, *, seconds=60, ceiling=LIMIT):
     reason = None
     term = None
     eof = False
-    with selectors.DefaultSelector() as poll:
-        poll.register(p.stdout, selectors.EVENT_READ)
-        while not eof or p.poll() is None:
-            now = time.monotonic()
-            if reason is None and now-start >= seconds-2:
-                reason = 'DEADLINE'
-            if reason and term is None:
-                term = now
-                try: os.killpg(p.pid, signal.SIGTERM)
-                except ProcessLookupError: pass
-            if term is not None and now-term >= 1:
-                try: os.killpg(p.pid, signal.SIGKILL)
-                except ProcessLookupError: pass
-            if now-start >= seconds-.2:
-                reason = reason or 'CLOSURE_UNCERTAIN'
-                break
-            for key, _ in poll.select(.025):
-                chunk = os.read(key.fd, 4096)
-                if not chunk:
-                    poll.unregister(key.fileobj)
-                    eof = True
-                else:
-                    remaining = ceiling-len(data)
-                    data.extend(chunk[:remaining])
-                    if len(chunk)>remaining: reason = 'OUTPUT_OVERFLOW'
-    p.stdout.close()
-    if p.poll() is None:
-        try: os.killpg(p.pid, signal.SIGKILL)
-        except ProcessLookupError: pass
-    try: code = p.wait(timeout=.1)
-    except subprocess.TimeoutExpired: code = None
+    try:
+        with selectors.DefaultSelector() as poll:
+            poll.register(p.stdout, selectors.EVENT_READ)
+            while not eof or p.poll() is None:
+                now = time.monotonic()
+                if reason is None and now-start >= seconds-2:
+                    reason = 'DEADLINE'
+                if reason and term is None:
+                    term = now
+                    try: os.killpg(p.pid, signal.SIGTERM)
+                    except ProcessLookupError: pass
+                if term is not None and now-term >= 1:
+                    try: os.killpg(p.pid, signal.SIGKILL)
+                    except ProcessLookupError: pass
+                if now-start >= seconds-.2:
+                    reason = reason or 'CLOSURE_UNCERTAIN'
+                    break
+                for key, _ in poll.select(.025):
+                    chunk = os.read(key.fd, 4096)
+                    if not chunk:
+                        poll.unregister(key.fileobj)
+                        eof = True
+                    else:
+                        remaining = ceiling-len(data)
+                        data.extend(chunk[:remaining])
+                        if len(chunk)>remaining: reason = 'OUTPUT_OVERFLOW'
+        p.stdout.close()
+        if p.poll() is None:
+            try: os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+        try: code = p.wait(timeout=.1)
+        except subprocess.TimeoutExpired: code = None
+    finally:
+        # Also reap on local exceptions/cancellation. This is not remote proof.
+        if p.poll() is None:
+            try: os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+            try: p.wait(timeout=.1)
+            except subprocess.TimeoutExpired: pass
+        p.stdout.close()
     return bytes(data), dict(exit_code=code, reason=reason,
         client_closed=code is not None, output_bytes=len(data),
         remote_closure='NOT_ACKNOWLEDGED' if reason or code else 'NORMAL_PSQL_EXIT',

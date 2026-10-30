@@ -143,6 +143,7 @@ def test_permission_denial(world):
 def test_rls_filtered_empty_is_not_absence(world):
     c=world['boot']
     c.execute('CREATE ROLE fixture_inspection NOSUPERUSER NOBYPASSRLS')
+    c.execute('GRANT USAGE ON SCHEMA public TO fixture_inspection')
     c.execute('GRANT SELECT ON ingestion_work_items,ingestion_work_attempts TO fixture_inspection')
     try:
         c.execute('SET SESSION AUTHORIZATION fixture_inspection')
@@ -162,7 +163,8 @@ def test_real_psql_rollback_and_error_session_closure(world,tmp_path):
     assert executable, 'hosted PostgreSQL client required'
     info=conninfo_to_dict(os.environ['INGESTION_PROVISIONING_TEST_URL'])
     env={'PGHOST':'127.0.0.1','PGPORT':'5432','PGDATABASE':info['dbname'],
-         'PGUSER':info['user'],'PGPASSWORD':info['password'],'PGAPPNAME':'fixed-b-fixture'}
+         'PGUSER':info['user'],'PGPASSWORD':info['password'],'PGAPPNAME':'fixed-b-fixture',
+         'PGOPTIONS':'-c statement_timeout=1500 -c idle_in_transaction_session_timeout=1000'}
     for text in (SQL,'BEGIN READ ONLY; SELECT 1/0; ROLLBACK;',
                  'BEGIN READ ONLY; SELECT pg_sleep(10); ROLLBACK;'):
         f=tmp_path/'query.sql';f.write_text(text)
