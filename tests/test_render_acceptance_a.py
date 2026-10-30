@@ -48,7 +48,8 @@ def test_outer_command_preserves_intentional_sigkill_failure():
     assert p.returncode in (137,-9) and 'CONTROLLER_SIGKILL_INTENT' in p.stdout
 
 
-def test_real_browser_native_command(tmp_path):
+@pytest.mark.parametrize('scenario',['interrupt','startup_failure','timeout'])
+def test_real_browser_native_command(tmp_path,scenario):
     """Real browser + actual run/main/supervisor; only host/cgroup checks modelled.
 
     Harness reaps survivors after controller kill, modelling platform teardown.
@@ -62,6 +63,8 @@ def test_real_browser_native_command(tmp_path):
     from verification.ingestion_storage.render_intake import OwnedSubreaper
     p=profile(tmp_path);p.update(browser_path=cache,browser_sha256=hashlib.sha256(Path(headless_shell_executable(cache)).read_bytes()).hexdigest(),
         source_rss_bytes=1024*a.r.MiB,reserve_bytes=512*a.r.MiB,source_seconds=75)
+    if scenario=='startup_failure':
+        fake=profile(tmp_path/'broken');p.update(browser_path=fake['browser_path'],browser_sha256=fake['browser_sha256'])
     cfg=tmp_path/'profile.json';cfg.write_text(json.dumps(p))
     # No production command switch bypasses host/cgroup checks. This isolated
     # test bootstrap substitutes only runtime allocation observation.
@@ -80,13 +83,20 @@ def supervise(command,**kw):
 a.supervise=supervise
 raise SystemExit(a.main(sys.argv[1:]))
 '''
+    if scenario=='timeout':
+        bootstrap=bootstrap.replace('a.r.MemoryMonitor=M', 'a.r.MemoryMonitor=M\na.PHASE_SECONDS=1').replace("a.worker(sys.argv[1],sys.argv[2]=='True')", 'import time;time.sleep(10)')
     env=dict(PATH='/usr/bin:/bin',HOME=str(tmp_path),RENDER_SERVICE_ID=a.r.SERVICE,RENDER_GIT_COMMIT='a'*40,PLAYWRIGHT_BROWSERS_PATH=cache)
     reaper=OwnedSubreaper()
     try:
         result=subprocess.run(['timeout','--signal=TERM','--kill-after=5s','190s',sys.executable,'-c',bootstrap,
             '--profile',str(cfg),'--output',str(tmp_path/'run')],env=env,capture_output=True,text=True,timeout=200)
         (tmp_path/'captured-log.txt').write_text(result.stdout+result.stderr)
-        assert result.returncode in (137,-9),result.stdout+result.stderr
         phases=[json.loads(line)['phase'] for line in result.stdout.splitlines()]
-        assert 'NORMAL_CLEANUP_OBSERVED' in phases and phases[-1]=='CONTROLLER_SIGKILL_INTENT'
+        if scenario=='interrupt':
+            assert result.returncode in (137,-9),result.stdout+result.stderr
+            assert 'NORMAL_CLEANUP_OBSERVED' in phases and phases[-1]=='CONTROLLER_SIGKILL_INTENT'
+        else:
+            assert result.returncode==2,result.stdout+result.stderr
+            assert phases[-1]=='REFUSED' and 'CONTROLLER_SIGKILL_INTENT' not in phases
+            if scenario=='timeout':assert '"limit_hit": "DEADLINE"' in result.stdout
     finally:reaper.close()  # test teardown, never reported as Render evidence

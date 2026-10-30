@@ -7,7 +7,7 @@ Stage 4 remains OPEN. Implementation direction and the conservative profile are 
 Reviewed implementation: PR #206, draft/open/unmerged, commit
 `33993c92b279d0f7fc5dbbe43ebeabb579dcc42f`, tree
 `b2c585998c7e383b8ba71f5f5794180fa8ef5294`.
-This reconciliation changes only this document; its resulting commit/tree are reported in the handoff. No implementation restart or further code fix was justified by this focused review.
+The subsequent authorised fixed A connection adds render_acceptance_a.py, its focused tests and a disposable CI job. Its final commit/tree and focused evidence are reported in the handoff. Existing intake implementation is preserved.
 
 Review is GPT self-review of the implementation and its tests. No separately performed independent review is claimed. Reviewed: exact screening validation on fresh/repeated capture; durable OPEN/VERIFIED transitions; closure/publication ordering; Linux subreaper ownership and cleanup; explicit Render identity, browser and memory enforcement.
 
