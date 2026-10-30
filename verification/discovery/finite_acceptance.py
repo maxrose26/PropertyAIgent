@@ -45,7 +45,7 @@ def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=No
         from .source_profiles import validate
         validate(collection_profile,row)
         if campaign_scope!=row:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
-        expected_mode='four-council-owner-local' if collection_profile['family']=='ARCUS_UI' else None
+        expected_mode=('render-intake-v1' if execution_mode=='render-intake-v1' and row['council']=='manchester' else 'four-council-owner-local') if collection_profile['family']=='ARCUS_UI' else None
         if execution_budget!=collection_profile['execution_budget'] or execution_mode!=expected_mode:raise ValueError('PROFILE_CALLER_BUDGET_OR_MODE')
     if campaign_scope is not None:
         from .four_council_proof import manifest_scope
@@ -66,7 +66,7 @@ def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=N
     # A named browser execution budget applies to the Arcus UI reader only.
     if execution_budget is not None and (row['council'] not in ARCUS or not isinstance(execution_budget,str)):raise ValueError('execution budget')
     if type(fixed_four_rows) is not bool or (fixed_four_rows and (not retain_proof or not no_transport_retry)):raise ValueError('fixed row policy')
-    if execution_mode is not None and (execution_mode!='four-council-owner-local' or not retain_proof or (row['council']!='rochdale' and not _profiled_arcus(row))):
+    if execution_mode is not None and (execution_mode not in ('four-council-owner-local','render-intake-v1') or (execution_mode=='render-intake-v1' and row['council']!='manchester') or not retain_proof or (row['council']!='rochdale' and not _profiled_arcus(row))):
         raise ValueError('proof execution context')
     if retain_proof:
         from .four_council_proof import require_scope

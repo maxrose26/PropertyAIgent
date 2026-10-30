@@ -76,6 +76,46 @@ def undo(derived, sites=SITES):
     return text
 
 
+def capture_bound_sites():
+    """Opt-in COMPLETE-capture task identity; historical v3/v1 remain valid.
+
+    Reuses the observation revision formula without enabling partial observations.
+    The SQL batch verifies the actual parent and its canonical digest before
+    deriving a child; receipt validation requires that same digest and parent.
+    """
+    scoped="encode(sha256(convert_to('{\"assessment_revision\":\"'||%s||'\",\"observation_sha256\":\"'||(plan->>'capture_sha256')||'\"}','UTF8')),'hex')" % REVISION_V3
+    result_base="encode(sha256(convert_to('{\"config_sha256\":\"'||(p_payload->>'config_sha256')||'\",\"record_sha256\":\"'||(p_payload->>'record_sha256')||'\"}','UTF8')),'hex')"
+    result_scoped="encode(sha256(convert_to('{\"assessment_revision\":\"'||%s||'\",\"observation_sha256\":\"'||(p_payload->>'capture_checkpoint_sha256')||'\"}','UTF8')),'hex')" % result_base
+    guard="""   IF w.contract='listing-screen-v3' AND p_payload ? 'capture_bound' THEN
+    IF p_payload->'capture_bound' IS DISTINCT FROM 'true'::jsonb
+    OR jsonb_array_length(w.dependencies::jsonb)<>1
+    OR p_payload->>'capture_key' IS DISTINCT FROM w.dependencies->>0
+    OR coalesce(p_payload->>'capture_checkpoint_sha256','') !~ '^[a-f0-9]{64}$'
+    OR NOT EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.key=w.dependencies->>0
+      AND x.state='COMPLETE' AND x.task='DISCOVERY' AND x.checkpoint::jsonb->>'kind'='LISTING_RECEIPT_V1')
+    THEN RAISE EXCEPTION 'CAPTURE_BOUND_RECEIPT'; END IF;
+   END IF;
+"""
+    return (
+        (REVISION_V3+" ELSE "+REVISION_V1,
+         "(CASE WHEN plan->'capture_bound'='true'::jsonb THEN %s ELSE %s END) ELSE %s" % (scoped,REVISION_V3,REVISION_V1)),
+        (result_base+" IS DISTINCT FROM w.revision",
+         "(CASE WHEN p_payload->'capture_bound'='true'::jsonb THEN %s ELSE %s END) IS DISTINCT FROM w.revision" % (result_scoped,result_base)),
+        ("   IF w.contract='listing-screen-v3' AND (coalesce(p_payload->>'rule_version','')",guard+"   IF w.contract='listing-screen-v3' AND (coalesce(p_payload->>'rule_version','')"),
+        ("   idx:=coalesce((w.checkpoint::jsonb->>'next')::integer,(plan->>'first')::integer);",
+         "   IF plan ? 'capture_bound' AND (plan->'capture_bound' IS DISTINCT FROM 'true'::jsonb OR NOT (plan ? 'screening')) THEN RAISE EXCEPTION 'CAPTURE_BOUND_PLAN'; END IF;\n   idx:=coalesce((w.checkpoint::jsonb->>'next')::integer,(plan->>'first')::integer);"),
+    )
+
+
+def capture_bound_text(original=None):
+    """Reviewed offline extension; no installation, grant or source authority."""
+    text=derive() if original is None else original
+    for old,new in capture_bound_sites():
+        if text.count(old)!=1:raise ValueError('SUBSTITUTION_SITE_NOT_UNIQUE:'+old[:80])
+        text=text.replace(old,new)
+    return text
+
+
 def replacement_function(original=None):
     """Only the `CREATE FUNCTION public.ingestion_worker_step ... $fn$;` statement of the derived file, rewritten as CREATE OR REPLACE for installation over the installed original.
     Ownership and ACL are preserved by CREATE OR REPLACE; the installation ceremony re-asserts them (docs: installation route)."""

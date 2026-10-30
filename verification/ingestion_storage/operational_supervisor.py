@@ -9,15 +9,27 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None):
- if not 0<seconds<=(45 if source else 165):raise ValueError('FIXED_DEADLINE')
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None,render_profile=None):
+ if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
+ single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
+ if execution_budget is not None:
+  from app.ingestion.source_budget import select
+  selected=select(execution_budget);ceiling=selected['worker_seconds']
+  single_rss=group_rss=selected['source_memory_bytes']
+ if not 0<seconds<=ceiling:raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
- if source and not set(environment)<={'INGESTION_SOURCE_PRIVATE'}:raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
+ if source and not set(environment)<=({'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH','INGESTION_RENDER_PROFILE'} if render_profile else {'INGESTION_SOURCE_PRIVATE'}):raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
  if source and any('DATABASE' in k or 'PASSWORD' in k or 'TOKEN' in k or 'SECRET' in k for k in environment):raise ValueError('SOURCE_CREDENTIAL_FREE')
  if memory_group is not None:
   memory_group=Path(memory_group)
   if not source or memory_group.name!='source' or memory_group.parent.name!='propertyaigent-operational-once.scope' or not str(memory_group).startswith('/sys/fs/cgroup/') or memory_group.is_symlink():raise ValueError('BOUND_SOURCE_MEMORY_GROUP')
+ if render_profile is not None:
+  from .render_intake import validate_profile
+  validate_profile(render_profile)
+  if not source or execution_budget!='BROWSER_SOURCE_V2':raise ValueError('RENDER_SOURCE_SELECTION')
+  single_rss=group_rss=render_profile['source_rss_bytes']
+  if seconds>render_profile['source_seconds']:raise ValueError('RENDER_SOURCE_DEADLINE')
  def enter_memory():
   if memory_group is not None:memory_group.joinpath('cgroup.procs').write_text(str(os.getpid()))
  env=dict(PATH='/usr/bin:/bin',HOME=str(root),TMPDIR=str(root),LANG='C.UTF-8',PYTHONNOUSERSITE='1',PYTHONDONTWRITEBYTECODE='1',OPENBLAS_NUM_THREADS='1')
@@ -27,21 +39,26 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   paths=list(root.rglob('*'))
   if len(paths)>128 or any(p.is_symlink() for p in paths):raise ValueError('OUTPUT_PATH_BOUND')
   return sum(p.stat().st_size for p in paths if p.is_file())
+ reaper=None
  try:
+  if render_profile is not None:
+   from .render_intake import OwnedSubreaper
+   reaper=OwnedSubreaper()
   child=subprocess.Popen(command,env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,preexec_fn=enter_memory if memory_group is not None else None)
   identity=proc_info(child.pid);identity.update(group_host=child.pid,group_start=identity['start']);
   if identity['ppid']!=os.getpid():raise ValueError('PROCESS_NAMESPACE_MISMATCH')
   parent=psutil.Process(child.pid);seen[child.pid]=parent.create_time()
   while child.poll() is None:
    try:
-    owned=[parent]+parent.children(recursive=True);rss=0
+    check()
+    owned=reaper.parent.children(recursive=True) if reaper is not None else [parent]+parent.children(recursive=True);rss=0
     for p in owned:
      try:
       seen[p.pid]=p.create_time();n=p.memory_info().rss;rss+=n
-      if n>1024**3:reason='PROCESS_RSS'
+      if n>single_rss:reason='PROCESS_RSS'
      except psutil.NoSuchProcess:pass
     peak=max(peak,rss)
-    if rss>1536*1024**2:reason='AGGREGATE_RSS'
+    if rss>group_rss:reason='AGGREGATE_RSS'
     elif time.monotonic()-started>=seconds:reason='DEADLINE'
     elif stop_file and Path(stop_file).exists():reason='OWNER_STOP'
     elif size()>maximum-16384:reason='OUTPUT_BOUND'
@@ -91,6 +108,9 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
     if time.monotonic()>=until:survivors.extend(remaining);break
     time.sleep(.025)
   except Exception:certain=False
+ if reaper is not None:
+  try:reaper.close()
+  except Exception:certain=False;reason=reason or 'ADOPTED_CLEANUP_UNCERTAIN'
  elapsed=time.monotonic()-started
  if elapsed>seconds+10:reason=reason or 'CLEANUP_DEADLINE';certain=False
  result=dict(exit_code=child.returncode if child else None,expired=reason=='DEADLINE',limit_hit=reason,

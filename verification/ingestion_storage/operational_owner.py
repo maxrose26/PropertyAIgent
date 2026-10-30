@@ -277,6 +277,8 @@ class Owner:
         recognised policy state (never exception text). Preflight fails closed before any change."""
         states,upgraded,permitted=self.reviewed_inventories(self.apply_policy)
         every={'ORIGINAL':states['ORIGINAL'],'SUCCESSOR_POLICY_APPLIED':upgraded,'GENERATION2_POLICY_APPLIED':self.generation2_inventory(),'GENERATION2_CAPTURE_POLICY_APPLIED':self.capture_inventory(),'GENERATION3_WINDOW_POLICY_APPLIED':self.window_inventory(),'GENERATION3_SCREENING_V3_POLICY_APPLIED':self.screening_v3_policy_inventory(),'GENERATION3_SCREENING_V3_APPLIED':self.screening_v3_inventory()}
+        if self.permitted_policy_states and 'DAILY_INTAKE_APPLIED' in self.permitted_policy_states:
+            every['DAILY_INTAKE_APPLIED']=self.daily_intake_inventory()
         if self.permitted_policy_states is not None:      # a mode may name exactly the retained state it is bound to (it then neither applies the policy nor accepts any other state)
             permitted={k:v for k,v in every.items() if k in self.permitted_policy_states}
         names=list(upgraded)
@@ -452,6 +454,35 @@ class Owner:
             if capability!=(False,False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         self.emit('owner_registration_committed',dict(authority=authority,keys=sorted(bindings),binding_sha256=digest(grant)))
         return bindings
+
+    @classmethod
+    def daily_intake_inventory(cls):
+        from .intake_policy import policy_sql,worker_text
+        modified={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(policy_sql())}
+        if set(modified)!={'ingestion_bolton_allowed','ingestion_register_bolton_exception'}:raise ValueError('INTAKE_FUNCTION_INVENTORY')
+        worker={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(worker_text())}
+        return {**cls.screening_v3_inventory(),**modified,'ingestion_worker_step':worker['ingestion_worker_step']}
+
+    def register_intake_period(self,name,policy):
+        """Owner-only preauthorisation through the existing issuer, never runtime.
+
+        Does not clear a stop, install SQL, provision a login or issue daily work.
+        The SQL boundary verifies expiry, council list and expected stop snapshot.
+        """
+        self.permitted_policy_states={'DAILY_INTAKE_APPLIED'}
+        self.expected_generation=policy['expected_stop']['hard_stop_generation']
+        with self.connection() as c:
+            self.verify_installed(c)
+            self.expected_generation=policy['expected_stop']['hard_stop_generation']
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
+            result=self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
+                          (json.dumps(dict(operation='intake_period',period=name,policy=policy)),),effect=True)[0][0]
+            self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
+            self.q(c,'COMMIT',effect=True)
+            flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0]
+            if flags!=(False,False):raise Uncertain('INTAKE_ISSUER_CAPABILITY_REMAINS')
+            return result
 
     def teardown(self,github):
         """Disable access first, then resolve surviving sessions under a bounded, privilege-proven policy, then delete the temporary secrets independently once DISABLED status is verified.

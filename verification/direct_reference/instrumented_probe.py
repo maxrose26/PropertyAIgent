@@ -668,6 +668,12 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
         from verification.discovery.four_council_release import owner_source_context
         owner_source_context(execution_budget)
         owner_proof=True
+    if execution_mode=='render-intake-v1' and retain_proof:
+        from verification.ingestion_storage.render_intake import source_context
+        if case!='discovery_manchester_ui_window' or collection_profile is None or execution_budget!='BROWSER_SOURCE_V2':
+            raise ValueError('RENDER_INTAKE_SCOPE')
+        source_context(json.loads(os.environ.get('INGESTION_RENDER_PROFILE','null')))
+        owner_proof=True  # explicit checked context, never hosted-runner impersonation
     if not owner_proof and not execution_environment_allowed(case, execution_mode, os.environ):
         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
     if int(Path('/proc/self/stat').read_text().split()[0]) != os.getpid():

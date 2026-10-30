@@ -66,6 +66,10 @@ class SQLLedger:
         else:
             if set(screening)!={'contract','config_sha256'} or screening['contract']!='listing-screen-v3' or not re.fullmatch('[a-f0-9]{64}',str(screening['config_sha256'])):raise Denied('SCREENING_PLAN_BINDING')
             contract,revision='listing-screen-v3',digest(dict(record_sha256=digest(record),config_sha256=screening['config_sha256']))
+        if plan.get('capture_bound') is True:
+            from .observation_screening import observation_revision
+            if screening is None or capture.get('kind')!='LISTING_RECEIPT_V1':raise Denied('CAPTURE_BOUND_COMPLETE_V3_REQUIRED')
+            revision=observation_revision(revision,digest(capture))
         if capture.get('kind')=='LISTING_OBSERVATION_V1':
             from .observation_screening import observation_revision
             if plan.get('source_kind')!='LISTING_OBSERVATION_V1':raise Denied('OBSERVATION_PLAN_BINDING')
@@ -93,7 +97,13 @@ class SQLLedger:
 
     def finish(self,claim,outcome,*,state='COMPLETE',reason=None,**kwargs):
         self._claim(claim)
-        if kwargs:raise Denied('UNREVIEWED_SQL_TRANSITION')
+        if kwargs:
+            if set(kwargs)!={'delay','resolved_receipt','council_defer_seconds'}:raise Denied('UNREVIEWED_SQL_TRANSITION')
+            if self.broker_engine is None:raise Denied('TRUSTED_SOURCE_BROKER_REQUIRED')
+            payload=dict(outcome=outcome,state=state,reason=reason,**kwargs)
+            with self.broker_engine.begin() as c:
+                self._limits(c)
+                return self._step('settle_failure',claim.key,claim.fence,payload,connection=c)
         if state=='COMPLETE':return self._step('complete',claim.key,claim.fence,outcome)
         if state not in {'UNSUPPORTED_CONTRACT','SAFETY_BLOCKED'}:raise Denied('OPERATOR_TRANSITION_REQUIRED')
         return self._step('block',claim.key,claim.fence,dict(state=state,reason=reason,outcome=outcome))

@@ -27,6 +27,8 @@ class ArcusListingContract:
     row_qualifier:object
     qualification_sha256:str
     execution_budget:str|None=None
+    retain_explicit_zero:bool=False  # opt-in intake; historical empty-window refusal unchanged
+    compact_retained:bool=False  # raw label captures remain in the bound source archive
 
     def __post_init__(self):
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256):raise Denied('EXACT_ARCUS_QUALIFICATION_REQUIRED')
@@ -55,19 +57,30 @@ class ArcusListingContract:
         if (source.get('applied_interval')!=interval or source.get('failure') is not None or source.get('enumeration_evidence')!='COUNT_RECONCILED'
             or source.get('completeness')!='UNKNOWN' or source.get('persistence') is not False):raise Denied('ARCUS_WINDOW_BINDING_OR_COMPLETENESS')
         rows=canonical_rows(source['listing_records']);segments=source['listing_segments']
-        if not rows:raise Denied('ARCUS_EMPTY_WINDOW_NOT_CAPTURED')      # an empty window has no records to batch, screen or nominate; explicit zero stays detection evidence
+        if not rows and not self.retain_explicit_zero:raise Denied('ARCUS_EMPTY_WINDOW_NOT_CAPTURED')
         if len(rows)>limits['rows'] or not 1<=len(segments)<=limits['pages']:raise Denied('ARCUS_RESOURCE_BOUND')
         records=[]
         for n,row in enumerate(rows,1):
             seg=next((s for s in segments if s['first']<=n<=s['last']),None)
             if seg is None or not re.fullmatch('[a-f0-9]{64}',str(seg.get('evidence_sha256',''))):raise Denied('ARCUS_SEGMENT_PROVENANCE')
-            records.append(dict(row,provenance=dict(parser='app.ingestion.arcus_adapter',segment_ordinal=seg['ordinal'],body_sha256=seg['evidence_sha256'],row_ordinal=n)))
+            projected=dict(row)
+            if self.compact_retained:
+                # Validation above used the original complete row. Preserve all
+                # projected fields and the raw capture digest; the duplicated
+                # label array remains in source_sha256's durable source archive.
+                projected.pop('assessment_capture')
+            records.append(dict(projected,provenance=dict(parser='app.ingestion.arcus_adapter',segment_ordinal=seg['ordinal'],body_sha256=seg['evidence_sha256'],row_ordinal=n)))
         resources=dict(metric='ARCUS_UI_COMBINED_BYTES',requests=source['requests'],decoded_bytes=source['decoded_bytes'],encoded_bytes=source['encoded_bytes'],
             outbound_payload_bytes=source['outbound_payload_bytes'],combined_bytes=combined_bytes(source),supervisor_seconds=source['supervisor_seconds'],
             peak_owned_rss=source['peak_owned_rss'],redirects=source.get('redirects'))
         receipt=dict(kind='LISTING_RECEIPT_V1',contract=self.name,council=c.council,interval=interval,records=records,segments=segments,source_sha256=digest(source),
             qualification_sha256=self.qualification_sha256,applied_interval=interval,cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,resources=resources,
             date_semantics='VALIDATED')
+        if not rows:
+            # The existing source validator admits only Manchester's exact
+            # visible zero, retained criteria, no rows and no next control.
+            if c.council!='manchester' or source.get('explicit_zero_evidence')!='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT':raise Denied('ARCUS_ZERO_EVIDENCE')
+            receipt['explicit_zero']=True
         window=self.admission_window(receipt,c.council)
         if window.outcome!=Completeness.COMPLETE:raise Denied('ARCUS_QUALIFIED_WINDOW_REQUIRED')
         receipt['window']=window.receipt_dict()
@@ -76,7 +89,7 @@ class ArcusListingContract:
     def admission_window(self,receipt,council_code):
         c=self.config;r=receipt['resources'];start,end=date.fromisoformat(c.start),date.fromisoformat(c.end)
         return WindowEvidence(council_code,'coordinator-retained',start,end,start,end,'VALIDATED',receipt['contract'],receipt['source_sha256'],ARCUS_TERMINAL,
-            len(receipt['segments']),len(receipt['records']),r['requests'],r['combined_bytes'],r['supervisor_seconds'])
+            len(receipt['segments']),len(receipt['records']),r['requests'],r['combined_bytes'],r['supervisor_seconds'],explicit_zero=receipt.get('explicit_zero',False))
 
     def record_body_sha256(self,record):
         return record['provenance']['body_sha256']

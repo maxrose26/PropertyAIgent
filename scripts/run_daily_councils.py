@@ -1,4 +1,9 @@
-"""Daily multi-council Planning Application scraper orchestrator (Pilot
+"""Scheduled intake entrypoint is INACTIVE pending supported rolling authority.
+
+The legacy implementation below is preserved for the separately authorised manual
+scripts.run_daily_councils_legacy command. main() cannot fall back to it.
+
+Historical implementation: Daily multi-council Planning Application scraper orchestrator (Pilot
 Readiness PR-2, "Production Scheduling"). This is the production entry
 point Render's Cron Job (see render.yaml) invokes once a day.
 
@@ -451,7 +456,7 @@ def run_one_council(
 from app.security.cli import authorised_cli
 
 @authorised_cli('run_daily_councils')
-def main() -> int:
+def legacy_main() -> int:
     args = parse_args()
     # "[mem] orchestrator.start" (Render Daily Discovery missing-runtime-
     # logs diagnosis, Part 6) - deliberately BEFORE init_db()/the council
@@ -494,6 +499,20 @@ def main() -> int:
     )
 
     return _exit_code(healthy=success_count + partial_count, attempted=len(council_codes))
+
+
+@authorised_cli('run_daily_councils')
+def main() -> int:
+    """Intake-only boundary. Requires an existing expiring period; never legacy.
+
+    No arguments refuse all effects. Explicit intake arguments use only the
+    restricted rolling issuer. Legacy/manual flags cannot select a fallback.
+    """
+    if len(sys.argv)==1:
+        from app.ingestion.daily_intake import inactive_main
+        return inactive_main()
+    from verification.ingestion_storage.daily_intake_runtime import main as intake_main
+    return intake_main()
 
 
 def _exit_code(*, healthy: int, attempted: int) -> int:
