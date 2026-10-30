@@ -49,6 +49,26 @@ def test_client_has_fixed_secure_connection_contract():
     assert 'os.environ.copy' not in source and 'PGPASSWORD' not in source
 
 
+def test_password_is_private_and_removed(tmp_path,monkeypatch,capsys):
+    ca=tmp_path/'ca.pem';ca.write_text('synthetic CA')
+    output=tmp_path/'evidence'
+    answers=iter(['192.0.2.10',str(ca),'postgres',str(output)])
+    monkeypatch.setattr('builtins.input',lambda _:next(answers))
+    monkeypatch.setattr(client.getpass,'getpass',lambda _:'SYNTHETIC:secret\\value')
+    monkeypatch.setattr(client.shutil,'which',lambda _:'/usr/bin/psql')
+    seen=[]
+    def run(command,environment,**bounds):
+        p=Path(environment['PGPASSFILE']);seen.append(p)
+        assert p.stat().st_mode & 0o777==0o600
+        assert 'secret' not in repr(command) and 'PGPASSWORD' not in environment
+        assert environment['PGSSLMODE']=='verify-full'
+        return b'ROLLBACK\n',dict(classification='OBSERVATIONS_REQUIRE_REVIEW')
+    monkeypatch.setattr(client,'capture',run)
+    assert client.main()==0 and not seen[0].exists()
+    exported=''.join(p.read_text() for p in output.iterdir())+capsys.readouterr().out
+    assert 'secret' not in exported
+
+
 @pytest.fixture(scope='module')
 def world():
     from tests.e2e_pg_world import disposable_world

@@ -1,0 +1,32 @@
+{
+  "baseline": "c47b829ab766d2bdc7dfb329b9384c403ecb6a7d",
+  "checkpoint_sha256": "b486cea799886fd4317e18241a4ea6615969a27012b7de3af98be9ab395b2210",
+  "contract": "manchester-screening-metadata-v1",
+  "council": "manchester",
+  "current_files": {
+    "app/ingestion/arcus_adapter.py": "45782d8cd4d7bf9b6432ab8f77f2571528c8279f0d11dc245bdd87933a5e8751",
+    "app/ingestion/collection_mode.py": "195a2ea48f9c12a85b4900c41cd488a5e375b97c049b4a55ebc00f89a50c278d",
+    "app/ingestion/coordinator.py": "2e2ad5cedf9172f404f9cabecf5ac1f2890eaff67fe68c386afd6754a67c2b02",
+    "verification/discovery/arcus_ui_audit.py": "7e7895241608c347302bcf5e4ba697e8364f0a8d9b2b523e72470b4146514a8e",
+    "verification/discovery/arcus_ui_config.py": "a8287a460fad5c846c37f5e082251d37836ec1c2a25d93acc2815270d8905d19",
+    "verification/discovery/arcus_ui_window.py": "72b25b93e27ed8928017fb819984d3bd272e1844a5a253ea66c29ab73088dc13",
+    "verification/discovery/screening_capture.py": "5e196279346b1948339fe6c455a902c2a1f09c5350bf24e265de0f4e6241dded"
+  },
+  "current_receipt_refusal": "SOURCE_BINDING",
+  "historical_case": "discovery_manchester_screening_20261001_03",
+  "historical_interval": [
+    "2026-10-01",
+    "2026-10-03"
+  ],
+  "historical_revalidation": "PASS_CURRENT_VALIDATOR_ROW_REQUALIFICATION_AND_SEGMENT_HASHES",
+  "historical_rows": 14,
+  "limitations": [
+    "Historical nonzero two-page window only",
+    "Current budget declarations require new execution evidence, never historical receipt rewriting",
+    "Explicit-zero live behaviour not established by the historical sample",
+    "Render browser acceptance is separate from live portal qualification"
+  ],
+  "scope": "Listing metadata mechanism only; no current source observation, coverage or freshness claim",
+  "semantics": "VALIDATED",
+  "status": "PROPOSED_REVIEW_REQUIRED"
+}

@@ -889,3 +889,8 @@ Corrections required / production blocked. Review the partial code and decide
 whether to authorise the narrow existing worker/registration compatibility changes
 in (1)-(3), without a new access framework, before further Render wiring. No
 merge, deployment, production acceptance or activation is authorised by this PR.
+
+
+## B fixed read-only inspection validation follow-up
+
+Inactive package: [B-INSPECTION.md](B-INSPECTION.md). Fixed SQL hash remains `131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997`. The adjacent stdlib client invokes existing psql once; it issues no grants, installation or authority. Disposable provisioning is test-only. Hosted validation is required. Manchester's unchanged historical checkpoint passes historical row/audit/segment validation; current B receipt binding still refuses SOURCE_BINDING. Proposed qualification binding requires REVIEW acceptance. Tameside original archive remains an owner input. No production execution or B authority follows.

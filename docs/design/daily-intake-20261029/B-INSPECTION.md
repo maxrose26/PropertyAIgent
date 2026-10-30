@@ -91,3 +91,14 @@ pagination, existing finite Idox limits, no details/database/retry. No execution
 
 A administrative closure requires the existing RESTORATION_VERIFIED output;
 do not rerun restoration merely because the record has not been supplied here.
+
+## Offline Manchester recommendation
+
+Revalidated the unchanged historical checkpoint with current historical-case audit
+validation, complete row requalification and segment hashes: PASS (14 rows).
+The current daily contract still refuses the same bytes with SOURCE_BINDING.
+Recommend accepting the retained evidence as support for the metadata mechanism,
+subject to REVIEW of `manchester-qualification-proposal.json`; not as a current
+B execution receipt. Proposed contract `manchester-screening-metadata-v1`.
+Proposed qualification file SHA256: 50b69796aa1a8a118edc17a76d4ef169556407859ab5efc292529cbee67381e9.
+No new qualification is issued automatically; its explicit limitations remain.
