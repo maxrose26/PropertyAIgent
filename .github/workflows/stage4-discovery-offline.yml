@@ -177,11 +177,18 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
         run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake.py tests/test_daily_intake_limits.py tests/test_daily_intake_pg.py tests/test_daily_intake_runtime.py tests/test_daily_intake_interruptions.py tests/test_render_intake.py -q --junitxml="$RUNNER_TEMP/daily-intake.xml"
+      - name: Fixed B read-only inspection, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 120s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_b_readonly_inspection.py -q --junitxml="$RUNNER_TEMP/b-readonly.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: daily-intake-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/daily-intake.xml
+          path: |
+            ${{ runner.temp }}/daily-intake.xml
+            ${{ runner.temp }}/b-readonly.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
