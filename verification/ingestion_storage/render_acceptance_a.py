@@ -91,13 +91,17 @@ def worker(root, hold):
         context.close(); browser.close()
 
 
-def effective_profile(profile):
+def effective_profile(profile, observation=None):
     # Fixture-only convenience: read allocation inside the ONE A job, then
     # pass an ordinary exact-byte profile to the unchanged validator/monitor.
     # No plan-name inference and no additional discovery job.
     profile = dict(profile)
     if profile.get('aggregate_bytes') is None:
         value = r.memory_sample(r.memory_group())['memory.max']
+        if observation is not None:
+            observation['readback_status'] = 'available' if type(value) is int or value == 'max' else 'unavailable'
+            if type(value) is int and 0 <= value <= 2**64-1 or value == 'max':
+                observation['memory_max'] = value
         if type(value) is not int: raise RuntimeError('A_EFFECTIVE_ALLOCATION_UNAVAILABLE')
         profile['aggregate_bytes'] = value
     return profile
@@ -152,6 +156,22 @@ def run(profile, root, emit):
     raise RuntimeError('A_INTERRUPTION_NOT_OBSERVED')
 
 
+# Only fixed application codes may cross the log boundary; never exception text.
+REASONS = frozenset({
+    'A_ENVIRONMENT_NOT_ALLOWLISTED', 'A_SERVICE_BINDING', 'A_REVISION_BINDING',
+    'A_ARGUMENTS', 'A_PROFILE_BOUND', 'A_EFFECTIVE_ALLOCATION_UNAVAILABLE',
+    'A_FIXED_ACCEPTANCE_LIMITS', 'RENDER_CGROUP_V2_REQUIRED',
+    'RENDER_CGROUP_PATH', 'RENDER_CGROUP_PATH_UNAVAILABLE',
+    'RENDER_FINITE_AGGREGATE_REQUIRED',
+})
+
+
+def refusal(exc, check, details):
+    code = exc.args[0] if len(exc.args) == 1 and type(exc.args[0]) is str else None
+    return dict(reason_code=code if code in REASONS else 'A_UNKNOWN_FAILURE',
+                failing_check=check, **details)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--profile', type=Path)
@@ -170,21 +190,42 @@ def main(argv=None):
                 return 2
         return 0
     emit = Log()
+    check = 'environment'
+    details = {}
     try:
-        if set(os.environ) - ENV: raise RuntimeError('A_ENVIRONMENT_NOT_ALLOWLISTED')
+        unexpected = sorted(set(os.environ) - ENV)
+        if unexpected:
+            # Names only, finite count/length; JSON encoding escapes control chars.
+            details = dict(unexpected_names=[name[:128] for name in unexpected[:32]],
+                           unexpected_count=len(unexpected),
+                           names_truncated=len(unexpected)>32 or any(len(n)>128 for n in unexpected))
+            raise RuntimeError('A_ENVIRONMENT_NOT_ALLOWLISTED')
+        check = 'service_binding'
         if os.environ.get('RENDER_SERVICE_ID') != r.SERVICE: raise RuntimeError('A_SERVICE_BINDING')
+        check = 'revision_binding'
         import re
         if not re.fullmatch('[a-f0-9]{40}', os.environ.get('RENDER_GIT_COMMIT', '')): raise RuntimeError('A_REVISION_BINDING')
+        check = 'arguments'
         if args.profile is None or args.output is None or args.hold: raise RuntimeError('A_ARGUMENTS')
+        check = 'profile_size'
         if args.profile.stat().st_size > 4096: raise RuntimeError('A_PROFILE_BOUND')
-        profile = effective_profile(json.loads(args.profile.read_text()))
+        check = 'profile_read'
+        profile = json.loads(args.profile.read_text())
+        check = 'effective_allocation'
+        details = dict(required_readback='memory.max', readback_status='unavailable')
+        profile = effective_profile(profile, observation=details)
+        details = {}
+        check = 'fixed_limits'
         if (profile['source_rss_bytes'], profile['controller_rss_bytes'], profile['reserve_bytes'], profile['source_seconds']) != (1024*r.MiB,256*r.MiB,512*r.MiB,75):
             raise RuntimeError('A_FIXED_ACCEPTANCE_LIMITS')
+        check = 'output_directory'
         args.output.mkdir(mode=0o700)  # unique, no overwrite
         emit('ENVIRONMENT_ACCEPTED', names=sorted(os.environ))
+        check = 'supervised_fixture'
         run(profile, args.output, emit)
     except Exception as exc:
-        emit('REFUSED', error_type=type(exc).__name__, successful_intake=False)
+        emit('REFUSED', error_type=type(exc).__name__, successful_intake=False,
+             **refusal(exc, check, details))
         return 2
     return 2
 

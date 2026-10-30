@@ -110,3 +110,39 @@ def test_effective_allocation_uses_readback_not_plan_label(tmp_path,monkeypatch)
     assert got['aggregate_bytes']==2000000000 and p['aggregate_bytes'] is None
     monkeypatch.setattr(a.r,'memory_sample',lambda _: {'memory.max':'max'})
     with pytest.raises(RuntimeError,match='ALLOCATION_UNAVAILABLE'):a.effective_profile(p)
+
+@pytest.mark.parametrize('case,check,code',[
+    ('environment','environment','A_ENVIRONMENT_NOT_ALLOWLISTED'),
+    ('service','service_binding','A_SERVICE_BINDING'),
+    ('revision','revision_binding','A_REVISION_BINDING'),
+    ('arguments','arguments','A_ARGUMENTS'),
+    ('allocation','effective_allocation','A_EFFECTIVE_ALLOCATION_UNAVAILABLE'),
+    ('cgroup','effective_allocation','RENDER_CGROUP_PATH_UNAVAILABLE'),
+    ('unknown','effective_allocation','A_UNKNOWN_FAILURE'),
+])
+def test_safe_refusal_details(tmp_path,monkeypatch,capsys,case,check,code):
+    env=dict(PATH='/usr/bin',RENDER_SERVICE_ID=a.r.SERVICE,RENDER_GIT_COMMIT='a'*40)
+    if case=='environment':env.update({f'PRIVATE_{i}':'SECRET_VALUE' for i in range(40)})
+    if case=='service':env['RENDER_SERVICE_ID']='SECRET_VALUE'
+    if case=='revision':env['RENDER_GIT_COMMIT']='SECRET_VALUE'
+    monkeypatch.setattr(a.os,'environ',env)
+    cfg=tmp_path/'p.json';cfg.write_text('{"aggregate_bytes":null}')
+    monkeypatch.setattr(a.r,'memory_group',lambda:tmp_path)
+    monkeypatch.setattr(a.r,'memory_sample',lambda _: {'memory.max':'max'})
+    if case in ('cgroup','unknown'):
+        def fail():
+            if case=='cgroup':raise a.r.Denied('RENDER_CGROUP_PATH_UNAVAILABLE')
+            raise RuntimeError('SECRET_VALUE')
+        monkeypatch.setattr(a.r,'memory_group',fail)
+    args=[] if case=='arguments' else ['--profile',str(cfg),'--output',str(tmp_path/'run')]
+    assert a.main(args)==2
+    output=capsys.readouterr().out
+    record=json.loads(output)
+    assert record['reason_code']==code and record['failing_check']==check
+    assert record['phase']=='REFUSED' and record['successful_intake'] is False
+    assert 'SECRET_VALUE' not in output and len(output.encode())<8192
+    if case=='environment':
+        assert len(record['unexpected_names'])==32 and record['names_truncated']
+        assert record['unexpected_count']==40
+    if case=='allocation':assert record['memory_max']=='max'
+    if case=='cgroup':assert record['readback_status']=='unavailable'
