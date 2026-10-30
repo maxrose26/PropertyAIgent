@@ -198,6 +198,7 @@ def test_oldham_authority_expiry_and_malformed_data(seeded,case):
     elif case=='bad_binding':ctl['oldham_allowances'][AUTHORITY]['grant_binding']={}
     else:
         ctl['oldham_allowances']={AUTHORITY+str(i):copy.deepcopy(ctl['oldham_allowances'][AUTHORITY]) for i in range(33)}
+        ctl['grants']={k:copy.deepcopy(ctl['grants'][AUTHORITY]) for k in ctl['oldham_allowances']}
     c.execute("UPDATE ingestion_work_items SET outcome=%s WHERE key=repeat('0',64)",(json.dumps(ctl),))
     r=observe(c)['oldham_authorities'][0]
     if case=='overflow':assert r['total_count']==33 and r['reported_count']==32 and not r['complete']
