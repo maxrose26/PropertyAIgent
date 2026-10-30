@@ -1,4 +1,62 @@
-## Current parent-environment amendment — 30 October 2026
+## Current complete parent-only compatibility amendment — 30 October 2026
+
+Authoritative for parent compatibility; historical sections below are preserved.
+Base ea901e72cc40da0e3f7631a134ee3e9ddfd19315. Stage 4 OPEN. A unaccepted;
+B and recurring activation unauthorised. No Render execution is authorised here.
+
+REVIEW explicitly accepts the unknown Render pre-Python wrapper behaviour for A
+only, conditional on credential-free service preparation. This supersedes the
+prior support/source-evidence dependency. USER_RUN_COMMAND,
+RENDER_PRE_RUN_COMMAND and GUNICORN_CMD_ARGS are unused parent exceptions:
+our fixture neither reads/evaluates their values nor forwards them. This does
+NOT establish that Render ignores them. No invented equality predicates.
+
+The finite PARENT_PLATFORM_ENV set retains IS_PULL_REQUEST and adds exactly 92
+names: the reviewed 89 plus the three above. No wildcard. The complete 110-name
+fixture is frozen independently in tests from job-dbi9o0mtlv9c7398ki6g:
+110/110, contiguous 0..109, complete=true, 7222 output bytes. Render status
+Succeeded; numeric exitCode was not separately retained. This observation does
+not reconstruct the prior failed jobs' complete environments.
+
+Evidence classification: Render documents RENDER_CPU_COUNT, FORWARDED_ALLOW_IPS,
+GUNICORN_CMD_ARGS, PIPENV_YES, VENV_ROOT, NODE_ENV, NODE_MODULES_CACHE,
+NODE_VERSION, CARGO_HOME and RUSTUP_HOME:
+https://render.com/docs/environment-variables
+Other explicit names are reviewed observed compatibility exceptions, not claims
+of documented Python defaults or harmless values. Tool settings can affect their
+tools, but the fixed A route invokes no Gunicorn, installer or package manager.
+Kubernetes names are endpoint metadata, not evidence of credential absence.
+https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/
+Undocumented Render internals may change without warning. New names still refuse.
+
+SOURCE_ENV, fresh child construction, resource limits and bounded names-only
+diagnostics are unchanged. Never log values or arbitrary exception text.
+Tests cover all 110 names, each exception, unknown/credential refusal, shell-like
+sentinels through the real-browser path and child-environment exclusion. Native
+SIGKILL is real; cgroup observations and whole-job teardown remain harness-modelled.
+
+Restoration completed after inventory: owner-terminal RESTORATION_VERIFIED
+confirmed exact saved values for DATABASE_URL, PLANNING_STATUS_VERIFICATION_ENABLED
+and PYTHONUNBUFFERED, unchanged unrelated mappings, suspended service, master,
+original build command, auto-deploy off, /bin/true and unchanged schedule.
+This supersedes the historical pending-restoration statement.
+Retained Render build dep-dbi8e4mi0phs73d570lg / c37e7afb is unchanged.
+Preserve job-dbi8ivajnfac73d4b3tg (known environment refusal) and
+job-dbi7lmh42hec73cml7e0 (historical cause UNKNOWN).
+
+Inactive preparation: separately authorise an exact final-head SHA-guarded build;
+use the existing dependency/browser-canary procedure, regenerate browser SHA256
+and profile revision from that build, and package render-a-profile.json in the
+artifact (no persistent disk assumption). aggregate_bytes=null is A-only runtime
+readback. Limits remain source 1073741824, controller 268435456, reserve 536870912
+bytes, source phase 75 seconds; allocation must satisfy the existing validator.
+Use one separately approved A job, GNU timeout 190s plus 5s escalation and a unique
+output directory. Credential-free inherited mappings/groups/secret files remain
+mandatory before creation; runtime unsetting is not a substitute.
+No Render build/job/resumption/settings changes occurred in this amendment.
+Final head/tree and hosted results are supplied by the publication handoff.
+
+## Historical — partial parent-environment amendment — 30 October 2026
 
 Authoritative for this amendment; diagnostic history below is preserved but its
 32-name reporting cap and no-allowlist-expansion statements are superseded.
@@ -48,7 +106,7 @@ approval must bind build/profile/browser hashes to the new exact source head;
 190-second GNU timeout with five-second escalation, no automatic retry. No new
 environment-discovery service or controller is added.
 
-## Current A refusal diagnostic correction — 30 October 2026
+## Historical — A refusal diagnostic correction — 30 October 2026
 
 This section supersedes historical statements below that no Render A execution has occurred. It does not supersede the acceptance requirements or grant execution permission.
 
