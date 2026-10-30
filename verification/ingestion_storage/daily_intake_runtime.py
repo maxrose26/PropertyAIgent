@@ -243,8 +243,17 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
+            if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
             self.memory=require_source_context(self.policy['councils'],disposable=self.test,profile=self.policy.get('render_profile'),binding=self.binding)
+            if self.memory:
+                original_check=self.run.check
+                def monitored_check():
+                    original_check()
+                    # On refusal, finalisation may attempt bounded closure; it
+                    # must not restart source work or pretend pressure is gone.
+                    if not self.run.closing:self.memory.check()
+                self.run.check=monitored_check
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)
@@ -315,7 +324,8 @@ class Runtime:
             if result['cleanup']!='CLOSED':result['status']='STOP_RECONCILE_NO_RETRY'
             result['effect_reconciliation_required']=result['status']=='STOP_RECONCILE_NO_RETRY'
             result['test_evidence']=self.test;result['execution_binding']=self.binding
-            if self.memory:result['memory']=self.memory.evidence()
+            if self.memory:
+                result['memory']=self.memory.evidence();result['render_profile']=self.policy['render_profile']
             raw=canonical(result);events=canonical(self.events)
             try:
                 if self.authorities:self.run.publication(len(raw)+len(events),10)

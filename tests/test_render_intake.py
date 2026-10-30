@@ -30,7 +30,7 @@ def test_profile_refuses_wrong_identity_browser_and_unjustified_bounds(tmp_path,
 
 
 @pytest.mark.parametrize('fault',['normal_exit','deadline','cancel','monitor_failure','rss'])
-def test_supervisor_reaps_unsampled_session_orphan_on_all_exits(tmp_path,fault):
+def test_supervisor_reaps_unsampled_session_orphan_on_all_exits(tmp_path,fault,record_property):
     if int(Path('/proc/self/stat').read_text().split()[0])!=os.getpid():
         if os.environ.get('CI'):pytest.fail('native PID namespace required')
         pytest.skip('local /proc is outside PID namespace; native hosted test required')
@@ -50,6 +50,7 @@ def test_supervisor_reaps_unsampled_session_orphan_on_all_exits(tmp_path,fault):
             if fault=='monitor_failure':raise RuntimeError('synthetic monitor failure')
     result=supervise([sys.executable,'-c',leader],environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},root=tmp_path/'owned',
         source=True,seconds=1,stop_file=stop,execution_budget='BROWSER_SOURCE_V2',render_profile=p,check=check)
+    record_property('sampled_supervisor_result',json.dumps(result,sort_keys=True))
     assert pidfile.exists(),result
     pid=int(pidfile.read_text())
     assert not psutil.pid_exists(pid),result
@@ -82,3 +83,19 @@ def test_historical_host_modes_unchanged():
     assert execution_environment_allowed('trafford','render-disposable',{'RENDER_SERVICE_ID':r.SERVICE})
     assert not execution_environment_allowed('discovery_manchester_ui_window','render-disposable',{'RENDER_SERVICE_ID':r.SERVICE})
     assert not execution_environment_allowed('discovery_manchester_ui_window',r.MODE,{'RENDER_SERVICE_ID':r.SERVICE})
+
+
+def test_source_environment_refuses_credentials_and_controller_memory_refuses(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    p=profile(tmp_path)
+    monkeypatch.setattr(r,'memory_group',lambda:tmp_path)
+    monkeypatch.setattr(r,'memory_sample',lambda _:dict(**{'memory.max':p['aggregate_bytes'],'memory.current':64*r.MiB,
+        'memory.swap.max':0,'memory.peak':64*r.MiB,'memory.events':{'max':0,'oom':0,'oom_kill':0}}))
+    with monkeypatch.context() as m:
+        for key in list(os.environ):m.delenv(key)
+        m.setenv('INGESTION_SOURCE_PRIVATE','ONCE');m.setenv('PLAYWRIGHT_BROWSERS_PATH',p['browser_path'])
+        assert r.source_context(p)
+        m.setenv('INGESTION_WORKER_DATABASE_URL','never-used')
+        with pytest.raises(Denied,match='ENVIRONMENT'):r.source_context(p)
+    monkeypatch.setattr(r.psutil,'Process',lambda:SimpleNamespace(memory_info=lambda:SimpleNamespace(rss=257*r.MiB)))
+    with pytest.raises(Denied,match='HEADROOM'):r.MemoryMonitor(p)

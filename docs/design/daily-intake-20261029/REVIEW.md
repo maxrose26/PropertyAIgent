@@ -78,7 +78,14 @@ separate requirements. No merge/deploy/settings/job/activation authority follows
 
 This section supersedes the former unconditional Manchester-context refusal below
 only for the explicit validated profile; all unconfigured live invocations refuse.
-Focused validation results and final identities will be recorded in the handoff.
+First implementation candidate3f6e9895f9a6514abbf9803458b32dd953874758:
+79 focused tests passed on hosted PostgreSQL17.11/native Linux, job123806710989
+(run40976790552). Includes original58 plus8 real SIGKILL boundaries, exact
+screen/batch redelivery checks and12 Render/profile/native supervision tests.
+Local namespace-mismatched native cases are skipped explicitly, not counted as
+passes. Final follow-up adds controller-in-flight kill, aged/expired marker checks,
+source credential/controller-memory refusal and tighter cgroup path accounting.
+Final identities/results are in the consolidated handoff; no live Render claim.
 
 ## Current connected path
 

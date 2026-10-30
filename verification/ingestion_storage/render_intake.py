@@ -27,7 +27,7 @@ def memory_group():
     if '..' in Path(relative).parts:raise Denied('RENDER_CGROUP_PATH')
     mounted=Path('/sys/fs/cgroup')
     candidate=mounted/relative.lstrip('/')
-    if not (candidate/'memory.max').is_file():candidate=mounted
+    if not (candidate/'memory.max').is_file():raise Denied('RENDER_CGROUP_PATH_UNAVAILABLE')
     # Read only the process's namespace-visible hierarchy, never guess plan bytes.
     paths=[candidate]
     while paths[-1]!=mounted and mounted in paths[-1].parents:paths.append(paths[-1].parent)
@@ -91,7 +91,7 @@ class MemoryMonitor:
 
     def check(self):
         s=memory_sample(self.group);self.last=s
-        if s['memory.max']!=self.profile['aggregate_bytes'] or type(s['memory.current']) is not int or s['memory.events'] is None:
+        if s['memory.max']!=self.profile['aggregate_bytes'] or type(s['memory.current']) is not int or (s['memory.events'] is None or not {'max','oom','oom_kill'}<=s['memory.events'].keys()):
             raise Denied('RENDER_MEMORY_ACCOUNTING_UNAVAILABLE')
         if s['memory.swap.max']!=self.initial['memory.swap.max']:raise Denied('RENDER_SWAP_POLICY_CHANGED')
         controller=psutil.Process().memory_info().rss

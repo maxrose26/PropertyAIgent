@@ -44,6 +44,16 @@ def main():
                 yield Proxy(),budget
             if operation=='intake_close':pause('closure')
             if operation=='intake_finish':pause('finish_ack')
+    if args.fault=='during_source':
+        import verification.ingestion_storage.daily_intake_runtime as module
+        original_supervise=module.supervise
+        def monitored(*a,**kw):
+            check=kw['check']
+            def during():
+                check();pause('during_source')
+            kw['check']=during
+            return original_supervise(*a,**kw)
+        module.supervise=monitored
     original=Path.write_bytes
     def write(path,data):
         result=original(path,data)

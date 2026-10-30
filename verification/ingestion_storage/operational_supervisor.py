@@ -51,7 +51,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   while child.poll() is None:
    try:
     check()
-    owned=[parent]+parent.children(recursive=True);rss=0
+    owned=reaper.parent.children(recursive=True) if reaper is not None else [parent]+parent.children(recursive=True);rss=0
     for p in owned:
      try:
       seen[p.pid]=p.create_time();n=p.memory_info().rss;rss+=n
