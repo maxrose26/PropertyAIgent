@@ -1,0 +1,314 @@
+{
+  "allowance": {
+    "evidence": {
+      "outer_sha256": "b8e38edeaddf6609833b07354563092183c832f8aa6a21f62228716ecb5cbba3",
+      "qualification_sha256": "3d519c158bb35d50ad7d1472e842e40eb850dcde6ee7a6e01eda36e91589a003",
+      "registration_sha256": "9c9100f8257fc92f40f5c76e8167d110f30971e229b4e9198307e51ede3023b6",
+      "source_sha256": "97a3fe071da69a7fde32ee7bc663a19d8543c0e49fca5a127415c7e8c7ebc671"
+    },
+    "expires_at": 1793228890.0,
+    "grant_binding": {
+      "bindings": {
+        "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf": {
+          "contract": "oldham-owner-complete-v1",
+          "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+          "subject": {
+            "council": "oldham",
+            "end": "2026-10-21",
+            "kind": "DISCOVERY_SCOPE",
+            "semantics": "RECEIVED",
+            "start": "2026-10-15"
+          },
+          "task": "DISCOVERY"
+        }
+      },
+      "capture_key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+      "capture_only": false,
+      "completion_outcomes": {
+        "DISCOVERY": [
+          "ENUMERATED_METADATA_RETAINED"
+        ],
+        "LISTING_METADATA": [
+          "BATCH_SCREENED"
+        ],
+        "SCREENING": [
+          "SCREENED",
+          "ALREADY_KNOWN",
+          "INSUFFICIENT_EVIDENCE",
+          "SUPPORTED_PROCESSING_PRIORITY",
+          "RELATED_APPLICATION_FOLLOW_THROUGH",
+          "DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE"
+        ]
+      },
+      "contracts": [
+        "oldham-owner-complete-v1"
+      ],
+      "detail_source_keys": [],
+      "effect_login": "ingestion_effect_login",
+      "execution_binding": {
+        "manifest_sha256": "386b7c64d53f20af4a185f91b095d622f3c78260e895dfaec3ac97d4db4a006b",
+        "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+        "workflow_sha256": "06c50c29acf645a5f79cd5f4eb712af0d0346467a0ded829db4dfa33c66e282b"
+      },
+      "expires_at": 1793228890.0,
+      "keys": [
+        "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf"
+      ],
+      "login": "ingestion_worker_login",
+      "oldham_package_sha256": "PACKAGE_HASH_COMPUTED_IN_POSTGRES",
+      "workers": [
+        "required_once"
+      ]
+    },
+    "package": {
+      "authority": "INGESTION_CHAIN_OLDHAM_STAGED_CAPTURE_E9D12874CFB5",
+      "evidence": {
+        "outer_sha256": "b8e38edeaddf6609833b07354563092183c832f8aa6a21f62228716ecb5cbba3",
+        "qualification_sha256": "3d519c158bb35d50ad7d1472e842e40eb850dcde6ee7a6e01eda36e91589a003",
+        "registration_sha256": "9c9100f8257fc92f40f5c76e8167d110f30971e229b4e9198307e51ede3023b6",
+        "source_sha256": "97a3fe071da69a7fde32ee7bc663a19d8543c0e49fca5a127415c7e8c7ebc671"
+      },
+      "registration": {
+        "authority": "INGESTION_CHAIN_OLDHAM_STAGED_CAPTURE_E9D12874CFB5",
+        "bindings": {
+          "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf": {
+            "contract": "oldham-owner-complete-v1",
+            "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+            "subject": {
+              "council": "oldham",
+              "end": "2026-10-21",
+              "kind": "DISCOVERY_SCOPE",
+              "semantics": "RECEIVED",
+              "start": "2026-10-15"
+            },
+            "task": "DISCOVERY"
+          }
+        },
+        "grant": {
+          "bindings": {
+            "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf": {
+              "contract": "oldham-owner-complete-v1",
+              "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+              "subject": {
+                "council": "oldham",
+                "end": "2026-10-21",
+                "kind": "DISCOVERY_SCOPE",
+                "semantics": "RECEIVED",
+                "start": "2026-10-15"
+              },
+              "task": "DISCOVERY"
+            }
+          },
+          "capture_key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+          "capture_only": false,
+          "completion_outcomes": {
+            "DISCOVERY": [
+              "ENUMERATED_METADATA_RETAINED"
+            ],
+            "LISTING_METADATA": [
+              "BATCH_SCREENED"
+            ],
+            "SCREENING": [
+              "SCREENED",
+              "ALREADY_KNOWN",
+              "INSUFFICIENT_EVIDENCE",
+              "SUPPORTED_PROCESSING_PRIORITY",
+              "RELATED_APPLICATION_FOLLOW_THROUGH",
+              "DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE"
+            ]
+          },
+          "contracts": [
+            "oldham-owner-complete-v1"
+          ],
+          "detail_source_keys": [],
+          "effect_login": "ingestion_effect_login",
+          "execution_binding": {
+            "manifest_sha256": "386b7c64d53f20af4a185f91b095d622f3c78260e895dfaec3ac97d4db4a006b",
+            "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+            "workflow_sha256": "06c50c29acf645a5f79cd5f4eb712af0d0346467a0ded829db4dfa33c66e282b"
+          },
+          "expires_at": 1793228890.0,
+          "keys": [
+            "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf"
+          ],
+          "login": "ingestion_worker_login",
+          "source_calls": 0,
+          "workers": [
+            "required_once"
+          ],
+          "writes": 0
+        },
+        "insert": [
+          {
+            "attempt_count": 0,
+            "authority": null,
+            "checkpoint": null,
+            "contract": "oldham-owner-complete-v1",
+            "dependencies": [],
+            "eligible_at": 0,
+            "fence": 0,
+            "key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+            "lease_until": null,
+            "limits": {
+              "aggregate_rss": 1610612736,
+              "audit_bytes": 2097152,
+              "bytes": 20971520,
+              "outer_seconds": 60,
+              "pages": 6,
+              "requests": 80,
+              "rows": 60,
+              "source_rss": 1073741824,
+              "worker_seconds": 45
+            },
+            "max_attempts": 2,
+            "next_action": "CLAIM_WHEN_AUTHORISED",
+            "outcome": null,
+            "owner": null,
+            "phase": "IDLE",
+            "priority": 50,
+            "reason": null,
+            "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+            "state": "QUEUED",
+            "subject": {
+              "council": "oldham",
+              "end": "2026-10-21",
+              "kind": "DISCOVERY_SCOPE",
+              "semantics": "RECEIVED",
+              "start": "2026-10-15"
+            },
+            "task": "DISCOVERY"
+          }
+        ],
+        "kind": "CAPTURE",
+        "root_key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+        "rows": [
+          {
+            "attempt_count": 0,
+            "authority": null,
+            "checkpoint": null,
+            "contract": "oldham-owner-complete-v1",
+            "dependencies": [],
+            "eligible_at": 0,
+            "fence": 0,
+            "key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+            "lease_until": null,
+            "limits": {
+              "aggregate_rss": 1610612736,
+              "audit_bytes": 2097152,
+              "bytes": 20971520,
+              "outer_seconds": 60,
+              "pages": 6,
+              "requests": 80,
+              "rows": 60,
+              "source_rss": 1073741824,
+              "worker_seconds": 45
+            },
+            "max_attempts": 2,
+            "next_action": "CLAIM_WHEN_AUTHORISED",
+            "outcome": null,
+            "owner": null,
+            "phase": "IDLE",
+            "priority": 50,
+            "reason": null,
+            "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+            "state": "QUEUED",
+            "subject": {
+              "council": "oldham",
+              "end": "2026-10-21",
+              "kind": "DISCOVERY_SCOPE",
+              "semantics": "RECEIVED",
+              "start": "2026-10-15"
+            },
+            "task": "DISCOVERY"
+          }
+        ],
+        "targets": {}
+      },
+      "scope": {
+        "council": "oldham",
+        "end": "2026-10-21",
+        "kind": "DISCOVERY_SCOPE",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      },
+      "stop": {
+        "global_stop": {
+          "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+          "run": "38884069913"
+        },
+        "hard_stop_generation": 3,
+        "last_hard_stop": "IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE",
+        "manual_stop": "IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE"
+      },
+      "targets": {}
+    },
+    "package_sha256": "PACKAGE_HASH_COMPUTED_IN_POSTGRES",
+    "revoked": false,
+    "scope": {
+      "council": "oldham",
+      "end": "2026-10-21",
+      "kind": "DISCOVERY_SCOPE",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    "source_cap": 0,
+    "stop_sha256": "ff2876015380e16d3ce794b289d207e15e0e39f62fb44cf104c1608edcb39f7b",
+    "targets": {},
+    "write_cap": 0
+  },
+  "grant": {
+    "bindings": {
+      "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf": {
+        "contract": "oldham-owner-complete-v1",
+        "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+        "subject": {
+          "council": "oldham",
+          "end": "2026-10-21",
+          "kind": "DISCOVERY_SCOPE",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        },
+        "task": "DISCOVERY"
+      }
+    },
+    "capture_key": "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf",
+    "capture_only": false,
+    "completion_outcomes": {
+      "DISCOVERY": [
+        "ENUMERATED_METADATA_RETAINED"
+      ],
+      "LISTING_METADATA": [
+        "BATCH_SCREENED"
+      ],
+      "SCREENING": [
+        "SCREENED",
+        "ALREADY_KNOWN",
+        "INSUFFICIENT_EVIDENCE",
+        "SUPPORTED_PROCESSING_PRIORITY",
+        "RELATED_APPLICATION_FOLLOW_THROUGH",
+        "DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE"
+      ]
+    },
+    "contracts": [
+      "oldham-owner-complete-v1"
+    ],
+    "detail_source_keys": [],
+    "effect_login": "ingestion_effect_login",
+    "execution_binding": {
+      "manifest_sha256": "386b7c64d53f20af4a185f91b095d622f3c78260e895dfaec3ac97d4db4a006b",
+      "revision": "fa0064aa111c55bf4f8be1e4d4216aa2fe2b529e",
+      "workflow_sha256": "06c50c29acf645a5f79cd5f4eb712af0d0346467a0ded829db4dfa33c66e282b"
+    },
+    "expires_at": 1793228890.0,
+    "keys": [
+      "abf1b6f7e9c8119a74e2f8f3d2bdec0a4b2da3a5eee8768a2783614755aa26cf"
+    ],
+    "login": "ingestion_worker_login",
+    "oldham_package_sha256": "PACKAGE_HASH_COMPUTED_IN_POSTGRES",
+    "source_calls": 0,
+    "workers": [
+      "required_once"
+    ],
+    "writes": 0
+  }
+}
