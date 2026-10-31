@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import time
 
-SQL_SHA = 'd65ecc2dc250b52b211c91f0b9a727cef3d939b46a9faa07930360cdacc887eb'
+SQL_SHA = 'cb80667651a76056d6fa26772a8cf1103bb5e7e293def728cc3101ac0e5416d4'
 HOST = 'aws-0-eu-west-2.pooler.supabase.com'
 USER = 'postgres.zcikcfgpblzuzpanpdqd'
 LIMIT = 65536

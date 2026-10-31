@@ -16,8 +16,8 @@ from pathlib import Path
 import ast,hashlib,sys
 r,p=map(Path,sys.argv[1:])
 check=lambda path,h:hashlib.sha256(path.read_bytes()).hexdigest()==h
-assert check(p/'oldham-cleanup.sql','d65ecc2dc250b52b211c91f0b9a727cef3d939b46a9faa07930360cdacc887eb')
-assert check(p/'oldham-cleanup-client.py','c0bd1ada7f760032031b671a6e4c9581d2d3c15a545b220022264549a0a3136c')
+assert check(p/'oldham-cleanup.sql','cb80667651a76056d6fa26772a8cf1103bb5e7e293def728cc3101ac0e5416d4')
+assert check(p/'oldham-cleanup-client.py','e04d7973d47abab8adea8ae67a323eda0e72e81bfac4f9793df379b82a64fcf0')
 assert check(r/'verification/ingestion_storage/trust/supabase-prod-ca-2021.crt','700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7')
 assert check(r/'docs/design/daily-intake-20261029/b-readonly.sql','131e519e8d69f2b48b951b2dcc45e43dd2967cba66ec3e894b028752506e4997')
 assert check(r/'verification/ingestion_storage/intake_policy.py','ea5a27817d49b74c27e148e2478ae2327cfb294d4226470f1103cd090bae5487')      # the generators that produced this SQL (identical at 62fad2f)

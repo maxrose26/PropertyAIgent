@@ -13,6 +13,7 @@ A='INGESTION_CHAIN_OLDHAM_STAGED_CAPTURE_E9D12874CFB5'
 @pytest.fixture
 def baseline(seeded):
  b=seeded['boot']
+ b.execute('ALTER ROLE ingestion_storage_owner NOINHERIT')
  from verification.ingestion_storage.oldham_reuse import expected_historical
  class Owner:
   def q(self,c,q,p=None):return c.execute(q,p).fetchall()
@@ -40,7 +41,7 @@ def run(sql=SQL):
   except BaseException:c.execute('ROLLBACK');raise
 
 def test_exact_cleanup_and_preserved_stops_history_functions_schema(baseline,record_property):
- b=baseline['boot'];before=snap(b);ctl=copy.deepcopy(before[0][3]['items'][0]['outcome']) if False else b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+ b=baseline['boot'];before=snap(b);ctl=b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
  run();after=snap(b)
  expected=copy.deepcopy(ctl);expected['grants'][A]['expires_at']=0;expected['oldham_allowances'][A]['revoked']=True
  assert b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]==expected
@@ -50,7 +51,7 @@ def test_exact_cleanup_and_preserved_stops_history_functions_schema(baseline,rec
  record_property('server_version',baseline['server_version']);record_property('installer_superuser',False)
 
 @pytest.mark.parametrize('fault,code',[
- ('stop', 'CLEANUP_CURRENT_STOP_DRIFT'),('authority','CLEANUP_HISTORICAL_BINDING_OR_EXPIRY'),('work','CLEANUP_HISTORICAL_WORK_DRIFT'),('grantor','CLEANUP_TARGET_GRANTOR_OR_ADMIN'),('login','CLEANUP_LOGIN_STATE'),('password','CLEANUP_PASSWORD_PRESENCE'),('owner_set','CLEANUP_OWNER_BASELINE')])
+ ('stop', 'CLEANUP_CURRENT_STOP_DRIFT'),('authority','CLEANUP_HISTORICAL_BINDING_OR_EXPIRY'),('work','CLEANUP_HISTORICAL_WORK_DRIFT'),('grantor','CLEANUP_TARGET_GRANTOR_OR_ADMIN'),('login','CLEANUP_LOGIN_STATE'),('password','CLEANUP_PASSWORD_PRESENCE'),('owner_set','CLEANUP_OWNER_BASELINE'),('owner_flags','CLEANUP_ROLE_FLAGS')])
 def test_drift_refuses_without_change(baseline,fault,code):
  b=baseline['boot']
  q={'stop':"UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,'{hard_stop_generation}','6')::json WHERE key=repeat('0',64)",
@@ -59,6 +60,7 @@ def test_drift_refuses_without_change(baseline,fault,code):
  'grantor':'REVOKE ingestion_worker FROM ingestion_worker_login GRANTED BY postgres; GRANT ingestion_worker TO ingestion_worker_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE',
  'login':'ALTER ROLE ingestion_worker_login LOGIN',
  'password':"ALTER ROLE ingestion_worker_login PASSWORD 'synthetic_only'",
+ 'owner_flags':'ALTER ROLE ingestion_storage_owner INHERIT',
  'owner_set':'GRANT ingestion_storage_owner TO postgres WITH ADMIN FALSE, INHERIT FALSE, SET TRUE GRANTED BY postgres'}[fault]
  b.execute(q);before=snap(b)
  with pytest.raises(psycopg.Error,match=code):run()
@@ -79,3 +81,37 @@ def test_second_attempt_refused_no_retry(baseline):
  run();b=baseline['boot'];before=snap(b)
  with pytest.raises(psycopg.Error):run()
  assert snap(b)==before
+
+
+@pytest.mark.parametrize('mode',['ack','no_ack','error','overflow','deadline'])
+def test_cleanup_client_marker_bounds_secret_removal(tmp_path,monkeypatch,mode):
+ spec=importlib.util.spec_from_file_location('cleanup_client',P/'oldham-cleanup-client.py');client=importlib.util.module_from_spec(spec);spec.loader.exec_module(client)
+ ca=tmp_path/'ca';ca.write_text('synthetic');out=tmp_path/'evidence'
+ answers=iter(['18.135.253.94',str(ca),'postgres',str(out)])
+ monkeypatch.setattr('builtins.input',lambda _:next(answers));monkeypatch.setattr(client.getpass,'getpass',lambda _:'SYNTHETIC_PASSWORD_SENTINEL');monkeypatch.setattr(client.shutil,'which',lambda _:'/usr/bin/psql')
+ seen={}
+ def capture(cmd,env,**kw):
+  seen.update(env);assert env['PGSSLMODE']=='verify-full' and kw['ceiling']==64512
+  assert 'SYNTHETIC_PASSWORD_SENTINEL' not in repr(cmd)+repr(env)
+  assert Path(env['PGPASSFILE']).stat().st_mode&0o777==0o600
+  data=b'COMMIT\ndisposition\nOLDHAM_CLEANUP_COMMIT_ACKNOWLEDGED\n' if mode=='ack' else b'fixture\n'
+  return data,dict(exit_code=1 if mode=='error' else 0,reason=mode.upper() if mode in ('overflow','deadline') else None,client_closed=True,output_bytes=len(data),remote_closure='LOCAL_FIXTURE_ONLY')
+ monkeypatch.setattr(client,'capture',capture)
+ code=client.main();status=json.loads((out/'status.json').read_text())
+ assert code==(0 if mode=='ack' else 2)
+ assert status['transaction_outcome']==('COMMIT_ACKNOWLEDGED' if mode=='ack' else 'UNKNOWN_RECONCILE_NO_RETRY')
+ assert status['classification']==('CLEANUP_REQUIRES_REVIEW' if mode=='ack' else 'INCOMPLETE')
+ assert not Path(seen['PGPASSFILE']).exists()
+ assert sum(x.stat().st_size for x in out.iterdir())<=65536
+ assert 'SYNTHETIC_PASSWORD_SENTINEL' not in ''.join(x.read_text() for x in out.iterdir())
+
+
+def test_builder_runner_and_unchanged_capture_bindings():
+ import ast
+ assert subprocess.check_output([sys.executable,'-B',str(P/'build_cleanup.py')],text=True)==SQL
+ block=(P/'RUN-INACTIVE.sh').read_text().split("<<'PY'\n",1)[1].split('\nPY\n',1)[0]
+ result=subprocess.run([sys.executable,'-I','-S','-',str(ROOT),str(P)],input=block,text=True,capture_output=True,check=True)
+ assert 'NO_DATABASE_CONNECTION_YET' in result.stdout
+ source=ROOT/'docs/design/daily-intake-20261029/b-readonly-client.py'
+ pick=lambda f:next(x for x in ast.parse(f.read_text()).body if isinstance(x,ast.FunctionDef) and x.name=='capture')
+ assert ast.dump(pick(source))==ast.dump(pick(P/'oldham-cleanup-client.py'))

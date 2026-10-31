@@ -7,6 +7,7 @@ DO $pre$
 DECLARE owner_id oid:='ingestion_storage_owner'::regrole; me oid:='postgres'::regrole; r record;
 BEGIN
  IF current_user<>'postgres' OR session_user<>'postgres' OR current_database()<>'postgres' THEN RAISE EXCEPTION 'CLEANUP_IDENTITY'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE oid=me AND NOT rolsuper AND rolcreaterole AND rolcreatedb AND rolbypassrls) OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE oid=owner_id AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolinherit AND NOT rolbypassrls) THEN RAISE EXCEPTION 'CLEANUP_ROLE_FLAGS'; END IF;
  IF pg_has_role(me,owner_id,'SET') OR pg_has_role(me,owner_id,'USAGE') OR
  (SELECT count(*) FROM pg_auth_members WHERE roleid=owner_id AND member=me)<>1 OR
  NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid=owner_id AND member=me AND admin_option AND NOT inherit_option AND NOT set_option AND grantor<>me) THEN RAISE EXCEPTION 'CLEANUP_OWNER_BASELINE'; END IF;

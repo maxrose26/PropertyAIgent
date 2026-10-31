@@ -43,7 +43,7 @@ jobs:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
-          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test BOLTON_REQUIRE_PG17=1 BOLTON_TEST_PG_CONTAINER="$PG_CONTAINER" RECOVERY_TEST_REPO="$GITHUB_WORKSPACE" PR206_CHECKOUT="$GITHUB_WORKSPACE" TRUST_CHECKOUT="$GITHUB_WORKSPACE" GENERATOR_PYTHON="$RUNNER_TEMP/install-venv/bin/python" timeout --kill-after=2s 120s "$RUNNER_TEMP/install-venv/bin/python" -B -m pytest docs/design/oldham-cleanup-20261031/test_cleanup_pg.py -q -p no:cacheprovider -k 'not drift_refuses' --tb=short --junitxml="$RUNNER_TEMP/install-proof/installation.xml" 2>&1 | tee "$RUNNER_TEMP/install-proof/installation.log"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test BOLTON_REQUIRE_PG17=1 BOLTON_TEST_PG_CONTAINER="$PG_CONTAINER" RECOVERY_TEST_REPO="$GITHUB_WORKSPACE" PR206_CHECKOUT="$GITHUB_WORKSPACE" TRUST_CHECKOUT="$GITHUB_WORKSPACE" GENERATOR_PYTHON="$RUNNER_TEMP/install-venv/bin/python" timeout --kill-after=2s 120s "$RUNNER_TEMP/install-venv/bin/python" -B -m pytest docs/design/oldham-cleanup-20261031/test_cleanup_pg.py -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/install-proof/installation.xml" 2>&1 | tee "$RUNNER_TEMP/install-proof/installation.log"
       - name: Stop only the disposable service and record closure
         if: always()
         env:
