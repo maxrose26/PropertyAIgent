@@ -19,7 +19,7 @@ FIXTURE_PASSWORD='disposable_fixture_only';PGENV=dict(os.environ,PGPASSWORD=FIXT
 PGBIN=os.environ.get('PG_BIN',str(Path(shutil.which('psql') or '/usr/bin/psql').parent))
 FIXTURE_CONTAINER=os.environ.get('BOLTON_TEST_PG_CONTAINER')
 def pg_tool(name):
- return ['docker','exec','-e','PGPASSWORD',FIXTURE_CONTAINER,name] if FIXTURE_CONTAINER else [str(Path(PGBIN)/name)]
+ return ['docker','exec','-i','-e','PGPASSWORD',FIXTURE_CONTAINER,name] if FIXTURE_CONTAINER else [str(Path(PGBIN)/name)]
 SQL=(PKG/'bolton-intake-install.sql').read_text()
 PRED=dict(ingestion_bolton_allowed='961c1e1c441372a6c4fb4606d0f5b973a14dbb7e1fa390740789a4d4de2fe8bf',ingestion_register_bolton_exception='b5ce45dcaa4183b2f828dfb6383a0dde838d0b5365206ba406f8854f7bc0b3cd',ingestion_worker_step='79324a92b380de621e595470318f725cf64dbc1ac9c332591363cb70161ca912')
 CAND=dict(ingestion_bolton_allowed='09d3e0e8e87bbf158bb89cb683063a21e5e8c23076d342961d49b50ac7e60569',ingestion_register_bolton_exception='dba6b809c50b9bd937b2f509fc05c20de9d69499ca4394e9007ef3af196b481c',ingestion_worker_step='abb46082f6d0891e131271a2567d45d8afdeccfd4561a6692baece7c3759c5bf')
@@ -365,3 +365,113 @@ def test_installer_actor_and_exact_server_version_are_recorded(seeded,record_pro
  record_property('server_version',seeded['server_version'])
  record_property('installer_superuser',False)
  record_property('fixture_repository_commit',subprocess.check_output(['git','-C',FIXTURE_REPO,'rev-parse','HEAD'],text=True).strip())
+
+
+# Compatibility observations only. Stop changes and authorities below are synthetic
+# fixture setup AFTER installing at the required generation-5 baseline. No source
+# method, application writer, production login activation or live authority runs.
+def fixture_login(world,role):
+ from sqlalchemy.engine import make_url
+ u=make_url(world['urls'][role])
+ return psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user=u.username,password=u.password,autocommit=True)
+
+
+def synthetic_oldham_claim(world,mode):
+ from verification.ingestion_storage.oldham_authority import STOP_STATE
+ b=world['boot'];key=KEYS[0];a='INGESTION_CHAIN_OLDHAM_FIXTURE';owner='compatibility_fixture'
+ subject=dict(kind='APPLICATION',council='oldham',reference='SYNTHETIC_ONLY')
+ binding=dict(task='SCREENING',contract='listing-screen-v3',revision='synthetic-only',subject=subject)
+ expiry=time.time()+3600
+ grant=dict(keys=[key],contracts=['listing-screen-v3'],expires_at=expiry,login='ingestion_worker_login',effect_login='ingestion_effect_login',workers=[owner],bindings={key:binding},source_calls=0,writes=0)
+ package=dict(authority=a,scope=dict(council='oldham',semantics='RECEIVED'),stop=copy.deepcopy(STOP_STATE),registration=dict(grant=copy.deepcopy(grant)))
+ h=b.execute("SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",(json.dumps(package),)).fetchone()[0]
+ grant['oldham_package_sha256']=h
+ allowance=dict(package=package,package_sha256=h,source_cap=0,write_cap=0,expires_at=expiry,revoked=(mode=='generation3_revoked'),grant_binding={k:v for k,v in grant.items() if k not in ('source_calls','writes')})
+ ctl=b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+ ctl.update(copy.deepcopy(STOP_STATE))
+ if mode=='generation5':ctl.update(manual_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',hard_stop_generation=5)
+ if mode=='clear_global':ctl.update(global_stop=None,manual_stop=None,last_hard_stop=None,hard_stop_generation=0)
+ ctl['grants']={a:grant};ctl['oldham_allowances']={a:allowance}
+ b.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
+ b.execute("UPDATE public.ingestion_work_items SET subject=%s::json,task='SCREENING',contract='listing-screen-v3',revision='synthetic-only',state='QUEUED',phase='IDLE',dependencies='[]',eligible_at=0,attempt_count=0,max_attempts=2,owner=NULL,lease_until=NULL,checkpoint=NULL,authority=NULL WHERE key=%s",(json.dumps(subject),key))
+ return key,a,owner,binding
+
+
+@pytest.mark.parametrize('mode,old_allowed,new_allowed',[
+ ('generation3_valid',True,False),('generation3_revoked',False,False),
+ ('generation5',False,False),('clear_global',False,True)])
+def test_oldham_compatibility_real_worker_allowance_and_unconditional_guard(seeded,mode,old_allowed,new_allowed,record_property):
+ b=seeded['boot']
+ with actor() as c:execute(c)
+ key,a,owner,binding=synthetic_oldham_claim(seeded,mode)
+ allowed=b.execute("SELECT public.ingestion_oldham_allowed(outcome::jsonb,%s,%s,%s::jsonb) FROM public.ingestion_work_items WHERE key=repeat('0',64)",(a,key,json.dumps(binding['subject']))).fetchone()[0]
+ assert allowed==(mode=='generation3_valid')
+ observed={}
+ for version,wanted in [('predecessor',old_allowed),('candidate',new_allowed)]:
+  if version=='predecessor':b.execute(seeded['predecessor_defs']['ingestion_worker_step'])
+  else:
+   from verification.ingestion_storage import intake_policy,screening_v3_worker_sql
+   b.execute(screening_v3_worker_sql.original_function(intake_policy.worker_text()))
+  before=snapshot(b)
+  with fixture_login(seeded,'ingestion_worker_login') as c:
+   c.execute('BEGIN')
+   try:
+    query="SELECT public.ingestion_worker_step('claim',%s,0,%s,%s,%s::jsonb,%s::jsonb)"
+    params=(key,owner,a,json.dumps(binding),json.dumps({'lease_seconds':30}))
+    if wanted:
+     result=c.execute(query,params).fetchone()[0];assert result['state']=='CLAIMED';observed[version]='CLAIMED_THEN_ROLLED_BACK'
+    else:
+     code='OLDHAM_ALLOWANCE_INVALID' if version=='predecessor' else 'GLOBAL_STOP'
+     with pytest.raises(psycopg.Error,match=code):c.execute(query,params)
+     observed[version]=code
+   finally:c.execute('ROLLBACK')
+  assert snapshot(b)==before
+ record_property('synthetic_scenario',mode);record_property('behaviour',json.dumps(observed,sort_keys=True))
+
+
+@pytest.mark.parametrize('remaining',[-100,3600],ids=['expired','unexpired'])
+def test_oldham_compatibility_retained_authority_is_preserved_not_retired(seeded,remaining):
+ b=seeded['boot'];a='INGESTION_CHAIN_OLDHAM_RETAINED_FIXTURE';expiry=time.time()+remaining
+ ctl=b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+ ctl.setdefault('grants',{})[a]=dict(expires_at=expiry,source_calls=0,writes=0,keys=[])
+ ctl.setdefault('oldham_allowances',{})[a]=dict(expires_at=expiry,revoked=False,package={'synthetic_only':True})
+ b.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
+ before=snapshot(b)
+ with actor() as c:execute(c)
+ assert snapshot(b)[1:]==before[1:]
+ actual=b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+ assert actual['grants'][a]==ctl['grants'][a] and actual['oldham_allowances'][a]==ctl['oldham_allowances'][a]
+ assert actual['hard_stop_generation']==5 and body_sha(b,'ingestion_oldham_allowed')==UNCH['ingestion_oldham_allowed']
+
+
+@pytest.mark.parametrize('phase,state',[('SOURCE_INTENT','SAFETY_BLOCKED'),('WRITE_INTENT','PERSISTENCE_UNCERTAIN'),('CHECKPOINTED','SAFETY_BLOCKED')])
+def test_oldham_compatibility_recovery_function_does_not_require_worker_allowance(seeded,phase,state):
+ b=seeded['boot']
+ with actor() as c:execute(c)
+ key,a,owner,binding=synthetic_oldham_claim(seeded,'generation5')
+ b.execute("UPDATE public.ingestion_work_items SET state='CLAIMED',phase=%s,fence=7,owner=%s,authority=%s,lease_until=%s WHERE key=%s",(phase,owner,a,time.time()-100,key))
+ b.execute("INSERT INTO public.ingestion_work_attempts(work_key,fence,owner,started_at,authority,phase) VALUES(%s,7,%s,%s,%s,%s)",(key,owner,time.time()-200,a,phase))
+ # Synthetic recovery capability for this test only. No recovery-login activation.
+ b.execute('GRANT ingestion_recovery_operator TO postgres WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
+ try:
+  before=snapshot(b)
+  with actor() as c:
+   c.execute('BEGIN')
+   try:
+    result=c.execute('SELECT public.ingestion_recover_abandoned(%s,7,false)',(key,)).fetchone()[0]
+    assert result['state']==state and result['phase']=='RECOVERED' and result['fence']==8
+    assert result['outcome']['source_or_write_replay_authorised'] is False
+    assert c.execute("SELECT outcome::jsonb->'hard_stop_generation' FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]==6
+   finally:c.execute('ROLLBACK')
+  assert snapshot(b)==before and body_sha(b,'ingestion_recover_abandoned')==UNCH['ingestion_recover_abandoned']
+ finally:b.execute('REVOKE ingestion_recovery_operator FROM postgres')
+
+
+def test_oldham_compatibility_existing_inventory_gate_refuses_candidate(seeded):
+ from types import SimpleNamespace
+ from app.ingestion.ledger import Denied
+ from verification.ingestion_storage.oldham_lifecycle import verify_inventory
+ b=seeded['boot'];o=SimpleNamespace(q=lambda c,s,p=None:c.execute(s,p).fetchall())
+ verify_inventory(o,b,capture_screening_only=True)
+ with actor() as c:execute(c)
+ with pytest.raises(Denied,match='OLDHAM_POLICY_INVENTORY'):verify_inventory(o,b,capture_screening_only=True)
