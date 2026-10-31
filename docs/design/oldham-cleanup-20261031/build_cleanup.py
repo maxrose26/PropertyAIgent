@@ -6,7 +6,7 @@ bindings=json.loads((p/'historical-bindings.json').read_text())
 expected=json.dumps(bindings,separators=(',',':'))
 functions="""(SELECT coalesce(jsonb_agg(to_jsonb(f) ORDER BY f.oid),'[]'::jsonb) FROM pg_proc f WHERE pronamespace='public'::regnamespace)"""
 members="(SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor),'[]'::jsonb) FROM pg_auth_members m)"
-ledger="""jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),'attempts',(SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY work_key,fence),'[]'::jsonb) FROM public.ingestion_work_attempts a))"""
+ledger="""jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),'attempts',(SELECT coalesce(jsonb_agg(to_jsonb(attempt_row) ORDER BY work_key,fence),'[]'::jsonb) FROM public.ingestion_work_attempts attempt_row))"""
 base="""BEGIN;
 SET LOCAL search_path=pg_catalog;
 SET LOCAL statement_timeout='10s';
