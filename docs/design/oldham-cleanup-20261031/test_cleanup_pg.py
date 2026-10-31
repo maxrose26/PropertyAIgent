@@ -19,14 +19,15 @@ def baseline(seeded):
  g,a=expected_historical(Owner(),b)
  b.execute('GRANT SELECT (rolname,rolpassword) ON pg_authid TO postgres')
  for role,cap in [('ingestion_worker_login','ingestion_worker'),('ingestion_effect_login','ingestion_effect_broker')]:
-  b.execute('REVOKE '+cap+' FROM '+role+' CASCADE')
+  for (grantor,) in b.execute('SELECT grantor::regrole::text FROM pg_auth_members WHERE roleid=%s::regrole AND member=%s::regrole',(cap,role)).fetchall():
+   b.execute(psycopg.sql.SQL('REVOKE {} FROM {} GRANTED BY {} CASCADE').format(*map(psycopg.sql.Identifier,(cap,role,grantor))))
   b.execute('GRANT '+cap+' TO postgres WITH ADMIN TRUE, INHERIT FALSE, SET FALSE')
   b.execute('GRANT '+cap+' TO '+role+' WITH ADMIN FALSE, INHERIT TRUE, SET FALSE GRANTED BY postgres')
   b.execute('ALTER ROLE '+role+' NOLOGIN PASSWORD NULL')
  row=a['package']['registration']['rows'][0]
  b.execute('INSERT INTO public.ingestion_work_items SELECT (jsonb_populate_record(NULL::public.ingestion_work_items,%s::jsonb)).*',(json.dumps(row),))
  ctl=b.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
- ctl.setdefault('grants',{})[A]=g;ctl.setdefault('oldham_allowances',{})[A]=a
+ ctl.setdefault('grants',{})['SYNTHETIC_UNRELATED']={'expires_at':0,'retained':True};ctl['grants'][A]=g;ctl.setdefault('oldham_allowances',{})[A]=a
  b.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
  return seeded
 
@@ -70,7 +71,8 @@ def test_midtransaction_failures_rollback_every_effect(baseline,point):
  elif point=='after_first_revoke':s=SQL.replace('REVOKE ingestion_effect_broker','SELECT 1/0; REVOKE ingestion_effect_broker')
  elif point=='missing_temp_cleanup':s=SQL.replace('REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;','')
  else:s=SQL.replace('RESET ROLE;',"UPDATE public.ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,'{hard_stop_generation}','6')::json WHERE key=repeat('0',64); RESET ROLE;")
- with pytest.raises(psycopg.Error):run(s)
+ code={'after_update':'division by zero','after_first_revoke':'division by zero','missing_temp_cleanup':'CLEANUP_MEMBERSHIP_POST','extra_authority_change':'CLEANUP_LEDGER_POST'}[point]
+ with pytest.raises(psycopg.Error,match=code):run(s)
  assert snap(b)==before
 
 def test_second_attempt_refused_no_retry(baseline):
