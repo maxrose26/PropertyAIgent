@@ -1,0 +1,62 @@
+name: Bolton intake installation disposable PG17
+on:
+  push:
+    branches: [validation/bolton-intake-install-pg17-20261031]
+permissions:
+  contents: read
+jobs:
+  installation-pg17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: provisioning_bootstrap
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: ingestion_provisioning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U provisioning_bootstrap -d ingestion_provisioning_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Existing pinned disposable dependencies
+        run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/install-venv"
+      - name: Bind candidate and record disposable PostgreSQL version
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/install-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/install-proof/commit.txt"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/install-proof/tree.txt"
+          sha256sum docs/design/bolton-intake-install-20261031/* > "$RUNNER_TEMP/install-proof/input-hashes.txt"
+          docker exec "$PG_CONTAINER" postgres --version > "$RUNNER_TEMP/install-proof/postgres-version.txt"
+          docker exec "$PG_CONTAINER" pg_dump --version > "$RUNNER_TEMP/install-proof/pg-dump-version.txt"
+      - name: Exact predecessor, privileges, rollback, cleanup and preservation
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test BOLTON_REQUIRE_PG17=1 BOLTON_TEST_PG_CONTAINER="$PG_CONTAINER" RECOVERY_TEST_REPO="$GITHUB_WORKSPACE" PR206_CHECKOUT="$GITHUB_WORKSPACE" TRUST_CHECKOUT="$GITHUB_WORKSPACE" GENERATOR_PYTHON="$RUNNER_TEMP/install-venv/bin/python" timeout --kill-after=2s 120s "$RUNNER_TEMP/install-venv/bin/python" -B -m pytest docs/design/bolton-intake-install-20261031/test_install_package.py -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/install-proof/installation.xml" 2>&1 | tee "$RUNNER_TEMP/install-proof/installation.log"
+      - name: Stop only the disposable service and record closure
+        if: always()
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/install-proof"
+          docker stop "$PG_CONTAINER" > /dev/null
+          docker inspect --format '{{json .State}}' "$PG_CONTAINER" > "$RUNNER_TEMP/install-proof/service-stop.json"
+          test "$(docker inspect --format '{{.State.Running}}' "$PG_CONTAINER")" = false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bolton-install-pg17-${{ github.sha }}
+          path: ${{ runner.temp }}/install-proof/
+          retention-days: 14
