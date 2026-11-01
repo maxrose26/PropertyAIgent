@@ -108,9 +108,22 @@ def issue_period(c,b,policy,journal,save):
         raise
 
 
+# GitHub documents variable-length opaque ghs_ installation tokens (~520 bytes),
+# not a fixed length. These are LOCAL input bounds, not GitHub format maxima:
+# preserve the existing24-byte minimum;2048 fits within the unchanged4000-byte
+# serialized secret pipe and32768-byte encrypted vault. No JWT parsing/claims.
+INSTALLATION_TOKEN_MIN_BYTES = 24
+INSTALLATION_TOKEN_MAX_BYTES = 2048
+
+
+def installation_token_allowed(token):
+    return (type(token) is str and INSTALLATION_TOKEN_MIN_BYTES <= len(token) <= INSTALLATION_TOKEN_MAX_BYTES
+            and token.startswith('ghs_') and all(0x21 <= ord(c) <= 0x7e for c in token))
+
+
 def token_arm(b,token,save):
     op.validate_binding(b)
-    op.require(type(token) is str and re.fullmatch(r'ghs_[A-Za-z0-9]{20,251}',token) is not None,'INSTALLATION_TOKEN_ONLY')
+    op.require(installation_token_allowed(token),'INSTALLATION_TOKEN_ONLY')
     op.require(b.get('publication_scope')=={'repository':'maxrose26/PropertyAIgent','contents':'write','metadata':'read'} and type(b.get('publication_valid_until')) in (int,float),'TOKEN_REVIEWED_SCOPE_REQUIRED')
     state=dict(version='FINITE_PUBLICATION_TOKEN_V1',binding=b,state='ARMED_NO_RETRY',token=token,token_sha256=hashlib.sha256(token.encode()).hexdigest())
     save(state)
@@ -120,7 +133,7 @@ def token_arm(b,token,save):
 def token_load(b,state):
     op.require(state.get('version')=='FINITE_PUBLICATION_TOKEN_V1' and state.get('binding')==b and state.get('state')=='ARMED_NO_RETRY','TOKEN_PRIOR_INTENT_RECONCILE_NO_RETRY')
     token=state.get('token')
-    op.require(type(token) is str and re.fullmatch(r'ghs_[A-Za-z0-9]{20,251}',token) is not None and hashlib.sha256(token.encode()).hexdigest()==state.get('token_sha256'),'TOKEN_PRIVATE_BINDING')
+    op.require(installation_token_allowed(token) and hashlib.sha256(token.encode()).hexdigest()==state.get('token_sha256'),'TOKEN_PRIVATE_BINDING')
     return token
 
 

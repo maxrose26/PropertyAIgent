@@ -323,7 +323,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
         # inherited by its owner-local gh child. Installation tokens self-revoke.
         from .operational_publication import GitHub
         token=state['render']['publication_token']
-        op.require(token.startswith('ghs_'),'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
+        op.require(extra.installation_token_allowed(token),'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
         op.require(state.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED' and
                    state['render'].get('state')=='RESTORATION_ACKNOWLEDGED' and
                    state['render'].get('publication_state')=='ACTIVE','PUBLICATION_CLOSE_STATE_OR_PRIOR_UNCERTAINTY')
@@ -418,7 +418,10 @@ def _main(argv, context):
         if phase in ('activate','period','publication-arm') and hidden('Confirm vault passphrase (hidden): ')!=secret['vault_key']:
             raise SystemExit('VAULT_CONFIRMATION_REFUSED')
     if phase.startswith('handoff'):secret['render_token']=hidden('Existing owner-local Render token (hidden): ')
-    if phase=='publication-arm' or (phase=='handoff' and not b.get('publication_vault_path')):secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
+    if phase=='publication-arm' or (phase=='handoff' and not b.get('publication_vault_path')):
+        secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
+        from .intake_owner_operations import installation_token_allowed
+        if not installation_token_allowed(secret['publication_token']):raise SystemExit('INSTALLATION_TOKEN_ONLY')
     raw=json.dumps(secret).encode()
     if len(raw)>4000:raise SystemExit('SECRET_PIPE_BOUND')
     readfd,writefd=os.pipe()

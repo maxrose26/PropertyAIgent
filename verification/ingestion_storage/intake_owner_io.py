@@ -133,8 +133,10 @@ def boundary(b):
 def handoff(api, state, save, publication_token):
     b = state['binding']; boundary(b)
     require(state.get('state') == 'ACTIVATION_ACKNOWLEDGED' and 'render' not in state, 'HANDOFF_SINGLE_USE')
-    require(time.time() + 960 < b['valid_until'] and len(publication_token) >= 20, 'HANDOFF_CREDENTIAL_WINDOW')
-    require(publication_token.startswith('ghs_') and type(b.get('publication_valid_until')) in (int,float) and
+    require(time.time() + 960 < b['valid_until'], 'HANDOFF_CREDENTIAL_WINDOW')
+    from .intake_owner_operations import installation_token_allowed
+    require(installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
+    require(type(b.get('publication_valid_until')) in (int,float) and
             time.time()+960 < b['publication_valid_until'] <= b['valid_until'], 'FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN')
     guard = service_guard(api.call('GET'))
     require(guard == b.get('render_config_sha256'), 'RENDER_REVIEWED_CONFIGURATION')
