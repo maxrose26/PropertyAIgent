@@ -2,9 +2,9 @@
 from dataclasses import asdict
 import hashlib,json,os,re,stat
 from pathlib import Path
-from urllib.parse import urlencode,urljoin,urlsplit,parse_qs
+from urllib.parse import urlencode,urljoin,urlsplit,parse_qs,parse_qsl
 from bs4 import BeautifulSoup
-from app.scrapers.discovery_idox import observe_listing_rows,source_url,ListingError
+from app.scrapers.discovery_idox import observe_listing_rows,ListingError
 from .idox_sort import sort_payload,require_reference_sort
 from .four_council_proof import ProofLog,PrivateResponseBodies,encoded,sha,ProofError
 from verification.stage26b_l1.request_boundary import BoundaryFailure
@@ -52,8 +52,25 @@ def safe_controls(fields):
 def disabled(node):
     return any(n.has_attr('disabled') or n.get('aria-disabled')=='true' or 'disabled' in n.get('class',[]) or n.has_attr('hidden') or n.get('aria-hidden')=='true' or bool(re.search(r'display\s*:\s*none',n.get('style',''),re.I)) for n in [node,*node.parents] if getattr(n,'attrs',None) is not None)
 
+def paging_get(href,config,expected):
+    """Normalize only a complete, supported returned paging destination.
+
+    Never drop meaningful parameters: duplicate keys, extras, fragments and
+    noncanonical encodings refuse. Parameter order alone has no semantics.
+    """
+    try:
+        require(type(href) is str and 0<len(href)<=2048,'CALIBRATION_NAVIGATION_UNSUPPORTED')
+        target=urljoin(config.base+'/',href);u=urlsplit(target);base=urlsplit(config.base)
+        require(u.scheme=='https' and u.netloc==base.netloc and not u.fragment and '%' not in target and u.path==base.path+'/pagedSearchResults.do','CALIBRATION_NAVIGATION_UNSUPPORTED')
+        pairs=parse_qsl(u.query,keep_blank_values=True,strict_parsing=True)
+        require(len(pairs)==2 and len({k for k,v in pairs})==2 and dict(pairs)=={'action':'page','searchCriteria.page':str(expected)},'CALIBRATION_NAVIGATION_UNSUPPORTED')
+        return config.base+'/pagedSearchResults.do?'+urlencode({'action':'page','searchCriteria.page':str(expected)})
+    except CalibrationError:raise
+    except Exception:raise CalibrationError('CALIBRATION_NAVIGATION_UNSUPPORTED') from None
+
+
 def directions(soup,config,current):
-    found={'NEXT':[],'PREVIOUS':[]}
+    found={'NEXT':[],'PREVIOUS':[],'NUMBERED_NEXT':[]}
     for node in soup.select('a,button,input[type="submit"],input[type="button"],[role="button"],[onclick]'):
         label=' '.join((node.get('value','') if node.name=='input' else node.get_text(' ',strip=True)).split()).casefold()
         aria=node.get('aria-label','').strip().casefold();rel=node.get('rel',[]);classes=node.get('class',[])
@@ -62,21 +79,21 @@ def directions(soup,config,current):
             if label in ('load more','more results','more applications'):raise CalibrationError('CALIBRATION_NAVIGATION_UNSUPPORTED')
             if node.name=='a' and not disabled(node):
                 q=parse_qs(urlsplit(node.get('href','')).query)
-                value=q.get('searchCriteria.page',[''])[0]
-                if value.isdigit() and int(value)>current:raise CalibrationError('CALIBRATION_NAVIGATION_AMBIGUOUS')
-            continue
+                values=q.get('searchCriteria.page',[])
+                paging='searchCriteria.page' in q or urlsplit(node.get('href','')).path.endswith('/pagedSearchResults.do') or urlsplit(node.get('href','')).path=='pagedSearchResults.do'
+                if paging and label.isdigit() and len(label)<=3 and int(label)>current:
+                    require(int(label)==current+1,'CALIBRATION_NAVIGATION_AMBIGUOUS')
+                    kind='NUMBERED_NEXT'
+                elif any(v.isdigit() and (len(v)>3 or int(v)>current) for v in values):
+                    raise CalibrationError('CALIBRATION_NAVIGATION_AMBIGUOUS')
+            if kind is None:continue
         e=dict(kind=kind,element=node.name,disabled=disabled(node),method=None,action_path=None,fields={},page=None)
         if not e['disabled']:
-            expected=current+(1 if kind=='NEXT' else -1)
+            expected=current+(1 if kind in ('NEXT','NUMBERED_NEXT') else -1)
             require(1<=expected<=7,'CALIBRATION_NAVIGATION_CONFLICT')
             if node.name=='a':
                 href=node.get('href');require(type(href) is str and not node.has_attr('onclick'),'CALIBRATION_NAVIGATION_UNSUPPORTED')
-                try:
-                    if kind=='NEXT':target=source_url(config.council,href,page=expected)
-                    else:
-                        target=urljoin(config.base+'/',href);u=urlsplit(target);base=urlsplit(config.base);q=parse_qs(u.query,keep_blank_values=True)
-                        require(u.scheme=='https' and u.netloc==base.netloc and not u.fragment and '%' not in target and u.path==base.path+'/pagedSearchResults.do' and q=={'action':['page'],'searchCriteria.page':[str(expected)]},'CALIBRATION_NAVIGATION_UNSUPPORTED')
-                except ListingError:raise CalibrationError('CALIBRATION_NAVIGATION_UNSUPPORTED') from None
+                target=paging_get(href,config,expected)
                 e.update(method='GET',action_path=urlsplit(target).path,fields={'action':'page','searchCriteria.page':str(expected)},page=expected)
                 request=('GET',target,None)
             else:
@@ -112,6 +129,11 @@ def directions(soup,config,current):
         unique={x[1] for x in active};require(len(unique)<=1,'CALIBRATION_NAVIGATION_AMBIGUOUS')
         summary[kind.lower()]=[x[0] for x in items]
         if kind=='NEXT' and active:next_request=active[0][1]
+    # A numbered link can corroborate an explicit Next; it never authorises
+    # navigation on its own. Reconcile after scanning both top/bottom pagers.
+    numbered=[request for evidence,request in found['NUMBERED_NEXT'] if not evidence['disabled']]
+    require(not numbered or next_request is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS')
+    require(all(request==next_request for request in numbered),'CALIBRATION_NAVIGATION_CONFLICT')
     return summary,next_request
 
 def observe(body,config,ordinal):

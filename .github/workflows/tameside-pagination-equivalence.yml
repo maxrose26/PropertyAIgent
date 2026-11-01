@@ -1,0 +1,45 @@
+name: Tameside pagination equivalence OFFLINE
+on:
+  create:
+permissions:
+  contents: read
+jobs:
+  diagnostics:
+    if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'validation/tameside-pagination-equivalence-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing pinned dependencies
+        run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/diagnostic-venv"
+      - name: Only equivalent navigation and affected refusal checks
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/diagnostic-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-proof/commit.txt"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/diagnostic-proof/tree.txt"
+          sha256sum verification/discovery/{tameside_qualification,pagination_calibration,idox_window,idox_sort,four_council_proof,finite_acceptance}.py verification/ingestion_storage/daily_intake_runtime.py verification/stage26b_l1/request_boundary.py tests/test_tameside_pagination_equivalence.py tests/test_tameside_pagination_calibration.py tests/fixtures/tameside_pagination/equivalent_controls.html docs/design/tameside-pagination-equivalence-20261101/* .github/workflows/tameside-pagination-equivalence.yml > "$RUNNER_TEMP/diagnostic-proof/input-hashes.txt"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_tameside_pagination_equivalence.py tests/test_tameside_pagination_calibration.py -k "not private_checkpoint and not new_authority_refuses_bad_binding and not new_consumption_durable and not launcher_guards and not source_worker_exact" -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
+      - name: Export focused evidence
+        if: always()
+        run: |
+          python3 - "$RUNNER_TEMP/diagnostic-proof" <<'PY_EVIDENCE'
+          import base64,hashlib,io,pathlib,sys,zipfile
+          p=pathlib.Path(sys.argv[1]);buf=io.BytesIO()
+          with zipfile.ZipFile(buf,'w',zipfile.ZIP_DEFLATED) as z:
+              for f in sorted(p.iterdir()):
+                  if f.is_file():z.writestr(f.name,f.read_bytes())
+          b=buf.getvalue()
+          assert len(b)<=65536
+          print('TAMESIDE_EQUIVALENCE_SHA256='+hashlib.sha256(b).hexdigest())
+          print('TAMESIDE_EQUIVALENCE_BASE64='+base64.b64encode(b).decode())
+          PY_EVIDENCE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tameside-pagination-equivalence-${{ github.sha }}
+          path: ${{ runner.temp }}/diagnostic-proof/
+          retention-days: 14
