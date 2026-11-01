@@ -236,7 +236,7 @@ def test_full_owner_calibration_keeps_bodies_proof_and_never_assessment(tmp_path
         with manifest_scope(q.ROW):result=live(C,retain_proof=True,response_evidence=store.record,pagination_calibration=True)
         store.finish()
         with manifest_scope(q.ROW):write_audit(Path(command[command.index('--output')+1]),result)
-        return dict(cleanup='CLOSED',exit_code=0,limit_hit=None,expired=False,accounting_complete=True,live_owned_survivors=0)
+        return dict(cleanup='CLOSED',exit_code=0,limit_hit=None,expired=False,accounting_complete=True,live_owned_survivors=0,peak_owned_rss=1024,elapsed_seconds=.1)
     root=tmp_path/'out'
     if failure:
         with pytest.raises(q.Denied,match='CALIBRATION_SESSION_EXPIRED'):q.qualify(root,supervisor=supervisor,authority=q.CALIBRATION_AUTHORITY,private_pages=True,pagination_calibration=True)
@@ -293,3 +293,34 @@ def test_recognised_transport_diagnostic_survives_into_proof(tmp_path):
     assert d['failure']['exception_class']=='REQUESTS_CONNECT_TIMEOUT'
     assert r['retained_proof']['events'][-1]['transport']==d
     assert 'PRIVATE_SENTINEL' not in json.dumps(r)
+
+@pytest.mark.parametrize('patch',[{'accounting_complete':False},{'accounting_complete':None},{'live_owned_survivors':1},{'peak_owned_rss':2**31},{'elapsed_seconds':60},{'expired':True},{'live_owned_survivors':True}])
+def test_calibration_retains_existing_outer_safety_validation(tmp_path,patch):
+    from verification.discovery import tameside_qualification as q
+    outer=dict(cleanup='CLOSED',exit_code=0,limit_hit=None,expired=False,accounting_complete=True,live_owned_survivors=0,peak_owned_rss=1024,elapsed_seconds=.1)
+    outer.update(patch)
+    with pytest.raises(q.Denied,match='OUTER_SAFETY'):q.qualify(tmp_path/'out',supervisor=lambda *a,**k:outer,authority=q.CALIBRATION_AUTHORITY,private_pages=True,pagination_calibration=True)
+    outcome=json.loads((tmp_path/'out/qualification-outcome.json').read_bytes())
+    assert outcome['stage']=='SOURCE_SAFETY' and outcome['reason']=='OUTER_SAFETY'
+    assert not (tmp_path/'out/calibration-summary.json').exists()
+
+@pytest.mark.parametrize('mode',['correct','wrong-mode','wrong-path'])
+def test_source_worker_exact_calibration_opt_in(tmp_path,monkeypatch,mode):
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    from verification.discovery import finite_acceptance as finite,tameside_qualification as q
+    from types import SimpleNamespace
+    import resource
+    limits=[];calls=[]
+    monkeypatch.setattr(resource,'setrlimit',lambda *a:limits.append(a))
+    monkeypatch.setenv('INGESTION_SOURCE_PRIVATE','ONCE')
+    monkeypatch.setattr(finite,'read',lambda *a,**k:(calls.append(k) or {'fixture':True}))
+    plan=tmp_path/'plan.json';out=tmp_path/'source.json'
+    plan.write_text(json.dumps(dict(row=q.ROW,fixture=None,private_response_bodies=str(tmp_path/('elsewhere' if mode=='wrong-path' else 'raw-bodies')),pagination_calibration='BAD' if mode=='wrong-mode' else 'TAMESIDE_FIVE_PER_PAGE_V1')))
+    if mode=='correct':
+        runtime.source_worker(SimpleNamespace(plan=str(plan),output=str(out)))
+        assert len(calls)==1 and calls[0]['pagination_calibration'] is True
+        assert calls[0]['no_transport_retry'] is True
+        assert (resource.RLIMIT_FSIZE,(524288,524288)) in limits
+    else:
+        with pytest.raises(q.Denied):runtime.source_worker(SimpleNamespace(plan=str(plan),output=str(out)))
+        assert not calls and not out.exists()

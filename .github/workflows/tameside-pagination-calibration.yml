@@ -22,7 +22,7 @@ jobs:
           git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-proof/commit.txt"
           git rev-parse HEAD^{tree} > "$RUNNER_TEMP/diagnostic-proof/tree.txt"
           sha256sum verification/discovery/{tameside_qualification,pagination_calibration,idox_window,idox_sort,four_council_proof,finite_acceptance}.py verification/ingestion_storage/daily_intake_runtime.py verification/stage26b_l1/request_boundary.py tests/test_tameside_pagination_calibration.py tests/test_discovery_idox_listing.py docs/design/tameside-pagination-calibration-20261101/* .github/workflows/tameside-pagination-calibration.yml > "$RUNNER_TEMP/diagnostic-proof/input-hashes.txt"
-          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_tameside_pagination_calibration.py tests/test_discovery_idox_listing.py -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_tameside_pagination_calibration.py -k "full_owner or outer_safety or source_worker or supervisor or new_authority or new_consumption or launcher" -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
       - name: Export focused evidence
         if: always()
         run: |

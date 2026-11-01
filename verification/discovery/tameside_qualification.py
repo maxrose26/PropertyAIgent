@@ -159,6 +159,10 @@ def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=Fa
         (root/'outer.json').write_bytes(canonical(outer))
         if outer.get('cleanup') != 'CLOSED' or outer.get('exit_code') != 0 or outer.get('limit_hit') is not None:
             raise Denied('QUALIFICATION_SOURCE_OR_CLOSURE_UNCERTAIN_NO_RETRY')
+        if pagination_calibration:
+            from app.ingestion.coordinator import validate_outer
+            validate_outer(outer,DEFAULT_LIMITS)
+            if outer.get('accounting_complete') is not True:raise Denied('OUTER_SAFETY')
         stage='SOURCE_EXPORT'
         if not output.is_file() or output.is_symlink() or output.stat().st_size > 524288:
             raise Denied('QUALIFICATION_SOURCE_EXPORT')
