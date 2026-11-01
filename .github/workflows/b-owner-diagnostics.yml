@@ -1,0 +1,45 @@
+name: Finite owner diagnostics offline
+on:
+  create:
+permissions:
+  contents: read
+jobs:
+  diagnostics:
+    if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'validation/b-owner-diagnostics-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing pinned dependencies
+        run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/diagnostic-venv"
+      - name: Only new diagnostics and affected existing child refusal
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/diagnostic-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-proof/commit.txt"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/diagnostic-proof/tree.txt"
+          sha256sum verification/ingestion_storage/intake_owner_client.py tests/test_intake_owner_diagnostics.py .github/workflows/b-owner-diagnostics.yml > "$RUNNER_TEMP/diagnostic-proof/input-hashes.txt"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_intake_owner_diagnostics.py tests/test_intake_owner_io.py::test_real_phase_child_is_addressed_as_module_and_refuses_invalid_binding_before_connection -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
+      - name: Export focused evidence
+        if: always()
+        run: |
+          python3 - "$RUNNER_TEMP/diagnostic-proof" <<'PY_EVIDENCE'
+          import base64,hashlib,io,pathlib,sys,zipfile
+          p=pathlib.Path(sys.argv[1]);buf=io.BytesIO()
+          with zipfile.ZipFile(buf,'w',zipfile.ZIP_DEFLATED) as z:
+              for f in sorted(p.iterdir()):
+                  if f.is_file():z.writestr(f.name,f.read_bytes())
+          b=buf.getvalue()
+          assert len(b)<=65536
+          print('OWNER_DIAGNOSTIC_EVIDENCE_SHA256='+hashlib.sha256(b).hexdigest())
+          print('OWNER_DIAGNOSTIC_EVIDENCE_BASE64='+base64.b64encode(b).decode())
+          PY_EVIDENCE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owner-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/diagnostic-proof/
+          retention-days: 14
