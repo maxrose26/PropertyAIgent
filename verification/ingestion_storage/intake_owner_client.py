@@ -5,6 +5,7 @@ No child/reconnect/retry other than exactly one selected phase process.
 import argparse,getpass,hashlib,json,os,selectors,shutil,signal,subprocess,sys,time,warnings
 from pathlib import Path
 LIMIT=65536
+MODULE='verification.ingestion_storage.intake_owner_client'
 
 def capture(command, environment, *, seconds=60, ceiling=LIMIT, pass_fds=()):
     """One process, combined pipe, finite bytes; TERM at deadline-2, KILL at -1."""
@@ -192,7 +193,7 @@ def main(argv=None):
     readfd,writefd=os.pipe()
     try:
         os.write(writefd,raw);os.close(writefd)
-        command=[sys.executable,'-B','-m',__name__,'--child','--secrets-fd',str(readfd),'--phase',phase,
+        command=[sys.executable,'-B','-m',MODULE,'--child','--secrets-fd',str(readfd),'--phase',phase,
                  '--binding',path,'--binding-sha256',h]
         if vault:command+=['--vault',vault]
         if expected:command+=['--expected',expected,'--expected-sha256',eh]
@@ -200,7 +201,8 @@ def main(argv=None):
             'PYTHONDONTWRITEBYTECODE':'1','OPENBLAS_NUM_THREADS':'1'},ceiling=30720,pass_fds=(readfd,))
     finally:os.close(readfd)
     status.update(phase=phase,connection_policy='NO_RECONNECT_NO_RETRY',
-        transaction_outcome='RECONCILE' if status['reason'] or status['exit_code'] else 'ACKNOWLEDGED_SEE_RESULT')
+        transaction_outcome='RECONCILE' if status['reason'] or status['exit_code'] else 'ACKNOWLEDGED_SEE_RESULT',
+        remote_closure='UNKNOWN_AFTER_FORCED_EXIT' if status['reason'] or status['exit_code'] else 'NORMAL_PHASE_EXIT_SEE_RESULT')
     (output/'output.txt').write_bytes(data);(output/'status.json').write_text(json.dumps(status,sort_keys=True)+'\n')
     print('PHASE_REQUIRES_LOCAL_EVIDENCE_REVIEW' if not status['reason'] and status['exit_code']==0 else 'STOP_RECONCILE_NO_RETRY')
     return 0 if status['exit_code']==0 and not status['reason'] else 2

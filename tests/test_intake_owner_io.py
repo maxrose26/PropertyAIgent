@@ -126,3 +126,40 @@ def test_existing_capture_has_combined_pipe_bound_and_anonymous_secret_input():
     assert status['exit_code']==0 and b'PIPE_RECEIVED' in data and b'SYNTHETIC_PIPE_SECRET' not in data
     data,status=capture([sys.executable,'-c','import sys;sys.stdout.write("x"*10000)'],dict(PATH='/usr/bin:/bin'),seconds=4,ceiling=1024)
     assert len(data)<=1024 and status['reason']=='OUTPUT_OVERFLOW' and status['client_closed']
+
+
+def test_real_phase_child_is_addressed_as_module_and_refuses_invalid_binding_before_connection(tmp_path):
+    import hashlib
+    from verification.ingestion_storage.intake_owner_client import MODULE
+    p=tmp_path/'binding.json';p.write_text('{}');h=hashlib.sha256(p.read_bytes()).hexdigest()
+    readfd,writefd=os.pipe();os.write(writefd,b'{}');os.close(writefd)
+    try:
+        command=[sys.executable,'-B','-m',MODULE,'--child','--secrets-fd',str(readfd),'--phase','readback','--binding',str(p),'--binding-sha256',h]
+        data,status=capture(command,dict(PATH='/usr/bin:/bin',PYTHONDONTWRITEBYTECODE='1'),seconds=4,ceiling=1024,pass_fds=(readfd,))
+    finally:os.close(readfd)
+    assert status['exit_code']==2 and b'STOP_PHASE_REQUIRES_REVIEW_NO_RETRY' in data and b'Traceback' not in data
+
+
+def test_publication_token_revocation_uses_existing_transport_once_and_preserves_uncertainty(monkeypatch):
+    from verification.ingestion_storage import intake_owner_io as io,operational_publication as publication
+    from verification.ingestion_storage.intake_owner_client import worker
+    from verification.ingestion_storage import intake_owner as op
+    api=API();state=prepared(api)
+    state.update(state='DATABASE_CLOSURE_ACKNOWLEDGED')
+    state['binding'].update(version='FINITE_INTAKE_OWNER_V1',hostaddr='192.0.2.1',owner_hostaddr='192.0.2.2',
+                            execution_binding=op.APPLICATION_BINDING,accepted_stop=op.ACCEPTED_STOP)
+    state['render']=dict(state='RESTORATION_ACKNOWLEDGED',publication_state='ACTIVE',publication_token='ghs_'+'x'*40)
+    class FakeVault:
+        def __init__(self,*_,**kw):pass
+        def load(self):return state
+        def save(self,v):pass
+    calls=[]
+    class FakeGitHub:
+        def __init__(self,*_,**kw):assert kw['bound']==1
+        def call(self,method,path):
+            calls.append((method,path));raise RuntimeError('synthetic lost revocation reply')
+    monkeypatch.setattr(io,'Vault',FakeVault);monkeypatch.setattr(publication,'GitHub',FakeGitHub)
+    with pytest.raises(RuntimeError):worker('publication-close',state['binding'],dict(vault_key='synthetic'),'/unused',{})
+    assert state['render']['publication_state']=='REVOKE_INTENT_NO_RETRY'
+    with pytest.raises(Denied):worker('publication-close',state['binding'],dict(vault_key='synthetic'),'/unused',{})
+    assert calls==[('DELETE','installation/token')]

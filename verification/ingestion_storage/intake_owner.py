@@ -154,6 +154,10 @@ def retained_cleanup(c, ctl):
     raw=Path('docs/design/b-owner-finite-20261031/oldham-historical-bindings.json').read_bytes()
     require(hashlib.sha256(raw).hexdigest()==HISTORICAL_SHA,'OLDHAM_RETAINED_BINDINGS_HASH')
     historical=json.loads(raw);grant,allowance=historical['grant'],historical['allowance']
+    package_sha=c.execute("SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",
+                          (json.dumps(allowance['package']),)).fetchone()[0]
+    grant['oldham_package_sha256']=package_sha;allowance['package_sha256']=package_sha
+    allowance['grant_binding']['oldham_package_sha256']=package_sha
     grant['expires_at'] = 0; allowance['revoked'] = True
     require(ctl['grants'][OLDHAM] == grant and ctl['oldham_allowances'][OLDHAM] == allowance,
             'OLDHAM_HISTORICAL_BINDING_CHANGED')
@@ -373,7 +377,8 @@ def close(c, state, save, *, emit=lambda *_: None):
         require(o.session_disposition in ('CLEARED_BY_WAIT', 'TERMINATED_VERIFIED_ABSENT'), 'SESSIONS_UNRESOLVED')
     state.update(state='DATABASE_CLOSURE_ACKNOWLEDGED', passwords={}); save(state)
     return dict(outcome='COMMIT_ACKNOWLEDGED', runtime_access='DISABLED', authorities=sorted(grants),
-                authority_expiry=0, temporary_owner='REMOVED', sessions='ABSENT', stop_preserved=stop)
+                authority_expiry=0, temporary_owner='REMOVED', sessions='ABSENT', stop_preserved=stop,
+                intake_run_state=run.get('state'), open_run_requires_reconciliation=run.get('state')=='OPEN')
 
 
 def finalisation(c, b, expected):

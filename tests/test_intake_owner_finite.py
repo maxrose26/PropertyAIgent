@@ -159,6 +159,83 @@ def test_lost_local_postcommit_save_has_independent_failure_closure(installed):
     assert result['stop_preserved']['hard_stop_generation']==6 and op.control(b)==ctl
 
 
+def test_lost_commit_reply_requires_independent_closure_not_activation_retry(installed):
+    accepted(installed);box=[]
+    class LostReply:
+        def __init__(self,c):self.c=c;self.once=True
+        def __getattr__(self,k):return getattr(self.c,k)
+        def execute(self,q,params=None):
+            result=self.c.execute(q,params)
+            if q=='COMMIT' and self.once:
+                self.once=False;raise psycopg.OperationalError('synthetic lost COMMIT reply after commit')
+            return result
+    with support.actor() as c:
+        with pytest.raises(psycopg.OperationalError):op.activate(LostReply(c),binding(),save_to(box))
+    assert box[0]['state']=='ARMED_BEFORE_ACTIVATION'
+    with support.actor() as c:r=op.close(c,box[0],save_to(box))
+    assert r['runtime_access']=='DISABLED'
+
+
+def test_sql_failure_mid_activation_rolls_back_both_logins_memberships_and_timeouts(installed):
+    accepted(installed);b=installed['boot'];before=op.settings(b);members=b.execute(op.MEMBERS).fetchall();box=[]
+    class SQLFailure:
+        def __init__(self,c):self.c=c
+        def __getattr__(self,k):return getattr(self.c,k)
+        def execute(self,q,params=None):
+            rendered=q.as_string(self.c) if isinstance(q,sql.Composable) else q
+            if 'ALTER ROLE "ingestion_effect_login" LOGIN PASSWORD' in rendered:
+                return self.c.execute('SELECT 1/0')
+            return self.c.execute(q,params)
+    with support.actor() as c:
+        with pytest.raises(psycopg.errors.DivisionByZero):op.activate(SQLFailure(c),binding(),save_to(box))
+        op.owner_absent(c)
+    assert op.settings(b)==before and b.execute(op.MEMBERS).fetchall()==members
+    assert all(not row[1] and row[2] for row in b.execute(op.ROLE_QUERY,(list(op.ROLES),)))
+
+
+def test_existing_signal_rights_resolve_exact_surviving_session_without_new_grants(installed):
+    b=installed['boot'];b.execute('GRANT pg_signal_backend TO postgres');box=open_access(installed)
+    runtime=psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='ingestion_worker_login',password=box[0]['passwords']['ingestion_worker_login'])
+    try:
+        with support.actor() as c:r=op.close(c,box[0],save_to(box))
+        assert r['sessions']=='ABSENT' and b.execute("SELECT count(*) FROM pg_stat_activity WHERE usename='ingestion_worker_login'").fetchone()[0]==0
+    finally:runtime.close();b.execute('REVOKE pg_signal_backend FROM postgres')
+
+
+def test_closure_binds_actual_supported_registrar_marker_without_inventing_marker_fields(installed):
+    from datetime import datetime,timedelta,timezone,date
+    from app.ingestion.daily_intake import current_windows
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from app.ingestion.ledger import DEFAULT_LIMITS,digest
+    from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+    from verification.discovery.idox_window import WindowConfig
+    from verification.ingestion_storage.operational_owner import Owner
+    from verification.ingestion_storage.chain_registration import capture_registration
+    from verification.ingestion_storage.daily_intake_runtime import registration_payload
+    from verification.ingestion_storage.scope_binding import binding_for
+    b=installed['boot'];b.execute('GRANT ingestion_barrier_releaser TO postgres WITH ADMIN TRUE,INHERIT FALSE,SET FALSE')
+    box=open_access(installed);bv=box[0]['binding']
+    owner=Owner(support.actor,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc)+timedelta(seconds=1200),bindings=op.APPLICATION_BINDING)
+    policy=dict(hostaddr=None,route='DISPOSABLE',expires_at=time.time()+1700,max_runs=1,overlap_days=7,
+        expected_stop=op.ACCEPTED_STOP,execution_binding=op.APPLICATION_BINDING,test_evidence=True,
+        screening_config=digest(ScreeningRule(RULE_V3,unit_threshold=10,link_related=False).config()),
+        councils={c:dict(contract='synthetic-current-'+c,qualification_sha256='9'*64) for c in ('tameside','manchester')})
+    owner.register_intake_period(bv['period'],policy)
+    row=current_windows(datetime.now(timezone.utc),['tameside'])[0]
+    contract=IdoxListingContract('synthetic-current-tameside',WindowConfig('tameside','RECEIVED',
+        date.fromisoformat(row['start']),date.fromisoformat(row['end']),0,60),'9'*64)
+    reg=capture_registration(owner,binding_for('tameside'),contract,row['start'],row['end'],
+        revision='synthetic-current-capture',item_limits=DEFAULT_LIMITS)
+    payload=registration_payload(bv['period'],reg,op.APPLICATION_BINDING,run_id='a'*32)
+    with psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='ingestion_worker_login',password=box[0]['passwords']['ingestion_worker_login'],autocommit=True) as runtime:
+        runtime.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(payload),))
+    marker=op.control(b)['intake_run']
+    assert marker['state']=='OPEN' and 'execution_binding' not in marker
+    with support.actor() as c:r=op.close(c,box[0],save_to(box))
+    assert reg.authority in r['authorities'] and r['open_run_requires_reconciliation'] is True
+    assert op.control(b)['intake_run']==marker and op.control(b)['grants'][reg.authority]['expires_at']==0
+
+
 def test_changed_inventory_cannot_prevent_initial_access_disablement(installed):
     box=open_access(installed);b=installed['boot']
     b.execute('ALTER FUNCTION ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb) SECURITY INVOKER')
