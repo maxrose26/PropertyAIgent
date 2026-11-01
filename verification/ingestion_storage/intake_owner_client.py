@@ -64,12 +64,14 @@ def capture(command, environment, *, seconds=60, ceiling=LIMIT, pass_fds=()):
 
 
 PHASES = ('activate', 'qualify', 'close', 'stop-disposition', 'readback', 'handoff',
-          'handoff-reconcile', 'handoff-restore', 'publication-close', 'inspect')
+          'handoff-reconcile', 'handoff-restore', 'publication-close', 'inspect',
+          'period', 'publication-arm', 'publication-revoke')
 
 
 # Fixed reviewed failure identifiers. Never format an exception, inspect its cause,
 # DSN, environment or arbitrary driver message. New/unrecognised failures stay unknown.
 FAILURE_REASONS = frozenset("""
+PERIOD_EXACT_TEMPORARY_ISSUER PERIOD_COMMIT_ACK_UNCERTAIN TOKEN_REVOKE_ACK_UNCERTAIN OPERATION_VAULT_BINDING PERIOD_EXACT_POLICY PERIOD_POLICY_HASH PERIOD_SINGLE_RUN PERIOD_REVIEWED_BINDINGS PERIOD_ROUTE_EXPIRY PERIOD_PROFILE PERIOD_PRIVILEGE_RESTORATION PERIOD_LEDGER_POSTCONDITION PERIOD_COMMITTED_READBACK PERIOD_EXISTING_ISSUER_ADMIN_ONLY PERIOD_STOP_CHANGED PERIOD_ALREADY_EXISTS_NO_RETRY PERIOD_SERVER_EXPIRY PERIOD_REGISTRATION_READBACK PERIOD_JOURNAL_BINDING INSTALLATION_TOKEN_ONLY TOKEN_REVIEWED_SCOPE_REQUIRED TOKEN_PRIOR_INTENT_RECONCILE_NO_RETRY TOKEN_PRIVATE_BINDING INDEPENDENT_PUBLICATION_REVOKE_REQUIRED
 ACCEPTED_STORAGE_ACCESS_CHANGED
 ACCESS_DISABLED_BUT_MEMBERSHIP_RECONCILIATION_REQUIRED
 ACCESS_DISABLE_READBACK
@@ -279,6 +281,19 @@ def worker(phase, binding, secrets_input, vault_path, expected):
     from .tls_trust import verified_trust
     op.validate_binding(binding, opening=phase=='activate')
     save=lambda _:None;state=None
+    from . import intake_owner_operations as extra
+    if phase in ('period','publication-arm','publication-revoke'):
+        key='period_vault_path' if phase=='period' else 'publication_vault_path'
+        extra.private_path(binding,key,vault_path)
+        vault=Vault(vault_path,secrets_input['vault_key'],create=phase in ('period','publication-arm'))
+        save=vault.save
+        if phase=='publication-arm':return extra.token_arm(binding,secrets_input['publication_token'],save)
+        if phase=='publication-revoke':return extra.token_revoke(binding,vault.load(),save)
+        extra.validate_policy(binding,expected)
+        state=dict(version='FINITE_INTAKE_PERIOD_V1',state='ARMED_NO_RETRY',binding=binding,policy=expected)
+        save(state)
+    if phase=='publication-close' and binding.get('publication_vault_path'):
+        op.require(False,'INDEPENDENT_PUBLICATION_REVOKE_REQUIRED')
     if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect'):
         vault=Vault(vault_path,secrets_input['vault_key'],create=phase=='activate')
         save=vault.save
@@ -294,7 +309,12 @@ def worker(phase, binding, secrets_input, vault_path, expected):
     if phase.startswith('handoff'):
         api=Render(secrets_input['render_token'])
         try:
-            if phase=='handoff':return handoff(api,state,save,secrets_input['publication_token'])
+            if phase=='handoff':
+                token=secrets_input.get('publication_token')
+                if binding.get('publication_vault_path'):
+                    extra.private_path(binding,'publication_vault_path',binding['publication_vault_path'])
+                    token=extra.token_load(binding,Vault(binding['publication_vault_path'],secrets_input['vault_key']).load())
+                return handoff(api,state,save,token)
             if phase=='handoff-reconcile':return reconcile_handoff(api,state,save)
             return restore_handoff(api,state,save,expected.get('job_id'))
         finally:api.session.close()
@@ -337,6 +357,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
         port=5432,dbname='postgres',user='postgres.zcikcfgpblzuzpanpdqd',password=secrets_input['owner_password'],
         sslmode='verify-full',sslrootcert=str(ca),gssencmode='disable',connect_timeout=5,prepare_threshold=None,
         autocommit=True,options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000') as c:
+        if phase=='period':return extra.issue_period(c,binding,expected,state,save)
         if phase=='activate':return op.activate(c,binding,save)
         if phase=='close':return op.close(c,state,save)
         if phase=='stop-disposition':return op.stop_disposition(c,binding.get('stop_decisions',[]))
@@ -381,20 +402,23 @@ def _main(argv, context):
         raise SystemExit('EXPLICIT_PHASE_APPROVAL_REQUIRED')
     output=Path(input('NEW private phase evidence directory: ').strip()).expanduser();output.mkdir(mode=0o700)
     vault=a.vault
-    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect'):
+    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect','period','publication-arm','publication-revoke'):
         vault=str(Path(vault or input('Owner-local encrypted vault path (NEW for activate): ').strip()).expanduser().resolve())
     expected=a.expected;eh=a.expected_sha256
-    if phase in ('readback','handoff-restore'):
+    if phase in ('readback','handoff-restore','period'):
         expected=str(Path(expected or input('Reviewed nonsecret expected receipt file: ').strip()).expanduser().resolve())
         eh=eh or input('Expected receipt SHA-256: ').strip();loaded(expected,eh)
+    if phase=='period':
+        from .intake_owner_operations import validate_policy,private_path
+        validate_policy(b,loaded(expected,eh));private_path(b,'period_vault_path',vault)
     secret={}
-    if phase in ('activate','close','stop-disposition','readback'):secret['owner_password']=hidden('Existing owner password (hidden): ')
+    if phase in ('activate','close','stop-disposition','readback','period'):secret['owner_password']=hidden('Existing owner password (hidden): ')
     if vault:
         secret['vault_key']=hidden('Vault passphrase, at least 24 characters (hidden): ')
-        if phase=='activate' and hidden('Confirm vault passphrase (hidden): ')!=secret['vault_key']:
+        if phase in ('activate','period','publication-arm') and hidden('Confirm vault passphrase (hidden): ')!=secret['vault_key']:
             raise SystemExit('VAULT_CONFIRMATION_REFUSED')
     if phase.startswith('handoff'):secret['render_token']=hidden('Existing owner-local Render token (hidden): ')
-    if phase=='handoff':secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
+    if phase=='publication-arm' or (phase=='handoff' and not b.get('publication_vault_path')):secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
     raw=json.dumps(secret).encode()
     if len(raw)>4000:raise SystemExit('SECRET_PIPE_BOUND')
     readfd,writefd=os.pipe()
