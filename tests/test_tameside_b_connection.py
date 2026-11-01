@@ -137,3 +137,9 @@ def test_counted_runtime_body_ceiling_is_not_raised():
 def test_counted_projection_refuses_unclosed_outer(tmp_path,monkeypatch,patch):
     source,_=connected_source(tmp_path,monkeypatch);o=outer();o.update(patch)
     with pytest.raises(Denied,match='OUTER_SAFETY'):contract().project(source,o,DEFAULT_LIMITS,source_bytes_limit=524288)
+
+
+def test_new_contract_cannot_accept_legacy_unbound_mode():
+    from tests.e2e_connection_support import idox_audit,entry,SCHEME
+    source=idox_audit('tameside',[entry('LEGACY/26',SCHEME)],C.start,C.end)
+    with pytest.raises(Denied,match='IDOX_PAGINATION_PROFILE_BINDING'):contract().project(source,outer(),DEFAULT_LIMITS)

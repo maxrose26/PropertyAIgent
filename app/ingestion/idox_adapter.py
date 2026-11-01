@@ -83,7 +83,7 @@ class IdoxListingContract:
         validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
         mode=source.get('pagination_mode');profile=source.get('collection_profile',{})
-        if mode is not None or profile.get('idox_pagination') is not None:
+        if mode is not None or profile.get('idox_pagination') is not None or self.name=='tameside-screening-metadata-five-v1':
             if (mode!='TAMESIDE_FIVE_COUNT_V1' or profile.get('idox_pagination')!=mode or profile.get('page_size')!=5
                 or c.council!='tameside' or c.semantics!='RECEIVED' or self.name!='tameside-screening-metadata-five-v1'
                 or (source.get('pagination_evidence') or {}).get('state')!='COUNT_RECONCILED'
