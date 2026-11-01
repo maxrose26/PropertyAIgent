@@ -39,3 +39,19 @@ def test_different_council_is_not_relabelled_to_obtain_qualification(tmp_path):
         result=supervisor(*args,**kw);command=args[0];p=Path(command[command.index('--output')+1])
         source=json.loads(p.read_bytes());source['council']='bolton';p.write_text(json.dumps(source));return result
     with pytest.raises(q.Denied):q.qualify(tmp_path/'wrong',supervisor=wrong)
+
+
+def test_cli_single_use_record_prevents_new_output_path_from_becoming_new_authority(tmp_path,monkeypatch):
+    import os,sys
+    for key in list(os.environ):
+        if 'DATABASE' in key or key.endswith(('_KEY','_TOKEN','_PASSWORD')):monkeypatch.delenv(key)
+    monkeypatch.setattr(q,'CONSUMPTION',tmp_path/'consumed.json');calls=[]
+    def synthetic(path):
+        calls.append(path)
+        return dict(status='SYNTHETIC_TEST_ONLY',record_count=0,pages=1,source_sha256='1'*64)
+    monkeypatch.setattr(q,'qualify',synthetic)
+    monkeypatch.setattr(sys,'argv',['qualification','--output',str(tmp_path/'first'),'--authority',q.AUTHORITY])
+    assert q.main()==0
+    monkeypatch.setattr(sys,'argv',['qualification','--output',str(tmp_path/'replacement'),'--authority',q.AUTHORITY])
+    with pytest.raises(SystemExit,match='CONSUMED'):q.main()
+    assert len(calls)==1 and q.CONSUMPTION.stat().st_mode&0o777==0o600

@@ -52,6 +52,11 @@ def require(value, reason):
         raise Denied(reason)
 
 
+def json_equal(c,left,right):
+    """PostgreSQL JSON identity: booleans are never mistaken for numeric zero/one."""
+    return c.execute('SELECT %s::jsonb=%s::jsonb',(json.dumps(left),json.dumps(right))).fetchone()[0] is True
+
+
 def validate_binding(b, *, opening=False, now=None):
     require(isinstance(b, dict) and b.get('version') == 'FINITE_INTAKE_OWNER_V1', 'OWNER_BINDING')
     require(re.fullmatch(r'[A-Za-z0-9_-]{1,60}', b.get('period', '')), 'OWNER_PERIOD')
@@ -72,12 +77,14 @@ def validate_binding(b, *, opening=False, now=None):
     return b
 
 
-def identity(c):
+def identity(c, *, containment=False):
     r = c.execute("SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls "
                   "FROM pg_roles WHERE rolname=current_user").fetchone()
-    require(r == ('postgres', 'postgres', False, True, True, True), 'OWNER_IDENTITY')
-    require(c.execute("SELECT pg_has_role(current_user,'pg_read_all_stats','USAGE')").fetchone()[0] is True,
-            'OWNER_SESSION_VISIBILITY')
+    require(r[:4] == ('postgres', 'postgres', False, True) if containment else
+            r == ('postgres', 'postgres', False, True, True, True), 'OWNER_IDENTITY')
+    if not containment:
+        require(c.execute("SELECT pg_has_role(current_user,'pg_read_all_stats','USAGE')").fetchone()[0] is True,
+                'OWNER_SESSION_VISIBILITY')
 
 
 def owner_absent(c):
@@ -86,8 +93,8 @@ def owner_absent(c):
             'TEMPORARY_OWNER_CAPABILITY_REMAINS')
 
 
-def admin_capabilities(c):
-    required = list(ROLES) + list(ROLES.values())
+def admin_capabilities(c, *, logins_only=False):
+    required = list(ROLES) + ([] if logins_only else list(ROLES.values()))
     rows = c.execute('SELECT DISTINCT roleid::regrole::text FROM pg_auth_members '
                      'WHERE member=current_user::regrole AND admin_option AND roleid=ANY(%s::regrole[])',
                      (required,)).fetchall()
@@ -159,12 +166,13 @@ def retained_cleanup(c, ctl):
     grant['oldham_package_sha256']=package_sha;allowance['package_sha256']=package_sha
     allowance['grant_binding']['oldham_package_sha256']=package_sha
     grant['expires_at'] = 0; allowance['revoked'] = True
-    require(ctl['grants'][OLDHAM] == grant and ctl['oldham_allowances'][OLDHAM] == allowance,
+    require(json_equal(c,ctl['grants'][OLDHAM],grant) and json_equal(c,ctl['oldham_allowances'][OLDHAM],allowance),
             'OLDHAM_HISTORICAL_BINDING_CHANGED')
     historical_root=allowance['package']['registration']['rows'][0]
-    actual=c.execute('SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s',
-                     (historical_root['key'],)).fetchone()
-    require(actual is not None and all(actual[0].get(k)==v for k,v in historical_root.items()),
+    actual=c.execute("SELECT (SELECT jsonb_object_agg(e.key,e.value) FROM jsonb_each(to_jsonb(w)) e "
+                     "WHERE e.key=ANY(%s))=%s::jsonb FROM public.ingestion_work_items w WHERE key=%s",
+                     (list(historical_root),json.dumps(historical_root),historical_root['key'])).fetchone()
+    require(actual == (True,),
             'OLDHAM_HISTORICAL_ROOT_CHANGED')
     rows = c.execute("SELECT key,state,phase,fence,owner,lease_until FROM public.ingestion_work_items "
                      "WHERE key=ANY(%s) ORDER BY key", (list(RECOVERED),)).fetchall()
@@ -230,8 +238,8 @@ def ledger_sha(c, replacement=None):
      )::text,'UTF8')),'hex')""", (json.dumps(replacement) if replacement is not None else None,)*2).fetchone()[0]
 
 
-def begin(c):
-    identity(c)
+def begin(c, *, containment=False):
+    identity(c, containment=containment)
     c.execute('BEGIN')
     c.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s'")
 
@@ -310,14 +318,24 @@ def close(c, state, save, *, emit=lambda *_: None):
     """Independent revocation; no stop/generation preflight and no source replay."""
     b = validate_binding(state['binding'])
     require(state.get('version') == 'FINITE_INTAKE_ACCESS_STATE_V1', 'CLOSURE_STATE')
-    begin(c)
+    begin(c, containment=True)
+    try:
+        admin_capabilities(c,logins_only=True)
+        # Containment must commit even when a later ledger/state check refuses.
+        for role in ROLES:
+            c.execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(role)))
+        c.execute('COMMIT')
+    except BaseException:
+        c.execute('ROLLBACK'); raise
+    state['state'] = 'ACCESS_DISABLED_ACKNOWLEDGED'; save(state)
+    rows = c.execute(ROLE_QUERY, (list(ROLES),)).fetchall()
+    require(rows == [(r,False,True,False,False,False,False,False,False,1) for r in sorted(ROLES)], 'ACCESS_DISABLE_READBACK')
+    begin(c,containment=True)
     try:
         admin_capabilities(c)
-        # Containment must commit even when a later ledger/state check refuses.
         # Revoke only the exact self-issued member/grantor rows. Never CASCADE.
         membership_drift=False
-        for role, cap in ROLES.items():
-            c.execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(role)))
+        for role,cap in ROLES.items():
             rows = c.execute('SELECT admin_option,inherit_option,set_option FROM pg_auth_members '
                              'WHERE roleid=%s::regrole AND member=%s::regrole AND grantor=current_user::regrole',
                              (cap, role)).fetchall()
@@ -328,11 +346,9 @@ def close(c, state, save, *, emit=lambda *_: None):
         c.execute('COMMIT')
     except BaseException:
         c.execute('ROLLBACK'); raise
-    state['state'] = 'ACCESS_DISABLED_ACKNOWLEDGED'; save(state)
+    state['membership_closure']='ACKNOWLEDGED' if not membership_drift else 'RECONCILIATION_REQUIRED';save(state)
     require(not membership_drift, 'ACCESS_DISABLED_BUT_MEMBERSHIP_RECONCILIATION_REQUIRED')
-    rows = c.execute(ROLE_QUERY, (list(ROLES),)).fetchall()
-    require(rows == [(r,False,True,False,False,False,False,False,False,1) for r in sorted(ROLES)], 'ACCESS_DISABLE_READBACK')
-    begin(c)
+    begin(c,containment=True)
     try:
         inventory(c); enter_owner(c)
         c.execute('LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE')
@@ -367,6 +383,7 @@ def close(c, state, save, *, emit=lambda *_: None):
         c.execute('ROLLBACK'); raise
     owner_absent(c)
     require(all(control(c)['grants'][a]['expires_at'] == 0 for a in grants), 'CLOSURE_AUTHORITY_READBACK')
+    identity(c)  # session closure needs proven monitoring; containment did not
     # Existing bounded wait/precise-termination primitive; no new privileges.
     o = Owner(None, emit, lambda: None, expiry=datetime.now(timezone.utc), bindings=b['execution_binding'])
     o.q = lambda conn, query, params=None, **_: conn.execute(query, params).fetchall()
@@ -392,13 +409,13 @@ def finalisation(c, b, expected):
                 policy.get('execution_binding') == b['execution_binding'] and run.get('state') == 'VERIFIED' and
                 run.get('status') == 'RETAINED_AND_SCREENED', 'INDEPENDENT_FINALISATION_BINDING')
         pub = run.get('publication')
-        require(pub == expected.get('publication') and pub.get('readback_verified') is True and
+        require(isinstance(pub,dict) and json_equal(c,pub,expected.get('publication')) and pub.get('readback_verified') is True and
                 re.fullmatch('[a-f0-9]{40}', pub.get('commit', '')) and
                 re.fullmatch('[a-f0-9]{64}', pub.get('sha256', '')) and
                 pub.get('path') == f"docs/design/ingestion-operational-execution-daily-intake/{b['period']}/{run['id']}/final/result-before-publication.json",
                 'INDEPENDENT_PUBLICATION_BINDING')
         grants = {a: g for a, g in ctl.get('grants', {}).items() if g.get('intake_run') == run['id']}
-        require(0 < len(grants) <= 4 and all(g.get('expires_at') == 0 and g.get('intake_period') == b['period'] and
+        require(0 < len(grants) <= 4 and all(type(g.get('expires_at')) in (int,float) and g['expires_at'] == 0 and g.get('intake_period') == b['period'] and
                 g.get('execution_binding') == b['execution_binding'] for g in grants.values()), 'INDEPENDENT_AUTHORITY_CLOSURE')
         roots = (ctl.get('intake_periods', {}).get(b['period'], {}).get('days') or {}).get(run.get('day')) or {}
         require(set(roots) == {'tameside', 'manchester'} and len(set(roots.values())) == 2, 'INDEPENDENT_COUNCILS')

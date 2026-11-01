@@ -78,11 +78,13 @@ def test_exact_stop_disposition_preserves_history_generation_and_privileges(inst
     record_property('postgres_version',installed['server_version']);record_property('actor_superuser',False)
 
 
-@pytest.mark.parametrize('drift',['generation','oldham','recovery','unfinished','intent','active_grant','function'])
+@pytest.mark.parametrize('drift',['generation','oldham','oldham_expiry_type','oldham_counter_type','recovery','unfinished','intent','active_grant','function'])
 def test_disposition_refuses_drift_atomically(installed,drift):
     b=installed['boot'];ctl=op.control(b)
     if drift=='generation':ctl['hard_stop_generation']=6
     elif drift=='oldham':ctl['oldham_allowances'][op.OLDHAM]['revoked']=False
+    elif drift=='oldham_expiry_type':ctl['grants'][op.OLDHAM]['expires_at']=False
+    elif drift=='oldham_counter_type':ctl['grants'][op.OLDHAM]['source_calls']=False
     elif drift=='recovery':b.execute("UPDATE ingestion_work_items SET fence=3 WHERE key=%s",(op.RECOVERED[0],))
     elif drift=='unfinished':ctl['intake_run']=dict(state='OPEN')
     elif drift=='intent':b.execute("UPDATE ingestion_work_items SET phase='SOURCE_INTENT' WHERE key=%s",(op.RECOVERED[0],))
@@ -245,6 +247,22 @@ def test_changed_inventory_cannot_prevent_initial_access_disablement(installed):
     assert box[0]['state']=='ACCESS_DISABLED_ACKNOWLEDGED'
 
 
+@pytest.mark.parametrize('lost',['monitoring','capability_admin'])
+def test_lost_later_cleanup_permission_cannot_prevent_no_login_containment(installed,lost):
+    box=open_access(installed);b=installed['boot']
+    name='pg_read_all_stats' if lost=='monitoring' else 'ingestion_worker'
+    # Synthetic concurrent permission loss, deliberately outside the promised
+    # production no-concurrency condition; no automatic privilege repair.
+    b.execute(sql.SQL('REVOKE {} FROM postgres CASCADE').format(sql.Identifier(name)))
+    try:
+        with support.actor() as c:
+            with pytest.raises(op.Denied):op.close(c,box[0],save_to(box))
+        assert all(not row[1] and row[2] for row in b.execute(op.ROLE_QUERY,(list(op.ROLES),)))
+        assert box[0]['state']=='ACCESS_DISABLED_ACKNOWLEDGED'
+    finally:
+        if lost=='monitoring':b.execute('GRANT pg_read_all_stats TO postgres')
+
+
 def test_surviving_session_without_existing_signal_right_is_not_claimed_closed(installed):
     box=open_access(installed)
     runtime=psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='ingestion_worker_login',password=box[0]['passwords']['ingestion_worker_login'])
@@ -285,7 +303,7 @@ def test_independent_terminal_projection_reads_both_councils_and_exact_publicati
     assert op.ledger_sha(b)==before and b.execute(op.MEMBERS).fetchall()==members
 
 
-@pytest.mark.parametrize('drift',['run','publication','open','incomplete','expiry','council','zero','archive','screen'])
+@pytest.mark.parametrize('drift',['run','publication','open','incomplete','expiry','boolean_expiry','council','zero','archive','screen'])
 def test_independent_readback_refuses_false_terminal_success(installed,drift):
     b=installed['boot'];bv,e=terminal_fixture(installed);ctl=op.control(b)
     if drift=='run':e['run_id']='9'*32
@@ -293,6 +311,7 @@ def test_independent_readback_refuses_false_terminal_success(installed,drift):
     elif drift=='open':ctl['intake_run']['state']='OPEN'
     elif drift=='incomplete':ctl['intake_run']['status']='INCOMPLETE'
     elif drift=='expiry':ctl['grants']['SYNTHETIC_B_AUTHORITY']['expires_at']=time.time()-1
+    elif drift=='boolean_expiry':ctl['grants']['SYNTHETIC_B_AUTHORITY']['expires_at']=False
     elif drift=='council':del ctl['intake_periods'][bv['period']]['days']['2026-10-30']['manchester']
     else:
         cp=b.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s',('d'*64,)).fetchone()[0]

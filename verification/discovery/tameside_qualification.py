@@ -18,6 +18,7 @@ from verification.ingestion_storage.operational_supervisor import supervise
 
 ROW = dict(council='tameside', semantics='RECEIVED', start='2026-10-24', end='2026-10-30')
 AUTHORITY = 'ONE_TAMESIDE_LISTING_METADATA_QUALIFICATION_20261024_30'
+CONSUMPTION = Path('/home/maxrose26/stage4-owner/tameside-qualification-20261024-30-consumed.json')
 
 
 def qualify(root, *, supervisor=supervise):
@@ -69,6 +70,13 @@ def main():
     if any('DATABASE' in k or k.endswith(('_KEY', '_TOKEN', '_PASSWORD')) for k in os.environ):
         raise SystemExit('CREDENTIAL_FREE_OWNER_PARENT_REQUIRED')
     os.umask(0o077)
+    try:
+        with CONSUMPTION.open('x') as record:
+            json.dump(dict(authority=AUTHORITY,row=ROW,state='CONSUMED_BEFORE_SOURCE',
+                           output=str(Path(a.output).resolve())),record,sort_keys=True)
+            record.flush();os.fsync(record.fileno())
+    except OSError:
+        raise SystemExit('QUALIFICATION_CONSUMED_OR_RECORD_UNAVAILABLE_RECONCILE_NO_RETRY') from None
     try:
         result = qualify(a.output)
         print(json.dumps({k:result[k] for k in ('status','record_count','pages','source_sha256')}))

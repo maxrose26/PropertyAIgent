@@ -64,7 +64,7 @@ def capture(command, environment, *, seconds=60, ceiling=LIMIT, pass_fds=()):
 
 
 PHASES = ('activate', 'qualify', 'close', 'stop-disposition', 'readback', 'handoff',
-          'handoff-reconcile', 'handoff-restore', 'publication-close')
+          'handoff-reconcile', 'handoff-restore', 'publication-close', 'inspect')
 
 
 def hidden(prompt):
@@ -92,12 +92,18 @@ def worker(phase, binding, secrets_input, vault_path, expected):
     from .tls_trust import verified_trust
     op.validate_binding(binding, opening=phase=='activate')
     save=lambda _:None;state=None
-    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close'):
+    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect'):
         vault=Vault(vault_path,secrets_input['vault_key'],create=phase=='activate')
         save=vault.save
         if phase!='activate':
             state=vault.load()
             op.require(state['binding']==binding,'VAULT_BINDING_CHANGED')
+    if phase=='inspect':
+        r=state.get('render',{})
+        return dict(status='LOCAL_ENCRYPTED_STATE_INSPECTION',period=binding['period'],
+                    state=state.get('state'),membership_closure=state.get('membership_closure'),
+                    render_state=r.get('state'),publication_state=r.get('publication_state'),
+                    production_connections=0,source_requests=0,provider_calls=0)
     if phase.startswith('handoff'):
         api=Render(secrets_input['render_token'])
         try:
@@ -123,6 +129,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
         return dict(status='PUBLICATION_TOKEN_REVOCATION_ACKNOWLEDGED',calls=1)
     ca,_=verified_trust()
     if phase=='qualify':
+        op.require(time.time()+60<binding['valid_until'],'QUALIFICATION_FINITE_WINDOW')
         from .restricted_route import url
         from .operational_controller import DatabaseBudget
         out=[]
@@ -172,12 +179,17 @@ def main(argv=None):
     if phase not in PHASES:raise SystemExit('PHASE_REFUSED')
     path=str(Path(a.binding or input('Reviewed binding file: ').strip()).expanduser().resolve())
     h=a.binding_sha256 or input('Reviewed binding SHA-256: ').strip()
-    loaded(path,h)
-    if input('Approval phrase (EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE): ').strip()!= 'EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE':
+    b=loaded(path,h)
+    try:
+        from .intake_owner import validate_binding
+        validate_binding(b,opening=phase=='activate')
+    except BaseException:
+        raise SystemExit('BINDING_NOT_EXECUTABLE_REVIEW_REQUIRED') from None
+    if phase!='inspect' and input('Approval phrase (EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE): ').strip()!= 'EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE':
         raise SystemExit('EXPLICIT_PHASE_APPROVAL_REQUIRED')
     output=Path(input('NEW private phase evidence directory: ').strip()).expanduser();output.mkdir(mode=0o700)
     vault=a.vault
-    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close'):
+    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect'):
         vault=str(Path(vault or input('Owner-local encrypted vault path (NEW for activate): ').strip()).expanduser().resolve())
     expected=a.expected;eh=a.expected_sha256
     if phase in ('readback','handoff-restore'):
@@ -185,7 +197,10 @@ def main(argv=None):
         eh=eh or input('Expected receipt SHA-256: ').strip();loaded(expected,eh)
     secret={}
     if phase in ('activate','close','stop-disposition','readback'):secret['owner_password']=hidden('Existing owner password (hidden): ')
-    if vault:secret['vault_key']=hidden('Vault passphrase, at least 24 characters (hidden): ')
+    if vault:
+        secret['vault_key']=hidden('Vault passphrase, at least 24 characters (hidden): ')
+        if phase=='activate' and hidden('Confirm vault passphrase (hidden): ')!=secret['vault_key']:
+            raise SystemExit('VAULT_CONFIRMATION_REFUSED')
     if phase.startswith('handoff'):secret['render_token']=hidden('Existing owner-local Render token (hidden): ')
     if phase=='handoff':secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
     raw=json.dumps(secret).encode()

@@ -163,3 +163,29 @@ def test_publication_token_revocation_uses_existing_transport_once_and_preserves
     assert state['render']['publication_state']=='REVOKE_INTENT_NO_RETRY'
     with pytest.raises(Denied):worker('publication-close',state['binding'],dict(vault_key='synthetic'),'/unused',{})
     assert calls==[('DELETE','installation/token')]
+
+
+def test_local_state_inspection_exports_no_secret_and_needs_no_connection(monkeypatch):
+    from verification.ingestion_storage import intake_owner_io as io,intake_owner as op
+    from verification.ingestion_storage.intake_owner_client import worker
+    bv=dict(version='FINITE_INTAKE_OWNER_V1',period='fixture',route='POOLER',hostaddr='192.0.2.1',
+            owner_hostaddr='192.0.2.2',execution_binding=op.APPLICATION_BINDING,accepted_stop=op.ACCEPTED_STOP)
+    class FakeVault:
+        def __init__(self,*_,**kw):pass
+        def load(self):return dict(binding=bv,state='ACCESS_DISABLED_ACKNOWLEDGED',passwords={'hidden':'SYNTHETIC_SECRET'},
+                                   render=dict(state='PUT_INTENT_NO_RETRY',publication_token='ghs_SYNTHETIC_SECRET'))
+        def save(self,_):raise AssertionError('inspection must not mutate')
+    monkeypatch.setattr(io,'Vault',FakeVault)
+    result=worker('inspect',bv,dict(vault_key='synthetic'),'/unused',{})
+    assert result['production_connections']==0 and result['provider_calls']==0
+    assert 'SYNTHETIC_SECRET' not in json.dumps(result)
+
+
+def test_inactive_binding_is_refused_before_secret_prompts(tmp_path,monkeypatch):
+    import hashlib
+    from verification.ingestion_storage import intake_owner_client as client
+    p=tmp_path/'binding.json';p.write_text('{}');h=hashlib.sha256(p.read_bytes()).hexdigest()
+    monkeypatch.setattr(sys.stdin,'isatty',lambda:True);monkeypatch.setattr(sys.stderr,'isatty',lambda:True)
+    monkeypatch.setattr(client,'hidden',lambda _: (_ for _ in ()).throw(AssertionError('no secret should be prompted')))
+    with pytest.raises(SystemExit,match='BINDING_NOT_EXECUTABLE'):
+        client.main(['--phase','activate','--binding',str(p),'--binding-sha256',h])
