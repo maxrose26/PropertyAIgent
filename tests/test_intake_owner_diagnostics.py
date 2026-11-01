@@ -93,11 +93,44 @@ def test_child_failure_handler_uses_safe_envelope(monkeypatch,capsys,kind):
     assert len(out.out.encode())<=1024
 
 
-def test_parent_binding_refusal_preserves_known_reason_before_hidden_input(monkeypatch):
+def test_parent_binding_refusal_preserves_known_reason_before_hidden_input(monkeypatch,capsys):
     monkeypatch.setattr(client.sys.stdin,'isatty',lambda:True)
     monkeypatch.setattr(client.sys.stderr,'isatty',lambda:True)
     monkeypatch.setattr(client,'loaded',lambda *_:{})
     monkeypatch.setattr(client,'hidden',lambda *_:pytest.fail('no hidden prompt for invalid binding'))
-    with pytest.raises(SystemExit) as refused:
-        client.main(['--phase','activate','--binding','unused','--binding-sha256','unused'])
-    assert json.loads(refused.value.code)['failure_reason']=='OWNER_BINDING'
+    assert client.main(['--phase','activate','--binding','unused','--binding-sha256','unused'])==2
+    assert json.loads(capsys.readouterr().out)['failure_reason']=='OWNER_BINDING'
+
+
+def test_parent_unknown_setup_failure_is_fixed_and_does_not_print_traceback(monkeypatch,capsys):
+    monkeypatch.setattr(client.sys.stdin,'isatty',lambda:True)
+    monkeypatch.setattr(client.sys.stderr,'isatty',lambda:True)
+    def loaded(*_):raise OSError('SENSITIVE_SETUP_VALUE')
+    monkeypatch.setattr(client,'loaded',loaded)
+    assert client.main(['--phase','close','--binding','unused','--binding-sha256','unused'])==2
+    result=capsys.readouterr()
+    assert not result.err and 'SENSITIVE' not in result.out and 'Traceback' not in result.out
+    assert json.loads(result.out)['failure_reason']=='UNKNOWN_FAILURE'
+    assert json.loads(result.out)['phase']=='close'
+
+
+def test_invalid_cli_value_is_not_echoed_and_no_phase_is_guessed(capsys):
+    assert client.main(['--phase','password=SENSITIVE_ARGUMENT'])==2
+    result=capsys.readouterr()
+    assert not result.err and 'SENSITIVE' not in result.out
+    assert json.loads(result.out)['failure_reason']=='ARGUMENTS_REFUSED'
+    assert json.loads(result.out)['phase']=='UNKNOWN_PHASE'
+
+
+def test_interactive_phase_retained_for_setup_failure(monkeypatch,capsys):
+    monkeypatch.setattr(client.sys.stdin,'isatty',lambda:True)
+    monkeypatch.setattr(client.sys.stderr,'isatty',lambda:True)
+    values=iter(['close','unused','unused'])
+    monkeypatch.setattr('builtins.input',lambda *_:next(values))
+    def loaded(*_):raise OSError('SENSITIVE_INTERACTIVE_VALUE')
+    monkeypatch.setattr(client,'loaded',loaded)
+    assert client.main([])==2
+    result=capsys.readouterr()
+    assert not result.err and 'SENSITIVE' not in result.out
+    assert json.loads(result.out)['phase']=='close'
+    assert json.loads(result.out)['failure_reason']=='UNKNOWN_FAILURE'

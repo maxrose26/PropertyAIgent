@@ -81,7 +81,9 @@ ACTIVATION_SETTINGS_POSTCONDITION
 ACTIVATION_STOP_CHANGED
 ADMIN_COMMAND_BOUND
 ADMIN_CONNECTION_BOUND
+ARGUMENTS_REFUSED
 AUTH_PROBE
+BINDING_NOT_EXECUTABLE_REVIEW_REQUIRED
 BINDING_FILE_REFUSED
 BINDING_HASH_REFUSED
 BOTH_EXPLICIT_STOP_DECISIONS_REQUIRED
@@ -110,7 +112,9 @@ EXACT_STORAGE_STOP_STATE
 EXISTING_PASSWORD_BOOLEAN_READ_UNAVAILABLE
 EXISTING_PIPELINE_SESSION
 EXISTING_RUNTIME_ADMIN_CAPABILITIES_REQUIRED
+EXPLICIT_PHASE_APPROVAL_REQUIRED
 FINITE_OWNER_VALIDITY
+HIDDEN_OWNER_TTY_REQUIRED
 FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN
 GITHUB_REQUEST_BOUND
 HANDOFF_CREDENTIAL_WINDOW
@@ -151,6 +155,7 @@ OWNER_ROUTE
 OWNER_SESSION_VISIBILITY
 OWNER_STOP_BINDING
 PASSWORD_ENTROPY_BOUND
+PHASE_REFUSED
 PINNED_REVIEWED_ADDRESS_REQUIRED
 PREEXISTING_RUNTIME_SESSIONS
 PRIVATE_VAULT_REQUIRED
@@ -202,6 +207,8 @@ ROLE_SETTING_PRIOR_VALUE_UNSUPPORTED
 RUNTIME_MEMBERSHIP_PRESENT
 RUNTIME_NOT_DORMANT
 SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED
+SECRET_FORMAT_REFUSED
+SECRET_PIPE_BOUND
 SERVER_FINITE_VALIDITY
 SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE
 SESSIONS_UNRESOLVED
@@ -218,6 +225,7 @@ UNKNOWN_PHASE
 UNRESOLVED_EFFECT_INTENT
 VAULT_32K_BOUND
 VAULT_BINDING_CHANGED
+VAULT_CONFIRMATION_REFUSED
 VAULT_INCOMPLETE
 VAULT_PASSPHRASE_LENGTH
 """.split())
@@ -336,12 +344,16 @@ def worker(phase, binding, secrets_input, vault_path, expected):
     raise SystemExit('UNKNOWN_PHASE')
 
 
-def main(argv=None):
+def _main(argv, context):
     os.umask(0o077)
     p=argparse.ArgumentParser();p.add_argument('--child',action='store_true');p.add_argument('--secrets-fd',type=int)
     p.add_argument('--phase',choices=PHASES);p.add_argument('--binding');p.add_argument('--binding-sha256')
     p.add_argument('--vault');p.add_argument('--expected');p.add_argument('--expected-sha256')
+    def argument_error(_):
+        raise SystemExit('ARGUMENTS_REFUSED')
+    p.error=argument_error
     a=p.parse_args(argv)
+    context[0]=a.phase
     if a.child:
         try:
             secret=json.loads(os.read(a.secrets_fd,4096));os.close(a.secrets_fd)
@@ -355,6 +367,7 @@ def main(argv=None):
             print(failure_output(a.phase, exc));return 2
     if not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('HIDDEN_OWNER_TTY_REQUIRED')
     phase=a.phase or input('Approved phase: ').strip()
+    context[0]=phase
     if phase not in PHASES:raise SystemExit('PHASE_REFUSED')
     path=str(Path(a.binding or input('Reviewed binding file: ').strip()).expanduser().resolve())
     h=a.binding_sha256 or input('Reviewed binding SHA-256: ').strip()
@@ -363,7 +376,7 @@ def main(argv=None):
         from .intake_owner import validate_binding
         validate_binding(b,opening=phase=='activate')
     except BaseException as exc:
-        raise SystemExit(failure_output(phase, exc)) from None
+        print(failure_output(phase, exc));return 2
     if phase!='inspect' and input('Approval phrase (EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE): ').strip()!= 'EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE':
         raise SystemExit('EXPLICIT_PHASE_APPROVAL_REQUIRED')
     output=Path(input('NEW private phase evidence directory: ').strip()).expanduser();output.mkdir(mode=0o700)
@@ -400,6 +413,17 @@ def main(argv=None):
     (output/'output.txt').write_bytes(data);(output/'status.json').write_text(json.dumps(status,sort_keys=True)+'\n')
     print('PHASE_REQUIRES_LOCAL_EVIDENCE_REVIEW' if not status['reason'] and status['exit_code']==0 else 'STOP_RECONCILE_NO_RETRY')
     return 0 if status['exit_code']==0 and not status['reason'] else 2
+
+
+def main(argv=None):
+    context=[None]
+    try:
+        return _main(argv, context)
+    except BaseException as exc:
+        if type(exc) is SystemExit and exc.code == 0:
+            return 0
+        print(failure_output(context[0], exc))
+        return 2
 
 
 if __name__=='__main__':raise SystemExit(main())
