@@ -56,8 +56,9 @@ class WindowConfig:
 
 
 class WindowBoundary(Boundary):
-    def __init__(self, dispatch, config=WindowConfig(), *, probe=False, response_evidence=None):
+    def __init__(self, dispatch, config=WindowConfig(), *, probe=False, response_evidence=None, calibration_navigation=False):
         self.config=config
+        self.calibration_navigation=calibration_navigation
         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
             config.base,config.form_url),
             (Budget(requests=1,per_reference=1,total_bytes=262_144,response_bytes=262_144,seconds=15) if probe else Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45)),dispatch,
@@ -85,7 +86,7 @@ class WindowBoundary(Boundary):
         if self.closed: self.budget.reject('PARTIAL_RETRIEVAL','closed')
         allowed=((self.phase=='FORM' and method=='GET' and url==self.config.form_url and body is None)
             or (self.phase in {'SEARCH','SORT'} and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)
-            or (self.phase=='PAGE' and method=='GET' and url==self.next_url and self.next_url is not None and body is None)
+            or (self.phase=='PAGE' and ((method=='GET' and url==self.next_url and self.next_url is not None and body is None) or (self.calibration_navigation is True and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)))
             or (self.phase=='REFINE' and method=='GET' and url==self.policy.base_url+'/refineSearch.do?action=refine' and body is None))
         if not allowed: self.budget.reject('PARTIAL_RETRIEVAL','window request not admitted')
 
@@ -285,7 +286,7 @@ def form_probe(config=WindowConfig()):
     return result
 
 
-def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None):
+def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None, pagination_calibration=False):
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
@@ -297,7 +298,11 @@ def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None):
             kwargs.pop('deadline',None)
             kwargs['timeout']=(3,8)
             return s.request(method,url,**kwargs)
-        result=run(dispatch,config,retain_proof=retain_proof,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
+        if pagination_calibration:
+            from .pagination_calibration import run_calibration
+            result=run_calibration(dispatch,config,response_evidence=response_evidence)
+        else:
+            result=run(dispatch,config,retain_proof=retain_proof,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     result['cleanup']='SESSION_BOUNDARY_CLOSED'
     return result
 

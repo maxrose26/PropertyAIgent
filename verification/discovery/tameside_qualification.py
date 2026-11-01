@@ -27,8 +27,36 @@ THIRD_AUTHORITY = 'ONE_TAMESIDE_LISTING_METADATA_QUALIFICATION_20261024_30_ATTEM
 THIRD_OUTPUT = Path('/home/maxrose26/stage4-owner/tameside-listing-qualification-evidence-03')
 THIRD_CONSUMPTION = Path('/home/maxrose26/stage4-owner/tameside-qualification-20261024-30-attempt-03-consumed.json')
 SECOND_CONSUMPTION_SHA256 = 'f23fcc2b5994df608690ce24971b1c25aa5f34164c6d3e4915ba776bab01d21d'
+CALIBRATION_AUTHORITY='ONE_TAMESIDE_PAGINATION_CALIBRATION_20261024_30_V1'
+CALIBRATION_OUTPUT=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-evidence-01')
+CALIBRATION_CONSUMPTION=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-20261024-30-consumed.json')
+THIRD_CONSUMPTION_SHA256='0d35e23218894e476dea5b5b37b53408ce8891acd91469932f0a4b4ea7c91d97'
 
 QUALIFICATION_REASONS=frozenset("""
+CALIBRATION_SCOPE
+CALIBRATION_RETENTION_INCOMPLETE
+CALIBRATION_PAGE_SIZE_IGNORED
+CALIBRATION_SORT_CHANGED
+CALIBRATION_PAGE_IDENTITY
+CALIBRATION_NAVIGATION_AMBIGUOUS
+CALIBRATION_NAVIGATION_UNSUPPORTED
+CALIBRATION_NAVIGATION_CONFLICT
+CALIBRATION_REPEATED_PAGE
+CALIBRATION_DUPLICATE_IDENTITY
+CALIBRATION_CONTRADICTORY_COUNTS
+CALIBRATION_ERROR_RESPONSE
+CALIBRATION_SESSION_EXPIRED
+CALIBRATION_UNEXPECTED_MESSAGE
+CALIBRATION_ROW_LAYOUT_REFUSED
+CALIBRATION_SEARCH_BINDING
+CALIBRATION_PAGE_CAP
+CALIBRATION_ROW_CAP
+CALIBRATION_REQUEST_CAP
+CALIBRATION_BYTE_CAP
+CALIBRATION_DEADLINE
+CALIBRATION_TRACE_BOUND
+CALIBRATION_TRACE_IO
+CALIBRATION_UNKNOWN
 OUTER_SAFETY
 SCREENING_COLLECTION_MODE_REQUIRED
 COLLECTION_PROFILE
@@ -70,7 +98,7 @@ QUALIFICATION_SOURCE_OR_CLOSURE_UNCERTAIN_NO_RETRY
 SOURCE_AUDIT_BOUND
 UNKNOWN
 """.split())
-QUALIFICATION_STAGES=frozenset({'PREPARE','SOURCE','SOURCE_SAFETY','SOURCE_EXPORT','PRIVATE_RETENTION','PROJECTION','ASSESSMENT','UNKNOWN'})
+QUALIFICATION_STAGES=frozenset({'PREPARE','SOURCE','SOURCE_SAFETY','SOURCE_EXPORT','PRIVATE_RETENTION','PROJECTION','ASSESSMENT','CALIBRATION','UNKNOWN'})
 
 
 def qualification_outcome(root, stage, exc=None):
@@ -78,7 +106,7 @@ def qualification_outcome(root, stage, exc=None):
     reason='UNKNOWN'
     if type(exc) in (Denied,ProofError,ValueError) and len(exc.args)==1 and type(exc.args[0]) is str and exc.args[0] in QUALIFICATION_REASONS:
         reason=exc.args[0]
-    value=dict(status='REFUSED' if exc is not None else 'PROJECTION_ACCEPTED_ASSESSMENT_REQUIRED',
+    value=dict(status='REFUSED' if exc is not None else 'OBSERVATIONS_RECORDED' if stage=='CALIBRATION' else 'PROJECTION_ACCEPTED_ASSESSMENT_REQUIRED',
                stage=stage if stage in QUALIFICATION_STAGES else 'UNKNOWN',reason=reason if exc is not None else 'NONE',retry=False)
     raw=canonical(value)
     if len(raw)>2048:raise Denied('QUALIFICATION_CONTROL_BOUND')
@@ -98,7 +126,7 @@ def control_bound(root, *, reserve=0):
     if sum(f.stat().st_size for f in controls)+reserve>65536:raise Denied('QUALIFICATION_CONTROL_BOUND')
 
 
-def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=False):
+def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=False, pagination_calibration=False):
     root = Path(root)
     if root.exists() or root.is_symlink(): raise Denied('NEW_QUALIFICATION_OUTPUT_REQUIRED')
     root.mkdir(mode=0o700)
@@ -108,9 +136,12 @@ def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=Fa
         plan = root/'plan.json'; output = root/'source.json'
         plan_value=dict(row=ROW, fixture=None)
         if private_pages:
-            if authority!=THIRD_AUTHORITY:raise Denied('PRIVATE_RESPONSE_SCOPE')
+            if authority not in (THIRD_AUTHORITY,CALIBRATION_AUTHORITY):raise Denied('PRIVATE_RESPONSE_SCOPE')
             (root/'raw-bodies').mkdir(mode=0o700)
             plan_value['private_response_bodies']=str((root/'raw-bodies').resolve())
+        if pagination_calibration:
+            if authority!=CALIBRATION_AUTHORITY or not private_pages:raise Denied('CALIBRATION_SCOPE')
+            plan_value['pagination_calibration']='TAMESIDE_FIVE_PER_PAGE_V1'
         plan.write_bytes(canonical(plan_value))
         def check():
             import psutil
@@ -137,6 +168,21 @@ def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=Fa
             from verification.discovery.four_council_proof import validate_private_responses
             validate_private_responses(root/'raw-bodies',source)
             control_bound(root,reserve=2048+16384)
+        if pagination_calibration:
+            stage='CALIBRATION'
+            from verification.discovery.pagination_calibration import MODE,CODES
+            observation=source.get('calibration',{})
+            if observation.get('mode')!=MODE or observation.get('acceptance_enabled') is not False:raise Denied('CALIBRATION_SCOPE')
+            code=observation.get('failure')
+            if code is None and (observation.get('criteria_verified') is not True or observation.get('state')!='OBSERVATIONS_REQUIRE_REVIEW'):code='CALIBRATION_UNKNOWN'
+            summary=dict(status='CALIBRATION_OBSERVATIONS_REQUIRE_REVIEW' if code is None and observation.get('criteria_verified') is True else 'CALIBRATION_STOP_REQUIRES_REVIEW',mode=MODE,acceptance_enabled=False,completeness='UNKNOWN',reason=code if code in CODES else 'NONE' if code is None else 'UNKNOWN',observed_pages=len(observation.get('pages',[])),observed_records=len(source.get('records',[])),source_sha256=hashlib.sha256(raw).hexdigest(),criteria_verified=observation.get('criteria_verified') is True,product_decision_required=True,retry=False)
+            if len(canonical(summary))>4096:raise Denied('QUALIFICATION_CONTROL_BOUND')
+            control_bound(root,reserve=4096+2048)
+            fd=os.open(root/'calibration-summary.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,'wb') as f:f.write(canonical(summary));f.flush();os.fsync(f.fileno())
+            if code is not None:raise Denied(code if code in CODES else 'UNKNOWN')
+            qualification_outcome(root,stage)
+            return summary
         stage='PROJECTION'
         c = WindowConfig('tameside', 'RECEIVED', date(2026,10,24), date(2026,10,30), 0, 60)
         # The assessment uses the exact source SHA as a provisional evidence identity;
@@ -176,7 +222,12 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--output', required=True); p.add_argument('--authority', required=True)
     a = p.parse_args()
     consumption=CONSUMPTION
-    if a.authority == THIRD_AUTHORITY:
+    if a.authority == CALIBRATION_AUTHORITY:
+        if a.output!=str(CALIBRATION_OUTPUT):raise SystemExit('EXACT_CALIBRATION_OUTPUT_REQUIRED')
+        for path,expected in ((CONSUMPTION,PREDECESSOR_SHA256),(SECOND_CONSUMPTION,SECOND_CONSUMPTION_SHA256),(THIRD_CONSUMPTION,THIRD_CONSUMPTION_SHA256)):
+            if path.is_symlink() or not path.is_file() or path.stat().st_size>4096 or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise SystemExit('ALL_THREE_CONSUMPTIONS_REQUIRED')
+        consumption=CALIBRATION_CONSUMPTION
+    elif a.authority == THIRD_AUTHORITY:
         if a.output!=str(THIRD_OUTPUT):raise SystemExit('EXACT_THIRD_ATTEMPT_OUTPUT_REQUIRED')
         for path,expected in ((CONSUMPTION,PREDECESSOR_SHA256),(SECOND_CONSUMPTION,SECOND_CONSUMPTION_SHA256)):
             if path.is_symlink() or not path.is_file() or path.stat().st_size>4096 or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
@@ -197,15 +248,15 @@ def main():
             json.dump(dict(authority=a.authority,row=ROW,state='CONSUMED_BEFORE_SOURCE',
                            output=str(Path(a.output).resolve())),record,sort_keys=True)
             record.flush();os.fsync(record.fileno())
-        if a.authority in (SECOND_AUTHORITY,THIRD_AUTHORITY):
+        if a.authority in (SECOND_AUTHORITY,THIRD_AUTHORITY,CALIBRATION_AUTHORITY):
             fd=os.open(consumption.parent,os.O_RDONLY|os.O_DIRECTORY)
             try:os.fsync(fd)
             finally:os.close(fd)
     except OSError:
         raise SystemExit('QUALIFICATION_CONSUMED_OR_RECORD_UNAVAILABLE_RECONCILE_NO_RETRY') from None
     try:
-        result = qualify(a.output,authority=a.authority,private_pages=True) if a.authority==THIRD_AUTHORITY else qualify(a.output) if a.authority==AUTHORITY else qualify(a.output,authority=a.authority)
-        print(json.dumps({k:result[k] for k in ('status','record_count','pages','source_sha256')}))
+        result = qualify(a.output,authority=a.authority,private_pages=True,pagination_calibration=True) if a.authority==CALIBRATION_AUTHORITY else qualify(a.output,authority=a.authority,private_pages=True) if a.authority==THIRD_AUTHORITY else qualify(a.output) if a.authority==AUTHORITY else qualify(a.output,authority=a.authority)
+        print(json.dumps({k:result[k] for k in (('status','observed_pages','observed_records','source_sha256') if a.authority==CALIBRATION_AUTHORITY else ('status','record_count','pages','source_sha256'))}))
     except BaseException:
         print('STOP_QUALIFICATION_REQUIRES_REVIEW_NO_RETRY'); return 2
     return 0
