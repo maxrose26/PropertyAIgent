@@ -56,7 +56,7 @@ class WindowConfig:
 
 
 class WindowBoundary(Boundary):
-    def __init__(self, dispatch, config=WindowConfig(), *, probe=False):
+    def __init__(self, dispatch, config=WindowConfig(), *, probe=False, response_evidence=None):
         self.config=config
         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
             config.base,config.form_url),
@@ -69,6 +69,8 @@ class WindowBoundary(Boundary):
         self.response_provenance=[]
         self.last_response=None
         self.proof_log=None
+        if response_evidence is not None:
+            self.response_evidence=lambda body,sequence,complete:response_evidence(self.phase,sequence,body,complete=complete)
         physical=self.dispatch
         def recording(method,url,**kwargs):      # the shape of THIS request's response only (status, allow-listed media type, redirect disposition); nothing else is kept
             self.last_response=None
@@ -109,14 +111,14 @@ class WindowBoundary(Boundary):
         return data
 
 
-def run(dispatch, config=WindowConfig(), *, retain_proof=False):
+def run(dispatch, config=WindowConfig(), *, retain_proof=False, response_evidence=None):
     proof=None
     if type(retain_proof) is not bool:raise ValueError('proof selection')
     if retain_proof:
         from .four_council_proof import ProofLog
         if config.max_transport_retries!=0:raise ValueError('proof requires zero retries')
         proof=ProofLog(config.council,config.semantics,config.start,config.end)
-    b=WindowBoundary(dispatch,config)
+    b=WindowBoundary(dispatch,config,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     b.proof_log=proof
     out={'council':config.council,'requested_interval':[config.start.isoformat(),config.end.isoformat()],
         'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
@@ -283,7 +285,7 @@ def form_probe(config=WindowConfig()):
     return result
 
 
-def live(config=WindowConfig(), *, retain_proof=False):
+def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None):
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
@@ -295,7 +297,7 @@ def live(config=WindowConfig(), *, retain_proof=False):
             kwargs.pop('deadline',None)
             kwargs['timeout']=(3,8)
             return s.request(method,url,**kwargs)
-        result=run(dispatch,config,retain_proof=retain_proof)
+        result=run(dispatch,config,retain_proof=retain_proof,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     result['cleanup']='SESSION_BOUNDARY_CLOSED'
     return result
 

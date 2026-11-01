@@ -40,7 +40,7 @@ def select_rows(plan,expected_hash,councils):
     if not wanted or len(set(wanted))!=len(wanted) or any(c not in COUNCILS for c in wanted):raise ValueError('council selection')
     return [dict(row) for row in plan['rows'] if row['council'] in wanted]
 
-def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, campaign_scope=None, collection_profile=None):
+def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, campaign_scope=None, collection_profile=None, private_response_bodies=None):
     if collection_profile is not None:
         from .source_profiles import validate
         validate(collection_profile,row)
@@ -51,8 +51,8 @@ def read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=No
         from .four_council_proof import manifest_scope
         if row!=campaign_scope or not retain_proof or not no_transport_retry or not fixed_four_rows:raise ValueError('CAMPAIGN_READER_BINDING')
         with manifest_scope(campaign_scope,collection_profile):
-            return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
-    return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget)
+            return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget,**({'private_response_bodies':private_response_bodies} if private_response_bodies is not None else {}))
+    return _read(row,no_transport_retry=no_transport_retry,retain_proof=retain_proof,execution_mode=execution_mode,fixed_four_rows=fixed_four_rows,execution_budget=execution_budget,**({'private_response_bodies':private_response_bodies} if private_response_bodies is not None else {}))
 
 
 def _profiled_arcus(row):
@@ -61,8 +61,9 @@ def _profiled_arcus(row):
     return p is not None and p['family']=='ARCUS_UI' and p['council']==row['council']
 
 
-def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None):
+def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=None, fixed_four_rows=False, execution_budget=None, private_response_bodies=None):
     if type(no_transport_retry) is not bool or type(retain_proof) is not bool:raise ValueError('retry/proof policy')
+    if private_response_bodies is not None and (row!=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30') or not retain_proof or not no_transport_retry or not fixed_four_rows):raise ValueError('PRIVATE_RESPONSE_SCOPE')
     # A named browser execution budget applies to the Arcus UI reader only.
     if execution_budget is not None and (row['council'] not in ARCUS or not isinstance(execution_budget,str)):raise ValueError('execution budget')
     if type(fixed_four_rows) is not bool or (fixed_four_rows and (not retain_proof or not no_transport_retry)):raise ValueError('fixed row policy')
@@ -78,7 +79,7 @@ def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=N
         with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
             path=Path(td)/'source.json'
             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
-            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+(['--campaign-scope',json.dumps(selected,sort_keys=True)] if selected is not None else [])+(['--collection-profile',json.dumps(profile,sort_keys=True)] if profile is not None else [])+['--output',str(path)],env=env,deadline=50)
+            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+(['--retain-four-council-proof'] if retain_proof else [])+(['--fixed-four-row-limit'] if fixed_four_rows else [])+(['--campaign-scope',json.dumps(selected,sort_keys=True)] if selected is not None else [])+(['--collection-profile',json.dumps(profile,sort_keys=True)] if profile is not None else [])+(['--private-response-bodies',str(private_response_bodies)] if private_response_bodies is not None else [])+['--output',str(path)],env=env,deadline=50)
             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
             value=json.loads(path.read_bytes())
             if retain_proof and 'retained_proof' in value:
@@ -172,6 +173,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--no-transport-retry',action='store_true');p.add_argument('--retain-four-council-proof',action='store_true');p.add_argument('--fixed-four-row-limit',action='store_true')
     p.add_argument('--campaign-scope');p.add_argument('--collection-profile')
+    p.add_argument('--private-response-bodies')
     a=p.parse_args();c,start,end=a.idox_worker
     if a.fixed_four_row_limit and (not a.retain_four_council_proof or not a.no_transport_retry):raise ValueError('fixed row selection')
     if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
@@ -182,7 +184,15 @@ def main():
     profile=json.loads(a.collection_profile) if a.collection_profile else None
     if profile is not None and selected is None:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
     with manifest_scope(selected,profile) if selected is not None else contextlib.nullcontext():
-        result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
+        store=None
+        if a.private_response_bodies:
+            if selected!=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30') or not a.retain_four_council_proof or not a.no_transport_retry or not a.fixed_four_row_limit:raise ValueError('PRIVATE_RESPONSE_SCOPE')
+            from .four_council_proof import PrivateResponseBodies
+            store=PrivateResponseBodies(a.private_response_bodies)
+        try:
+            result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}),**({'response_evidence':store.record} if store is not None else {}))
+        finally:
+            if store is not None:store.finish()
         if profile is not None:
             from .source_profiles import bind_audit
             result=bind_audit(profile,result)

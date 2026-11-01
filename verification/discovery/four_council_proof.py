@@ -302,3 +302,126 @@ def validate_audit(value,expected_scope=None):
         hashes={v.get('body_sha256') for v in value['response_provenance']}
         if any(e['original_response_sha256'] is not None and e['original_response_sha256'] not in hashes for e in p['events']):raise ProofError('PROOF_RESPONSE_PROVENANCE')
     return value
+
+
+# Opt-in private sidecar for the already-budgeted responses, not a complete
+# response archive inside the structural proof or public source JSON.
+PRIVATE_BODY_LIMIT = 2_000_000
+PRIVATE_SINGLE_LIMIT = 500_000
+PRIVATE_INDEX_LIMIT = 16384
+PRIVATE_OPERATIONS = frozenset({'FORM','SEARCH','SORT','PAGE','REFINE'})
+
+
+class PrivateResponseBodies:
+    def __init__(self, root):
+        import os,stat
+        self.root=Path(root);self.used=0;self.failed=False
+        self.value=dict(kind='PRIVATE_RESPONSE_BODIES_V1',bytes_kind='REQUESTS_ITER_CONTENT_BEFORE_CHARSET_CONVERSION_NOT_WIRE',
+                        limit_bytes=PRIVATE_BODY_LIMIT,state='OPEN',entries=[])
+        st=self.root.lstat()
+        if self.root.is_symlink() or not stat.S_ISDIR(st.st_mode) or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o700:
+            raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+        if next(self.root.iterdir(),None) is not None:raise ProofError('PRIVATE_RESPONSE_NEW_DIRECTORY_REQUIRED')
+        self._persist(initial=True)
+
+    def _persist(self, *, initial=False):
+        import os,stat
+        st=self.root.lstat()
+        if self.root.is_symlink() or not stat.S_ISDIR(st.st_mode) or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o700:raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+        raw=encoded(self.value)
+        if len(raw)>PRIVATE_INDEX_LIMIT:raise ProofError('PRIVATE_RESPONSE_INDEX_BOUND')
+        name='index.json' if initial else 'index.next'
+        fd=os.open(self.root/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        with os.fdopen(fd,'wb') as f:
+            if f.write(raw)!=len(raw):raise ProofError('PRIVATE_RESPONSE_INDEX_WRITE')
+            f.flush();os.fsync(f.fileno())
+        if not initial:
+            prior=(self.root/'index.json').lstat()
+            if not stat.S_ISREG(prior.st_mode) or prior.st_nlink!=1:raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+            os.replace(self.root/name,self.root/'index.json')
+        fd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+
+    def record(self, operation, sequence, body, *, complete=True):
+        """Never changes request/refusal/cleanup behaviour, including on disk error."""
+        import os
+        if self.failed:return
+        try:
+            if operation not in PRIVATE_OPERATIONS or type(sequence) is not int or not 1<=sequence<=10 or type(body) is not bytes:
+                raise ProofError('PRIVATE_RESPONSE_BINDING')
+            if len(self.value['entries'])>=10 or any(e['sequence']>=sequence for e in self.value['entries']):
+                raise ProofError('PRIVATE_RESPONSE_BINDING')
+            entry=dict(operation=operation,sequence=sequence,observed_bytes=len(body),observed_sha256=sha(body),
+                       name=f'{sequence:02d}-{operation}.body',retained_bytes=0,retained_sha256=None,complete=False,status='PLANNED')
+            self.value['entries'].append(entry);self._persist()
+            if len(body)>PRIVATE_SINGLE_LIMIT:entry['status']='BODY_LIMIT'
+            elif self.used+len(body)>PRIVATE_BODY_LIMIT:entry['status']='AGGREGATE_LIMIT'
+            else:
+                try:
+                    fd=os.open(self.root/entry['name'],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+                    with os.fdopen(fd,'wb') as f:
+                        written=f.write(body);f.flush();os.fsync(f.fileno())
+                    saved=(self.root/entry['name']).read_bytes()
+                    entry.update(retained_bytes=len(saved),retained_sha256=sha(saved))
+                    self.used+=len(saved)
+                    entry['complete']=complete is True and written==len(body) and saved==body
+                    entry['status']='COMPLETE' if entry['complete'] else 'PARTIAL'
+                except FileExistsError:entry['status']='UNSAFE_PATH'
+                except Exception:
+                    entry['status']='WRITE_FAILURE'
+                    entry['retained_bytes']=None
+                    # Any file left by this exclusive write is unacknowledged,
+                    # not a complete original. Never read a pre-existing link.
+            if not entry['complete']:self.value['state']='INCOMPLETE'
+            self._persist()
+            if not entry['complete']:self.failed=True
+        except Exception:
+            self.failed=True  # durable index stays OPEN/PLANNED; never success
+
+    def finish(self):
+        if self.failed:return
+        self.value['state']='FINISHED' if all(e['complete'] for e in self.value['entries']) else 'INCOMPLETE'
+        try:self._persist()
+        except Exception:self.failed=True
+
+
+def validate_private_responses(root, source=None):
+    """Read only, finite, no HTML decoding, log/export or acceptance override."""
+    import os,stat
+    root=Path(root);st=root.lstat()
+    if root.is_symlink() or not stat.S_ISDIR(st.st_mode) or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o700:
+        raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+    f=root/'index.json';st=f.lstat()
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink!=1 or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o600 or st.st_size>PRIVATE_INDEX_LIMIT:
+        raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+    value=json.loads(f.read_bytes())
+    if type(value) is not dict or set(value)!={'kind','bytes_kind','limit_bytes','state','entries'} or value.get('bytes_kind')!='REQUESTS_ITER_CONTENT_BEFORE_CHARSET_CONVERSION_NOT_WIRE':raise ProofError('PRIVATE_RESPONSE_BINDING')
+    entries=value['entries']
+    if value.get('kind')!='PRIVATE_RESPONSE_BODIES_V1' or value.get('limit_bytes')!=PRIVATE_BODY_LIMIT or value.get('state')!='FINISHED' or type(entries) is not list or len(entries)>10:
+        raise ProofError('PRIVATE_RESPONSE_RETENTION_INCOMPLETE')
+    total=0;last=0;names={'index.json'}
+    for e in entries:
+        if type(e) is not dict or set(e)!={'operation','sequence','observed_bytes','observed_sha256','name','retained_bytes','retained_sha256','complete','status'}:raise ProofError('PRIVATE_RESPONSE_BINDING')
+        if any(type(e[k]) is not int or not 0<=e[k]<=PRIVATE_SINGLE_LIMIT for k in ('observed_bytes','retained_bytes')) or any(type(e[k]) is not str or re.fullmatch('[a-f0-9]{64}',e[k]) is None for k in ('observed_sha256','retained_sha256')):raise ProofError('PRIVATE_RESPONSE_BINDING')
+        if type(e['sequence']) is not int or not last<e['sequence']<=10 or e['operation'] not in PRIVATE_OPERATIONS:
+            raise ProofError('PRIVATE_RESPONSE_BINDING')
+        last=e['sequence'];name=f"{last:02d}-{e['operation']}.body";names.add(name)
+        if e['name']!=name or e.get('complete') is not True or e.get('status')!='COMPLETE':raise ProofError('PRIVATE_RESPONSE_RETENTION_INCOMPLETE')
+        body=root/name;st=body.lstat()
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink!=1 or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o600 or st.st_size>PRIVATE_SINGLE_LIMIT:
+            raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+        raw=body.read_bytes();total+=len(raw)
+        if total>PRIVATE_BODY_LIMIT or len(raw)!=e['observed_bytes'] or len(raw)!=e['retained_bytes'] or sha(raw)!=e['observed_sha256'] or sha(raw)!=e['retained_sha256']:
+            raise ProofError('PRIVATE_RESPONSE_RETENTION_INCOMPLETE')
+    if {f.name for f in root.iterdir()}!=names:raise ProofError('PRIVATE_RESPONSE_UNSAFE_PATH')
+    if source is not None:
+        resource=source.get('resource',{})
+        if type(resource.get('requests_attempted')) is not int or last>resource['requests_attempted'] or type(resource.get('received_bytes')) is not int or total>resource['received_bytes']:raise ProofError('PRIVATE_RESPONSE_PROOF_BINDING')
+        previous=0
+        for event in source.get('retained_proof',{}).get('events',[]):
+            if event['original_response_sha256'] is not None:
+                matches=[e for e in entries if e['sequence']>previous and e['operation']==event['operation'] and e['observed_sha256']==event['original_response_sha256'] and e['observed_bytes']==event['body_bytes']]
+                if not matches:raise ProofError('PRIVATE_RESPONSE_PROOF_BINDING')
+                previous=matches[0]['sequence']
+    return value

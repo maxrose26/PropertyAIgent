@@ -81,6 +81,7 @@ class Boundary:
         self.redirects = self.retries = self.requests = self.received_bytes = 0
         self.closed = False
         self.transport_failure = None
+        self.response_evidence = None
 
     def unique(self, matches, *, complete=False):
         matches = sorted(set(matches))
@@ -159,6 +160,12 @@ class Boundary:
             charged = 0
             self.transport_failure = None
             transport_stage = 'REQUEST_DISPATCH'
+            payload = None; body_observed = False
+            def retain(complete):
+                nonlocal body_observed
+                if not body_observed and payload is not None and self.response_evidence is not None:
+                    body_observed = True
+                    self.response_evidence(bytes(payload), self.requests, complete=complete)
             try:
                 response = self.dispatch(method, url, data=body, headers=headers or {}, stream=True,
                     allow_redirects=False, timeout=min(15, self.budget.seconds-(time.monotonic()-self.budget.started)),
@@ -181,6 +188,7 @@ class Boundary:
                     self.received_bytes += delta
                     charged = measured
                     self.budget.charge_bytes(delta, measured)
+                retain(True)
                 transport_stage = 'RESPONSE_STATUS'
                 status = response.status_code
                 if status == 429: self.budget.reject('RATE_LIMITED', 'HTTP rate limit')
@@ -194,6 +202,7 @@ class Boundary:
                     self.validate('GET', target)
                 return status, dict(response.headers), bytes(payload)
             except (requests.Timeout, requests.ConnectionError) as exc:
+                retain(False)
                 from verification.discovery.source_diagnostics import transport_failure
                 self.transport_failure = transport_failure(exc, transport_stage)
                 host = urlsplit(self.policy.base_url).hostname
@@ -203,8 +212,11 @@ class Boundary:
                 self.retries += 1
                 # One retry, globally for this reference, including all browser assets.
                 self.budget.check()
-            except BoundaryFailure: raise
+            except BoundaryFailure:
+                retain(False)
+                raise
             except Exception as exc:
+                retain(False)
                 from verification.discovery.source_diagnostics import transport_failure
                 self.transport_failure = transport_failure(exc, transport_stage)
                 self.budget.reject('PARTIAL_RETRIEVAL', 'unqualified transport failure')

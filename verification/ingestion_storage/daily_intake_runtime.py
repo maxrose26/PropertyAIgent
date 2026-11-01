@@ -399,8 +399,12 @@ def source_worker(args):
         from verification.discovery.source_profiles import profile
         from verification.discovery.finite_acceptance import read
         p=profile(row,'SCREENING_METADATA')
+        private=plan.get('private_response_bodies')
+        if private is not None:
+            if row!=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30') or private!=str(Path(args.output).resolve().parent/'raw-bodies'):
+                raise Denied('PRIVATE_RESPONSE_SCOPE')
         audit=read(row,no_transport_retry=True,retain_proof=True,fixed_four_rows=True,execution_budget=p['execution_budget'],
-                   execution_mode=('render-intake-v1' if os.environ.get('INGESTION_RENDER_PROFILE') else 'four-council-owner-local') if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p)
+                   execution_mode=('render-intake-v1' if os.environ.get('INGESTION_RENDER_PROFILE') else 'four-council-owner-local') if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p,**({'private_response_bodies':private} if private is not None else {}))
         raw=canonical(audit)
     if len(raw)>512*1024:raise Denied('SOURCE_EXPORT_BOUND')
     with Path(args.output).open('xb') as f:f.write(raw)
