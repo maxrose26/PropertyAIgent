@@ -192,7 +192,7 @@ def main():
             from .four_council_proof import PrivateResponseBodies
             store=PrivateResponseBodies(a.private_response_bodies)
         try:
-            result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}),**({'response_evidence':store.record} if store is not None else {}),**({'pagination_calibration':True} if a.tameside_pagination_calibration else {}))
+            result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}),**({'response_evidence':store.record} if store is not None else {}),**({'pagination_calibration':True} if a.tameside_pagination_calibration else {}),**({'pagination_mode':profile['idox_pagination']} if profile is not None and profile.get('idox_pagination') and not a.tameside_pagination_calibration else {}))
         finally:
             if store is not None:store.finish()
         if profile is not None:

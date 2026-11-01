@@ -22,7 +22,7 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
-BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+BOUND_FILES=('verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
@@ -168,6 +168,9 @@ class Runtime:
     def contract(self,row):
         config=self.policy['councils'][row['council']];b=binding_for(row['council'])
         if b.family=='idox':
+            if row['council']=='tameside' and not self.test:
+                qualification=hashlib.sha256(Path('docs/design/tameside-b-connection-20261101/tameside-qualification.json').read_bytes()).hexdigest()
+                if config!=dict(contract='tameside-screening-metadata-five-v1',qualification_sha256=qualification):raise Denied('TAMESIDE_REVIEWED_CONTRACT_BINDING')
             from app.ingestion.idox_adapter import IdoxListingContract
             from verification.discovery.idox_window import WindowConfig
             return IdoxListingContract(config['contract'],WindowConfig(row['council'],row['semantics'],date.fromisoformat(row['start']),date.fromisoformat(row['end']),0,60),config['qualification_sha256'])
@@ -398,12 +401,12 @@ def source_worker(args):
     else:
         from verification.discovery.source_profiles import profile
         from verification.discovery.finite_acceptance import read
-        p=profile(row,'SCREENING_METADATA')
+        calibration=plan.get('pagination_calibration')
+        p=profile(row,'SCREENING_METADATA',**({'idox_pagination':'TAMESIDE_FIVE_COUNT_V1'} if row['council']=='tameside' and calibration is None else {}))
         private=plan.get('private_response_bodies')
         if private is not None:
             if row!=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30') or private!=str(Path(args.output).resolve().parent/'raw-bodies'):
                 raise Denied('PRIVATE_RESPONSE_SCOPE')
-        calibration=plan.get('pagination_calibration')
         if calibration is not None and (calibration!='TAMESIDE_FIVE_PER_PAGE_V1' or private is None):raise Denied('CALIBRATION_SCOPE')
         audit=read(row,no_transport_retry=True,retain_proof=True,fixed_four_rows=True,execution_budget=p['execution_budget'],
                    execution_mode=('render-intake-v1' if os.environ.get('INGESTION_RENDER_PROFILE') else 'four-council-owner-local') if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p,**({'private_response_bodies':private} if private is not None else {}),**({'pagination_calibration':True} if calibration is not None else {}))

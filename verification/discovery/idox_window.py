@@ -286,7 +286,8 @@ def form_probe(config=WindowConfig()):
     return result
 
 
-def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None, pagination_calibration=False):
+def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None, pagination_calibration=False, pagination_mode=None):
+    if pagination_mode not in (None,'TAMESIDE_FIVE_COUNT_V1'):raise ValueError('IDOX_PAGINATION_MODE')
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
@@ -301,6 +302,9 @@ def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None, p
         if pagination_calibration:
             from .pagination_calibration import run_calibration
             result=run_calibration(dispatch,config,response_evidence=response_evidence)
+        elif pagination_mode=='TAMESIDE_FIVE_COUNT_V1':
+            from .pagination_calibration import run_counted_window
+            result=run_counted_window(dispatch,config,response_evidence=response_evidence)
         else:
             result=run(dispatch,config,retain_proof=retain_proof,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     result['cleanup']='SESSION_BOUNDARY_CLOSED'

@@ -1,4 +1,4 @@
-"""One opt-in Tameside navigation observation; never window acceptance."""
+"""Shared bounded Tameside five-page engine; observation and counted wrappers."""
 from dataclasses import asdict
 import hashlib,json,os,re,stat
 from pathlib import Path
@@ -10,6 +10,8 @@ from .four_council_proof import ProofLog,PrivateResponseBodies,encoded,sha,Proof
 from verification.stage26b_l1.request_boundary import BoundaryFailure
 
 MODE='TAMESIDE_FIVE_PER_PAGE_V1'
+COUNTED_MODE='TAMESIDE_FIVE_COUNT_V1'
+COUNTED_CONTRACT='tameside-screening-metadata-five-v1'
 ROW=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30')
 TRACE_LIMIT=8192
 CODES=frozenset('CALIBRATION_SCOPE CALIBRATION_RETENTION_INCOMPLETE CALIBRATION_PAGE_SIZE_IGNORED CALIBRATION_SORT_CHANGED CALIBRATION_PAGE_IDENTITY CALIBRATION_NAVIGATION_AMBIGUOUS CALIBRATION_NAVIGATION_UNSUPPORTED CALIBRATION_NAVIGATION_CONFLICT CALIBRATION_REPEATED_PAGE CALIBRATION_DUPLICATE_IDENTITY CALIBRATION_CONTRADICTORY_COUNTS CALIBRATION_ERROR_RESPONSE CALIBRATION_SESSION_EXPIRED CALIBRATION_UNEXPECTED_MESSAGE CALIBRATION_ROW_LAYOUT_REFUSED CALIBRATION_SEARCH_BINDING CALIBRATION_PAGE_CAP CALIBRATION_ROW_CAP CALIBRATION_REQUEST_CAP CALIBRATION_BYTE_CAP CALIBRATION_DEADLINE CALIBRATION_TRACE_BOUND CALIBRATION_TRACE_IO CALIBRATION_UNKNOWN'.split())
@@ -192,18 +194,32 @@ def observe(body,config,ordinal):
     return rows,page,next_request
 
 def run_calibration(dispatch,config,*,response_evidence):
+    return _run_five_page(dispatch,config,response_evidence=response_evidence,observation_only=True)
+
+
+def run_counted_window(dispatch,config,*,response_evidence=None):
+    from .four_council_proof import current_collection_profile
+    p=current_collection_profile()
+    require(p is not None and p.get('idox_pagination')==COUNTED_MODE and p.get('page_size')==5 and p.get('collection_mode')=='SCREENING_METADATA','CALIBRATION_SCOPE')
+    return _run_five_page(dispatch,config,response_evidence=response_evidence,observation_only=False)
+
+
+def _run_five_page(dispatch,config,*,response_evidence,observation_only):
     from .idox_window import WindowBoundary
     from verification.bolton_recon.recon import Failure
-    require((config.council,config.semantics,str(config.start),str(config.end),config.max_transport_retries,config.max_rows)==('tameside','RECEIVED','2026-10-24','2026-10-30',0,60),'CALIBRATION_SCOPE')
+    require(type(observation_only) is bool and config.council=='tameside' and config.semantics=='RECEIVED' and config.max_transport_retries==0 and config.max_rows==60 and (config.end-config.start).days==6,'CALIBRATION_SCOPE')
+    if observation_only:require(str(config.start)=='2026-10-24' and str(config.end)=='2026-10-30','CALIBRATION_SCOPE')
     store=getattr(response_evidence,'__self__',None)
-    require(isinstance(store,PrivateResponseBodies),'CALIBRATION_SCOPE')
-    progress_path=store.root.parent/'calibration-progress.json'
+    if observation_only:require(isinstance(store,PrivateResponseBodies),'CALIBRATION_SCOPE')
+    progress_path=store.root.parent/'calibration-progress.json' if store is not None else None
     progress=dict(mode=MODE,state='IN_PROGRESS',acceptance_enabled=False,requests=[],pages=[],failure=None,criteria_verified=False)
     proof=ProofLog(config.council,config.semantics,config.start,config.end)
     b=WindowBoundary(dispatch,config,response_evidence=response_evidence,calibration_navigation=True);b.proof_log=proof
     out=dict(council=config.council,requested_interval=[str(config.start),str(config.end)],date_semantics=config.semantics,applied_interval=None,completeness='UNKNOWN',enumeration_evidence='CALIBRATION_OBSERVATION_ONLY',source_qualification='CANDIDATE_CONTRACT',persistence=False,pages=[],records=[],failure=None,capped=False,cleanup='UNKNOWN')
     stage='FORM_REQUEST';keys=set();refs=set();body_hashes=set();total=None
-    def save():checkpoint(progress_path,progress)
+    def save():
+        require(len(encoded(progress))<=TRACE_LIMIT,'CALIBRATION_TRACE_BOUND')
+        if progress_path is not None:checkpoint(progress_path,progress)
     def fetch(phase,method,target,fields=None):
         b.budget.check();require(b.requests<10,'CALIBRATION_REQUEST_CAP')
         entry=dict(sequence=b.requests+1,operation=phase,method=method,action_path=urlsplit(target).path,fields=safe_controls(fields or {}),response='PENDING')
@@ -214,11 +230,11 @@ def run_calibration(dispatch,config,*,response_evidence):
         if method=='POST':b.admitted_post=target;b.admitted_body=payload
         else:b.next_url=target if phase=='PAGE' else None
         body=b.retrieve(method,target,payload);b.admitted_body=None
-        require(not store.failed,'CALIBRATION_RETENTION_INCOMPLETE')
+        require(store is None or not store.failed,'CALIBRATION_RETENTION_INCOMPLETE')
         entry.update(response='BODY_RETAINED',body_sha256=sha(body),body_bytes=len(body));save()
         return body
     try:
-        require(not progress_path.exists() and not progress_path.is_symlink(),'CALIBRATION_TRACE_IO');save()
+        require(progress_path is None or not progress_path.exists() and not progress_path.is_symlink(),'CALIBRATION_TRACE_IO');save()
         form=fetch('FORM','GET',config.form_url)
         stage='FORM_PARSE';target,fields=config.payload(form)
         stage='SEARCH_REQUEST';search=fetch('SEARCH','POST',target,fields);fields.clear()
@@ -228,6 +244,7 @@ def run_calibration(dispatch,config,*,response_evidence):
         for ordinal in range(1,7):
             require(sha(body) not in body_hashes,'CALIBRATION_REPEATED_PAGE')
             stage='PAGE_PARSE';rows,page,next_request=observe(body,config,ordinal)
+            if not observation_only:require(page['range'] is not None,'CALIBRATION_CONTRADICTORY_COUNTS')
             body_hashes.add(page['body_sha256'])
             for row in rows:
                 require(row.source_key not in keys and row.reference not in refs,'CALIBRATION_DUPLICATE_IDENTITY')
@@ -246,12 +263,16 @@ def run_calibration(dispatch,config,*,response_evidence):
             if fields is not None:fields={k:v[0] for k,v in fields.items()}
             stage='PAGE_REQUEST';body=fetch('PAGE',method,target,fields)
             if fields is not None:fields.clear()
+        if not observation_only:require(progress['pages'][-1]['terminal_candidate']=='EXPLICIT_RANGE_LAST_EQUALS_TOTAL','CALIBRATION_CONTRADICTORY_COUNTS')
         stage='REFINE_REQUEST';echo=fetch('REFINE','GET',config.base+'/refineSearch.do?action=refine')
         stage='CRITERIA_ECHO'
         try:_,fields=config.payload(echo,echo=True);fields.clear()
         except Exception:raise CalibrationError('CALIBRATION_SEARCH_BINDING') from None
         out.update(applied_interval=out['requested_interval'],applied_evidence='STRICT_REFINE_FORM_ECHO',applied_evidence_sha256=sha(echo),criteria_result_binding=dict(method='SAME_SESSION_POST_ENUMERATION_REFINE_NO_RESUBMIT',segment_sha256=[p['body_sha256'] for p in out['pages']],criteria_sha256=sha(echo),request_ordinal=b.requests,result_set_reenumerated=False,publication_semantics='UNKNOWN'))
-        progress.update(state='OBSERVATIONS_REQUIRE_REVIEW',criteria_verified=True);save()
+        progress.update(state='OBSERVATIONS_REQUIRE_REVIEW' if observation_only else 'COUNT_RECONCILED',criteria_verified=True);save()
+        if not observation_only:
+            out['enumeration_evidence']='COUNT_RECONCILED'
+            out['pages'][-1]['terminal']='EXPLICIT_LAST_EQUALS_TOTAL'
     except Exception as exc:
         if type(exc) is CalibrationError:code=exc.code
         elif isinstance(exc,BoundaryFailure):
@@ -272,5 +293,6 @@ def run_calibration(dispatch,config,*,response_evidence):
         out.update(unique_references=len(refs),resource=b.audit(out['completeness']),cleanup='BOUNDARY_CLOSED',response_provenance=b.response_provenance,retained_proof=proof.result())
         # The source export stays bounded even if a trace checkpoint was refused.
         compact=progress if len(encoded(progress))<=TRACE_LIMIT else dict(mode=MODE,state='STOPPED_REQUIRES_REVIEW',failure='CALIBRATION_TRACE_BOUND',acceptance_enabled=False,requests=[],pages=[],criteria_verified=False)
-        out['calibration']=compact
+        if observation_only:out['calibration']=compact
+        else:out.update(pagination_mode=COUNTED_MODE,pagination_evidence=compact)
     return out
