@@ -35,6 +35,10 @@ SECOND_CALIBRATION_AUTHORITY='ONE_TAMESIDE_PAGINATION_CALIBRATION_20261024_30_V2
 SECOND_CALIBRATION_OUTPUT=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-evidence-02')
 SECOND_CALIBRATION_CONSUMPTION=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-20261024-30-attempt-02-consumed.json')
 CALIBRATION_CONSUMPTION_SHA256='ba280a8f747a52bd94d2043e7c2e8b5e55067d5e98de9043febb95c70742dede'
+THIRD_CALIBRATION_AUTHORITY='ONE_TAMESIDE_PAGINATION_CALIBRATION_20261024_30_V3'
+THIRD_CALIBRATION_OUTPUT=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-evidence-03')
+THIRD_CALIBRATION_CONSUMPTION=Path('/home/maxrose26/stage4-owner/tameside-pagination-calibration-20261024-30-attempt-03-consumed.json')
+SECOND_CALIBRATION_CONSUMPTION_SHA256='351bed08e4200218c085a9546cda7fad2853c59f99049fd1ec557786428df187'
 
 QUALIFICATION_REASONS=frozenset("""
 CALIBRATION_SCOPE
@@ -140,11 +144,11 @@ def qualify(root, *, supervisor=supervise, authority=AUTHORITY, private_pages=Fa
         plan = root/'plan.json'; output = root/'source.json'
         plan_value=dict(row=ROW, fixture=None)
         if private_pages:
-            if authority not in (THIRD_AUTHORITY,CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY):raise Denied('PRIVATE_RESPONSE_SCOPE')
+            if authority not in (THIRD_AUTHORITY,CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY,THIRD_CALIBRATION_AUTHORITY):raise Denied('PRIVATE_RESPONSE_SCOPE')
             (root/'raw-bodies').mkdir(mode=0o700)
             plan_value['private_response_bodies']=str((root/'raw-bodies').resolve())
         if pagination_calibration:
-            if authority not in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY) or not private_pages:raise Denied('CALIBRATION_SCOPE')
+            if authority not in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY,THIRD_CALIBRATION_AUTHORITY) or not private_pages:raise Denied('CALIBRATION_SCOPE')
             plan_value['pagination_calibration']='TAMESIDE_FIVE_PER_PAGE_V1'
         plan.write_bytes(canonical(plan_value))
         def check():
@@ -230,7 +234,12 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--output', required=True); p.add_argument('--authority', required=True)
     a = p.parse_args()
     consumption=CONSUMPTION
-    if a.authority == SECOND_CALIBRATION_AUTHORITY:
+    if a.authority == THIRD_CALIBRATION_AUTHORITY:
+        if a.output!=str(THIRD_CALIBRATION_OUTPUT):raise SystemExit('EXACT_THIRD_CALIBRATION_OUTPUT_REQUIRED')
+        for path,expected in ((CONSUMPTION,PREDECESSOR_SHA256),(SECOND_CONSUMPTION,SECOND_CONSUMPTION_SHA256),(THIRD_CONSUMPTION,THIRD_CONSUMPTION_SHA256),(CALIBRATION_CONSUMPTION,CALIBRATION_CONSUMPTION_SHA256),(SECOND_CALIBRATION_CONSUMPTION,SECOND_CALIBRATION_CONSUMPTION_SHA256)):
+            if path.is_symlink() or not path.is_file() or path.stat().st_size>4096 or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise SystemExit('ALL_FIVE_CONSUMPTIONS_REQUIRED')
+        consumption=THIRD_CALIBRATION_CONSUMPTION
+    elif a.authority == SECOND_CALIBRATION_AUTHORITY:
         if a.output!=str(SECOND_CALIBRATION_OUTPUT):raise SystemExit('EXACT_SECOND_CALIBRATION_OUTPUT_REQUIRED')
         for path,expected in ((CONSUMPTION,PREDECESSOR_SHA256),(SECOND_CONSUMPTION,SECOND_CONSUMPTION_SHA256),(THIRD_CONSUMPTION,THIRD_CONSUMPTION_SHA256),(CALIBRATION_CONSUMPTION,CALIBRATION_CONSUMPTION_SHA256)):
             if path.is_symlink() or not path.is_file() or path.stat().st_size>4096 or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise SystemExit('ALL_FOUR_CONSUMPTIONS_REQUIRED')
@@ -261,15 +270,15 @@ def main():
             json.dump(dict(authority=a.authority,row=ROW,state='CONSUMED_BEFORE_SOURCE',
                            output=str(Path(a.output).resolve())),record,sort_keys=True)
             record.flush();os.fsync(record.fileno())
-        if a.authority in (SECOND_AUTHORITY,THIRD_AUTHORITY,CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY):
+        if a.authority in (SECOND_AUTHORITY,THIRD_AUTHORITY,CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY,THIRD_CALIBRATION_AUTHORITY):
             fd=os.open(consumption.parent,os.O_RDONLY|os.O_DIRECTORY)
             try:os.fsync(fd)
             finally:os.close(fd)
     except OSError:
         raise SystemExit('QUALIFICATION_CONSUMED_OR_RECORD_UNAVAILABLE_RECONCILE_NO_RETRY') from None
     try:
-        result = qualify(a.output,authority=a.authority,private_pages=True,pagination_calibration=True) if a.authority in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY) else qualify(a.output,authority=a.authority,private_pages=True) if a.authority==THIRD_AUTHORITY else qualify(a.output) if a.authority==AUTHORITY else qualify(a.output,authority=a.authority)
-        print(json.dumps({k:result[k] for k in (('status','observed_pages','observed_records','source_sha256') if a.authority in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY) else ('status','record_count','pages','source_sha256'))}))
+        result = qualify(a.output,authority=a.authority,private_pages=True,pagination_calibration=True) if a.authority in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY,THIRD_CALIBRATION_AUTHORITY) else qualify(a.output,authority=a.authority,private_pages=True) if a.authority==THIRD_AUTHORITY else qualify(a.output) if a.authority==AUTHORITY else qualify(a.output,authority=a.authority)
+        print(json.dumps({k:result[k] for k in (('status','observed_pages','observed_records','source_sha256') if a.authority in (CALIBRATION_AUTHORITY,SECOND_CALIBRATION_AUTHORITY,THIRD_CALIBRATION_AUTHORITY) else ('status','record_count','pages','source_sha256'))}))
     except BaseException:
         print('STOP_QUALIFICATION_REQUIRES_REVIEW_NO_RETRY'); return 2
     return 0

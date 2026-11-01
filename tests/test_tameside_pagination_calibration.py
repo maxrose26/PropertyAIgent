@@ -79,7 +79,7 @@ def test_returned_post_next_copies_actual_fresh_controls(tmp_path):
     (lambda b:b.replace(b'</html>',b'<button disabled>Next</button></html>'),'CALIBRATION_NAVIGATION_CONFLICT'),
     (lambda b:b.replace(b'value="5" selected>5',b'value="10" selected>10'),'CALIBRATION_SORT_CHANGED'),
     (lambda b:b.replace(b'value="Descending" selected',b'value="Ascending" selected'),'CALIBRATION_SORT_CHANGED'),
-    (lambda b:b.replace(b'name="searchCriteria.page" value="1"',b'name="searchCriteria.page" value="9"'),'CALIBRATION_PAGE_IDENTITY'),
+    (lambda b:b.replace(b'<span class="current">1</span>',b'<span class="current">9</span>'),'CALIBRATION_PAGE_IDENTITY'),
     (lambda b:b.replace(b'</html>',b'<div class="error">SECRET</div></html>'),'CALIBRATION_ERROR_RESPONSE'),
     (lambda b:b.replace(b'</html>',b'<div class="error">Session has expired SECRET</div></html>'),'CALIBRATION_SESSION_EXPIRED'),
     (lambda b:b.replace(b'</html>',b'<p class="pager">Showing 1-5 of 5</p></html>'),'CALIBRATION_CONTRADICTORY_COUNTS'),

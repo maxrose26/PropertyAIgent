@@ -153,7 +153,9 @@ def observe(body,config,ordinal):
     except ListingError:raise CalibrationError('CALIBRATION_SORT_CHANGED') from None
     opts=soup.select('select[name="searchCriteria.resultsPerPage"] option[selected]')
     require(size==5 and len(opts)==1 and opts[0].get('value')=='5','CALIBRATION_PAGE_SIZE_IGNORED')
-    require(controls.get('searchCriteria.page')==str(ordinal) and controls.get('action')=='page','CALIBRATION_PAGE_IDENTITY')
+    # The form submits a future sort operation; its hidden page can reset to1.
+    # It is not current-response identity. Keep its operation/shape validation.
+    require(controls.get('action')=='page','CALIBRATION_PAGE_IDENTITY')
     nav,next_request=directions(soup,config,ordinal)
     counts=[]
     for node in soup.select('p.pager,.pagination,.paging'):
@@ -168,17 +170,22 @@ def observe(body,config,ordinal):
         require((next_request is not None)==(last<total),'CALIBRATION_CONTRADICTORY_COUNTS')
         count=dict(first=first,last=last,total=total)
     current_labels=[]
-    for n in soup.select('.pager .current,.pagination .current,.paging .current,[aria-current="page"]'):
+    for n in soup.select('.pager .current,.pagination .current,.paging .current,[aria-current="page"],p.pager > strong'):
         value=n.get_text(' ',strip=True)
         if value.isdigit():current_labels.append(int(value))
     require(not current_labels or set(current_labels)=={ordinal},'CALIBRATION_PAGE_IDENTITY')
+    require(count is not None or bool(current_labels),'CALIBRATION_PAGE_IDENTITY')
+    identity_basis=(['DISPLAYED_RANGE'] if count is not None else [])+(['CURRENT_PAGE_MARKER'] if current_labels else [])
+    sort_page=controls.get('searchCriteria.page','')
+    sort_page=sort_page if re.fullmatch(r'[0-9]{1,3}',sort_page) else 'OTHER'
+
     terminal_labels=[]
     allowed_terminal={'You have reached the last page.':'LAST_PAGE_TEXT','This is the last page.':'LAST_PAGE_TEXT','End of results.':'END_OF_RESULTS_TEXT','No more results.':'NO_MORE_RESULTS_TEXT'}
     for text in soup.find_all(string=True):
         if text.find_parent(['script','style']) or text.find_parent(id='searchresults'):continue
         label=allowed_terminal.get(' '.join(str(text).split()))
         if label is not None:terminal_labels.append(label)
-    page=dict(ordinal=ordinal,body_sha256=fingerprint,rows=len(rows),references=[x.reference for x in rows],page_size=size,current_page=int(controls['searchCriteria.page']),sort='REFERENCE_DESCENDING',navigation=nav,visible_current_pages=current_labels,explicit_terminal_labels=sorted(set(terminal_labels)),range=count,terminal_candidate=None)
+    page=dict(ordinal=ordinal,body_sha256=fingerprint,rows=len(rows),references=[x.reference for x in rows],page_size=size,current_page=ordinal,identity_basis=identity_basis,sort_form_page=sort_page,sort='REFERENCE_DESCENDING',navigation=nav,visible_current_pages=current_labels,explicit_terminal_labels=sorted(set(terminal_labels)),range=count,terminal_candidate=None)
     if next_request is None:
         page['terminal_candidate']='NEXT_DISABLED' if nav['next'] else 'NO_NEXT_CONTROL'
         if count is not None and count['last']==count['total']:page['terminal_candidate']='EXPLICIT_RANGE_LAST_EQUALS_TOTAL'
