@@ -273,7 +273,22 @@ def test_surviving_session_without_existing_signal_right_is_not_claimed_closed(i
     finally:runtime.close()
 
 
+def projected_idox_capture():
+    """Actual supported nonempty reader/adapter over synthetic transport only."""
+    from datetime import date
+    from tests.e2e_connection_support import idox_audit,entry,SCHEME,outer
+    from verification.discovery.idox_window import WindowConfig
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    c=WindowConfig('tameside','RECEIVED',date(2026,10,24),date(2026,10,30),0,60)
+    source=idox_audit('tameside',[entry('READBACK_SYNTHETIC/26',SCHEME)],c.start,c.end)
+    receipt=IdoxListingContract('synthetic-current-tameside',c,'9'*64).project(source,outer(),DEFAULT_LIMITS)
+    receipt.pop('window')  # existing Coordinator.retained_capture retention step
+    return receipt
+
+
 def terminal_fixture(world):
+    accepted(world)  # modeled post-disposition B state; initial fixture stays post-cleanup/stopped
     b=world['boot'];binding_value=binding();run_id='a'*32
     pub=dict(commit='b'*40,sha256='c'*64,readback_verified=True,
              path=f'docs/design/ingestion-operational-execution-daily-intake/{binding_value["period"]}/{run_id}/final/result-before-publication.json')
@@ -287,20 +302,34 @@ def terminal_fixture(world):
             capture_key=key,execution_binding=binding_value['execution_binding'])
     b.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
     for council,key in roots.items():
-        # Synthetic explicit-zero captures isolate the terminal readback; this is
-        # not execution evidence and does not rerun collection/screening suites.
-        checkpoint=dict(kind='LISTING_RECEIPT_V1',council=council,records=[],explicit_zero=True,
-                        durable_archive=dict(commit='f'*40,path=f'docs/design/ingestion-operational-execution-daily-intake/{binding_value["period"]}/{run_id}/capture-{1 if council=="tameside" else 2}/source.json',sha256='1'*64,readback_verified=True),source_sha256='1'*64)
+        # Actual projected nonempty Idox shape plus Manchester explicit zero.
+        # Counter rows and remote archive references are synthetic fixture data.
+        checkpoint=projected_idox_capture() if council=='tameside' else dict(kind='LISTING_RECEIPT_V1',council=council,records=[],explicit_zero=True,source_sha256='1'*64)
+        checkpoint['durable_archive']=dict(commit='f'*40,path=f'docs/design/ingestion-operational-execution-daily-intake/{binding_value["period"]}/{run_id}/capture-{1 if council=="tameside" else 2}/source.json',sha256=checkpoint['source_sha256'],readback_verified=True)
         patch=dict(key=key,state='COMPLETE',task='DISCOVERY',checkpoint=checkpoint,subject=dict(council=council))
         b.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(t)||%s::jsonb)).* FROM ingestion_work_items t WHERE key=%s",(json.dumps(patch),op.CONTROL))
+        if council=='tameside':
+            for task,child_key,checkpoint in [('SCREENING','7'*64,dict(evidence_label='SYNTHETIC_COUNTER_ONLY')),
+                    ('LISTING_METADATA','8'*64,dict(plan=dict(capture_key=key),evidence_label='SYNTHETIC_COUNTER_ONLY'))]:
+                child=dict(key=child_key,state='COMPLETE',task=task,checkpoint=checkpoint,dependencies=[key])
+                b.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(t)||%s::jsonb)).* FROM ingestion_work_items t WHERE key=%s",(json.dumps(child),key))
     return binding_value,dict(run_id=run_id,publication=pub)
 
 
-def test_independent_terminal_projection_reads_both_councils_and_exact_publication(installed):
+def test_independent_terminal_projection_reads_both_councils_and_exact_publication(installed,record_property):
     b=installed['boot'];binding_value,expected=terminal_fixture(installed);before=op.ledger_sha(b);members=b.execute(op.MEMBERS).fetchall()
-    with support.actor() as c:r=op.finalisation(c,binding_value,expected)
+    with support.actor() as c:
+        assert c.execute('SELECT rolsuper FROM pg_roles WHERE rolname=current_user').fetchone()==(False,)
+        r=op.finalisation(c,binding_value,expected)
     assert {v['council'] for v in r['captures']}=={'tameside','manchester'} and r['publication']==expected['publication']
     assert op.ledger_sha(b)==before and b.execute(op.MEMBERS).fetchall()==members
+    record_property('postgres_version',installed['server_version']);record_property('actor_superuser',False)
+
+
+def test_actual_supported_idox_retention_has_records_and_no_invented_zero_flag():
+    receipt=projected_idox_capture()
+    assert 'explicit_zero' not in receipt and 'window' not in receipt
+    assert len(receipt['records'])==1 and receipt['segments'][0]['terminal']=='EXPLICIT_LAST_EQUALS_TOTAL'
 
 
 @pytest.mark.parametrize('drift',['run','publication','open','incomplete','expiry','boolean_expiry','council','zero','archive','screen'])
@@ -315,9 +344,9 @@ def test_independent_readback_refuses_false_terminal_success(installed,drift):
     elif drift=='council':del ctl['intake_periods'][bv['period']]['days']['2026-10-30']['manchester']
     else:
         cp=b.execute('SELECT checkpoint FROM ingestion_work_items WHERE key=%s',('d'*64,)).fetchone()[0]
-        if drift=='zero':cp['explicit_zero']=False
+        if drift=='zero':cp['records']=[];cp['explicit_zero']=True  # unsupported Tameside zero must refuse
         elif drift=='archive':cp['durable_archive']=None
-        else:cp['records']=[dict(reference='synthetic-unprocessed')];cp['explicit_zero']=False
+        else:b.execute("UPDATE ingestion_work_items SET state='QUEUED' WHERE key=%s",('7'*64,))
         b.execute('UPDATE ingestion_work_items SET checkpoint=%s::json WHERE key=%s',(json.dumps(cp),'d'*64))
     b.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
     before=op.ledger_sha(b)

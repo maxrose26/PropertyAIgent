@@ -433,7 +433,7 @@ def finalisation(c, b, expected):
                     re.fullmatch('[a-f0-9]{64}',archive.get('sha256','')) and archive['sha256']==receipt.get('source_sha256') and
                     re.fullmatch(re.escape(f"docs/design/ingestion-operational-execution-daily-intake/{b['period']}/{run['id']}/")+
                                  r'capture-[12]/source\.json',archive.get('path','')) and
-                    isinstance(records, list) and len(records) <= 60 and (records or receipt.get('explicit_zero') is True),
+                    isinstance(records, list) and len(records) <= 60 and (records or (council=='manchester' and receipt.get('explicit_zero') is True)),
                     'INDEPENDENT_ARCHIVE_OR_ZERO')
             n = len(records)
             screens = c.execute("SELECT count(*) FILTER (WHERE state='COMPLETE'),count(*) FROM public.ingestion_work_items "
