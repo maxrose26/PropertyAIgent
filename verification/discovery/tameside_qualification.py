@@ -93,7 +93,7 @@ def main():
     except OSError:
         raise SystemExit('QUALIFICATION_CONSUMED_OR_RECORD_UNAVAILABLE_RECONCILE_NO_RETRY') from None
     try:
-        result = qualify(a.output,authority=a.authority)
+        result = qualify(a.output) if a.authority==AUTHORITY else qualify(a.output,authority=a.authority)
         print(json.dumps({k:result[k] for k in ('status','record_count','pages','source_sha256')}))
     except BaseException:
         print('STOP_QUALIFICATION_REQUIRES_REVIEW_NO_RETRY'); return 2

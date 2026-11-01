@@ -22,7 +22,7 @@ jobs:
           git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-proof/commit.txt"
           git rev-parse HEAD^{tree} > "$RUNNER_TEMP/diagnostic-proof/tree.txt"
           sha256sum verification/discovery/tameside_qualification.py tests/test_tameside_owner_attempt_02.py docs/design/tameside-owner-attempt-02-20261101/* .github/workflows/tameside-owner-attempt-02.yml > "$RUNNER_TEMP/diagnostic-proof/input-hashes.txt"
-          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_tameside_owner_attempt_02.py -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=sqlite:///:memory: timeout --kill-after=2s 30s "$RUNNER_TEMP/diagnostic-venv/bin/python" -B -m pytest tests/test_tameside_owner_attempt_02.py tests/test_tameside_qualification_package.py::test_cli_single_use_record_prevents_new_output_path_from_becoming_new_authority -q -p no:cacheprovider --tb=short --junitxml="$RUNNER_TEMP/diagnostic-proof/diagnostics.xml" 2>&1 | tee "$RUNNER_TEMP/diagnostic-proof/diagnostics.log"
       - name: Export focused evidence
         if: always()
         run: |
