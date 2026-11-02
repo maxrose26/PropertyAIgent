@@ -263,6 +263,12 @@ def public_result(raw):
     need(type(r) is dict and set(r)<= {'status','reason','mint_outcome','retry','authority_sha256','receipt_sha256','expires_at','expiry','provider_calls'},'JSON')
     need(r.get('status') in ('STOP_MINT_SEAL_REQUIRES_REVIEW_NO_RETRY','MINT_RECEIPT_VALIDATED_NOT_ARMED','PRIVATE_PUBLICATION_TOKEN_ARMED') and r.get('retry') is False,'JSON')
     need(r.get('mint_outcome') in ('MINTED','MINTED_REQUIRES_CLOSURE','UNCERTAIN','DEFINITELY_NOT_SENT','PRIOR_ATTEMPT_RECONCILE','MINTED_NOT_ARMED','SEAL_UNCERTAIN_RECONCILE','NOT_INFERRED','NOT_INFERRED_RECONCILE'),'JSON')
+    shapes={
+        'STOP_MINT_SEAL_REQUIRES_REVIEW_NO_RETRY': {'status','reason','mint_outcome','retry'},
+        'MINT_RECEIPT_VALIDATED_NOT_ARMED': {'status','mint_outcome','retry','authority_sha256','receipt_sha256','expires_at','expiry'},
+        'PRIVATE_PUBLICATION_TOKEN_ARMED': {'status','mint_outcome','retry','receipt_sha256','provider_calls'}}
+    need(set(r)==shapes[r['status']],'JSON')
+    if r['status']!='STOP_MINT_SEAL_REQUIRES_REVIEW_NO_RETRY':need(r['mint_outcome']=='MINTED','JSON')
     for k in ('authority_sha256','receipt_sha256'):
         if k in r:need(type(r[k]) is str and re.fullmatch('[a-f0-9]{64}',r[k]),'JSON')
     if 'reason' in r:need(type(r['reason']) is str and r['reason'] in REASONS,'JSON')

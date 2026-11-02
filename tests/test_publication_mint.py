@@ -327,3 +327,14 @@ def test_real_owner_capture_secret_pipe_with_mocked_child_provider(fx,tmp_path,m
  assert m.main(['--phase','mint','--authority',str(p),'--authority-sha256',m.digest(p.read_bytes())])==0
  out=capsys.readouterr().out;assert json.loads(out)['owner_process']['client_closed'] is True and state(f)['token_candidate']==TOKEN
  for secret in (TOKEN,PASSWORD,VAULT,'SYNTHETIC_INHERITED'):assert secret not in out
+
+@pytest.mark.parametrize('status',['MINT_RECEIPT_VALIDATED_NOT_ARMED','PRIVATE_PUBLICATION_TOKEN_ARMED'])
+def test_incomplete_child_success_receipt_refuses(status):
+ with pytest.raises(m.Refusal,match='JSON'):m.public_result(m.canonical(dict(status=status,mint_outcome='MINTED',retry=False)))
+
+@pytest.mark.parametrize('kind',['mint','seal','refusal'])
+def test_complete_allowlisted_child_shapes(kind):
+ if kind=='mint':r=dict(status='MINT_RECEIPT_VALIDATED_NOT_ARMED',mint_outcome='MINTED',retry=False,authority_sha256='a'*64,receipt_sha256='b'*64,expires_at='2026-11-02T12:00:00Z',expiry=1793620800)
+ elif kind=='seal':r=dict(status='PRIVATE_PUBLICATION_TOKEN_ARMED',mint_outcome='MINTED',retry=False,receipt_sha256='b'*64,provider_calls=0)
+ else:r=m.failure('UNKNOWN','NOT_INFERRED')
+ assert m.public_result(m.canonical(r))==r
