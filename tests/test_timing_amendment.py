@@ -30,7 +30,7 @@ def observation(f,operation='HANDOFF'):
 def state(f):return dict(state='ACTIVATION_ACKNOWLEDGED',binding=f['b'],passwords={r:'SYNTHETIC_PASSWORD_'+'x'*48 for r in op.ROLES})
 
 def test_fresh_hour_token_binds_immediately_without_ageing_and_never_slides(v2):
- f=v2;b=f['b'];assert b['valid_until']==f['clock'][0]+2100 and b['publication_valid_until']==f['clock'][0]+3600 and f['p']['expires_at']==b['valid_until']
+ f=v2;b=f['b'];assert b['valid_until']==f['clock'][0]+2100 and b['publication_valid_until']==f['clock'][0]+3600 and f['p']['expires_at']==b['runtime_deadline']==b['valid_until']-185
  f['clock'][0]+=500;got,_,_=flow.frozen_binding();assert got==b and got['timing_policy']['bound_at']==b['timing_policy']['bound_at']
  assert 'inherited_boundary' not in b
 
@@ -133,9 +133,9 @@ def test_independent_restore_and_exact_token_revoke_after_E_and_stale_obs(v2):
  with pytest.raises(FileExistsError):extra.token_revoke(f['b'],stale,lambda _:None,runner=runner)
 
 
-def test_period_issuer_uses_D_and_preserves_memberships(v2,mocked_sql):
+def test_period_issuer_uses_P_below_D_and_preserves_memberships(v2,mocked_sql):
  f=v2;c=mocked_sql;prior=list(c.members);_,_,call=issue(c,f['b'],f['p']);r=call()
- assert r['outcome']=='COMMIT_ACKNOWLEDGED' and c.members==prior and c.ctl['intake_periods'][f['b']['period']]['expires_at']==f['b']['valid_until']<f['r']['expiry']
+ assert r['outcome']=='COMMIT_ACKNOWLEDGED' and c.members==prior and c.ctl['intake_periods'][f['b']['period']]['expires_at']==f['b']['runtime_deadline']==f['b']['valid_until']-185<f['r']['expiry']
 
 
 def test_issuer_server_clock_ten_minute_boundary_rolls_back(v2,mocked_sql):
