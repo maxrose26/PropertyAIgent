@@ -194,6 +194,7 @@ def safe_result(exc):
      'ACTIVATION_SETTINGS_POSTCONDITION',
      'ACTIVATION_STOP_CHANGED',
      'BOTH_EXPLICIT_STOP_DECISIONS_REQUIRED',
+     'CONTROLLER_CEILING',
      'CLOSURE_AUTHORITY_BINDING',
      'CLOSURE_AUTHORITY_BOUND',
      'CLOSURE_AUTHORITY_READBACK',
@@ -569,7 +570,9 @@ class Pilot:
         b=self.state['binding'];ca,_=verified_trust()
         out=[]
         for role,cap in op.ROLES.items():
-            budget=DatabaseBudget(statements=4,connections=1,returned_bytes=8192,seconds=12)
+            # Includes driver initialisation and the existing eight-statement
+            # cleanup reserve; four is below DatabaseBudget's admitted minimum.
+            budget=DatabaseBudget(statements=20,connections=1,returned_bytes=8192,seconds=12)
             try:
                 engine=budget.engine(url('POOLER',role,self.state['access']['passwords'][role]),ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr=b['hostaddr'],route='POOLER')
                 with engine.connect() as c:
