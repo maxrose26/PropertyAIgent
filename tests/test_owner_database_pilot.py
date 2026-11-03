@@ -57,7 +57,10 @@ def test_wrong_operation_stale_observation_and_uncertain_put_do_not_repeat(bound
 
 class MemoryDB:
     key='a'*64
-    def __init__(self):self.rows=[];self.lost=False
+    def __init__(self):
+        from types import SimpleNamespace
+        from psycopg.pq import TransactionStatus
+        self.rows=[];self.lost=False;self.pgconn=SimpleNamespace(transaction_status=TransactionStatus.IDLE)
     @contextmanager
     def connection(self):yield self
     def execute(self,sql,params):
@@ -92,6 +95,43 @@ def test_complete_inventory(value):assert p.complete_inventory(value,'deploy')==
 def test_partial_active_or_malformed_inventory_refuses(bad):
     with pytest.raises((op.Denied,KeyError)):p.complete_inventory(bad,'job')
 
+def test_actual_transport_limits_and_safe_http_diagnostics():
+    class Reply:
+        status_code=200
+        def __init__(self,raw):self.raw=raw
+        def __enter__(self):return self
+        def __exit__(self,*_):pass
+        def iter_content(self,n):
+            for i in range(0,len(self.raw),n):yield self.raw[i:i+n]
+    class Session:
+        def __init__(self,raw):self.raw=raw;self.calls=0;self.status=200
+        def request(self,*a,**kw):
+            self.calls+=1;assert kw['allow_redirects'] is False and kw['headers']['Authorization']=='Bearer SYNTHETIC_SENTINEL'
+            reply=Reply(self.raw);reply.status_code=self.status;return reply
+        def close(self):pass
+    s=Session(b'"'+b'x'*524286+b'"');api=p.Render('SYNTHETIC_SENTINEL',session=s)
+    assert len(api.call('GET','/deploys?limit=100'))==524286
+    s.raw=b'"'+b'x'*32767+b'"'
+    with pytest.raises(op.Denied) as failure:api.call('GET','')
+    result=p.safe_result(failure.value);assert result['reason']=='OWNER_RENDER_RESPONSE_BYTE_LIMIT' and result['limits']['response_byte_limit']==32768
+    assert 'SYNTHETIC_SENTINEL' not in json.dumps(result)
+    s=Session(b'[]');api=p.Render('SYNTHETIC_SENTINEL',session=s)
+    for _ in range(8):api.call('GET','')
+    with pytest.raises(op.Denied) as failure:api.call('GET','')
+    assert s.calls==8 and p.safe_result(failure.value)['reason']=='OWNER_RENDER_REQUEST_LIMIT'
+    s=Session(b'[]');s.status=401;api=p.Render('SYNTHETIC_SENTINEL',session=s)
+    with pytest.raises(op.Denied) as failure:api.call('GET','')
+    assert p.safe_result(failure.value)['http_status']==401 and s.calls==1
+
+def test_restoration_uncertainty_never_permits_a_second_put(bound):
+    b,policy,api=bound
+    state={'binding':b,'state':'ACTIVATION_ACKNOWLEDGED','passwords':{r:'x'*48 for r in op.ROLES}}
+    handoff(api,state,lambda _:None,None,observation=obs(b,'HANDOFF'))
+    state['state']='DATABASE_CLOSURE_ACKNOWLEDGED';state['render']['reconciliation']='EXPECTED';api.fail_put=True
+    with pytest.raises(RuntimeError):restore_handoff(api,state,lambda _:None,None)
+    with pytest.raises(op.Denied,match='PRIOR_INTENT'):restore_handoff(api,state,lambda _:None,None)
+    assert api.puts==2
+
 def test_connected_owner_prepare_run_and_independent_closure_mocked(bound,tmp_path,monkeypatch):
     b,policy,old=bound;e=b['execution_binding']
     monkeypatch.setenv('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE',json.dumps({'execution_binding':e,'branch':'prep/b-timing-pg17-current-20261103'}))
@@ -124,14 +164,18 @@ def test_connected_owner_prepare_run_and_independent_closure_mocked(bound,tmp_pa
     provider=Provider();db=MemoryDB();db.address='192.0.2.1'
     pilot=p.Pilot(db,token='SENSITIVE_SENTINEL',render_factory=lambda:provider,sleep=lambda _:None)
     monkeypatch.setattr(p.Pilot,'migrate',lambda _:None)
+    monkeypatch.setattr(p,'verify_inventory',lambda _:None)
     for name in ('identity','inventory','dormant','owner_absent','retained_cleanup','no_hazards'):monkeypatch.setattr(op,name,lambda *a,**kw:None)
     monkeypatch.setattr(op,'control',lambda *_:dict(op.ACCEPTED_STOP,intake_periods={},intake_run={'id':'a'*32,'publication':{'fixture':True}}))
     def period(c,b,policy,journal,save):journal['state']='COMMIT_ACKNOWLEDGED';save(journal);return {'temporary_issuer':'REMOVED'}
     monkeypatch.setattr(p,'issue_period',period)
-    def activate(c,b,save):
-        save({'version':'FINITE_INTAKE_ACCESS_STATE_V1','binding':b,'state':'ACTIVATION_ACKNOWLEDGED','passwords':{r:'x'*48 for r in op.ROLES}});return {'outcome':'COMMIT_ACKNOWLEDGED'}
+    prepared=lambda c,b:{'version':'FINITE_INTAKE_ACCESS_STATE_V1','binding':b,'state':'ARMED_BEFORE_ACTIVATION','passwords':{r:'x'*48 for r in op.ROLES}}
+    monkeypatch.setattr(op,'prepare_activation',prepared)
+    def activate(c,b,save,prepared=None):
+        save(dict(prepared,state='ACTIVATION_ACKNOWLEDGED'));return {'outcome':'COMMIT_ACKNOWLEDGED'}
     monkeypatch.setattr(op,'activate',activate);monkeypatch.setattr(p.Pilot,'qualify',lambda _:['SYNTHETIC_AUTHENTICATIONS'])
     monkeypatch.setattr(op,'finalisation',lambda *a:{'status':'INDEPENDENT_DATABASE_VERIFIED_SUCCESS','captures':[{'council':'tameside','record_count':9},{'council':'manchester','record_count':1}]})
+    monkeypatch.setattr(p.Pilot,'read_result',lambda _:None)
     def close(c,state,save):state['state']='DATABASE_CLOSURE_ACKNOWLEDGED';state['passwords']={};save(state);return {'runtime_access':'DISABLED'}
     monkeypatch.setattr(op,'close',close)
     # Keep the actual exclusive local submission-file path, isolated from all

@@ -69,7 +69,7 @@ BEGIN
  AND g.value->'execution_binding'=policy->'execution_binding' AND (g.value->>'expires_at')::double precision>t
  AND (convert_from(p_body,'UTF8')::jsonb)->'requested_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')
  AND ((w.subject::jsonb->>'council'='tameside' AND w.subject::jsonb->>'semantics'='RECEIVED' AND (convert_from(p_body,'UTF8')::jsonb)->>'council'='tameside' AND (convert_from(p_body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED')
- OR (w.subject::jsonb->>'council'='manchester' AND w.subject::jsonb->>'semantics'='VALIDATED' AND (convert_from(p_body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window' AND (convert_from(p_body,'UTF8')::jsonb)->'applied_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')))
+ OR (w.subject::jsonb->>'council'='manchester' AND w.subject::jsonb->>'semantics'='VALIDATED' AND (convert_from(p_body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window'))
  )) THEN RAISE EXCEPTION 'EVIDENCE_SOURCE_AUTHORITY'; END IF;
  IF p_name LIKE 'final/%' AND EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') g WHERE g.value->>'intake_run'=p_run AND g.value->'expires_at' IS DISTINCT FROM '0'::jsonb) THEN RAISE EXCEPTION 'EVIDENCE_FINITE_AUTHORITIES_NOT_CLOSED'; END IF;
  -- Reject malformed/non-object exports without converting an arbitrary exception to success.
@@ -117,7 +117,9 @@ DECLARE prior public.ingestion_run_evidence%ROWTYPE; n integer; h text;
 BEGIN
  IF session_user<>'postgres' THEN RAISE EXCEPTION 'OWNER_STATE_OWNER_ONLY' USING ERRCODE='42501'; END IF;
  IF p_period<>'b-dbpilot-20261027-1102-01_owner' OR p_run<>substr(encode(sha256(convert_to(p_period,'UTF8')),'hex'),1,32) THEN RAISE EXCEPTION 'OWNER_STATE_EXACT_PILOT'; END IF;
- PERFORM 1 FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
+ -- Owner journal transactions must never wait for the period/controller lock:
+ -- they preserve intent before that transaction starts, or ack after COMMIT.
+ IF NOT pg_try_advisory_xact_lock(1886547824,20261103) THEN RAISE EXCEPTION 'OWNER_STATE_BUSY'; END IF;
  SELECT * INTO prior FROM public.ingestion_run_evidence d WHERE d.period=p_period AND d.run_id=p_run AND d.name LIKE 'owner/state-%' ORDER BY d.name DESC LIMIT 1;
  IF p_body IS NULL THEN
   IF prior.name IS NOT NULL THEN RETURN QUERY SELECT substring(prior.name from 13)::integer,prior.body,prior.sha256; END IF;
@@ -167,6 +169,7 @@ FINISH_GUARD_SQL=r'''
          AND d.sha256=encode(sha256(d.body),'hex')
          AND (((convert_from(d.body,'UTF8')::jsonb)->>'council'=w.subject::jsonb->>'council' AND w.subject::jsonb->>'council'='tameside') OR (w.subject::jsonb->>'council'='manchester' AND (convert_from(d.body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window'))
          AND (convert_from(d.body,'UTF8')::jsonb)->'requested_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')
+         AND (w.subject::jsonb->>'council'<>'manchester' OR w.state<>'COMPLETE' OR (convert_from(d.body,'UTF8')::jsonb)->'applied_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end'))
          AND w.checkpoint::jsonb->'durable_archive'->>'backend'='POSTGRES_PILOT_V1'
          AND w.checkpoint::jsonb->'durable_archive'->>'period'=a
          AND w.checkpoint::jsonb->'durable_archive'->>'run_id'=p->>'run_id'
@@ -179,12 +182,7 @@ FINISH_GUARD_SQL=r'''
 '''
 
 PREDECESSOR_REGISTER_SHA='dba6b809c50b9bd937b2f509fc05c20de9d69499ca4394e9007ef3af196b481c'
-def migration_sql():
-    """One guarded additive migration, exact installed predecessor, no login/data effects."""
-    from .intake_policy import policy_sql
-    from .operational_owner import Owner
-    text=policy_sql();start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(');end=text.index('$register$;',start)+len('$register$;');register=text[start:end]
-    expected=hashlib.sha256(Owner.daily_intake_inventory()['ingestion_register_bolton_exception'].encode()).hexdigest()
+def function_contracts():
     contracts=[]
     for name,source,tag,grantees in (
         ('ingestion_intake_evidence_write',WRITE_SQL,'evidence_write',['ingestion_storage_owner','ingestion_worker']),
@@ -192,6 +190,28 @@ def migration_sql():
         ('ingestion_intake_owner_state',OWNER_SQL,'owner_state',['ingestion_storage_owner','postgres'])):
         body=source.split('$'+tag+'$',2)[1]
         contracts.append(dict(name=name,sha256=hashlib.sha256(body.encode()).hexdigest(),grantees=sorted(grantees)))
+    return contracts
+
+def verify_inventory(c):
+    from .intake_owner import require
+    for contract in function_contracts():
+        rows=c.execute("""SELECT encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),p.proowner::regrole::text,p.prosecdef,p.proconfig,
+         (SELECT array_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole::text) FROM aclexplode(p.proacl) a),
+         (SELECT bool_or(a.is_grantable OR a.privilege_type<>'EXECUTE' OR a.grantor<>'ingestion_storage_owner'::regrole) FROM aclexplode(p.proacl) a)
+         FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=%s""",(contract['name'],)).fetchall()
+        require(rows==[(contract['sha256'],'ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False)],'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
+    row=c.execute("""SELECT c.relowner::regrole::text,c.relrowsecurity,c.relforcerowsecurity,
+     (SELECT count(*) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)
+     FROM pg_class c WHERE c.oid='public.ingestion_run_evidence'::regclass""").fetchone()
+    require(row==('ingestion_storage_owner',True,True,0),'DATABASE_EVIDENCE_TABLE_PRIVILEGES')
+
+def migration_sql():
+    """One guarded additive migration, exact installed predecessor, no login/data effects."""
+    from .intake_policy import policy_sql
+    from .operational_owner import Owner
+    text=policy_sql();start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(');end=text.index('$register$;',start)+len('$register$;');register=text[start:end]
+    expected=hashlib.sha256(Owner.daily_intake_inventory()['ingestion_register_bolton_exception'].encode()).hexdigest()
+    contracts=function_contracts()
     return r'''
 BEGIN;
 SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s';

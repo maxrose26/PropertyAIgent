@@ -94,7 +94,7 @@ class Runtime:
             if not args.hostaddr or ipaddress.ip_address(args.hostaddr).version!=4:raise Denied('REVIEWED_ADDRESS_REQUIRED')
             from .tls_trust import verified_trust
             ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr,'route':self.route_name}
-        self.events=[];self.github=None;self.head=None;self.archive_ordinal=0
+        self.events=[];self.github=None;self.head=None;self.archive_ordinal=0;self.database_prearchives={};self.active_council=None
         self.policy=None;self.memory=None
         self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in Owner.daily_intake_inventory().items()}
 
@@ -160,10 +160,16 @@ class Runtime:
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
         database=bool(self.policy and self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1')
+        sha=hashlib.sha256(raw).hexdigest()
+        cache_key=(self.active_council,sha)
+        if database and cache_key in self.database_prearchives:return self.database_prearchives[cache_key]
         self.run.publication(len(raw),0 if database else 10)
-        sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
+        self.archive_ordinal+=1
         directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/capture-'+str(self.archive_ordinal)
-        if database:return self.database_archive(raw,'capture-'+str(self.archive_ordinal)+'/source.json')
+        if database:
+            receipt=self.database_archive(raw,'capture-'+str(self.archive_ordinal)+'/source.json')
+            self.database_prearchives[cache_key]=receipt
+            return receipt
         if self.test:
             target=Path(self.args.disposable_archive);target.mkdir(exist_ok=True,parents=True)
             dest=target/(sha+'.json');dest.write_bytes(raw)
@@ -235,6 +241,11 @@ class Runtime:
             r=source['resource'];metrics=dict(requests=r['requests_attempted'],source_bytes=r['received_bytes'],source_seconds=r['elapsed_seconds'],supervised_seconds=outer['elapsed_seconds'])
         self.run.source(metrics)
         self.emit('source_closed',dict(council=row['council'],sha256=digest(source),metrics=metrics,outer=outer))
+        if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
+            # Retain a complete supervised audit even if projection subsequently
+            # refuses. Retention is not acceptance; the same validator and SQL
+            # completion gates still govern capture, screening and finalisation.
+            self.archive(canonical(source))
         return source,outer
 
     def verify_screening(self,root_key):
@@ -277,6 +288,7 @@ class Runtime:
                 if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!={'tameside','manchester'}:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
                 for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:
+                self.active_council=row['council']
                 self.run.before_scope(binding_for(row['council']).family)
                 if self.policy['expires_at']-time.time()<LIMITS['wall_seconds']-self.run.totals()['elapsed_seconds']:
                     raise Denied('INTAKE_PERIOD_TOO_SHORT_FOR_RUN')
@@ -388,6 +400,10 @@ class Runtime:
                         raise Denied('INTAKE_FINALISATION_READBACK')
                     result['durable_finalisation']=actual
                     result['finalisation']='VERIFIED'
+                elif self.authorities:
+                    result['finalisation']='NOT_ATTEMPTED_STOPPED'
+                else:
+                    result['finalisation']='NOT_ISSUED'
 
             except BaseException:
                 result.update(status='STOP_RECONCILE_NO_RETRY',evidence='UNCERTAIN',finalisation='NOT_VERIFIED')

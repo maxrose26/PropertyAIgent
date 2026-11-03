@@ -107,3 +107,21 @@ def test_pg17_queued_start_without_full_reserve_refuses_before_source(evidence_w
  assert run.returncode!=0 and result['status']=='STOP_RECONCILE_NO_RETRY' and result['usage']['requests']==0 and result['scopes']==[]
  assert result['authority_closure']=='NOT_ISSUED' and result['usage']['all_connections_closed']
  assert w['boot'].execute('SELECT count(*) FROM ingestion_run_evidence').fetchone()==(0,)
+
+def test_pg17_projection_refusal_preserves_source_audit_and_truthful_open(evidence_world,tmp_path,monkeypatch):
+ from tests.test_tameside_b_connection import connected_source,COUNTED_CONTRACT,QUAL
+ w=evidence_world;reset(w);w['boot'].execute('DELETE FROM ingestion_run_evidence')
+ p=policy(w);d=time.time()+2090;p.update(evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1,access_deadline=d,expires_at=d-185)
+ p['councils']['tameside']=dict(contract=COUNTED_CONTRACT,qualification_sha256=QUAL);name='db-evidence-refusal';authorise(w,name,p)
+ env,sources=env_and_sources(w,tmp_path);folder=tmp_path/'fixture';folder.mkdir()
+ audit,_=connected_source(folder,monkeypatch,dict(council='tameside',semantics='RECEIVED',start='2026-10-27',end='2026-11-02'))
+ (sources/'tameside.json').write_text(json.dumps(audit))
+ man=arcus_audit('manchester',[entry('REFUSAL/1/26',SCHEME)],date(2026,10,27),date(2026,11,2),budget='BROWSER_SOURCE_V2');man['applied_interval']=['2026-10-26','2026-11-02']
+ (sources/'manchester.json').write_text(json.dumps(man));out=tmp_path/'result'
+ run=subprocess.run([sys.executable,'-B','-m','scripts.run_daily_councils','--period',name,'--output',str(out),'--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'unused')],env=env,capture_output=True,text=True,timeout=90)
+ result=json.loads((out/'final-result.json').read_bytes())
+ assert run.returncode!=0 and result['status']=='STOP_RECONCILE_NO_RETRY' and result['finalisation']=='NOT_ATTEMPTED_STOPPED'
+ stored=w['boot'].execute("SELECT body,sha256 FROM ingestion_run_evidence WHERE name='capture-2/source.json'").fetchone()
+ assert bytes(stored[0])==canonical(man) and stored[1]==hashlib.sha256(canonical(man)).hexdigest()
+ assert w['boot'].execute("SELECT outcome::jsonb->'intake_run'->>'state' FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()==('OPEN',)
+ assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED' and result['evidence']=='READBACK_VERIFIED'

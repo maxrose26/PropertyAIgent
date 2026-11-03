@@ -308,10 +308,24 @@ def stop_disposition(c, decisions):
     return dict(outcome='COMMIT_ACKNOWLEDGED', stop=ACCEPTED_STOP, historical_controller_closure='UNKNOWN')
 
 
-def activate(c, b, save, *, password_factory=None):
+def prepare_activation(c,b,*,password_factory=None):
+    """Read the exact encrypted recovery baseline before the activation tx.
+
+    The pilot persists this on the same autocommit owner connection. The
+    activation transaction independently rechecks every baseline field.
+    """
+    validate_binding(b,opening=True);identity(c);admin_capabilities(c);inventory(c)
+    members=dormant(c);owner_absent(c)
+    passwords={r:(password_factory or (lambda:secrets.token_urlsafe(48)))() for r in ROLES}
+    require(all(type(v) is str and len(v)>=48 for v in passwords.values()),'PASSWORD_ENTROPY_BOUND')
+    return dict(version='FINITE_INTAKE_ACCESS_STATE_V1',binding=copy.deepcopy(b),state='ARMED_BEFORE_ACTIVATION',
+                prior_settings=settings(c),original_memberships=[list(m) for m in members],passwords=passwords)
+
+def activate(c, b, save, *, password_factory=None,prepared=None):
     """Persist encrypted closure baseline BEFORE any access effect; one atomic activation."""
     validate_binding(b, opening=True)
-    passwords = {r: (password_factory or (lambda: secrets.token_urlsafe(48)))() for r in ROLES}
+    passwords = prepared['passwords'] if prepared is not None else {r: (password_factory or (lambda: secrets.token_urlsafe(48)))() for r in ROLES}
+    require(set(passwords)==set(ROLES),'ACTIVATION_PREPARED_PASSWORD_BINDING')
     require(all(isinstance(v, str) and len(v) >= 48 for v in passwords.values()), 'PASSWORD_ENTROPY_BOUND')
     begin(c)
     try:
@@ -329,6 +343,7 @@ def activate(c, b, save, *, password_factory=None):
         prior = settings(c); original_ledger = ledger_sha(c)
         state = dict(version='FINITE_INTAKE_ACCESS_STATE_V1', binding=copy.deepcopy(b), state='ARMED_BEFORE_ACTIVATION',
                      prior_settings=prior, original_memberships=[list(m) for m in members], passwords=passwords)
+        if prepared is not None:require(prepared==state,'ACTIVATION_PREPARED_BASELINE_DRIFT')
         save(state)  # must fsync encrypted owner-local recovery data before COMMIT is possible
         set_settings(c)
         for role, cap in ROLES.items():

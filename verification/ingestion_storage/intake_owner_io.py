@@ -240,6 +240,7 @@ def submission_ack_timing(b,job):
 def restore_handoff(api, state, save, job_id):
     require(state.get('state') == 'DATABASE_CLOSURE_ACKNOWLEDGED', 'DATABASE_CLOSURE_FIRST')
     r = state['render']
+    require(r.get('state')!='RESTORE_INTENT_NO_RETRY','RESTORATION_PRIOR_INTENT_RECONCILE_NO_RETRY')
     require(r.get('state') == 'PUT_ACKNOWLEDGED' or r.get('reconciliation') == 'EXPECTED', 'HANDOFF_RECONCILIATION_REQUIRED')
     # A canceled-before-submission preparation must also have a closure route.
     # Complete (<100) job inventory and no post-handoff creation are required.
