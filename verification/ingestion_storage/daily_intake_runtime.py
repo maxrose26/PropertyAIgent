@@ -296,6 +296,11 @@ class Runtime:
                 caller.contained_failure=contained_idox_failure
                 def before_archive(ledger):
                     with ledger.worker_engine.begin() as connection:self.policy_read(connection)
+                    # The restricted role has CONNECTION LIMIT1. Release the
+                    # caller's idle pool before independent archive write/read
+                    # connections; subsequent checkpoint work reopens within
+                    # the same metered budget. No concurrent second login.
+                    if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':ledger.worker_engine.dispose()
                 caller.before_archive=before_archive
                 def prepare(receipt):
                     root=caller.read_intake_items([reg.root_key])[0]
