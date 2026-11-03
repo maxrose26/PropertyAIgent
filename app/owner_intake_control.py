@@ -13,9 +13,10 @@ def require_owner():
 def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     global _process
     if server_prepare:
-        if action!='prepare' or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=PERIOD:raise ValueError('CONFIGURED_PREPARATION_ONLY')
+        expected=PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else None
+        if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
-    if action not in ('prepare','run','recover') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
+    if action not in ('prepare','run','recover','status') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
     if action=='run' and (type(checked_at) not in (int,float) or not 0<=time.time()-checked_at<=300):raise ValueError('OWNER_BOUNDARY_CONFIRMATION_EXPIRED')
     with _lock:
         if _process is not None and _process.poll() is None:
@@ -48,3 +49,5 @@ def status():
 def startup_prepare():
     if os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')==PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_PREPARATION '+str(start('prepare',server_prepare=True)['status']),flush=True)
+    elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='READBACK:'+PERIOD:
+        print('PROPERTYAIGENT_OWNER_PILOT_READBACK '+str(start('status',server_prepare=True)['status']),flush=True)

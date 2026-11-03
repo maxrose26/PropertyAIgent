@@ -17,11 +17,7 @@ def main():
         if a.action=='prepare':pilot.prepare()
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
-        else:
-            pilot.state=pilot.journal.load()
-            if pilot.state is None:
-                print('PROPERTYAIGENT_OWNER_PILOT_RESULT '+json.dumps({'status':'NOT_PREPARED','period':PERIOD}),flush=True);return 2
-        result=pilot.summary()
+        result=pilot.inspect() if a.action=='status' else pilot.summary()
     except BaseException as exc:
         result=safe_result(exc)
         if pilot is not None and pilot.state is not None:

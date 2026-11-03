@@ -386,6 +386,8 @@ def safe_result(exc):
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
     result=dict(status='RECONCILIATION_REQUIRED',reason=reason,sqlstate=code if type(code) is str and re.fullmatch('[0-9A-Z]{5}',code) else None)
+    classes={'Denied','ValueError','KeyError','TypeError','AttributeError','IndexError','JSONDecodeError','OperationalError','ProgrammingError','DataError','InterfaceError','RuntimeError'}
+    result['exception_class']=type(exc).__name__ if type(exc).__name__ in classes else 'UNKNOWN_CLASS'
     status=getattr(exc,'http_status',None)
     if type(status) is int and 100<=status<=599:result['http_status']=status;result['requests']=getattr(exc,'requests',None)
     if reason.startswith('OWNER_RENDER_') and hasattr(exc,'limits'):result['limits']=exc.limits
@@ -694,6 +696,29 @@ class Pilot:
         if 'binding' not in self.state:self.recover_build()
         else:self.cleanup()
         return self.summary()
+    def inspect(self):
+        """Read-only reconciliation; never calls prepare, recovery or save."""
+        self.state=self.journal.load()
+        if self.state is None:return {'status':'NOT_PREPARED','period':PERIOD,'read_only':True}
+        value=self.summary();value['workflow_status']=value['status'];value['status']='READ_ONLY_EVIDENCE_SAVED';value['read_only']=True
+        value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
+        value['artifact_verified']='artifact' in self.state
+        with envelope(),self.db.connection() as c:
+            c.execute('BEGIN READ ONLY')
+            try:
+                roles=c.execute(op.ROLE_QUERY,(list(op.ROLES),)).fetchall()
+                value['runtime_roles']=[{'role':r[0],'login':r[1],'password_null':r[2]} for r in roles]
+                value['period_present']=PERIOD in op.control(c).get('intake_periods',{})
+                value['temporary_owner_absent']=c.execute("SELECT NOT pg_has_role(current_user,'ingestion_storage_owner','SET') AND NOT pg_has_role(current_user,'ingestion_storage_owner','USAGE') AND NOT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()[0]
+            finally:c.execute('ROLLBACK')
+        with self.api() as api:
+            service=api.call('GET');environment=env_values(api.call('GET','/env-vars?limit=100'))
+            jobs=complete_inventory(api.call('GET','/jobs?limit=100'),'job')
+            deploys=complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+        value['current_readback']={'suspended':service.get('suspended')=='suspended','configuration_equal':service_guard(service)==self.state.get('original_guard'),
+             'environment_equal':environment==self.state.get('original_environment'),'complete_terminal_jobs':len(jobs),'complete_terminal_deployments':len(deploys),
+             'latest_deployment':sorted(deploys,key=lambda x:x['createdAt'],reverse=True)[0]['id'] if deploys else None,'provider_mutations':0}
+        return value
     def summary(self):
         s=self.state
         return {'period':PERIOD,'window':WINDOW,'date_fields':{'tameside':'RECEIVED','manchester':'VALIDATED'},'status':s['status'],
