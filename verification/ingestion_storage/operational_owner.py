@@ -26,12 +26,12 @@ ROLE_SETTINGS=(('statement_timeout','10s'),('lock_timeout','3s'),('idle_in_trans
 ROLE_SETTINGS_SQL='SELECT r.rolname,r.rolconfig,(SELECT count(*) FROM pg_catalog.pg_db_role_setting s WHERE s.setrole=r.oid AND s.setdatabase<>0) FROM pg_catalog.pg_roles r WHERE r.rolname=ANY(%s) ORDER BY r.rolname'
 ROLE_SETTING_VALUE=re.compile(r'[0-9]{1,9}(?:ms|s|min|h|d)?')
 
-PKG=Path('docs/design/ingestion-operational-required-20261018')
-WORKER=Path('docs/design/ingestion-operational-20261016/worker.sql')
-GENERATION2_POLICY=Path('docs/design/ingestion-form-probe-20261021/policy-generation2.sql')
-GENERATION2_CAPTURE_POLICY=Path('docs/design/ingestion-capture-acceptance-20261022/policy-capture-allowance.sql')
-GENERATION3_WINDOW_POLICY=Path('docs/design/ingestion-window-demonstration-20261023/policy-window-allowance.sql')
-GENERATION3_SCREENING_V3_POLICY=Path('docs/design/ingestion-screening-v3-activation-20261030/policy-screening-v3-allowance.sql')      # policy v6: ONE named screening-only allowance (verification/ingestion_storage/policy_screening_v3.py)
+PKG=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-operational-required-20261018')
+WORKER=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-operational-20261016/worker.sql')
+GENERATION2_POLICY=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-form-probe-20261021/policy-generation2.sql')
+GENERATION2_CAPTURE_POLICY=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-capture-acceptance-20261022/policy-capture-allowance.sql')
+GENERATION3_WINDOW_POLICY=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-window-demonstration-20261023/policy-window-allowance.sql')
+GENERATION3_SCREENING_V3_POLICY=Path(__file__).resolve().parents[2] / Path('docs/design/ingestion-screening-v3-activation-20261030/policy-screening-v3-allowance.sql')      # policy v6: ONE named screening-only allowance (verification/ingestion_storage/policy_screening_v3.py)
 GENERATION2_STOP=dict(manual_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',last_hard_stop='IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',hard_stop_generation=2,
                       stop_state_sha256='675b69adfe844e2e443bcdaaf26b5d745f03b01a6651b025ad2a002445f06b21',control_sha256='d2abd06f56e0c86d4b7c9e4f73f1df2f7fb91c4f32c98e09004bb278113886a9')
 # DERIVED, NOT YET OBSERVED: the stop the consumed 22 October capture raised. The owner's failure diagnostic observed generation 3, manual stop IDOX and no unexpired grant; coordinator.py calls

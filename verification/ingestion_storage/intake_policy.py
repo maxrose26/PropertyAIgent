@@ -45,6 +45,10 @@ REGISTRATION = r"""
     IF jsonb_typeof(item) IS DISTINCT FROM 'object' OR NOT (item ?& ARRAY['contract','qualification_sha256']) OR jsonb_typeof(item->'contract') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'qualification_sha256') IS DISTINCT FROM 'string' OR item->>'contract' !~ '^[A-Za-z0-9_-]{1,100}$'
      OR item->>'qualification_sha256' !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'INTAKE_QUALIFIED_CONTRACT'; END IF;
    END LOOP;
+   IF e ? 'evidence_backend' AND (e->>'evidence_backend' IS DISTINCT FROM 'POSTGRES_PILOT_V1'
+     OR e->'max_runs' IS DISTINCT FROM '1'::jsonb OR (SELECT count(*) FROM jsonb_each(e->'councils'))<>2
+     OR e->'fixed_window' IS DISTINCT FROM '{"start":"2026-10-27","end":"2026-11-02"}'::jsonb)
+   THEN RAISE EXCEPTION 'INTAKE_DATABASE_PILOT_BINDING'; END IF;
    e:=e||jsonb_build_object('registered_at',t,'days','{}'::jsonb);
    ctl:=jsonb_set(ctl,'{intake_periods}',coalesce(ctl->'intake_periods','{}'::jsonb)||jsonb_build_object(a,e));
    UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
@@ -71,7 +75,7 @@ REGISTRATION = r"""
     OR ctl->'intake_run'->>'period' IS DISTINCT FROM a
     OR coalesce(p->>'status','') NOT IN ('RETAINED_AND_SCREENED','INCOMPLETE')
     OR p->'publication'->>'readback_verified' IS DISTINCT FROM 'true'
-    OR coalesce(p->'publication'->>'commit','') !~ '^[a-f0-9]{40}$'
+    OR (e->>'evidence_backend' IS DISTINCT FROM 'POSTGRES_PILOT_V1' AND coalesce(p->'publication'->>'commit','') !~ '^[a-f0-9]{40}$')
     OR coalesce(p->'publication'->>'sha256','') !~ '^[a-f0-9]{64}$'
     OR p->'publication'->>'path' IS DISTINCT FROM ctl->'intake_run'->>'publication_path'
     OR EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') x WHERE x.value->>'intake_run'=p->>'run_id' AND x.value->'expires_at' IS DISTINCT FROM '0'::jsonb)
@@ -126,8 +130,8 @@ REGISTRATION = r"""
     OR jsonb_typeof(item->'subject'->'start') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'end') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'council') IS DISTINCT FROM 'string'
-    OR item->'subject'->>'end'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text
-    OR item->'subject'->>'start'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text
+    OR item->'subject'->>'end'<>CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'end' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text END
+    OR item->'subject'->>'start'<>CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'start' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text END
     OR item->'subject'->>'semantics' IS DISTINCT FROM (CASE WHEN item->'subject'->>'council'='manchester' THEN 'VALIDATED' ELSE 'RECEIVED' END)
     OR NOT (e->'councils' ? (item->'subject'->>'council'))
     OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'
@@ -254,7 +258,9 @@ def policy_sql():
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(')
     end=text.index('$register$;',start)+len('$register$;')
     register=text[start:end]
-    register=register.replace("BEGIN\n IF NOT pg_has_role", "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
+    from .database_evidence import FINISH_GUARD_SQL
+    registration=REGISTRATION.replace("  IF p->>'operation'='intake_finish' THEN\n","  IF p->>'operation'='intake_finish' THEN\n"+FINISH_GUARD_SQL,1)
+    register=register.replace("BEGIN\n IF NOT pg_has_role", "BEGIN\n"+registration+"\n IF NOT pg_has_role",1)
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_bolton_allowed(')
     end=text.index('$policy$;',start)+len('$policy$;')
     allowed=text[start:end]

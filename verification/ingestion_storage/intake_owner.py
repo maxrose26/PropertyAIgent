@@ -165,7 +165,7 @@ def inventory(c):
 
 def activation_gate(c):
     """Existing two-login gate; only the reviewed worker registrar ACL is newly allowed."""
-    text = Path('docs/design/ingestion-operational-required-20261018/activate.sql').read_text()
+    text = (Path(__file__).resolve().parents[2] / 'docs/design/ingestion-operational-required-20261018/activate.sql').read_text()
     text = text.split('ALTER ROLE ingestion_worker_login LOGIN;')[0]
     require(text.count('BEGIN;') == 1, 'ACTIVATION_GATE_DERIVATION')
     marker = "   AND has_function_privilege(login,p.oid,'EXECUTE'))"
@@ -184,7 +184,7 @@ def retained_cleanup(c, ctl):
     require((ctl.get('grants', {}).get(OLDHAM) or {}).get('expires_at') == 0 and
             (ctl.get('oldham_allowances', {}).get(OLDHAM) or {}).get('revoked') is True,
             'OLDHAM_REVOKED_STATE_CHANGED')
-    raw=Path('docs/design/b-owner-finite-20261031/oldham-historical-bindings.json').read_bytes()
+    raw=(Path(__file__).resolve().parents[2] / 'docs/design/b-owner-finite-20261031/oldham-historical-bindings.json').read_bytes()
     require(hashlib.sha256(raw).hexdigest()==HISTORICAL_SHA,'OLDHAM_RETAINED_BINDINGS_HASH')
     historical=json.loads(raw);grant,allowance=historical['grant'],historical['allowance']
     package_sha=c.execute("SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",

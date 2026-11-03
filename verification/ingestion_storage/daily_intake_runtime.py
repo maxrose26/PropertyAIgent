@@ -22,7 +22,7 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
-BOUND_FILES=('verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+BOUND_FILES=('verification/ingestion_storage/database_evidence.py','verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
@@ -147,11 +147,23 @@ class Runtime:
         self.emit('supported_registration',dict(kind=reg.kind,authority=reg.authority,keys=len(reg.bindings)))
         return None
 
+    def database_archive(self,raw,name):
+        from .database_evidence import store
+        def write(period,run,name,body):
+            with self.connection() as (c,_):
+                return c.execute(text('SELECT public.ingestion_intake_evidence_write(:p,:r,:n,:b)'),dict(p=period,r=run,n=name,b=body)).scalar_one()
+        def read(period,run,name):
+            with self.connection() as (c,_):
+                return bytes(c.execute(text('SELECT public.ingestion_intake_evidence_read(:p,:r,:n)'),dict(p=period,r=run,n=name)).scalar_one())
+        return store(raw,self.args.period,self.run_id,name,write,read)
+
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
-        self.run.publication(len(raw),10)
+        database=bool(self.policy and self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1')
+        self.run.publication(len(raw),0 if database else 10)
         sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
         directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/capture-'+str(self.archive_ordinal)
+        if database:return self.database_archive(raw,'capture-'+str(self.archive_ordinal)+'/source.json')
         if self.test:
             target=Path(self.args.disposable_archive);target.mkdir(exist_ok=True,parents=True)
             dest=target/(sha+'.json');dest.write_bytes(raw)
@@ -242,7 +254,7 @@ class Runtime:
         return len(receipt['records'])
 
     def execute(self):
-        result=dict(status='STOP_RECONCILE_NO_RETRY',scopes=[],coverage_advance=False,admission_connected=False,extraction_connected=False)
+        result=dict(period=self.args.period,run_id=self.run_id,status='STOP_RECONCILE_NO_RETRY',scopes=[],coverage_advance=False,admission_connected=False,extraction_connected=False)
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
@@ -258,6 +270,9 @@ class Runtime:
                     if not self.run.closing:self.memory.check()
                 self.run.check=monitored_check
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
+            if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
+                if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!={'tameside','manchester'}:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
+                for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)
                 if self.policy['expires_at']-time.time()<LIMITS['wall_seconds']-self.run.totals()['elapsed_seconds']:
@@ -329,22 +344,31 @@ class Runtime:
             result['test_evidence']=self.test;result['execution_binding']=self.binding
             if self.memory:
                 result['memory']=self.memory.evidence();result['render_profile']=self.policy['render_profile']
+            database=bool(self.policy and self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1')
+            result['github_publication']='NOT_REQUESTED' if database else 'PENDING'
+            result['finalisation']='PENDING_COMMITTED_READBACK'
             raw=canonical(result);events=canonical(self.events)
             try:
-                if self.authorities:self.run.publication(len(raw)+len(events),10)
-                if self.authorities and not self.test:
+                if self.authorities:self.run.publication(len(raw)+len(events),0 if database else 10)
+                database_receipt=None
+                if self.authorities and database:
+                    database_receipt=self.database_archive(raw,'final/result-before-publication.json')
+                    self.database_archive(events,'final/events-before-publication.json')
+                if self.authorities and not self.test and not database:
                     if self.github is None:
                         self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
                     self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final',expected_head=self.head)
-                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                result['publication']='NOT_REQUESTED' if database else 'NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                result['github_publication']=result['publication']
+                if database:result['evidence']='READBACK_VERIFIED'
                 if self.authorities and result['status'] in ('RETAINED_AND_SCREENED','INCOMPLETE'):
                     path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
                     if self.test:
                         dest=Path(self.args.disposable_archive)/(self.run_id+'-final.json')
                         dest.write_bytes(raw)
                         if dest.read_bytes()!=raw:raise Denied('FINAL_ARCHIVE_READBACK')
-                    publication=dict(path=path,sha256=hashlib.sha256(raw).hexdigest(),
+                    publication=database_receipt if database else dict(path=path,sha256=hashlib.sha256(raw).hexdigest(),
                         commit=hashlib.sha1(b'TEST_FINAL'+raw).hexdigest() if self.test else self.head,readback_verified=True)
                     payload=dict(operation='intake_finish',period=self.args.period,run_id=self.run_id,
                                  execution_binding=self.binding,status=result['status'],publication=publication)
@@ -355,9 +379,12 @@ class Runtime:
                     if actual.get('id')!=self.run_id or actual.get('state')!='VERIFIED' or actual.get('publication')!=publication:
                         raise Denied('INTAKE_FINALISATION_READBACK')
                     result['durable_finalisation']=actual
+                    result['finalisation']='VERIFIED'
 
             except BaseException:
-                result.update(status='STOP_RECONCILE_NO_RETRY',publication='UNCERTAIN')
+                result.update(status='STOP_RECONCILE_NO_RETRY',evidence='UNCERTAIN',finalisation='NOT_VERIFIED')
+                result['publication']='NOT_REQUESTED' if database else 'UNCERTAIN'
+                result['github_publication']=result['publication']
                 try:
                     self.stop_run('DAILY_INTAKE_REQUIRED_PUBLICATION_FAILURE')
                 except BaseException:result['stop_readback']='UNCERTAIN'
