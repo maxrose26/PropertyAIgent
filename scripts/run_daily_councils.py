@@ -502,7 +502,7 @@ def legacy_main() -> int:
 
 
 @authorised_cli('run_daily_councils')
-def main() -> int:
+def main(*,prepared_runtime=None) -> int:
     """Intake-only boundary. Requires an existing expiring period; never legacy.
 
     No arguments refuse all effects. Explicit intake arguments use only the
@@ -512,7 +512,7 @@ def main() -> int:
         from app.ingestion.daily_intake import inactive_main
         return inactive_main()
     from verification.ingestion_storage.daily_intake_runtime import main as intake_main
-    return intake_main()
+    return intake_main(prepared_runtime=prepared_runtime)
 
 
 def _exit_code(*, healthy: int, attempted: int) -> int:

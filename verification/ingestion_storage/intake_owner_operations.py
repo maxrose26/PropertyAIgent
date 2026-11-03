@@ -76,7 +76,7 @@ class PeriodIssuer(Owner):
         if statement == 'BEGIN':
             c.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s'")
             op.identity(c);op.inventory(c);op.owner_absent(c)
-            self.prior_members=op.dormant(c)
+            self.prior_members=op.dormant(c,stable_verifiers=self.journal['binding'].get('credential_verifier_sha256') if self.journal['binding'].get('credential_policy')=='STABLE_RESTRICTED_V1' else None)
             rows=c.execute(ISSUER_MEMBERS).fetchall()
             op.require(len(rows)==1 and rows[0][0]!='postgres' and rows[0][1:]==(True,False,False) and c.execute(FLAGS).fetchone()==(False,False), 'PERIOD_EXISTING_ISSUER_ADMIN_ONLY')
             before=op.control(c)

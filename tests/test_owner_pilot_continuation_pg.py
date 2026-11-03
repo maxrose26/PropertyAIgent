@@ -10,7 +10,7 @@ from verification.ingestion_storage.database_evidence import migration_sql,OWNER
 def test_exact_namespace_transition_and_rollback(migration_world,monkeypatch,mode):
     boot=migration_world['boot']
     with support.actor() as c:support.execute(c,migration_sql())
-    old=OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1).replace("p_period NOT IN ('b-dbpilot-20261027-1102-01_owner','b-dbpilot-20261027-1102-02_owner')","p_period<>'b-dbpilot-20261027-1102-01_owner'")
+    old=OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1).replace("'b-dbpilot-20261027-1102-02_owner','b-dbpilot-20261027-1102-03_owner')","'b-dbpilot-20261027-1102-02_owner')")
     boot.execute(old)
     before=op.ledger_sha(boot);members=boot.execute(op.MEMBERS).fetchall()
     q='SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)'

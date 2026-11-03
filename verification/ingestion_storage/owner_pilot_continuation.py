@@ -4,11 +4,14 @@ from . import intake_owner as op
 from .database_evidence import OWNER_SQL,canonical,verify_inventory
 
 def predecessor(state):
-    op.require(type(state) is dict and state.get('period')=='b-dbpilot-20261027-1102-01'
+    op.require(type(state) is dict and state.get('period')=='b-dbpilot-20261027-1102-02'
         and state.get('status')=='CLOSED' and state.get('pipeline_status')=='NOT_VERIFIED'
         and state.get('failure',{}).get('phase')=='QUALIFY'
-        and state.get('failure',{}).get('exception_class')=='Denied'
+        and state.get('failure',{}).get('exception_class')=='OperationalError'
         and state.get('failure',{}).get('reason')=='UNKNOWN_FAILURE'
+        and len(state.get('qualification_attempts',[]))==1
+        and state['qualification_attempts'][0].get('driver_statements')==0
+        and state['qualification_attempts'][0].get('connection_diagnostics',[{}])[-1].get('reason_code')=='AUTHENTICATION_REJECTED'
         and state.get('access',{}).get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED'
         and state.get('closure_receipt',{}).get('outcome')=='COMMIT_ACKNOWLEDGED'
         and state.get('closure_receipt',{}).get('sessions')=='ABSENT'
@@ -19,12 +22,12 @@ def predecessor(state):
         'OWNER_CONTINUATION_PREDECESSOR')
     return {'period':state['period'],'state_sha256':hashlib.sha256(canonical(state)).hexdigest(),
         'closure_sha256':hashlib.sha256(canonical(state['closure_receipt'])).hexdigest(),
-        'source_requests':'NOT_REACHED','execution_identity':'b-dbpilot-20261027-1102-02'}
+        'source_requests':'NOT_REACHED','execution_identity':'b-dbpilot-20261027-1102-03'}
 
 def migrate_owner_namespace(c):
     """Atomic exact old→two-name interface; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
-    old=new.replace("p_period NOT IN ('b-dbpilot-20261027-1102-01_owner','b-dbpilot-20261027-1102-02_owner')", "p_period<>'b-dbpilot-20261027-1102-01_owner'")
+    old=new.replace("'b-dbpilot-20261027-1102-02_owner','b-dbpilot-20261027-1102-03_owner')", "'b-dbpilot-20261027-1102-02_owner')")
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c);op.owner_absent(c)

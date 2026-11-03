@@ -22,7 +22,7 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
-BOUND_FILES=('scripts/owner_pilot_job.py','docs/design/database-pilot-20261103/command-policy.json','verification/ingestion_storage/database_evidence.py','verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+BOUND_FILES=('verification/ingestion_storage/runtime_authentication.py','scripts/owner_pilot_job.py','docs/design/database-pilot-20261103/command-policy.json','verification/ingestion_storage/database_evidence.py','verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
@@ -357,6 +357,7 @@ class Runtime:
                     if any(actual.get(a,{}).get('expires_at')!=0 for a in self.authorities):raise Denied('INTAKE_AUTHORITY_COMMITTED_READBACK')
                 result['authority_closure']='INVALIDATED' if self.authorities else 'NOT_ISSUED'
             except BaseException:result.update(status='STOP_RECONCILE_NO_RETRY',authority_closure='UNCERTAIN')
+            result['runtime_qualification']=getattr(self,'runtime_qualification',None)
             result['usage']=self.run.totals();result['limits']=LIMITS
             result['cleanup']='CLOSED' if result['usage']['all_connections_closed'] and result['authority_closure']!='UNCERTAIN' else 'UNCERTAIN'
             if result['cleanup']!='CLOSED':result['status']='STOP_RECONCILE_NO_RETRY'
@@ -466,13 +467,14 @@ def source_worker(args):
     with Path(args.output).open('xb') as f:f.write(raw)
 
 
-def main(argv=None):
+def main(argv=None,*,prepared_runtime=None):
     p=argparse.ArgumentParser();p.add_argument('--period',required=True);p.add_argument('--output',required=True)
     p.add_argument('--disposable-sources');p.add_argument('--disposable-archive')
     p.add_argument('--hostaddr')
     p.add_argument('--backlog',action='store_true');p.add_argument('--after');p.add_argument('--page-size',type=int,default=3)
     args=p.parse_args(argv)
-    runtime=Runtime(args)
+    runtime=Runtime(args) if prepared_runtime is None else prepared_runtime
+    if not isinstance(runtime,Runtime) or vars(runtime.args)!=vars(args):raise Denied('RUNTIME_QUALIFICATION_BINDING')
     if args.backlog:
         result=runtime.read_backlog();print(json.dumps(dict(status=result['status'],records=len(result['records']),more=result['more'],next_cursor=result['next_cursor'])));return 0
     result=runtime.execute();print(json.dumps({k:result[k] for k in ('status','cleanup','authority_closure','publication')}))
