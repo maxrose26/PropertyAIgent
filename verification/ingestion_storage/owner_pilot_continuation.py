@@ -29,24 +29,25 @@ def migrate_owner_namespace(c):
     try:
         op.identity(c);op.inventory(c);op.dormant(c);op.owner_absent(c)
         c.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s'")
-        c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
         before=c.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(c)
         schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
-        snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
         definition=c.execute("SELECT prosrc,proacl::text,proowner::regrole::text,prosecdef,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
         op.require(definition[0] in (old,new) and definition[2:]==('ingestion_storage_owner',True,['search_path=pg_catalog']),'OWNER_CONTINUATION_MIGRATION')
-        if definition[0]==old:
-            c.execute('GRANT ingestion_storage_owner TO postgres WITH INHERIT FALSE,SET TRUE GRANTED BY postgres')
-            c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner')
-            c.execute('SET LOCAL ROLE ingestion_storage_owner')
-            c.execute(OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
-            c.execute('RESET ROLE')
-            c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
-            c.execute('REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT')
+        if definition[0]==new:
+            verify_inventory(c);c.execute('COMMIT');return
+        c.execute('GRANT ingestion_storage_owner TO postgres WITH INHERIT FALSE,SET TRUE GRANTED BY postgres')
+        c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner')
+        c.execute('SET LOCAL ROLE ingestion_storage_owner')
+        c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
+        snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
+        c.execute(OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+        op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
+        c.execute('RESET ROLE')
+        c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
+        c.execute('REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT')
         after=c.execute("SELECT proacl::text FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
         op.require(after==(definition[1],) and c.execute(op.MEMBERS).fetchall()==before and op.ledger_sha(c)==ledger
-            and c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()==schema
-            and c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
+            and c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()==schema,'OWNER_CONTINUATION_PRESERVATION')
         verify_inventory(c);op.owner_absent(c);c.execute('COMMIT')
         verify_inventory(c);op.owner_absent(c)
     except BaseException:
