@@ -88,6 +88,11 @@ def test_consumed_journal_cannot_start_a_second_run(monkeypatch):
     pilot=object.__new__(p.Pilot);pilot.journal=p.Journal(MemoryDB());pilot.journal.save({'period':p.PERIOD,'status':'RELEASE_BOUND','intents':{'RELEASE':{}}})
     with pytest.raises(op.Denied,match='PRIOR_ATTEMPT'):pilot.run(time.time())
 
+def test_missing_or_stale_owner_boundary_refuses_before_database_or_consumption():
+    pilot=object.__new__(p.Pilot)
+    for observed in (None,time.time()-301,time.time()+60):
+        with pytest.raises(op.Denied,match='INHERITED_BOUNDARY'):pilot.run(observed)
+
 @pytest.mark.parametrize('value',[[],[{'deploy':{'id':'dep-a','createdAt':'2026-11-03T10:00:00Z','finishedAt':'2026-11-03T10:01:00Z','status':'live'}}]])
 def test_complete_inventory(value):assert p.complete_inventory(value,'deploy')==[x['deploy'] for x in value]
 

@@ -381,10 +381,11 @@ def safe_result(exc):
     for n in range(1,4):
         known.update('OWNER_RENDER_'+'_AND_'.join(parts) for parts in combinations(('RESPONSE_BYTE_LIMIT','AGGREGATE_BYTE_LIMIT','CLIENT_TIME_LIMIT'),n))
     known.update({'OWNER_RENDER_REQUEST_LIMIT','OWNER_RENDER_REQUEST_LIMIT_AND_CLIENT_TIME_LIMIT'})
+    known.update({'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
-    result=dict(status='RECONCILIATION_REQUIRED',reason=reason,sqlstate=code if code in ('42501','28P01','28000','57014','P0001') else None)
+    result=dict(status='RECONCILIATION_REQUIRED',reason=reason,sqlstate=code if type(code) is str and re.fullmatch('[0-9A-Z]{5}',code) else None)
     status=getattr(exc,'http_status',None)
     if type(status) is int and 100<=status<=599:result['http_status']=status;result['requests']=getattr(exc,'requests',None)
     if reason.startswith('OWNER_RENDER_') and hasattr(exc,'limits'):result['limits']=exc.limits
@@ -423,8 +424,8 @@ class Pilot:
         with envelope(),self.db.connection() as c:
             exists=c.execute("SELECT to_regclass('public.ingestion_run_evidence') IS NOT NULL").fetchone()[0]
             if not exists:
-                from .storage_controller import split_sql
-                for statement in split_sql(migration_sql()):c.execute(statement)
+                c.execute(migration_sql())
+                while c.pgconn.get_result() is not None:pass
             op.inventory(c);verify_inventory(c);op.owner_absent(c)
     def preflight(self):
         with envelope(),self.db.connection() as c:
@@ -579,16 +580,18 @@ class Pilot:
             out.append({'role':role,'attempts':budget.attempts,'closed':True})
         return out
     def run(self,owner_checked_at):
+        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
         self.state=self.journal.load()
         op.require(self.state is not None and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
         self.preflight()
         release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
         release['deployment']=self.state['deployment']
-        folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD);folder.mkdir(mode=0o700)
+        folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
         b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
         b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'))
         self.state.update(binding=b,policy=p,status='RELEASE_BOUND');self.intent('RELEASE')
         try:
+            folder.mkdir(mode=0o700)
             self.intent('PERIOD')
             journal={'version':'FINITE_INTAKE_PERIOD_V1','state':'ARMED_NO_RETRY','binding':b,'policy':p}
             self.state['period_journal']=journal;self.save()
