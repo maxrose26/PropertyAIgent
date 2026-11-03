@@ -57,6 +57,11 @@ def json_equal(c,left,right):
     return c.execute('SELECT %s::jsonb=%s::jsonb',(json.dumps(left),json.dumps(right))).fetchone()[0] is True
 
 
+# Five remaining60s owner/preflight phases +960s B +5s grace +three60s closures.
+# This narrows latest activation; it does not increase any existing limit.
+MINT_START_MIN_SECONDS = 5*60 + 960 + 5 + 3*60
+
+
 def validate_binding(b, *, opening=False, now=None):
     require(isinstance(b, dict) and b.get('version') == 'FINITE_INTAKE_OWNER_V1', 'OWNER_BINDING')
     require(re.fullmatch(r'[A-Za-z0-9_-]{1,60}', b.get('period', '')), 'OWNER_PERIOD')
@@ -70,10 +75,31 @@ def validate_binding(b, *, opening=False, now=None):
                 [('revision', 40), ('workflow_sha256', 64), ('manifest_sha256', 64)]), 'OWNER_CODE_BINDING')
     require(e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')
+    if 'publication_mint' in b:
+        m=b['publication_mint']
+        require(type(m) is dict and set(m)=={'authority_sha256','receipt_sha256','expires_at'} and
+                all(type(m[k]) is str and re.fullmatch('[a-f0-9]{64}',m[k]) for k in ('authority_sha256','receipt_sha256')) and
+                type(m['expires_at']) in (int,float) and m['expires_at']==b.get('publication_valid_until') and type(b.get('valid_until')) in (int,float) and (b.get('valid_until')<=m['expires_at'] if 'timing_policy' in b else b.get('valid_until')==m['expires_at']),
+                'MINT_RECEIPT_BINDING')
+    if 'timing_policy' in b:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        t=b['timing_policy']
+        require(type(t) is dict and set(t)=={'version','bound_at','execution_day'} and t['version'] in ('SEPARATE_EXPIRY_V1','SEPARATE_EXPIRY_V2_RESERVE') and type(t['bound_at']) in (int,float),'FINITE_TIMING_POLICY')
+        day=datetime.fromtimestamp(t['bound_at'],ZoneInfo('Europe/London'))
+        from datetime import timedelta
+        midnight=datetime.combine(day.date()+timedelta(days=1),datetime.min.time(),ZoneInfo('Europe/London')).timestamp()
+        require(t['execution_day']==day.date().isoformat() and b.get('valid_until')==t['bound_at']+2100 and b['valid_until']<=b.get('publication_valid_until',0) and b['valid_until']<=midnight,'FINITE_FIXED_DEADLINE')
+    if 'timing_policy' in b and b['timing_policy']['version']=='SEPARATE_EXPIRY_V2_RESERVE':
+        require(b.get('runtime_deadline')==b['valid_until']-185,'FINITE_EXECUTION_RESERVE_BINDING')
     if opening:
         now = time.time() if now is None else now
         require(type(b.get('valid_until')) in (int, float) and
                 960 < b['valid_until'] - now <= 2100, 'FINITE_OWNER_VALIDITY')
+        if 'timing_policy' in b:
+            require(now>=b['timing_policy']['bound_at'] and b['valid_until']-now>1500,'SETUP_TEN_MINUTE_BOUND')
+        elif 'publication_mint' in b:
+            require(b['valid_until']-now > MINT_START_MIN_SECONDS,'MINT_B_AND_CLOSURE_WINDOW')
     return b
 
 
@@ -278,6 +304,8 @@ def activate(c, b, save, *, password_factory=None):
         admin_capabilities(c); inventory(c); members = dormant(c); ctl = control(c)
         server_now=c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0]
         require(960 < b['valid_until'] - float(server_now) <= 2100, 'SERVER_FINITE_VALIDITY')
+        if 'publication_mint' in b:
+            validate_binding(b,opening=True,now=float(server_now))
         enter_owner(c)
         c.execute('LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE')
         ctl=control(c,locked=True)

@@ -65,7 +65,7 @@ def capture(command, environment, *, seconds=60, ceiling=LIMIT, pass_fds=()):
 
 PHASES = ('activate', 'qualify', 'close', 'stop-disposition', 'readback', 'handoff',
           'handoff-reconcile', 'handoff-restore', 'publication-close', 'inspect',
-          'period', 'publication-arm', 'publication-revoke')
+          'period', 'publication-arm', 'publication-revoke', 'submission-check')
 
 
 # Fixed reviewed failure identifiers. Never format an exception, inspect its cause,
@@ -116,6 +116,8 @@ EXISTING_PIPELINE_SESSION
 EXISTING_RUNTIME_ADMIN_CAPABILITIES_REQUIRED
 EXPLICIT_PHASE_APPROVAL_REQUIRED
 FINITE_OWNER_VALIDITY
+MINT_RECEIPT_BINDING
+MINT_B_AND_CLOSURE_WINDOW
 HIDDEN_OWNER_TTY_REQUIRED
 FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN
 GITHUB_REQUEST_BOUND
@@ -234,6 +236,8 @@ VAULT_PASSPHRASE_LENGTH
 DIAGNOSTIC_BYTES = 1024
 
 
+FAILURE_REASONS=FAILURE_REASONS | frozenset(('FINITE_TIMING_POLICY','FINITE_FIXED_DEADLINE','SETUP_TEN_MINUTE_BOUND','PERIOD_FIXED_DEADLINE','OPERATION_OBSERVATION_BINDING','OPERATION_OBSERVATION_STALE','OPERATION_OBSERVATION_DRIFT','SUBMISSION_HANDOFF_REQUIRED','SUBMISSION_PRIOR_INTENT_NO_RETRY','SUBMISSION_CURRENT_STATE_DRIFT','SUBMISSION_INTENT_PATH','TIMING_RELEASE_UNBOUND','ATTENDED_TIMER_CONFLICT'))
+
 def failure_record(phase, exc):
     from app.ingestion.ledger import Denied
     reason = 'UNKNOWN_FAILURE'
@@ -265,6 +269,65 @@ def hidden(prompt):
     return value
 
 
+# Fixed local-only input feedback; never include an input or exception value.
+LOCAL_INPUT_MESSAGES = {
+    'FORMAT': 'LOCAL_INPUT_FORMAT: use bounded text without CR, LF or NUL (maximum 1024 JSON-encoded bytes for passwords).',
+    'LENGTH': 'LOCAL_VAULT_LENGTH: use at least 24 characters.',
+    'CONFIRM': 'LOCAL_CONFIRMATION_MISMATCH: enter and confirm again.',
+    'UNLOCK': 'LOCAL_VAULT_UNLOCK_REFUSED: check the existing Vault passphrase; no provider request.',
+    'TOKEN': 'LOCAL_INSTALLATION_TOKEN_FORMAT_REFUSED: use only the reviewed bounded installation token.',
+    'KEY': 'LOCAL_KEY_UNLOCK_REFUSED: check PropertyAIgent — GitHub signing-key passphrase; no provider request.',
+}
+
+
+def private_input(prompt, *, minimum=1, maximum=1024, confirm=False, validator=None, unlock_code='UNLOCK'):
+    """Correct local input in this parent, before child/operation reservation.
+
+    Validator returns a boolean for recognised local decryption refusal only;
+    unexpected errors propagate to the fixed outer failure reporter. No retry of
+    child, network, mutation or unknown error is performed here.
+    """
+    while True:
+        try:
+            value=hidden(prompt)
+        except SystemExit as exc:
+            if exc.code != 'SECRET_FORMAT_REFUSED': raise
+            print(LOCAL_INPUT_MESSAGES['FORMAT'],file=sys.stderr); continue
+        if type(value) is not str or not value or len(json.dumps(value).encode())-2>maximum or any(c in value for c in '\r\n\0'):
+            print(LOCAL_INPUT_MESSAGES['FORMAT'],file=sys.stderr); continue
+        if len(value)<minimum:
+            print(LOCAL_INPUT_MESSAGES['LENGTH'],file=sys.stderr); continue
+        if confirm:
+            try: other=hidden('Confirm B-state Vault passphrase (hidden): ')
+            except SystemExit as exc:
+                if exc.code != 'SECRET_FORMAT_REFUSED': raise
+                print(LOCAL_INPUT_MESSAGES['CONFIRM'],file=sys.stderr); continue
+            if other!=value:
+                print(LOCAL_INPUT_MESSAGES['CONFIRM'],file=sys.stderr); continue
+        if validator is not None and not validator(value):
+            print(LOCAL_INPUT_MESSAGES[unlock_code],file=sys.stderr); continue
+        return value
+
+
+def vault_unlock(path, password):
+    from cryptography.fernet import InvalidToken
+    from .intake_owner_io import Vault
+    try: Vault(path,password).load()
+    except InvalidToken: return False
+    return True
+
+
+def vault_input(path, *, create=False, mint_bound=False):
+    # Authenticate the common passphrase against the existing mint Vault for
+    # new access/period vaults. No additional persistence or confirmation needed.
+    from . import publication_mint as mint
+    authentication_path=mint.ROOT/'mint-01.vault' if mint_bound and create else path
+    validate=None if create and not mint_bound else lambda password: vault_unlock(authentication_path,password)
+    print('Retrieve the B-state Vault passphrase. This is distinct from the PREBUILD baseline and signing-key passphrases.',file=sys.stderr)
+    return private_input('B-state Vault passphrase (hidden, >=24 characters): ',minimum=24,
+                         confirm=create and not mint_bound,validator=validate)
+
+
 def loaded(path, expected):
     p=Path(path).expanduser()
     if p.is_symlink() or not p.is_file() or p.stat().st_size>32768:
@@ -279,7 +342,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
     from . import intake_owner as op
     from .intake_owner_io import Vault, Render, handoff, reconcile_handoff, restore_handoff
     from .tls_trust import verified_trust
-    op.validate_binding(binding, opening=phase=='activate')
+    op.validate_binding(binding, opening=phase=='activate' or ('timing_policy' in binding and phase in ('period','qualify','handoff','submission-check')))
     save=lambda _:None;state=None
     from . import intake_owner_operations as extra
     if phase in ('period','publication-arm','publication-revoke'):
@@ -294,7 +357,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
         save(state)
     if phase=='publication-close' and binding.get('publication_vault_path'):
         op.require(False,'INDEPENDENT_PUBLICATION_REVOKE_REQUIRED')
-    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect'):
+    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect','submission-check'):
         vault=Vault(vault_path,secrets_input['vault_key'],create=phase=='activate')
         save=vault.save
         if phase!='activate':
@@ -306,15 +369,18 @@ def worker(phase, binding, secrets_input, vault_path, expected):
                     state=state.get('state'),membership_closure=state.get('membership_closure'),
                     render_state=r.get('state'),publication_state=r.get('publication_state'),
                     production_connections=0,source_requests=0,provider_calls=0)
-    if phase.startswith('handoff'):
+    if phase.startswith('handoff') or phase=='submission-check':
         api=Render(secrets_input['render_token'])
         try:
+            if phase=='submission-check':
+                from .intake_owner_io import submission_check
+                return submission_check(api,state,save,expected)
             if phase=='handoff':
                 token=secrets_input.get('publication_token')
                 if binding.get('publication_vault_path'):
                     extra.private_path(binding,'publication_vault_path',binding['publication_vault_path'])
                     token=extra.token_load(binding,Vault(binding['publication_vault_path'],secrets_input['vault_key']).load())
-                return handoff(api,state,save,token)
+                return handoff(api,state,save,token,observation=expected)
             if phase=='handoff-reconcile':return reconcile_handoff(api,state,save)
             return restore_handoff(api,state,save,expected.get('job_id'))
         finally:api.session.close()
@@ -323,7 +389,7 @@ def worker(phase, binding, secrets_input, vault_path, expected):
         # inherited by its owner-local gh child. Installation tokens self-revoke.
         from .operational_publication import GitHub
         token=state['render']['publication_token']
-        op.require(token.startswith('ghs_'),'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
+        op.require(extra.installation_token_allowed(token),'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
         op.require(state.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED' and
                    state['render'].get('state')=='RESTORATION_ACKNOWLEDGED' and
                    state['render'].get('publication_state')=='ACTIVE','PUBLICATION_CLOSE_STATE_OR_PRIOR_UNCERTAINTY')
@@ -369,12 +435,34 @@ def _main(argv, context):
     os.umask(0o077)
     p=argparse.ArgumentParser();p.add_argument('--child',action='store_true');p.add_argument('--secrets-fd',type=int)
     p.add_argument('--phase',choices=PHASES);p.add_argument('--binding');p.add_argument('--binding-sha256')
-    p.add_argument('--vault');p.add_argument('--expected');p.add_argument('--expected-sha256')
+    p.add_argument('--vault');p.add_argument('--expected');p.add_argument('--expected-sha256');p.add_argument('--evidence');p.add_argument('--launch',action='store_true');p.add_argument('--session',action='store_true');p.add_argument('--timing-v2',action='store_true')
     def argument_error(_):
         raise SystemExit('ARGUMENTS_REFUSED')
     p.error=argument_error
     a=p.parse_args(argv)
     context[0]=a.phase
+    if a.launch:
+        if a.child:raise SystemExit('ARGUMENTS_REFUSED')
+        if not a.session and a.phase in ('period','activate','qualify','handoff','submission-check'):
+            from . import finite_release_binding as flow
+            import shlex
+            try:flow.use_timing_release()
+            except flow.PreparationError as exc:raise SystemExit(exc.code) from None
+            phase,command=flow.next_command(expect=a.phase)
+            raw=list(sys.argv[1:] if argv is None else argv)
+            if raw.count('--launch')!=1 or [x for x in raw if x!='--launch']!=shlex.split(command)[2:]:raise SystemExit('ARGUMENTS_REFUSED')
+        elif not a.session and a.phase not in ('close','publication-revoke','handoff-reconcile','handoff-restore','inspect','readback'):raise SystemExit('PHASE_REFUSED')
+    if a.session:
+        if a.child or a.phase or a.binding or a.vault or a.expected or a.evidence:raise SystemExit('ARGUMENTS_REFUSED')
+        from .finite_release_binding import use_timing_release
+        try:use_timing_release()
+        except BaseException as exc:
+            if getattr(exc,'code',None)=='TIMING_RELEASE_UNBOUND':raise SystemExit('TIMING_RELEASE_UNBOUND') from None
+            raise
+        return attended_session()
+    if a.timing_v2 and a.phase in ('period','activate','qualify','handoff','submission-check') and not a.child:
+        from .finite_release_binding import use_timing_release
+        use_timing_release()
     if a.child:
         try:
             secret=json.loads(os.read(a.secrets_fd,4096));os.close(a.secrets_fd)
@@ -395,32 +483,45 @@ def _main(argv, context):
     b=loaded(path,h)
     try:
         from .intake_owner import validate_binding
-        validate_binding(b,opening=phase=='activate')
+        validate_binding(b,opening=phase=='activate' or ('timing_policy' in b and phase in ('period','qualify','handoff','submission-check')))
     except BaseException as exc:
         print(failure_output(phase, exc));return 2
     if phase!='inspect' and input('Approval phrase (EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE): ').strip()!= 'EXECUTE_EXACT_'+phase.upper().replace('-','_')+'_ONCE':
         raise SystemExit('EXPLICIT_PHASE_APPROVAL_REQUIRED')
-    output=Path(input('NEW private phase evidence directory: ').strip()).expanduser();output.mkdir(mode=0o700)
+    output=Path(a.evidence or input('NEW private phase evidence directory: ').strip()).expanduser()
+    if output.exists() or output.is_symlink():raise SystemExit('PRIVATE_VAULT_REQUIRED')
     vault=a.vault
-    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect','period','publication-arm','publication-revoke'):
+    if phase in ('activate','qualify','close','handoff','handoff-reconcile','handoff-restore','publication-close','inspect','period','publication-arm','publication-revoke','submission-check'):
         vault=str(Path(vault or input('Owner-local encrypted vault path (NEW for activate): ').strip()).expanduser().resolve())
     expected=a.expected;eh=a.expected_sha256
-    if phase in ('readback','handoff-restore','period'):
+    if phase in ('readback','handoff-restore','period','submission-check') or (phase=='handoff' and 'timing_policy' in b):
         expected=str(Path(expected or input('Reviewed nonsecret expected receipt file: ').strip()).expanduser().resolve())
         eh=eh or input('Expected receipt SHA-256: ').strip();loaded(expected,eh)
     if phase=='period':
         from .intake_owner_operations import validate_policy,private_path
         validate_policy(b,loaded(expected,eh));private_path(b,'period_vault_path',vault)
+    if 'timing_policy' in b and phase in ('handoff','submission-check'):
+        from .intake_owner_io import operation_observation
+        from .intake_owner import validate_binding
+        operation_observation(b,loaded(expected,eh),'HANDOFF' if phase=='handoff' else 'SUBMISSION');validate_binding(b,opening=True)
     secret={}
-    if phase in ('activate','close','stop-disposition','readback','period'):secret['owner_password']=hidden('Existing owner password (hidden): ')
     if vault:
-        secret['vault_key']=hidden('Vault passphrase, at least 24 characters (hidden): ')
-        if phase in ('activate','period','publication-arm') and hidden('Confirm vault passphrase (hidden): ')!=secret['vault_key']:
-            raise SystemExit('VAULT_CONFIRMATION_REFUSED')
-    if phase.startswith('handoff'):secret['render_token']=hidden('Existing owner-local Render token (hidden): ')
-    if phase=='publication-arm' or (phase=='handoff' and not b.get('publication_vault_path')):secret['publication_token']=hidden('Reviewed short-lived GitHub installation token (hidden): ')
+        secret['vault_key']=vault_input(vault,create=phase in ('activate','period','publication-arm'),
+                                        mint_bound='publication_mint' in b)
+    if phase in ('activate','close','stop-disposition','readback','period'):
+        print('Retrieve PropertyAIgent — Supabase postgres password for the existing owner connection; local format checks do not prove server authentication.',file=sys.stderr)
+        secret['owner_password']=private_input('PropertyAIgent — Supabase postgres password (hidden): ')
+    if phase.startswith('handoff') or phase=='submission-check':
+        print('Retrieve PropertyAIgent — Render API key. This is NOT PropertyAIgent — PREBUILD baseline passphrase.',file=sys.stderr)
+        secret['render_token']=private_input('PropertyAIgent — Render API key (hidden): ')
+    if phase=='publication-arm' or (phase=='handoff' and not b.get('publication_vault_path')):
+        from .intake_owner_operations import installation_token_allowed
+        print('Retrieve the reviewed short-lived installation token; no connector credential.',file=sys.stderr)
+        secret['publication_token']=private_input('Reviewed installation token (hidden): ',maximum=2048,validator=installation_token_allowed,unlock_code='TOKEN')
     raw=json.dumps(secret).encode()
     if len(raw)>4000:raise SystemExit('SECRET_PIPE_BOUND')
+    # No local credential-format/decryption refusal can consume this directory.
+    output.mkdir(mode=0o700)
     readfd,writefd=os.pipe()
     try:
         os.write(writefd,raw);os.close(writefd)
@@ -431,12 +532,122 @@ def _main(argv, context):
         data,status=capture(command,{'PATH':'/usr/bin:/bin','HOME':str(Path.home()),'LANG':'C.UTF-8',
             'PYTHONDONTWRITEBYTECODE':'1','OPENBLAS_NUM_THREADS':'1'},ceiling=30720,pass_fds=(readfd,))
     finally:os.close(readfd)
-    status.update(phase=phase,connection_policy='NO_RECONNECT_NO_RETRY',
+    status.update(phase=phase,binding_sha256=h,expected_sha256=eh,connection_policy='NO_RECONNECT_NO_RETRY',
         transaction_outcome='RECONCILE' if status['reason'] or status['exit_code'] else 'ACKNOWLEDGED_SEE_RESULT',
         remote_closure='UNKNOWN_AFTER_FORCED_EXIT' if status['reason'] or status['exit_code'] else 'NORMAL_PHASE_EXIT_SEE_RESULT')
     (output/'output.txt').write_bytes(data);(output/'status.json').write_text(json.dumps(status,sort_keys=True)+'\n')
     print('PHASE_REQUIRES_LOCAL_EVIDENCE_REVIEW' if not status['reason'] and status['exit_code']==0 else 'STOP_RECONCILE_NO_RETRY')
     return 0 if status['exit_code']==0 and not status['reason'] else 2
+
+
+class AttendedCredentials:
+    """RAM-only reuse in the current owner process; child input stays anonymous."""
+    def __init__(self,vault_password=None):
+        self.values={} if vault_password is None else {'vault':vault_password}
+        self.expires_at=None;self.base=None;self.old_alarm=None
+    @staticmethod
+    def kind(prompt):
+        if prompt.startswith('B-state Vault passphrase'):return 'vault'
+        if prompt.startswith('PropertyAIgent — Supabase postgres password'):return 'postgres'
+        if prompt.startswith('PropertyAIgent — Render API key'):return 'render'
+        return None  # Never retain signing-key passphrases or arbitrary inputs.
+    def arm_expiry(self,expiry):
+        self.expires_at=expiry
+        if expiry<=time.time():self.clear();return
+        if signal.getitimer(signal.ITIMER_REAL)!=(0.0,0.0):raise SystemExit('ATTENDED_TIMER_CONFLICT')
+        self.old_alarm=signal.getsignal(signal.SIGALRM)
+        signal.signal(signal.SIGALRM,lambda *_:self.clear())
+        signal.setitimer(signal.ITIMER_REAL,expiry-time.time())
+    def clear(self):self.values.clear()  # No secure-erasure guarantee.
+    def __enter__(self):
+        global private_input
+        self.base=private_input
+        def reuse(prompt,**kw):
+            key=self.kind(prompt)
+            if self.expires_at is not None and time.time()>=self.expires_at:self.clear()
+            value=self.values.get(key) if key is not None else None
+            if value is not None:
+                validator=kw.get('validator')
+                if validator is None or validator(value):return value
+                self.values.pop(key,None)
+            value=self.base(prompt,**kw)
+            if key is not None and (self.expires_at is None or time.time()<self.expires_at):self.values[key]=value
+            return value
+        private_input=reuse;return self
+    def __exit__(self,*_):
+        global private_input
+        private_input=self.base;self.clear()
+        if self.old_alarm is not None:
+            signal.setitimer(signal.ITIMER_REAL,0);signal.signal(signal.SIGALRM,self.old_alarm)
+
+
+def attended_session(*,vault_password=None):
+    """Attended mode of this existing client; no automatic phase or retry."""
+    from . import finite_release_binding as flow,publication_mint as mint
+    import shlex
+    if not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('HIDDEN_OWNER_TTY_REQUIRED')
+    s=flow.static();op=__import__(__package__+'.intake_owner',fromlist=['validate_binding'])
+    op.require(s.get('version')=='FINITE_TIMING_V2_STATIC' and s.get('execution_day') and s.get('mint_journal_path'),'TIMING_RELEASE_UNBOUND')
+    failed=False;closed=set()
+    with AttendedCredentials(vault_password) as memory:
+        if vault_password is None:vault_input(s['mint_journal_path'])
+        record=flow.private_json(flow.MINT_RESULT,'MINT_RESULT_REQUIRED');memory.arm_expiry(record['expiry'])
+        while True:
+            action=input('Attended action (preview/bind/next/close/publication-revoke/handoff-reconcile/handoff-restore/readback/exit): ').strip()
+            if action=='exit':
+                print('ATTENDED_SESSION_EXIT: local memory cleared; remote closure is established only by its separate receipts.')
+                return 0 if {'close','publication-revoke','handoff-restore'}<=closed else 2
+            if action in ('preview','bind','next') and failed:
+                print('OPENING_STOPPED_USE_INDEPENDENT_CLOSURE_OR_RECONCILIATION');continue
+            if action=='preview':
+                review_path=flow.ROOT/'ACTUAL-MINT-REVIEW.json'
+                if review_path.exists():
+                    review=flow.private_json(review_path,'MINT_REVIEW_REQUIRED')
+                    if review.get('mint_result_sha256')!=__import__('hashlib').sha256(flow.MINT_RESULT.read_bytes()).hexdigest():raise SystemExit('TIMING_RELEASE_UNBOUND')
+                    print(json.dumps(review,sort_keys=True));continue
+                if flow.main(['preview'])!=0:failed=True
+                continue
+            if action=='bind':
+                if any((flow.ROOT/n).exists() or (flow.ROOT/n).is_symlink() for n in ('owner-binding.json','period-policy.json','FROZEN.json')):
+                    try:
+                        existing,_,_=flow.frozen_binding(opening=False)
+                        print('FIXED_BINDING_ALREADY_EXISTS_NO_REBIND; D='+str(existing['valid_until']))
+                    except BaseException:
+                        print('PARTIAL_BINDING_REQUIRES_REVIEW_NO_RETRY');failed=True;memory.clear()
+                    continue
+                # Collect once before the35-minute clock, never in command arguments.
+                print('Retrieve PropertyAIgent — Supabase postgres password for the reviewed owner connections; retained only in this attended process.',file=sys.stderr)
+                private_input('PropertyAIgent — Supabase postgres password (hidden): ')
+                print('Retrieve PropertyAIgent — Render API key for handoff/readback/restoration; not the PREBUILD passphrase.',file=sys.stderr)
+                private_input('PropertyAIgent — Render API key (hidden): ')
+                if flow.main(['bind'])!=0:failed=True;memory.clear()
+                continue
+            if action=='next':
+                try:
+                    phase,command=flow.next_command()
+                    if phase.startswith('observe-'):
+                        print(json.dumps(flow.record_observation(phase[8:].upper()),sort_keys=True));continue
+                    args=shlex.split(command)[2:]
+                    print('Prepared phase: '+phase+'; normal expected output is not an approval phrase.')
+                    code=mint.main(args) if phase=='seal' else main(args)
+                    if code!=0:failed=True;memory.clear();continue
+                    # Read-only result checks before another phase can be offered.
+                    try:flow.next_command()
+                    except flow.PreparationError as exc:
+                        if exc.code!='NEXT_SUBMISSION_REVIEW_REQUIRED':raise
+                    if phase=='submission-check':print('ONE_SUBMISSION_INTENT_SAVED: use the reviewed suspended Dashboard action once, before D-1500; never retry a lost acknowledgement.')
+                except BaseException as exc:
+                    print(failure_output('UNKNOWN_PHASE',exc));failed=True;memory.clear()
+                continue
+            if action in ('close','publication-revoke','handoff-reconcile','handoff-restore','readback'):
+                # No opening/freshness/E guard: original independent closure remains usable.
+                bpath=flow.ROOT/'owner-binding.json';bh=__import__('hashlib').sha256(bpath.read_bytes()).hexdigest();b=loaded(str(bpath),bh)
+                args=['--phase',action,'--binding',str(bpath),'--binding-sha256',bh,'--evidence',str(flow.ROOT/(action+'-evidence'))]
+                if action!='readback':args+=['--vault',b['publication_vault_path'] if action=='publication-revoke' else s['access_vault']]
+                if main(args)==0:closed.add(action)
+                if {'close','publication-revoke','handoff-restore'}<=closed:memory.clear()
+                continue
+            print('ATTENDED_ACTION_REFUSED')
 
 
 def main(argv=None):

@@ -1,0 +1,20 @@
+{
+  "version": "FIXED_B_PUBLICATION_APP_V1",
+  "attempt": "ONE_B_PUBLICATION_TOKEN_MINT_V1",
+  "app_id": null,
+  "client_id": null,
+  "installation_id": null,
+  "app_slug": "propertyaigent-b-maxrose26",
+  "repository": "maxrose26/PropertyAIgent",
+  "repository_id": 1317423499,
+  "permissions": {
+    "contents": "write",
+    "metadata": "read"
+  },
+  "key_fingerprint": null,
+  "application": {
+    "revision": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+    "workflow_sha256": "5b87c6cbef2944fa05468314fc6daefc19b785644b04e04d1ff382b0596cadea",
+    "manifest_sha256": "3c04373b83801b89dd4b5fc0077ee5a533ae94bed4ee807b31bbe9e42b91d60e"
+  }
+}

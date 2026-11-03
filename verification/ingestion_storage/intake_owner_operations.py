@@ -38,6 +38,9 @@ def validate_policy(b, policy, *, now=None):
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
     op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == op.APPLICATION_BINDING and policy['expected_stop'] == op.ACCEPTED_STOP, 'PERIOD_REVIEWED_BINDINGS')
     op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and policy['expires_at'] <= b.get('publication_valid_until',0), 'PERIOD_ROUTE_EXPIRY')
+    if 'timing_policy' in b:
+        target=b['runtime_deadline'] if b['timing_policy']['version']=='SEPARATE_EXPIRY_V2_RESERVE' else b['valid_until']
+        op.require(policy['expires_at']==target,'PERIOD_FIXED_DEADLINE')
     profile=policy['render_profile']
     fields={'mode','service_id','revision','browser_path','browser_sha256','aggregate_bytes','source_rss_bytes','controller_rss_bytes','reserve_bytes','source_seconds'}
     op.require(type(profile) is dict and set(profile)==fields and profile==b.get('render_profile') and profile['mode']=='render-intake-v1' and profile['service_id']=='crn-d9sv93vavr4c73f98rb0' and profile['revision']==op.APPLICATION_BINDING['revision'], 'PERIOD_PROFILE')
@@ -78,6 +81,7 @@ class PeriodIssuer(Owner):
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')
+            if 'timing_policy' in self.journal['binding']:op.validate_binding(self.journal['binding'],opening=True,now=server_now)
             self.prior_control=copy.deepcopy(before);self.prior_ledger=op.ledger_sha(c);self.server_before=server_now
         if statement == 'SELECT public.ingestion_register_bolton_exception(%s::jsonb)':
             entry=result[0][0]
@@ -108,9 +112,22 @@ def issue_period(c,b,policy,journal,save):
         raise
 
 
+# GitHub documents variable-length opaque ghs_ installation tokens (~520 bytes),
+# not a fixed length. These are LOCAL input bounds, not GitHub format maxima:
+# preserve the existing24-byte minimum;2048 fits within the unchanged4000-byte
+# serialized secret pipe and32768-byte encrypted vault. No JWT parsing/claims.
+INSTALLATION_TOKEN_MIN_BYTES = 24
+INSTALLATION_TOKEN_MAX_BYTES = 2048
+
+
+def installation_token_allowed(token):
+    return (type(token) is str and INSTALLATION_TOKEN_MIN_BYTES <= len(token) <= INSTALLATION_TOKEN_MAX_BYTES
+            and token.startswith('ghs_') and all(0x21 <= ord(c) <= 0x7e for c in token))
+
+
 def token_arm(b,token,save):
     op.validate_binding(b)
-    op.require(type(token) is str and re.fullmatch(r'ghs_[A-Za-z0-9]{20,251}',token) is not None,'INSTALLATION_TOKEN_ONLY')
+    op.require(installation_token_allowed(token),'INSTALLATION_TOKEN_ONLY')
     op.require(b.get('publication_scope')=={'repository':'maxrose26/PropertyAIgent','contents':'write','metadata':'read'} and type(b.get('publication_valid_until')) in (int,float),'TOKEN_REVIEWED_SCOPE_REQUIRED')
     state=dict(version='FINITE_PUBLICATION_TOKEN_V1',binding=b,state='ARMED_NO_RETRY',token=token,token_sha256=hashlib.sha256(token.encode()).hexdigest())
     save(state)
@@ -120,7 +137,7 @@ def token_arm(b,token,save):
 def token_load(b,state):
     op.require(state.get('version')=='FINITE_PUBLICATION_TOKEN_V1' and state.get('binding')==b and state.get('state')=='ARMED_NO_RETRY','TOKEN_PRIOR_INTENT_RECONCILE_NO_RETRY')
     token=state.get('token')
-    op.require(type(token) is str and re.fullmatch(r'ghs_[A-Za-z0-9]{20,251}',token) is not None and hashlib.sha256(token.encode()).hexdigest()==state.get('token_sha256'),'TOKEN_PRIVATE_BINDING')
+    op.require(installation_token_allowed(token) and hashlib.sha256(token.encode()).hexdigest()==state.get('token_sha256'),'TOKEN_PRIVATE_BINDING')
     return token
 
 

@@ -13,7 +13,7 @@ import time
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from .intake_owner import require
+from .intake_owner import require,validate_binding
 from .operational_publication import canonical
 from .restricted_route import url
 from .render_intake import SERVICE
@@ -122,7 +122,18 @@ def service_guard(value):
     return hashlib.sha256(canonical(found)).hexdigest()
 
 
-def boundary(b):
+def operation_observation(b,x,operation,*,now=None):
+    now=time.time() if now is None else now
+    keys={'version','operation','binding_sha256','service_id','observed_at','env_groups','secret_files','inherited_credential_names','reviewed','no_current_work','other_activity_stopped','deployment_id','revision','suspended'}
+    require(type(x) is dict and set(x)==keys and x['version']=='FINITE_OPERATION_OBSERVATION_V1' and x['operation']==operation,'OPERATION_OBSERVATION_BINDING')
+    require(x['binding_sha256']==hashlib.sha256(canonical(b)).hexdigest() and x['service_id']==SERVICE and x['deployment_id']==b.get('retained_deployment') and x['revision']==b['execution_binding']['revision'],'OPERATION_OBSERVATION_BINDING')
+    require(type(x['observed_at']) in (int,float) and 0<=now-x['observed_at']<=300,'OPERATION_OBSERVATION_STALE')
+    require(x['env_groups']==[] and x['secret_files']==[] and x['inherited_credential_names']==[] and all(x[k] is True for k in ('reviewed','no_current_work','other_activity_stopped','suspended')),'OPERATION_OBSERVATION_DRIFT')
+    return x
+
+
+def boundary(b,observation=None):
+    if 'timing_policy' in b:return operation_observation(b,observation,'HANDOFF')
     x = b.get('inherited_boundary', {})
     require(x.get('service_id') == SERVICE and x.get('env_groups') == [] and x.get('secret_files') == [] and
             x.get('inherited_credential_names') == [] and x.get('reviewed') is True and
@@ -130,19 +141,28 @@ def boundary(b):
             'REVIEWED_INHERITED_BOUNDARY_REQUIRED')
 
 
-def handoff(api, state, save, publication_token):
-    b = state['binding']; boundary(b)
+def handoff(api, state, save, publication_token, *, observation=None):
+    b = state['binding']; boundary(b,observation)
+    if 'timing_policy' in b:validate_binding(b,opening=True)
     require(state.get('state') == 'ACTIVATION_ACKNOWLEDGED' and 'render' not in state, 'HANDOFF_SINGLE_USE')
-    require(time.time() + 960 < b['valid_until'] and len(publication_token) >= 20, 'HANDOFF_CREDENTIAL_WINDOW')
-    require(publication_token.startswith('ghs_') and type(b.get('publication_valid_until')) in (int,float) and
-            time.time()+960 < b['publication_valid_until'] <= b['valid_until'], 'FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN')
+    require(time.time() + 960 < b['valid_until'], 'HANDOFF_CREDENTIAL_WINDOW')
+    from .intake_owner_operations import installation_token_allowed
+    require(installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
+    require(type(b.get('publication_valid_until')) in (int,float) and
+            time.time()+960 < b['publication_valid_until'] and (b['valid_until']<=b['publication_valid_until'] if 'timing_policy' in b else b['publication_valid_until']<=b['valid_until']), 'FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN')
     guard = service_guard(api.call('GET'))
     require(guard == b.get('render_config_sha256'), 'RENDER_REVIEWED_CONFIGURATION')
     original = env_values(api.call('GET', '/env-vars?limit=100'))
     new = {k: v for k, v in original.items() if k in KEEP}
-    require('INGESTION_RENDER_PROFILE' in new and 'PLAYWRIGHT_BROWSERS_PATH' in new, 'RENDER_PROFILE_MAPPING_REQUIRED')
+    require('PLAYWRIGHT_BROWSERS_PATH' in new, 'RENDER_PROFILE_MAPPING_REQUIRED')
+    # The reviewed post-build restoration intentionally has no B profile yet.
+    # Carry the exact bound profile in this same finite handoff, never a second
+    # configuration write. Any pre-existing different profile remains drift.
+    profile = b.get('render_profile')
+    require('INGESTION_RENDER_PROFILE' not in original or
+            json.loads(original['INGESTION_RENDER_PROFILE']) == profile, 'RENDER_PROFILE_MAPPING_REQUIRED')
+    new['INGESTION_RENDER_PROFILE'] = canonical(profile).decode()
     # Browser existence/hash is checked in the job, never guessed on the owner host.
-    profile = json.loads(new['INGESTION_RENDER_PROFILE'])
     keys={'mode','service_id','revision','browser_path','browser_sha256','aggregate_bytes',
           'source_rss_bytes','controller_rss_bytes','reserve_bytes','source_seconds'}
     import re
@@ -161,14 +181,38 @@ def handoff(api, state, save, publication_token):
                        ('ingestion_effect_login', 'INGESTION_EFFECT_DATABASE_URL')]:
         new[name] = url(b['route'], role, state['passwords'][role])
     new['GH_TOKEN'] = publication_token
+    boundary(b,observation)
+    if 'timing_policy' in b:validate_binding(b,opening=True)
     state['render'] = dict(original=original, expected=new, guard=guard, state='PUT_INTENT_NO_RETRY',
                           publication_token=publication_token, publication_state='ACTIVE', mapped_at=time.time())
+    if 'timing_policy' in b:state['render']['handoff_observation_sha256']=hashlib.sha256(canonical(observation)).hexdigest()
     save(state)
     api.call('PUT', '/env-vars', [{'key': k, 'value': v} for k, v in sorted(new.items())])
     require(env_values(api.call('GET', '/env-vars?limit=100')) == new and service_guard(api.call('GET')) == guard,
             'RENDER_HANDOFF_READBACK')
     state['render']['state'] = 'PUT_ACKNOWLEDGED'; save(state)
-    return dict(status='RENDER_HANDOFF_ACKNOWLEDGED', service_id=SERVICE, names=sorted(new), calls=api.calls)
+    return dict(status='RENDER_HANDOFF_ACKNOWLEDGED', service_id=SERVICE, names=sorted(new), calls=api.calls,**(dict(observation_sha256=state['render']['handoff_observation_sha256']) if 'timing_policy' in b else {}))
+
+
+def submission_check(api,state,save,observation):
+    """Fresh readback and one durable local submission intent; never submits a job."""
+    from . import intake_owner as op
+    b=state['binding'];op.validate_binding(b,opening=True)
+    require('timing_policy' in b and state.get('state')=='ACTIVATION_ACKNOWLEDGED' and state.get('render',{}).get('state')=='PUT_ACKNOWLEDGED','SUBMISSION_HANDOFF_REQUIRED')
+    require('submission_state' not in state['render'],'SUBMISSION_PRIOR_INTENT_NO_RETRY')
+    operation_observation(b,observation,'SUBMISSION')
+    require(service_guard(api.call('GET'))==state['render']['guard'] and env_values(api.call('GET','/env-vars?limit=100'))==state['render']['expected'],'SUBMISSION_CURRENT_STATE_DRIFT')
+    operation_observation(b,observation,'SUBMISSION');op.validate_binding(b,opening=True)
+    path=Path(b['submission_intent_path'])
+    require(path.is_absolute() and str(path.resolve())==str(path) and path.parent==Path(b['release_root']),'SUBMISSION_INTENT_PATH')
+    record=dict(version='ONE_B_SUBMISSION_INTENT_V2',binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),observation_sha256=hashlib.sha256(canonical(observation)).hexdigest(),period=b['period'],max_submissions=1,retry=False,checked_at=time.time(),deadline=b['valid_until']-1500)
+    fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'wb') as f:f.write(canonical(record));f.flush();os.fsync(f.fileno())
+    fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
+    state['render']['submission_state']='SUBMISSION_INTENT_NO_RETRY';save(state)
+    return dict(status='SUSPENDED_SINGLE_SUBMISSION_READY',period=b['period'],latest_submission_exclusive=b['valid_until']-1500,intent_sha256=hashlib.sha256(canonical(record)).hexdigest(),observation_sha256=record['observation_sha256'],checked_at=record['checked_at'],provider_mutations=0)
 
 
 def reconcile_handoff(api, state, save):
@@ -176,6 +220,15 @@ def reconcile_handoff(api, state, save):
     result = 'EXPECTED' if actual == r['expected'] else 'ORIGINAL' if actual == r['original'] else 'DRIFT'
     r['reconciliation'] = result; save(state)
     return dict(status='RECONCILIATION_ONLY', observed=result, retry=False)
+
+
+def submission_ack_timing(b,job):
+    # Inform acceptance; never prevent independent containment/restoration.
+    try:
+        from datetime import datetime
+        created=datetime.fromisoformat(job['createdAt'].replace('Z','+00:00')).timestamp()
+        return 'WITHIN_APPROVED_DEADLINE' if b['timing_policy']['bound_at']<=created<b['valid_until']-1500 else 'OUTSIDE_APPROVED_DEADLINE'
+    except BaseException:return 'UNKNOWN'
 
 
 def restore_handoff(api, state, save, job_id):
@@ -199,6 +252,8 @@ def restore_handoff(api, state, save, job_id):
         job = api.call('GET', '/jobs/' + job_id)
         require(job.get('id') == job_id and job.get('status') in ('succeeded', 'failed', 'canceled') and job.get('finishedAt'),
                 'RENDER_JOB_NOT_TERMINAL')
+    if 'timing_policy' in state['binding']:
+        r['submission_ack_timing']='NO_JOB_VERIFIED' if job_id is None else submission_ack_timing(state['binding'],job)
     require(service_guard(api.call('GET')) == r['guard'] and
             env_values(api.call('GET', '/env-vars?limit=100')) == r['expected'], 'RENDER_RESTORE_DRIFT')
     r['state'] = 'RESTORE_INTENT_NO_RETRY'; save(state)
@@ -207,4 +262,5 @@ def restore_handoff(api, state, save, job_id):
             service_guard(api.call('GET')) == r['guard'], 'RENDER_RESTORE_READBACK')
     r['state'] = 'RESTORATION_ACKNOWLEDGED'; r['expected'] = {}; save(state)
     return dict(status='RESTORATION_VERIFIED', service_id=SERVICE, job_id=job_id, calls=api.calls,
-                publication_token='WITHDRAWN_FROM_SERVICE_SNAPSHOT_NOT_PROVIDER_REVOKED')
+                publication_token='WITHDRAWN_FROM_SERVICE_SNAPSHOT_NOT_PROVIDER_REVOKED',
+                **(dict(submission_ack_timing=r['submission_ack_timing']) if 'submission_ack_timing' in r else {}))

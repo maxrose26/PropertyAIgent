@@ -1,0 +1,41 @@
+# Owner workflow correction — INACTIVE; no new mint authority
+
+Accepted predecessor is20649aa3d65af7a21fce2590a2fe51f0e3327ce0. Its consumed successor is closed EXPIRED_UNUSED, closure SHAe681654cd008cfca30a6c63dba522bb92a4412edcf7cb2430446b4779e09e522. All originals stay unchanged. Application remains db05f5d48ce0c70c048c99f538d8765dae669c17. No new token/period/date authority is introduced by this correction. Do not run old mint, freeze or seal commands.
+
+## Demonstrated correction
+
+The old owner assembled sha256sum arguments for a missing binding; loading it raised a generic UNKNOWN before credentials. The owner also mistook expected success output for approval input. Static text alone did not keep the steps in order.
+
+The existing local binding utility now has a read-only `ready` mode. It verifies the complete exclusive freeze proof, raw binding/policy hashes, actual mint-result/receipt/expiry binding, static equality and actual observation age. Missing files, wrong hashes, stale observations, wrong confirmation and closed windows produce distinct allowlisted reasons, without arbitrary exception messages or provider data. No ready command is emitted on refusal.
+
+The successor seal parent uses that same checker BEFORE prompts; it fills exact frozen path/hash automatically. Explicit arguments may only match them. The child repeats the checker. No credential, signing, intent or network action precedes it. The existing mint network and seal mutation functions are unchanged.
+
+`ready` offers only the first not-yet-acknowledged opening phase: seal, period, activate, qualify, handoff. It checks prior process closure and the exact successful result (including issuer removal/readback, activation roles/expiry, both single-attempt authentication closures and handoff acknowledgement), hashes, phase and period. Partial/failed evidence, existing intent without result, later out-of-order receipts or uncertain outcomes refuse with review/no-retry. The owner client adds only an optional fixed evidence-directory argument and raw binding SHA to its saved status; phase internals are unchanged. Historical receipts missing this new binding field are never rewritten or treated as new evidence.
+
+Updated existing-style launchers run this local prerequisite check before opening phases. No new controller is introduced: `ready` never executes a command, waits, signs, decrypts a Vault, retries, accesses a provider or mutates operation state. Existing closure/reconciliation commands remain separately available and are NOT gated on successful opening phases or unexpired freshness. The corrected owner launcher rejects mint; no successor-after-successor authority exists.
+
+## Inactive ordered owner procedure
+
+1. Before any future mint, explicitly bind its execution date and exact council windows, one-use authority and paths, static proposal, artifact/profile, all commands/closure commands, credential availability and actual owner session. Current static files refer only to the CLOSED3November release; another day/window is never inferred. Do not mint until timing readiness below is resolved.
+2. Complete all static review before mint. Use only a separately approved one-use mint. During ageing inspect its actual result, then the existing preview binds the actual receipt/expiry and obtains the finite-release decision. Do not start the freshness clock during documentation or review.
+3. Just before use, genuine required observations, then existing `freeze`. Wrong confirmation writes no freeze. Missing mint review refuses before confirmation. Partial freeze cannot be overwritten or bypassed.
+4. Run the guarded binding launcher with `ready`. Codex/local guide reads its result and presents ONLY its `command` field for the next phase. The owner does not construct hash/path/evidence arguments. Every issued command is checked again on entry by its launcher. Run it once, enter the labelled approval phrase and hidden existing credentials, then rerun `ready` only to read/verify the saved result before presenting the next command. `ready` is repeatable GET-free local inspection, never an operation retry.
+5. Seal input: SEAL_EXACT_B_PUBLICATION_TOKEN_ONCE; expected output PRIVATE_PUBLICATION_TOKEN_ARMED. They are distinct. Subsequent input phrases are EXECUTE_EXACT_PERIOD_ONCE / ACTIVATE / QUALIFY / HANDOFF; expected parent status PHASE_REQUIRES_LOCAL_EVIDENCE_REVIEW, followed by local validation. Never type expected output at a prompt.
+6. At verified handoff the guide stops at NEXT_SUBMISSION_REVIEW_REQUIRED. Use the existing separately approved fresh pre-submission checks, exclusive operator intent and at most one suspended-service submission, then independent Render/publication/DB readbacks. No auto-submission exists here.
+7. Failure or expired observation stops progress, not containment. Use existing independent DB close, armed-token self-revocation and guarded exact handoff restoration/reconciliation as applicable. Do not repeat a mutation, clear OPEN, alter timestamps, create replacement slots or arm just to revoke. Unarmed unused-token expiry closure and exact-installation uninstall contingency require their applicable approval. Expiry is not revocation.
+
+## Manual timing feasibility
+
+Between freeze and handoff the successful path still requires five separately guarded phase invocations, five local result verifications, eight hidden credential submissions (5B-state Vault,2Supabase,1Render) and five visible phase approvals, plus the freeze confirmation. Optional --evidence and automatic frozen binding/hash eliminate manual path/hash assembly. Wrong known local inputs can be corrected before reservation, but their entry time is unbounded. No plaintext credential cache is added. Credentials remain exclusively owner-local, with the existing labels and prompts.
+
+All five children have60-second outer envelopes. Their conservative sum is300seconds, BEFORE owner input, process startup and verification. Thus the unchanged300-second freshness gate DOES NOT guarantee completion at allowed worst-case latencies. The local guide removes five chat round trips; it does not make a3-minute target evidence of feasibility. No production latency distribution or complete owner-paced rehearsal was measured by synthetic tests.
+
+GO for this offline correction: specific precredential refusals, automatic exact binding, ordered evidence-gated commands, unchanged live guards, passing focused tests. NO-GO for another mint based solely on this correction: an explicit date/window and a complete credential-free owner-paced rehearsal of this exact guide are still required to establish a credible margin. A rehearsal must include all phase approvals,8synthetic hidden entries, result checks and realistic delays; synthetic fast execution is not an owner timing measurement. If that rehearsal cannot fit with margin, stop for a specific freshness/handoff design decision. This correction does not move/refresh the timestamp after earlier phases or change the gate. No new mint is proposed.
+
+## Preservation and limitations
+
+No database/Render/council/GitHub calls, real credentials, permission changes, new builds or source changes. No unaffected PG17 or portal suites rerun. Synthetic tests establish local ordering/refusal, not external equality, live permissions or successful B. Review is self-review, not independent. Local candidate only under offline authority; no remote publication/merge. Final identities/evidence in the owner handoff directory.
+
+Self-review correction: launchers compare their ENTIRE opening argument list against the locally generated next command, not just the first --phase pair. Duplicate phases, child flags or substituted binding/hash/evidence/vault inputs refuse before entry. The local guide still never executes a phase. Focused argument-list tests passed. Owner-managed closure commands keep their existing independent guards and are not put behind this opening sequence.
+
+A saved EXPIRED_UNUSED successor closure now takes priority over missing-binding guidance: readiness reports RELEASE_CLOSED_EXPLICIT_REBIND_REQUIRED and emits no command. It does not misleadingly tell the owner to freeze a closed attempt. Any closure file or symlink refuses; nothing is reset. Synthetic closure/absence/wrong-approval checks passed.
