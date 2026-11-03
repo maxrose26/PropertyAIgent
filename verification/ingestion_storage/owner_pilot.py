@@ -26,8 +26,8 @@ from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
 
-PREDECESSOR='b-dbpilot-20261027-1102-01'
-PERIOD='b-dbpilot-20261027-1102-02'
+PREDECESSOR='b-dbpilot-20261027-1102-02'
+PERIOD='b-dbpilot-20261027-1102-03'
 OWNER_PERIOD=PERIOD+'_owner'
 OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
 SERVICE='crn-d9sv93vavr4c73f98rb0'
@@ -117,11 +117,12 @@ class Render:
             'elapsed_ms':min(60000,max(0,int((self.clock()-self.started)*1000))),'client_time_limit_ms':40000,'limit_hits':hits}
         raise exc
     def call(self,method,suffix='',body=None):
+        qualification=method=='GET' and re.fullmatch(r'qualification:job-[a-z0-9]{20}',suffix)
         artifact=method=='GET' and re.fullmatch(r'artifact:[0-9TZ:.+-]{20,40}',suffix)
         allowed=(method=='GET' and suffix in ('','/env-vars?limit=100','/jobs?limit=100','/deploys?limit=100','/secret-files?limit=100') or
                  method=='GET' and re.fullmatch(r'/(jobs/job-|deploys/dep-)[a-z0-9]{20}',suffix) or
                  method=='PUT' and suffix=='/env-vars' or method=='PATCH' and suffix=='' or
-                 method=='POST' and suffix in ('/resume','/suspend','/jobs') or artifact)
+                 method=='POST' and suffix in ('/resume','/suspend','/jobs') or artifact or qualification)
         op.require(allowed,'OWNER_RENDER_FIXED_OPERATION')
         before=[]
         if self.calls>=8:before.append('REQUEST_LIMIT')
@@ -132,6 +133,9 @@ class Render:
         if artifact:
             from urllib.parse import urlencode
             target='https://api.render.com/v1/logs?'+urlencode(dict(ownerId=WORKSPACE,resource=SERVICE,text='DATABASE_PILOT_BUILD_RECEIPT',startTime=suffix.split(':',1)[1],limit=5,direction='backward'))
+        if qualification:
+            from urllib.parse import urlencode
+            target='https://api.render.com/v1/logs?'+urlencode(dict(ownerId=WORKSPACE,resource=suffix.split(':',1)[1],text='DATABASE_PILOT_RUNTIME_QUALIFICATION',limit=5,direction='backward'))
         with self.session.request(method,target,
                 headers={'Authorization':'Bearer '+self.token,'Accept':'application/json'},json=body,
                 timeout=(3,5),allow_redirects=False,stream=True) as r:
@@ -388,6 +392,7 @@ def safe_result(exc):
     known.update({'OWNER_CONTINUATION_PREDECESSOR','OWNER_CONTINUATION_DUPLICATE','OWNER_CONTINUATION_MIGRATION','OWNER_CONTINUATION_PRESERVATION','OWNER_CONTINUATION_QUALIFICATION', 'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
     known.update('ARTIFACT_RECONCILIATION_'+x for x in ('CONFIGURATION','HASH','CODE','BROWSER','STATE','CONFLICT','PREDECESSOR','REFUSAL','CURRENT_STATE','DURABLE_READBACK'))
     known.update({'DRIVER_STATEMENT_BOUND','SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE','REVIEWED_TLS_ENDPOINT_REQUIRED','RESTRICTED_ROUTE_MISMATCH','LIBPQ_ENVIRONMENT_OVERRIDE','RUNTIME_TRANSACTION_MODE','PINNED_REVIEWED_ADDRESS_REQUIRED','CONNECTION_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE'})
+    known.update({'STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
@@ -448,7 +453,7 @@ class Pilot:
             op.inventory(c);verify_inventory(c);op.owner_absent(c)
     def preflight(self):
         with envelope(),self.db.connection() as c:
-            op.identity(c);op.inventory(c);verify_inventory(c);op.dormant(c);op.owner_absent(c)
+            op.identity(c);op.inventory(c);verify_inventory(c);op.dormant(c,stable_verifiers=(self.state or {}).get('stable_credentials',{}).get('verifier_sha256'));op.owner_absent(c)
             ctl=op.control(c);op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
@@ -550,6 +555,10 @@ class Pilot:
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()
         try:
+            from .stable_runtime_credentials import prepare,configure
+            with envelope(),self.db.connection() as c:
+                self.state['stable_credentials']=prepare(c);op.require('STABLE_CREDENTIAL_CONFIGURATION' not in self.state['intents'],'OWNER_PRIOR_INTENT_RECONCILE');self.state['intents']['STABLE_CREDENTIAL_CONFIGURATION']={'at':time.time(),'state':'INTENT_NO_RETRY'};self.journal.save(self.state,connection=c)
+                self.state['stable_configuration']=configure(c,self.state['stable_credentials']);self.state['intents']['STABLE_CREDENTIAL_CONFIGURATION']['state']='ACKNOWLEDGED';self.journal.save(self.state,connection=c)
             self.build();self.state['status']='ARTIFACT_READY';self.save()
         except BaseException as exc:
             self.state['failure']=safe_result(exc);self.state['failure']['phase']=max(self.state['intents'],key=lambda x:self.state['intents'][x]['at'],default='PREPARE');self.state['private_failure_detail']=private_failure(exc,self.state['failure']['phase']);self.state['status']='PREPARATION_REFUSED';self.save()
@@ -624,7 +633,7 @@ class Pilot:
         release['deployment']=self.state['deployment']
         folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
         b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
-        b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'))
+        b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
         if 'preparation_failure' in self.state:self.state.pop('failure',None)
         self.state.update(binding=b,policy=p,status='RELEASE_BOUND');self.intent('RELEASE')
         try:
@@ -640,21 +649,21 @@ class Pilot:
             self.state['period_receipt']=period;self.ack('PERIOD')
             self.intent('ACTIVATE')
             with envelope(),self.db.connection() as c:
-                prepared=op.prepare_activation(c,b)
+                prepared=op.prepare_activation(c,b,stable_credentials=self.state['stable_credentials']['passwords'])
                 self.state['access']=copy.deepcopy(prepared);self.journal.save(self.state,connection=c)
                 def access_saved(value):
                     self.state['access']=copy.deepcopy(value)
                     if value.get('state')=='ACTIVATION_ACKNOWLEDGED':self.journal.save(self.state,connection=c)
                 self.state['activation_receipt']=op.activate(c,b,access_saved,prepared=prepared)
             self.ack('ACTIVATE')
-            self.intent('QUALIFY');self.state['qualification']=self.qualify();self.ack('QUALIFY')
+            self.state['qualification']={'status':'REQUIRED_IN_ACTUAL_RUNTIME_BEFORE_SOURCE'};self.save()
             observation=self.observation('HANDOFF',owner_checked_at)
             self.intent('HANDOFF')
             with self.api() as api:self.state['handoff_receipt']=handoff(api,self.state['access'],self.access_save,None,observation=observation)
             self.ack('HANDOFF')
             observation=self.observation('SUBMISSION',owner_checked_at)
             with self.api() as api:submission_check(api,self.state['access'],self.access_save,observation)
-            command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --period '+PERIOD+' --hostaddr '+b['hostaddr']
+            command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --period '+PERIOD+' --hostaddr '+b['hostaddr']+' --deadline '+str(b['valid_until'])
             self.state['job_command']=command;self.intent('ONE_JOB')
             with self.api() as api:
                 op.validate_binding(b,opening=True)
@@ -666,6 +675,7 @@ class Pilot:
                 with self.api() as api:job=api.call('GET','/jobs/'+job['id'])
                 if job.get('status') in TERMINAL and job.get('finishedAt'):break
             self.state['job_terminal']=job;self.save()
+            self.read_runtime_qualification()
             self.read_result()
             op.require(job.get('status')=='succeeded' and job.get('finishedAt'),'OWNER_OPEN_OR_UNVERIFIED')
             with envelope(),self.db.connection() as c:
@@ -678,6 +688,15 @@ class Pilot:
         finally:
             self.cleanup()
         return self.summary()
+    def read_runtime_qualification(self):
+        with self.api() as api:value=api.call('GET','qualification:'+self.state['job']['id'])
+        op.require(value.get('hasMore') is False and len(value.get('logs',[]))==1,'RUNTIME_QUALIFICATION_EVIDENCE')
+        line=value['logs'][0]['message'];prefix='DATABASE_PILOT_RUNTIME_QUALIFICATION '
+        op.require(line.startswith(prefix),'RUNTIME_QUALIFICATION_EVIDENCE')
+        receipt=json.loads(line[len(prefix):])
+        op.require(receipt.get('period')==PERIOD and receipt.get('execution_binding')==self.state['binding']['execution_binding'] and receipt.get('deadline')==self.state['binding']['valid_until'] and receipt.get('source_requests')==0,'RUNTIME_QUALIFICATION_EVIDENCE')
+        self.state['runtime_qualification']=receipt;self.save()
+        op.require(receipt.get('status')=='VERIFIED_BOTH_RESTRICTED_ROLES','RUNTIME_AUTHENTICATION_REFUSED')
     def read_result(self):
         """Independent private byte/hash retrieval, including unsuccessful runs."""
         with envelope(),self.db.connection() as c:
@@ -691,7 +710,7 @@ class Pilot:
                 self.state['source_result']={'period':PERIOD,'run_id':run['id'],'run_state':run.get('state'),'pipeline_status':report.get('status'),
                     'scopes':report.get('scopes'),'cleanup':report.get('cleanup'),'authority_closure':report.get('authority_closure'),
                     'evidence_readback':{'name':'final/result-before-publication.json','sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)},
-                    'github_publication':report.get('github_publication'),'usage':report.get('usage'),'source_failure':report.get('reason') or report.get('failure')}
+                    'github_publication':report.get('github_publication'),'usage':report.get('usage'),'source_failure':report.get('reason') or report.get('failure'),'runtime_qualification':report.get('runtime_qualification')}
             finally:c.execute('ROLLBACK')
         self.save()
     def cleanup(self):
@@ -784,10 +803,10 @@ class Pilot:
         op.require(self.state.get('status')=='PREPARATION_REFUSED' and self.state.get('failure',{}).get('phase')=='RESUSPEND' and self.state.get('deployment')==cfg['deployment'] and not any(k in self.state for k in ('binding','access','job','period_journal')) and all(self.state.get('intents',{}).get(k,{}).get('state')=='ACKNOWLEDGED' for k in required),'ARTIFACT_RECONCILIATION_PREDECESSOR')
         op.require(hashlib.sha256(canonical(self.state['failure'])).hexdigest()==cfg['preparation_failure_sha256'],'ARTIFACT_RECONCILIATION_REFUSAL')
         observed=self.inspect();current=observed['current_readback']
-        op.require(observed['workflow_status']=='PREPARATION_REFUSED' and current['suspended'] and current['configuration_equal'] and current['environment_equal'] and current['latest_deployment']==cfg['deployment'] and current['latest_revision']==release['execution_binding']['revision'] and current['jobs_since_preparation']==0 and observed['period_present'] is False and observed['temporary_owner_absent'] is True and all(r['login'] is False and r['password_null'] is True for r in observed['runtime_roles']),'ARTIFACT_RECONCILIATION_CURRENT_STATE')
+        op.require(observed['workflow_status']=='PREPARATION_REFUSED' and current['suspended'] and current['configuration_equal'] and current['environment_equal'] and current['latest_deployment']==cfg['deployment'] and current['latest_revision']==release['execution_binding']['revision'] and current['jobs_since_preparation']==0 and observed['period_present'] is False and observed['temporary_owner_absent'] is True and all(r['login'] is False and r['password_null'] is (not bool(self.state.get('stable_credentials'))) for r in observed['runtime_roles']),'ARTIFACT_RECONCILIATION_CURRENT_STATE')
         with envelope(),self.db.connection() as c:
             c.execute('BEGIN READ ONLY')
-            try:op.dormant(c);op.inventory(c);verify_inventory(c);op.no_hazards(c,op.control(c))
+            try:op.dormant(c,stable_verifiers=self.state.get('stable_credentials',{}).get('verifier_sha256'));op.inventory(c);verify_inventory(c);op.no_hazards(c,op.control(c))
             finally:c.execute('ROLLBACK')
         self.state['preparation_failure']=copy.deepcopy(self.state['failure'])
         self.state.update(artifact=receipt,profile=profile,artifact_reconciliation=entry,status='ARTIFACT_READY')
@@ -805,4 +824,4 @@ class Pilot:
                 'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}

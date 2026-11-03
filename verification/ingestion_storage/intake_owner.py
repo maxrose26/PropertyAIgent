@@ -76,7 +76,9 @@ def validate_binding(b, *, opening=False, now=None):
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02'),'OWNER_DATABASE_PILOT_SCOPE')
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03'),'OWNER_DATABASE_PILOT_SCOPE')
+    if 'credential_policy' in b:
+        require(database and b['credential_policy']=='STABLE_RESTRICTED_V1' and type(b.get('credential_verifier_sha256')) is dict and set(b['credential_verifier_sha256'])==set(ROLES) and all(re.fullmatch('[a-f0-9]{64}',v) for v in b['credential_verifier_sha256'].values()),'STABLE_VERIFIER_BINDING')
     require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')
     if 'publication_mint' in b:
         m=b['publication_mint']
@@ -238,10 +240,13 @@ def no_hazards(c, ctl):
                     for g in ctl.get('grants', {}).values()), 'UNEXPIRED_OR_UNREADABLE_AUTHORITY')
 
 
-def dormant(c):
+def dormant(c, *, stable_verifiers=None):
     rows = c.execute(ROLE_QUERY, (list(ROLES),)).fetchall()
-    require(rows == [(r, False, True, False, False, False, False, False, False, 1) for r in sorted(ROLES)],
+    require(rows == [(r, False, stable_verifiers is None, False, False, False, False, False, False, 1) for r in sorted(ROLES)],
             'RUNTIME_NOT_DORMANT')
+    if stable_verifiers is not None:
+        actual=dict(c.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname=ANY(%s)",(list(ROLES),)).fetchall())
+        require(actual==stable_verifiers,'STABLE_VERIFIER_BINDING')
     members = c.execute(MEMBERS).fetchall()
     require(not any(m[1] in ROLES for m in members), 'RUNTIME_MEMBERSHIP_PRESENT')
     require(not any(c.execute("SELECT pg_has_role(%s,%s,'MEMBER')", (r, cap)).fetchone()[0]
@@ -308,15 +313,17 @@ def stop_disposition(c, decisions):
     return dict(outcome='COMMIT_ACKNOWLEDGED', stop=ACCEPTED_STOP, historical_controller_closure='UNKNOWN')
 
 
-def prepare_activation(c,b,*,password_factory=None):
+def prepare_activation(c,b,*,password_factory=None,stable_credentials=None):
     """Read the exact encrypted recovery baseline before the activation tx.
 
     The pilot persists this on the same autocommit owner connection. The
     activation transaction independently rechecks every baseline field.
     """
     validate_binding(b,opening=True);identity(c);admin_capabilities(c);inventory(c)
-    members=dormant(c);owner_absent(c)
-    passwords={r:(password_factory or (lambda:secrets.token_urlsafe(48)))() for r in ROLES}
+    stable=b.get('credential_policy')=='STABLE_RESTRICTED_V1'
+    require(not stable or stable_credentials is not None,'STABLE_CREDENTIALS_REQUIRED')
+    members=dormant(c,stable_verifiers=b.get('credential_verifier_sha256') if stable else None);owner_absent(c)
+    passwords=stable_credentials if stable else {r:(password_factory or (lambda:secrets.token_urlsafe(48)))() for r in ROLES}
     require(all(type(v) is str and len(v)>=48 for v in passwords.values()),'PASSWORD_ENTROPY_BOUND')
     return dict(version='FINITE_INTAKE_ACCESS_STATE_V1',binding=copy.deepcopy(b),state='ARMED_BEFORE_ACTIVATION',
                 prior_settings=settings(c),original_memberships=[list(m) for m in members],passwords=passwords)
@@ -329,7 +336,7 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
     require(all(isinstance(v, str) and len(v) >= 48 for v in passwords.values()), 'PASSWORD_ENTROPY_BOUND')
     begin(c)
     try:
-        admin_capabilities(c); inventory(c); members = dormant(c); ctl = control(c)
+        admin_capabilities(c); inventory(c); members = dormant(c,stable_verifiers=b.get('credential_verifier_sha256') if b.get('credential_policy')=='STABLE_RESTRICTED_V1' else None); ctl = control(c)
         server_now=c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0]
         require(960 < b['valid_until'] - float(server_now) <= 2100, 'SERVER_FINITE_VALIDITY')
         if 'publication_mint' in b:
@@ -351,6 +358,9 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
                 sql.Identifier(cap), sql.Identifier(role)))
         activation_gate(c,database=b.get('evidence_backend')=='POSTGRES_PILOT_V1')
         for role in ROLES:
+            if b.get('credential_policy')=='STABLE_RESTRICTED_V1':
+                c.execute(sql.SQL('ALTER ROLE {} LOGIN VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(datetime.fromtimestamp(b['valid_until'], timezone.utc).isoformat())))
+                continue
             verifier = c.pgconn.encrypt_password(passwords[role].encode(), role.encode(), algorithm=b'scram-sha-256').decode()
             c.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),
                 sql.Literal(verifier), sql.Literal(datetime.fromtimestamp(b['valid_until'], timezone.utc).isoformat())))
@@ -380,13 +390,16 @@ def close(c, state, save, *, emit=lambda *_: None):
         admin_capabilities(c,logins_only=True)
         # Containment must commit even when a later ledger/state check refuses.
         for role in ROLES:
-            c.execute(sql.SQL('ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(role)))
+            c.execute(sql.SQL('ALTER ROLE {} NOLOGIN' if b.get('credential_policy')=='STABLE_RESTRICTED_V1' else 'ALTER ROLE {} NOLOGIN PASSWORD NULL').format(sql.Identifier(role)))
         c.execute('COMMIT')
     except BaseException:
         c.execute('ROLLBACK'); raise
     state['state'] = 'ACCESS_DISABLED_ACKNOWLEDGED'; save(state)
+    if b.get('credential_policy')=='STABLE_RESTRICTED_V1':
+        actual=dict(c.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname=ANY(%s)",(list(ROLES),)).fetchall())
+        require(actual==b['credential_verifier_sha256'],'STABLE_VERIFIER_BINDING')
     rows = c.execute(ROLE_QUERY, (list(ROLES),)).fetchall()
-    require(rows == [(r,False,True,False,False,False,False,False,False,1) for r in sorted(ROLES)], 'ACCESS_DISABLE_READBACK')
+    require(rows == [(r,False,b.get('credential_policy')!='STABLE_RESTRICTED_V1',False,False,False,False,False,False,1) for r in sorted(ROLES)], 'ACCESS_DISABLE_READBACK')
     begin(c,containment=True)
     try:
         admin_capabilities(c)
@@ -450,7 +463,7 @@ def close(c, state, save, *, emit=lambda *_: None):
         o.resolve_sessions(c, sessions)
         require(o.session_disposition in ('CLEARED_BY_WAIT', 'TERMINATED_VERIFIED_ABSENT'), 'SESSIONS_UNRESOLVED')
     state.update(state='DATABASE_CLOSURE_ACKNOWLEDGED', passwords={}); save(state)
-    return dict(outcome='COMMIT_ACKNOWLEDGED', runtime_access='DISABLED', authorities=sorted(grants),
+    return dict(outcome='COMMIT_ACKNOWLEDGED', runtime_access='DISABLED', password_verifiers='RETAINED' if b.get('credential_policy')=='STABLE_RESTRICTED_V1' else 'CLEARED', authorities=sorted(grants),
                 authority_expiry=0, temporary_owner='REMOVED', sessions='ABSENT', stop_preserved=stop,
                 intake_run_state=run.get('state'), open_run_requires_reconciliation=run.get('state')=='OPEN')
 

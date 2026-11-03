@@ -16,6 +16,7 @@ PATTERNS = (
     ('TLS_CA_UNAVAILABLE', r'root certificate file[^\n]{0,512}(?:does not exist|could not read|permission denied)'),
     ('TLS_CHAIN_REJECTED', r'(?:certificate verify failed|certificate verification failed)'),
     ('AUTHENTICATION_REJECTED', r'password authentication failed for user'),
+    ('AUTH_SECRET_UNAVAILABLE', r'\bEAUTHQUERY\b.{0,256}unsupported or invalid secret format'),
     ('CIRCUIT_BREAKER_INDICATED', r'circuit breaker'),
     ('ROUTING_IDENTITY_REJECTED', r'\btenant or user not found\b'),
     ('AUTHORIZATION_REJECTED', r'\bno pg_hba.conf entry\b'),

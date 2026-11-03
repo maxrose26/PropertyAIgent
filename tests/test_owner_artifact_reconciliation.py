@@ -21,9 +21,9 @@ def setup(monkeypatch):
  pilot=object.__new__(p.Pilot);pilot.journal=Journal();pilot.db=DB()
  observed={'workflow_status':'PREPARATION_REFUSED','current_readback':{'suspended':True,'configuration_equal':True,'environment_equal':True,'latest_deployment':cfg['deployment'],'latest_revision':e['revision'],'jobs_since_preparation':0},'period_present':False,'temporary_owner_absent':True,'runtime_roles':[{'login':False,'password_null':True}]*2}
  monkeypatch.setattr(p.Pilot,'inspect',lambda _:copy.deepcopy(observed))
- for name in ('dormant','inventory','no_hazards'):monkeypatch.setattr(p.op,name,lambda *_:None)
+ for name in ('dormant','inventory','no_hazards'):monkeypatch.setattr(p.op,name,lambda *_a,**_kw:None)
  monkeypatch.setattr(p.op,'control',lambda *_:{})
- monkeypatch.setattr(p,'verify_inventory',lambda *_:None)
+ monkeypatch.setattr(p,'verify_inventory',lambda *_a,**_kw:None)
  return pilot,cfg,observed,state
 
 def test_existing_receipt_journal_idempotency_conflict_and_durable_readback(monkeypatch):
@@ -50,3 +50,11 @@ def test_private_diagnostic_omits_messages_locals_and_secret_values():
  try:raise TypeError('SENSITIVE_SENTINEL bearer=password')
  except TypeError as exc:diagnostic=p.private_failure(exc,'RECONCILE')
  assert diagnostic['exception_class']=='TypeError' and diagnostic['messages']=='OMITTED' and 'SENSITIVE_SENTINEL' not in json.dumps(diagnostic)
+
+
+def test_stable_retained_passwords_are_not_treated_as_open_access(monkeypatch):
+ pilot,cfg,observed,state=setup(monkeypatch)
+ pilot.journal.value['stable_credentials']={'verifier_sha256':{'ingestion_worker_login':'a'*64,'ingestion_effect_login':'b'*64}}
+ for role in observed['runtime_roles']:role['password_null']=False
+ assert pilot.reconcile_artifact(cfg)['status']=='ARTIFACT_READY'
+ assert pilot.journal.writes==1

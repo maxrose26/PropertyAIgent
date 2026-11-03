@@ -3,7 +3,7 @@ import os,signal,subprocess,sys,threading,time
 
 _lock=threading.Lock()
 _process=None
-PERIOD='b-dbpilot-20261027-1102-02'
+PERIOD='b-dbpilot-20261027-1102-03'
 
 def require_owner():
     from app.security.access import require_operator,load_policy,AccessDenied
