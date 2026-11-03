@@ -1,0 +1,8 @@
+/usr/bin/timeout --signal=INT --kill-after=5s 960s /bin/bash -c '
+set -eu
+B_GH_BIN=$(python -c "import sys;from pathlib import Path;print(Path(sys.prefix)/\"bin\")")
+export PATH="$B_GH_BIN:/usr/bin:/bin"
+printf "%s  %s\n" "9049d84f96f1d33490383a77f26b4c8d9f29ca7b11d59efd5b0b5c6d66bced41" ".b-build/GH-DEPENDENCY.py" | sha256sum --check --status
+python -B .b-build/GH-DEPENDENCY.py --verify-runtime --receipt-sha "$1"
+exec python -u -m scripts.run_daily_councils --period "$2" --output "$3" --hostaddr "$4"
+' b-gh-precondition "ab6d3b8e451e483be8a3c9f6eaca8dbdb46bfbdd4b748ca0471a75a22cdf9001" "b-20261103-tm-preput-successor01" "/tmp/propertyaigent-b-20261103-tm-preput-successor01" "18.135.253.94"

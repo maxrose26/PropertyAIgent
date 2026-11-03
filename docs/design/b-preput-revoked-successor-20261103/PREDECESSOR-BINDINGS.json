@@ -1,0 +1,25 @@
+{
+  "private": {
+    "b-20261103-tm-reserve01-access.vault": "0a9f781ebac4d1ecaba20701243af836cfb67ecc90cb4f22221256fd67ee1412",
+    "b-20261103-tm-reserve01-period.vault": "eb724968a86f5650fb63610a9f686ee1f579776ce3dcae0565450895dd716d33",
+    "mint-evidence-reserve-v2-20261103-01/result.json": "d36e2e148962b6804a715e6a3ddec252590a84dc385aadba500d97ae237aca2d",
+    "mint-reserve-v2-20261103-01-consumed.json": "2add0973ba02be77e15a3d9834391e74fc0d5d62c65a8e1055664b06ffef397e",
+    "mint-reserve-v2-20261103-01.vault": "d3f1b57a7668c733939af7cf58ef8f4762cb144f45dcf0d5cbb2c33ac8a76598",
+    "publication-01.vault": "eecba94a7fd1667c4c854801b6af6f0840fda9f551bf5851554082b21585aec3",
+    "publication-01.vault.revoke-consumed": "c5bc96250897bee2abe77433c6bc6768f36ebd3397c4950ad6b6b3d6218ed444",
+    "seal-01-consumed.json": "543eec239d995138522593b2eacd40ed7a63fc1647db2f95dfcd8b5ac7382392",
+    "seal-evidence-01/result.json": "a4ff7e52f278da8ad196c4d4385afba1fbc96dc9a1765bdf30841ad2b770e5e0"
+  },
+  "release": {
+    "ABORTED-B-CLOSURE-REVIEW.json": "0409e981670f2b404e1cb2e78de6cc33239d22e0a215d868ef4687a2b090056b",
+    "FROZEN.json": "8092a1e0b5423fe4dda6ae8295f5d906853ce8a10fc389219d606c629348bc03",
+    "close-evidence/output.txt": "63e485e9a6fccf1f75e3eb20fe103074ffdae537f26821a17f2ae852148545b1",
+    "close-evidence/status.json": "9e852a3b186eddee2b03212448cc0019da7b06ac991d3851d433ee15d3a9cd5e",
+    "handoff-evidence/output.txt": "0fe7b0176550ed59f9319f19936f0c0e50ebd6f3b00bc78e83be6856c9b3d6ea",
+    "handoff-evidence/status.json": "d196ad06a08ba6e378164113c85744505ecc531df3f8e06756e810c6743bd81a",
+    "owner-binding.json": "f092073dadb7313fb31674102391603bde30fd177853548debf8c81ecb677383",
+    "period-policy.json": "3e5d15e5fcdd10078625fcd6c7f2bc8cacd0b916cea3973b8cce333d8c42f614",
+    "publication-revoke-evidence/output.txt": "2365fb78efc790e174600b75c679ead25e16a4f0ee216ed8bbbcc0c473fde739",
+    "publication-revoke-evidence/status.json": "8ba77d146e6711887c88a2d742fba6d0bf82a257553f696a81f90a8c570feb34"
+  }
+}

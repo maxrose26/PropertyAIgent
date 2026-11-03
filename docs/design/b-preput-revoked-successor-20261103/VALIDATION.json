@@ -1,0 +1,83 @@
+{
+  "accepted_browser_checks": "16 pass reused unchanged",
+  "accepted_native_pg17": "28 pass reused; SQL/timing/transaction functions unchanged; no native suite rerun",
+  "actual_B_run": false,
+  "base": "0e7219ddd56596104c68b4de997794ce7f015ee3",
+  "connected_final_candidate_rechecked": true,
+  "existing_test_environment": "storage-controller Python and existing deps plus existing prep-test pytest appended; no install",
+  "final_verdicts": {
+    "test_actual_connected_fixed_launcher_entries_through_restore": "PASS",
+    "test_authenticated_predecessor_state_must_agree_with_receipts[access_not_closed]": "PASS",
+    "test_authenticated_predecessor_state_must_agree_with_receipts[render_intent_present]": "PASS",
+    "test_authenticated_predecessor_state_must_agree_with_receipts[revocation_uncertain]": "PASS",
+    "test_dangling_symlink_is_uncertain_prior_state_not_unused[new_access_next]": "PASS",
+    "test_dangling_symlink_is_uncertain_prior_state_not_unused[predecessor_submission]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[access]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[freeze]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[mint]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[period]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[publication]": "PASS",
+    "test_fresh_exclusive_slots_are_not_replaceable_authority[seal]": "PASS",
+    "test_fresh_state_key_authenticates_against_exact_current_journal": "PASS",
+    "test_parent_existing_evidence_slot_refuses_before_hidden_input": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[access_cipher]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[close]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[handoff]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[mint_cipher]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[publication_cipher]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[revocation]": "PASS",
+    "test_predecessor_drift_or_open_work_refuses_without_new_intent[submission]": "PASS",
+    "test_revoked_before_expiry_allows_one_new_post_and_no_replay": "PASS",
+    "test_same_or_missing_predecessor_state_key_refuses_before_intent": "PASS",
+    "test_uncertain_post_never_repeated": "PASS",
+    "test_wrong_approval_status_text_does_not_consume_slot": "PASS"
+  },
+  "history": {
+    "affected-02": {
+      "cases": 3,
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "0dd146cbc6f78f55011762eac805cd04d8742deafd6312fbef57048521cb8d45",
+      "skips": 0,
+      "xml_sha256": "7c5a3911c0e58bfc9b587036a23dcdb993d21baeaa718f9d4646982f7e00340e"
+    },
+    "affected-03": {
+      "cases": 5,
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "0166453cf709c219781f24c404860e51b74d77e3b5c111549d28b0815105ad72",
+      "skips": 0,
+      "xml_sha256": "b14a507cd0610d46315140714590252ef64a9f2d9cf345917bb64e3cbc0419cb"
+    },
+    "final-connected": {
+      "cases": 3,
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "be612ed015d306ae46658cc4198224c4c141b865a80dd985f30d4364b0076068",
+      "skips": 0,
+      "xml_sha256": "4495eb71529dde09b80d0577adf9523370f5e3b44eefd9be37702c34314444f2"
+    },
+    "focused-01": {
+      "cases": 17,
+      "errors": 0,
+      "failures": 2,
+      "log_sha256": "103d3c4992149949900ec9b786d0e95257a5149e7cdc79b88c0417799e875672",
+      "skips": 0,
+      "xml_sha256": "dc3cb8aa3b69d3d3ea5b49129769e573ea2050e0e5aa61cc678a69d83360b8ce"
+    },
+    "key-boundary-final": {
+      "cases": 1,
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "f9c9506451c8c246d741ba6f531e0c5616255ea5048df68bdc58562afc09939b",
+      "skips": 0,
+      "xml_sha256": "c5e4d29c5f6ae878edf844784ccf625a3b3a368d4680de03ab9c856b307072f5"
+    }
+  },
+  "kind": "ACTUAL_PARENT_CHILD_ENTRY_FUNCTIONS_AND_ENCRYPTED_SYNTHETIC_STATE_WITH_MOCKED_TRANSPORT_AND_DB_PROCESS_BOUNDARIES",
+  "live_source_or_database_or_Render_requests": 0,
+  "real_credentials_accessed": false,
+  "skips": 0,
+  "status": "25_UNIQUE_FOCUSED_FINAL_VERDICTS_PASS",
+  "unresolved_failures": 0
+}

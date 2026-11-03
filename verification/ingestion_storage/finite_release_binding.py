@@ -57,8 +57,8 @@ def build_v2(s,r,bound_at):
  owner.validate_binding(b,opening=True,now=bound_at);extra.validate_policy(b,policy,now=bound_at)
  return b,policy
 
-TIMING_ROOT=Path('/home/maxrose26/stage4-owner/b-reserve-date-successor-20261103-owner/release')
-TIMING_STATIC_SHA='3f34227266ecc0dfb7bc660b09b5d2725e38405c85b5ac16989a859dcf892a30'
+TIMING_ROOT=Path('/home/maxrose26/stage4-owner/b-preput-revoked-successor-20261103-owner/release')
+TIMING_STATIC_SHA='9ed888b90d88379327fa06d06891d80f51789b07b13dad5bb7ec6962109a584a'
 def use_timing_release():
  global ROOT,MINT_RESULT,STATIC_SHA,LAUNCHERS
  ROOT=TIMING_ROOT;STATIC_SHA=TIMING_STATIC_SHA;LAUNCHERS=TIMING_ROOT.parent
@@ -170,9 +170,9 @@ def owner_receipt(phase,b,bh):
 
 def next_command(*,now=None,expect=None):
  b,path,bh=frozen_binding(now=now,opening=False)
- seal=PRIVATE/'seal-evidence-01';marker=PRIVATE/'seal-01-consumed.json'
+ config=static();seal=Path(config.get('seal_evidence_path',str(PRIVATE/'seal-evidence-01')));marker=Path(config.get('seal_consumed_path',str(PRIVATE/'seal-01-consumed.json')));publication=Path(b['publication_vault_path'])
  if not seal.exists() and not seal.is_symlink():
-  check(not any(p.exists() or p.is_symlink() for p in [marker,PRIVATE/'publication-01.vault',PRIVATE/'publication-01.vault.next']),'PRIOR_PHASE_REQUIRES_REVIEW_NO_RETRY')
+  check(not any(p.exists() or p.is_symlink() for p in [marker,publication,Path(str(publication)+'.next')]),'PRIOR_PHASE_REQUIRES_REVIEW_NO_RETRY')
   phase='seal';args=['/bin/bash',str(LAUNCHERS/'RUN-SUCCESSOR-INACTIVE.sh'),'--phase',phase,'--successor-expired-unused','--authority',AUTHORITY_PATH,'--authority-sha256',AUTHORITY_RAW]
  else:
   v=private_json(seal/'result.json','PRIOR_PHASE_REQUIRES_REVIEW_NO_RETRY');c=v.get('owner_process',{})
@@ -207,7 +207,7 @@ def next_command(*,now=None,expect=None):
  try:
   if phase in ('seal','period','activate') or 'timing_policy' in b:owner.validate_binding(b,opening=True,now=time.time() if now is None else now)
  except BaseException:raise PreparationError('RELEASE_WINDOW_CLOSED') from None
- if 'timing_policy' in b and phase=='seal':args+=['--timing-v2','--reserve-v2']
+ if 'timing_policy' in b and phase=='seal':args+=['--timing-v2','--revoked-preput-successor' if static().get('mint_variant')=='revoked-preput-successor' else '--reserve-v2']
  if expect is not None:check(expect==phase,'PHASE_ORDER_REFUSED')
  return phase,shlex.join(args)
 

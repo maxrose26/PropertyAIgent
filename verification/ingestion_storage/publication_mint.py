@@ -39,7 +39,7 @@ REASONS = frozenset(('AUTHORITY','PRIVATE_PATH','PRIVATE_FILE','FILE_BOUND','FIL
     'EXISTING_ATTEMPT','KEY','KEY_FINGERPRINT','INSTALLATION','RESPONSE_BOUND','HTTP',
     'SCOPE','TOKEN','EXPIRY','CLOCK','DEADLINE','JOURNAL','RECEIPT','BINDING','WINDOW',
     'EXISTING_SEAL','SEAL','UNKNOWN','ARGUMENTS','TTY','APPROVAL','SECRET','CLEANUP',
-    'TRANSPORT_TIMEOUT','TRANSPORT_ERROR','LOCAL_REPLACEMENT','CORRECTED_REPLACEMENT','EXECUTION_DAY','MINT_DAY_MARGIN','SUCCESSOR_PRECONDITION','PREDECESSOR_NOT_EXPIRED','BINDING_MISSING_RUN_FREEZE','FROZEN_PROOF_REQUIRED','FROZEN_BINDING_MISMATCH','FROZEN_OBSERVATION_EXPIRED','FREEZE_INCOMPLETE','RELEASE_WINDOW_CLOSED','BINDING_ARGUMENT_MISMATCH','PREPARATION_UNKNOWN','MINT_RESULT_REQUIRED','RELEASE_CLOSED_EXPLICIT_REBIND_REQUIRED','TIMING_RELEASE_UNBOUND'))
+    'TRANSPORT_TIMEOUT','TRANSPORT_ERROR','LOCAL_REPLACEMENT','CORRECTED_REPLACEMENT','EXECUTION_DAY','MINT_DAY_MARGIN','SUCCESSOR_PRECONDITION','PREDECESSOR_NOT_EXPIRED','BINDING_MISSING_RUN_FREEZE','FROZEN_PROOF_REQUIRED','FROZEN_BINDING_MISMATCH','FROZEN_OBSERVATION_EXPIRED','FREEZE_INCOMPLETE','RELEASE_WINDOW_CLOSED','BINDING_ARGUMENT_MISMATCH','PREPARATION_UNKNOWN','MINT_RESULT_REQUIRED','RELEASE_CLOSED_EXPLICIT_REBIND_REQUIRED','TIMING_RELEASE_UNBOUND','CLOSED_PREDECESSOR','FRESH_STATE_KEY_REQUIRED'))
 
 class Refusal(Exception):
     pass
@@ -232,6 +232,10 @@ def corrected_replacement_preconditions(a,a_sha,vault_password=None,*,now=None):
              state['post_started'] is False,'CORRECTED_REPLACEMENT')
 
 
+REVOKED_PREPUT_MODE=False
+SEAL_MARKER='seal-01-consumed.json'
+SEAL_OUTPUT='seal-evidence-01'
+PUBLICATION_VAULT='publication-01.vault'
 SUCCESSOR_MARKER='mint-expired-unused-successor-01-consumed.json'
 SUCCESSOR_JOURNAL='mint-expired-unused-successor-01.vault'
 SUCCESSOR_OUTPUT='mint-evidence-expired-unused-successor-01'
@@ -256,6 +260,8 @@ SUCCESSOR_UNUSED_PHASES=('seal-evidence','period-evidence','activate-evidence','
 # One fixed extension after the exact accepted, expired-unused successor. No
 # arbitrary journal/path input and no erasure or reset of predecessor authority.
 def select_reserve_successor():
+    global REVOKED_PREPUT_MODE,SEAL_MARKER,SEAL_OUTPUT,PUBLICATION_VAULT
+    REVOKED_PREPUT_MODE=False;SEAL_MARKER='seal-01-consumed.json';SEAL_OUTPUT='seal-evidence-01';PUBLICATION_VAULT='publication-01.vault'
     global SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_OUTPUT,SUCCESSOR_CLOSURE,SUCCESSOR_CLOSURE_SHA
     global PREDECESSOR_EXPIRY,PREDECESSOR_RECEIPT,SUCCESSOR_PREDECESSOR_PROOFS
     global SUCCESSOR_UNUSED_RELEASE,SUCCESSOR_PREDECESSOR_JOURNAL,SUCCESSOR_ATTEMPT
@@ -276,7 +282,68 @@ def select_reserve_successor():
     }
     SUCCESSOR_UNUSED_RELEASE=Path('/home/maxrose26/stage4-owner/b-successor-release-20261103')
 
+
+# Fixed successor after token-specific revocation and a verified pre-PUT refusal.
+# No caller-supplied paths or authority; old journals/receipts are read-only.
+PREPUT_OLD_RELEASE=Path('/home/maxrose26/stage4-owner/b-reserve-date-successor-20261103-owner/release')
+PREPUT_OLD_JOURNAL='mint-reserve-v2-20261103-01.vault'
+PREPUT_OLD_PUBLICATION='publication-01.vault'
+PREPUT_OLD_ACCESS='b-20261103-tm-reserve01-access.vault'
+PREPUT_PUBLIC_PROOFS={'ABORTED-B-CLOSURE-REVIEW.json': '0409e981670f2b404e1cb2e78de6cc33239d22e0a215d868ef4687a2b090056b', 'FROZEN.json': '8092a1e0b5423fe4dda6ae8295f5d906853ce8a10fc389219d606c629348bc03', 'close-evidence/output.txt': '63e485e9a6fccf1f75e3eb20fe103074ffdae537f26821a17f2ae852148545b1', 'close-evidence/status.json': '9e852a3b186eddee2b03212448cc0019da7b06ac991d3851d433ee15d3a9cd5e', 'handoff-evidence/output.txt': '0fe7b0176550ed59f9319f19936f0c0e50ebd6f3b00bc78e83be6856c9b3d6ea', 'handoff-evidence/status.json': 'd196ad06a08ba6e378164113c85744505ecc531df3f8e06756e810c6743bd81a', 'owner-binding.json': 'f092073dadb7313fb31674102391603bde30fd177853548debf8c81ecb677383', 'period-policy.json': '3e5d15e5fcdd10078625fcd6c7f2bc8cacd0b916cea3973b8cce333d8c42f614', 'publication-revoke-evidence/output.txt': '2365fb78efc790e174600b75c679ead25e16a4f0ee216ed8bbbcc0c473fde739', 'publication-revoke-evidence/status.json': '8ba77d146e6711887c88a2d742fba6d0bf82a257553f696a81f90a8c570feb34'}
+PREPUT_PRIVATE_PROOFS={'b-20261103-tm-reserve01-access.vault': '0a9f781ebac4d1ecaba20701243af836cfb67ecc90cb4f22221256fd67ee1412', 'b-20261103-tm-reserve01-period.vault': 'eb724968a86f5650fb63610a9f686ee1f579776ce3dcae0565450895dd716d33', 'mint-evidence-reserve-v2-20261103-01/result.json': 'd36e2e148962b6804a715e6a3ddec252590a84dc385aadba500d97ae237aca2d', 'mint-reserve-v2-20261103-01-consumed.json': '2add0973ba02be77e15a3d9834391e74fc0d5d62c65a8e1055664b06ffef397e', 'mint-reserve-v2-20261103-01.vault': 'd3f1b57a7668c733939af7cf58ef8f4762cb144f45dcf0d5cbb2c33ac8a76598', 'publication-01.vault': 'eecba94a7fd1667c4c854801b6af6f0840fda9f551bf5851554082b21585aec3', 'publication-01.vault.revoke-consumed': 'c5bc96250897bee2abe77433c6bc6768f36ebd3397c4950ad6b6b3d6218ed444', 'seal-01-consumed.json': '543eec239d995138522593b2eacd40ed7a63fc1647db2f95dfcd8b5ac7382392', 'seal-evidence-01/result.json': 'a4ff7e52f278da8ad196c4d4385afba1fbc96dc9a1765bdf30841ad2b770e5e0'}
+
+def select_revoked_preput_successor():
+    global REVOKED_PREPUT_MODE,SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_OUTPUT,SUCCESSOR_ATTEMPT
+    global SUCCESSOR_CLOSURE,SUCCESSOR_CLOSURE_SHA,PREDECESSOR_RECEIPT,SEAL_MARKER,SEAL_OUTPUT,PUBLICATION_VAULT
+    REVOKED_PREPUT_MODE=True
+    SUCCESSOR_MARKER='mint-revoked-preput-successor-01-consumed.json'
+    SUCCESSOR_JOURNAL='mint-revoked-preput-successor-01.vault'
+    SUCCESSOR_OUTPUT='mint-evidence-revoked-preput-successor-01'
+    SUCCESSOR_ATTEMPT='ONE_B_MINT_AFTER_REVOKED_PREPUT_20261103_V1'
+    SUCCESSOR_CLOSURE=PREPUT_OLD_RELEASE/'ABORTED-B-CLOSURE-REVIEW.json'
+    SUCCESSOR_CLOSURE_SHA='0409e981670f2b404e1cb2e78de6cc33239d22e0a215d868ef4687a2b090056b'
+    PREDECESSOR_RECEIPT='e2c2c46cedf273a03b600b4b082eb2c7e8100e5d70b78039cf85709ad739d133'
+    SEAL_MARKER='seal-preput-successor-01-consumed.json'
+    SEAL_OUTPUT='seal-evidence-preput-successor-01'
+    PUBLICATION_VAULT='publication-preput-successor-01.vault'
+
+def revoked_preput_preconditions(a,a_sha,vault_password=None,*,now=None):
+    from zoneinfo import ZoneInfo
+    from . import finite_release_binding as flow
+    directory();validate_authority(a)
+    need(a==load_file(CORRECTED_AUTHORITY,CORRECTED_RAW_SHA) and a_sha==CORRECTED_A_SHA==digest(canonical(a)),'CLOSED_PREDECESSOR')
+    for name,h in PREPUT_PUBLIC_PROOFS.items():need(digest(private_read(PREPUT_OLD_RELEASE/name,32768))==h,'CLOSED_PREDECESSOR')
+    for name,h in PREPUT_PRIVATE_PROOFS.items():need(digest(private_read(ROOT/name,32768))==h,'CLOSED_PREDECESSOR')
+    closure=load_file(SUCCESSOR_CLOSURE,SUCCESSOR_CLOSURE_SHA);old=load_file(PREPUT_OLD_RELEASE/'owner-binding.json',PREPUT_PUBLIC_PROOFS['owner-binding.json'])
+    need(closure.get('status')=='B_NOT_SUBMITTED_CONTAINMENT_ACKNOWLEDGED' and closure.get('receipt')==PREDECESSOR_RECEIPT and
+         closure.get('environment_write',{}).get('put_intent_reached') is False and closure['environment_write'].get('put_reached') is False and
+         closure.get('submission',{}).get('local_intent_exists') is False and closure['submission'].get('job_submitted_by_reviewed_route') is False,'CLOSED_PREDECESSOR')
+    closed=parse(private_read(PREPUT_OLD_RELEASE/'close-evidence/output.txt',4096));revoked=parse(private_read(PREPUT_OLD_RELEASE/'publication-revoke-evidence/output.txt',4096));failed=parse(private_read(PREPUT_OLD_RELEASE/'handoff-evidence/output.txt',4096))
+    need(closed.get('outcome')=='COMMIT_ACKNOWLEDGED' and closed.get('runtime_access')=='DISABLED' and closed.get('sessions')=='ABSENT' and closed.get('temporary_owner')=='REMOVED' and closed.get('authorities')==[] and closed.get('intake_run_state') is None and closed.get('open_run_requires_reconciliation') is False and closed.get('stop_preserved')==owner.ACCEPTED_STOP,'CLOSED_PREDECESSOR')
+    need(revoked==dict(status='PUBLICATION_TOKEN_REVOCATION_ACKNOWLEDGED',calls=1,retry=False,database_required=False,restoration_required=False) and failed.get('failure_reason')=='EXACT_RENDER_PROFILE_FIELDS_AND_LIMITS','CLOSED_PREDECESSOR')
+    for phase,code in [('close',0),('publication-revoke',0),('handoff',2)]:
+        result=parse(private_read(PREPUT_OLD_RELEASE/(phase+'-evidence/status.json'),4096))
+        need(result.get('client_closed') is True and result.get('exit_code')==code and result.get('reason') is None and result.get('binding_sha256')==PREPUT_PUBLIC_PROOFS['owner-binding.json'],'CLOSED_PREDECESSOR')
+    need(not any(p.exists() or p.is_symlink() for p in (PREPUT_OLD_RELEASE/'submission.intent.json',PREPUT_OLD_RELEASE/'submission-check-evidence')),'CLOSED_PREDECESSOR')
+    flow.use_timing_release();s=flow.static();stamp=time.time() if now is None else now;local=datetime.fromtimestamp(stamp,ZoneInfo('Europe/London'))
+    need(local.date().isoformat()==s.get('execution_day')=='2026-11-03' and s.get('window')==dict(start='2026-10-27',end='2026-11-02',inclusive=True,tameside='RECEIVED',manchester='VALIDATED'),'EXECUTION_DAY')
+    need((datetime(2026,11,4,tzinfo=ZoneInfo('Europe/London'))-local).total_seconds()>3065,'MINT_DAY_MARGIN')
+    need(s.get('mint_authority')==dict(attempt=SUCCESSOR_ATTEMPT,predecessor_closure_sha256=SUCCESSOR_CLOSURE_SHA,predecessor_receipt_sha256=PREDECESSOR_RECEIPT,max_mint_posts=1,approved_for_execution=False) and s.get('mint_journal_path')==str(ROOT/SUCCESSOR_JOURNAL) and s.get('mint_result_path')==str(ROOT/SUCCESSOR_OUTPUT/'result.json') and s.get('seal_evidence_path')==str(ROOT/SEAL_OUTPUT) and s.get('seal_consumed_path')==str(ROOT/SEAL_MARKER) and s['binding_fields']['publication_vault_path']==str(ROOT/PUBLICATION_VAULT),'CLOSED_PREDECESSOR')
+    # The parent exclusively reserves SUCCESSOR_OUTPUT before child startup;
+    # it checks absence both before credentials and before mkdir. The child
+    # consumes the separate fixed mint marker before any provider effect.
+    for name in [SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_JOURNAL+'.next',SEAL_MARKER,SEAL_OUTPUT,PUBLICATION_VAULT,PUBLICATION_VAULT+'.next',PUBLICATION_VAULT+'.revoke-consumed']:need(not exists(name),'EXISTING_ATTEMPT')
+    for name in (*SUCCESSOR_UNUSED_PHASES,'owner-binding.json','period-policy.json','FROZEN.json','ACTUAL-MINT-REVIEW.json','handoff-observation.json','submission-observation.json','submission-check-evidence'):
+        p=flow.ROOT/name;need(not p.exists() and not p.is_symlink(),'EXISTING_ATTEMPT')
+    for value in [s['access_vault'],s['binding_fields']['period_vault_path']]:
+        p=Path(value);need(not p.exists() and not p.is_symlink() and not Path(str(p)+'.next').exists() and not Path(str(p)+'.next').is_symlink(),'EXISTING_ATTEMPT')
+    if vault_password is not None:
+        mint_state=Vault(ROOT/PREPUT_OLD_JOURNAL,vault_password).load();pub=Vault(ROOT/PREPUT_OLD_PUBLICATION,vault_password).load();access=Vault(ROOT/PREPUT_OLD_ACCESS,vault_password).load()
+        need(old.get('publication_mint',{}).get('receipt_sha256')==PREDECESSOR_RECEIPT and mint_state.get('state')=='SEALED_ACKNOWLEDGED' and mint_state.get('binding')==old and mint_state.get('receipt_sha256')==PREDECESSOR_RECEIPT and mint_state.get('authority')==a and mint_state.get('authority_sha256')==a_sha and 'token_candidate' not in mint_state and digest(canonical(mint_state.get('receipt')))==PREDECESSOR_RECEIPT,'CLOSED_PREDECESSOR')
+        need(pub.get('state')=='REVOKED_ACKNOWLEDGED' and pub.get('token')=='' and pub.get('binding')==old and access.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED' and access.get('passwords')=={} and access.get('binding')==old and 'render' not in access,'CLOSED_PREDECESSOR')
+
 def successor_preconditions(a,a_sha,vault_password=None,*,now=None):
+    if REVOKED_PREPUT_MODE:return revoked_preput_preconditions(a,a_sha,vault_password,now=now)
     from zoneinfo import ZoneInfo
     stamp=time.time() if now is None else now
     need(stamp>PREDECESSOR_EXPIRY,'PREDECESSOR_NOT_EXPIRED')
@@ -327,18 +394,19 @@ def mint_journal(a_sha,*,successor=False):
     return SUCCESSOR_JOURNAL if successor else CORRECTED_JOURNAL if a_sha==CORRECTED_A_SHA else 'mint-01.vault'
 
 
-def mint(a,a_sha,password,vault_password,*,transport_factory=Transport,clock=time.time,corrected_replacement=False,successor=False):
+def mint(a,a_sha,password,vault_password,*,transport_factory=Transport,clock=time.time,corrected_replacement=False,successor=False,predecessor_vault_password=None):
     """All errors return fixed diagnostics; POST entry is conservatively uncertain."""
     post=False;minted=False;journal=None;state=None;transport=None;prior=False
     try:
         directory();validate_authority(a);need(digest(canonical(a))==a_sha,'AUTHORITY')
         need(not(corrected_replacement and successor),'ARGUMENTS')
-        keys=(SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_JOURNAL+'.next','seal-01-consumed.json','publication-01.vault')
+        keys=(SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_JOURNAL+'.next',SEAL_MARKER,PUBLICATION_VAULT)
         if not successor:keys+=(CORRECTED_MARKER,CORRECTED_JOURNAL,CORRECTED_JOURNAL+'.next')
         if not corrected_replacement and not successor:keys+=('mint-01-consumed.json','mint-01.vault')
         prior=any(exists(n) for n in keys)
         need(not prior,'EXISTING_ATTEMPT')
-        if successor:successor_preconditions(a,a_sha,vault_password,now=clock())
+        if REVOKED_PREPUT_MODE:need(type(predecessor_vault_password) is str and 24<=len(predecessor_vault_password)<=1024 and type(vault_password) is str and 24<=len(vault_password)<=1024 and predecessor_vault_password!=vault_password,'FRESH_STATE_KEY_REQUIRED')
+        if successor:successor_preconditions(a,a_sha,predecessor_vault_password if REVOKED_PREPUT_MODE else vault_password,now=clock())
         elif corrected_replacement:corrected_replacement_preconditions(a,a_sha,vault_password,now=clock())
         else:need(a_sha!=CORRECTED_A_SHA,'CORRECTED_REPLACEMENT')
         marker=SUCCESSOR_MARKER if successor else CORRECTED_MARKER if corrected_replacement else 'mint-01-consumed.json'
@@ -397,18 +465,18 @@ def seal(a,a_sha,b,vault_password,*,clock=time.time,successor=False):
         directory();validate_authority(a);need(digest(canonical(a))==a_sha,'AUTHORITY')
         need(not successor or a_sha==CORRECTED_A_SHA,'AUTHORITY')
         journal_path=Path(b['publication_mint_journal_path']) if 'timing_policy' in b else ROOT/mint_journal(a_sha,successor=successor)
-        need(journal_path.parent==ROOT and journal_path.suffix=='.vault' and journal_path!=ROOT/'publication-01.vault','BINDING')
+        need(journal_path.parent==ROOT and journal_path.suffix=='.vault' and journal_path!=ROOT/PUBLICATION_VAULT,'BINDING')
         journal=Vault(journal_path,vault_password);state=journal.load()
         need(state.get('version')=='ONE_B_MINT_V1' and state.get('authority')==a and state.get('authority_sha256')==a_sha and state.get('state')=='RECEIPT_VALIDATED_NOT_ARMED','RECEIPT')
         r=state['receipt'];need(state.get('receipt_sha256')==digest(canonical(r)) and r.get('authority_sha256')==a_sha,'RECEIPT')
         meta=dict(authority_sha256=a_sha,receipt_sha256=state['receipt_sha256'],expires_at=r['expiry'])
-        need(b.get('publication_mint')==meta and b.get('publication_valid_until')==r['expiry'] and (b.get('valid_until')<=r['expiry'] if 'timing_policy' in b else b.get('valid_until')==r['expiry']) and b.get('publication_scope')==dict(repository=REPOSITORY,**PERMISSIONS) and b.get('publication_vault_path')==str(ROOT/'publication-01.vault'),'BINDING')
+        need(b.get('publication_mint')==meta and b.get('publication_valid_until')==r['expiry'] and (b.get('valid_until')<=r['expiry'] if 'timing_policy' in b else b.get('valid_until')==r['expiry']) and b.get('publication_scope')==dict(repository=REPOSITORY,**PERMISSIONS) and b.get('publication_vault_path')==str(ROOT/PUBLICATION_VAULT),'BINDING')
         owner.validate_binding(b,opening=True,now=clock())
         need(installation_token_allowed(state.get('token_candidate')),'TOKEN')
-        need(not any(exists(n) for n in ('seal-01-consumed.json','publication-01.vault','publication-01.vault.revoke-consumed')),'EXISTING_SEAL')
-        exclusive('seal-01-consumed.json',dict(attempt=ATTEMPT,authority_sha256=a_sha,binding_sha256=digest(canonical(b)),receipt_sha256=state['receipt_sha256'],retry=False));begun=True
+        need(not any(exists(n) for n in (SEAL_MARKER,PUBLICATION_VAULT,PUBLICATION_VAULT+'.revoke-consumed')),'EXISTING_SEAL')
+        exclusive(SEAL_MARKER,dict(attempt=ATTEMPT,authority_sha256=a_sha,binding_sha256=digest(canonical(b)),receipt_sha256=state['receipt_sha256'],retry=False));begun=True
         state['state']='SEAL_INTENT_NO_RETRY';journal.save(state)
-        target=Vault(ROOT/'publication-01.vault',vault_password,create=True)
+        target=Vault(ROOT/PUBLICATION_VAULT,vault_password,create=True)
         token_arm(b,state['token_candidate'],target.save)
         need(token_load(b,target.load())==state['token_candidate'],'SEAL')
         state.update(state='SEALED_ACKNOWLEDGED',binding=b);state.pop('token_candidate',None);journal.save(state)
@@ -480,9 +548,12 @@ def main(argv=None):
         parser.add_argument('--replace-issuer-refusal',action='store_true')
         parser.add_argument('--successor-expired-unused',action='store_true')
         parser.add_argument('--child',action='store_true');parser.add_argument('--secrets-fd',type=int)
-        parser.add_argument('--reserve-v2',action='store_true');parser.add_argument('--launch',action='store_true');parser.add_argument('--continue-owner-session',action='store_true');parser.add_argument('--timing-v2',action='store_true')
+        parser.add_argument('--revoked-preput-successor',action='store_true');parser.add_argument('--reserve-v2',action='store_true');parser.add_argument('--launch',action='store_true');parser.add_argument('--continue-owner-session',action='store_true');parser.add_argument('--timing-v2',action='store_true')
         parser.error=lambda _: (_ for _ in ()).throw(Refusal('ARGUMENTS'))
         args=parser.parse_args(argv)
+        predecessor_password=None
+        if args.revoked_preput_successor:
+            need(args.successor_expired_unused and args.timing_v2 and not args.reserve_v2,'ARGUMENTS');select_revoked_preput_successor()
         if args.reserve_v2:
             need(args.successor_expired_unused and args.timing_v2,'ARGUMENTS');select_reserve_successor()
         if args.launch:
@@ -527,21 +598,33 @@ def main(argv=None):
             need(type(args.secrets_fd) is int and args.secrets_fd>2,'ARGUMENTS')
             try:secret=parse(os.read(args.secrets_fd,4096))
             finally:os.close(args.secrets_fd)
-            need(type(secret) is dict and set(secret)=={'vault_password','key_password'},'SECRET')
+            need(type(secret) is dict and set(secret)==({'vault_password','key_password','predecessor_vault_password'} if args.revoked_preput_successor and args.phase=='mint' else {'vault_password','key_password'}),'SECRET')
+            if args.revoked_preput_successor and args.phase=='mint':need(type(secret['predecessor_vault_password']) is str and 24<=len(secret['predecessor_vault_password'])<=1024,'SECRET')
             need(type(secret['vault_password']) is str and 24<=len(secret['vault_password'])<=1024,'SECRET')
             if args.phase=='mint':need(type(secret['key_password']) is str and 0<len(secret['key_password'])<=1024,'SECRET')
             else:need(secret['key_password'] is None,'SECRET')
             with envelope():
-                result=mint(a,a_sha,secret['key_password'],secret['vault_password'],**({'successor':True} if args.successor_expired_unused else {'corrected_replacement':True} if args.replace_issuer_refusal else {})) if args.phase=='mint' else seal(a,a_sha,b,secret['vault_password'],**({'successor':True} if args.successor_expired_unused else {}))
+                result=mint(a,a_sha,secret['key_password'],secret['vault_password'],**({'successor':True,'predecessor_vault_password':secret['predecessor_vault_password']} if args.revoked_preput_successor else {'successor':True} if args.successor_expired_unused else {'corrected_replacement':True} if args.replace_issuer_refusal else {})) if args.phase=='mint' else seal(a,a_sha,b,secret['vault_password'],**({'successor':True} if args.successor_expired_unused else {}))
         else:
             need(args.secrets_fd is None,'ARGUMENTS')
             need(sys.stdin.isatty() and sys.stderr.isatty(),'TTY')
-            phrase='EXECUTE_ONE_RESERVE_V2_20261103_MINT' if args.reserve_v2 and args.phase=='mint' else 'EXECUTE_ONE_SUCCESSOR_AFTER_EXPIRED_UNUSED_MINT' if args.successor_expired_unused and args.phase=='mint' else 'EXECUTE_ONE_CORRECTED_ISSUER_B_PUBLICATION_TOKEN_MINT' if args.replace_issuer_refusal else 'EXECUTE_ONE_B_PUBLICATION_TOKEN_MINT' if args.phase=='mint' else 'SEAL_EXACT_B_PUBLICATION_TOKEN_ONCE'
+            phrase='EXECUTE_ONE_REVOKED_PREPUT_SUCCESSOR_MINT' if args.revoked_preput_successor and args.phase=='mint' else 'EXECUTE_ONE_RESERVE_V2_20261103_MINT' if args.reserve_v2 and args.phase=='mint' else 'EXECUTE_ONE_SUCCESSOR_AFTER_EXPIRED_UNUSED_MINT' if args.successor_expired_unused and args.phase=='mint' else 'EXECUTE_ONE_CORRECTED_ISSUER_B_PUBLICATION_TOKEN_MINT' if args.replace_issuer_refusal else 'EXECUTE_ONE_B_PUBLICATION_TOKEN_MINT' if args.phase=='mint' else 'SEAL_EXACT_B_PUBLICATION_TOKEN_ONCE'
             need(input('Approved phrase ('+phrase+'): ').strip()==phrase,'APPROVAL')
             from . import intake_owner_client as client
-            destination=ROOT/(SUCCESSOR_OUTPUT if args.successor_expired_unused and args.phase=='mint' else CORRECTED_OUTPUT if args.replace_issuer_refusal else REPLACEMENT_OUTPUT if args.replace_local_refusal else args.phase+'-evidence-01')
+            destination=ROOT/(SUCCESSOR_OUTPUT if args.successor_expired_unused and args.phase=='mint' else CORRECTED_OUTPUT if args.replace_issuer_refusal else REPLACEMENT_OUTPUT if args.replace_local_refusal else SEAL_OUTPUT if args.phase=='seal' else args.phase+'-evidence-01')
             need(not destination.exists() and not destination.is_symlink(),'EXISTING_ATTEMPT')
-            if args.phase=='mint' and args.successor_expired_unused:
+            if args.phase=='mint' and args.revoked_preput_successor:
+                print('Retrieve the PREDECESSOR B-state Vault passphrase only to verify its closed journals; it is not the new state key.',file=sys.stderr)
+                predecessor_password=client.vault_input(ROOT/PREPUT_OLD_ACCESS)
+                successor_preconditions(a,a_sha,predecessor_password)
+                while True:
+                    print('Choose a FRESH successor B-state Vault passphrase; old journals and keys are not reset or re-encrypted.',file=sys.stderr)
+                    password=client.private_input('NEW B-state Vault passphrase (hidden, >=24 characters): ',minimum=24,confirm=True)
+                    if password!=predecessor_password:break
+                    print('The successor-state passphrase must differ from the predecessor passphrase.',file=sys.stderr)
+                print('Retrieve PropertyAIgent — GitHub signing-key passphrase for the same encrypted key.',file=sys.stderr)
+                key_password=client.private_input('PropertyAIgent — GitHub signing-key passphrase (hidden): ',validator=lambda value:key_unlock(a,value),unlock_code='KEY')
+            elif args.phase=='mint' and args.successor_expired_unused:
                 password=client.vault_input(ROOT/SUCCESSOR_PREDECESSOR_JOURNAL)
                 successor_preconditions(a,a_sha,password)
                 print('Retrieve PropertyAIgent — GitHub signing-key passphrase; same existing encrypted key.',file=sys.stderr)
@@ -565,9 +648,9 @@ def main(argv=None):
             # any recognised local correction above.
             if args.replace_local_refusal:replacement_preconditions()
             if args.replace_issuer_refusal:corrected_replacement_preconditions(a,a_sha,password)
-            if args.successor_expired_unused and args.phase=='mint':successor_preconditions(a,a_sha,password)
+            if args.successor_expired_unused and args.phase=='mint':successor_preconditions(a,a_sha,predecessor_password if args.revoked_preput_successor else password)
             need(not destination.exists() and not destination.is_symlink(),'EXISTING_ATTEMPT')
-            secrets_raw=canonical(dict(vault_password=password,key_password=key_password))
+            secrets_raw=canonical(dict(vault_password=password,key_password=key_password,**({'predecessor_vault_password':predecessor_password} if args.revoked_preput_successor and args.phase=='mint' else {})))
             need(len(secrets_raw)<=4000,'SECRET')
             destination.mkdir(mode=0o700);output=destination
             from .intake_owner_client import capture
@@ -580,6 +663,7 @@ def main(argv=None):
                 if args.successor_expired_unused:command+=['--successor-expired-unused']
                 if args.timing_v2:command+=['--timing-v2']
                 if args.reserve_v2:command+=['--reserve-v2']
+                if args.revoked_preput_successor:command+=['--revoked-preput-successor']
                 if b is not None:command+=['--binding',str(Path(args.binding).absolute()),'--binding-sha256',args.binding_sha256]
                 data,c=capture(command,dict(HOME=str(Path.home()),PATH='/usr/bin:/bin',LANG='C.UTF-8',PYTHONDONTWRITEBYTECODE='1',OPENBLAS_NUM_THREADS='1'),seconds=60,ceiling=4096,pass_fds=(readfd,))
             finally:
@@ -606,7 +690,7 @@ def main(argv=None):
             raw=canonical(failure('JOURNAL','NOT_INFERRED_RECONCILE'));result=parse(raw)
     print(raw.decode().strip())
     if result['status']=='MINT_RECEIPT_VALIDATED_NOT_ARMED' and args.continue_owner_session:
-        key_password=None;secrets_raw=None  # Drop references; not guaranteed erasure.
+        key_password=None;secrets_raw=None;predecessor_password=None  # Drop references; not guaranteed erasure.
         from .intake_owner_client import attended_session
         try:return attended_session(vault_password=password)
         except BaseException as exc:

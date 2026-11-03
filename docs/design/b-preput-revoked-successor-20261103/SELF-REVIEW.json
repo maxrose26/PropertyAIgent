@@ -1,0 +1,48 @@
+{
+  "closed_predecessor_sha256": "0409e981670f2b404e1cb2e78de6cc33239d22e0a215d868ef4687a2b090056b",
+  "fields_bound": [
+    "exact raw corrected authority and canonical authority",
+    "public mint/seal/handoff/close/revocation/freeze proofs and encrypted predecessor file hashes",
+    "authenticated SEALED mint journal, REVOKED token vault with empty token, DATABASE_CLOSURE access state with empty passwords/no render intent",
+    "explicit current-day/window, new period, mint/seal/publication/period/access paths and fixed attempt identifier"
+  ],
+  "findings_resolved": [
+    {
+      "finding": "Parent reserves evidence directory before child; child initially rejected that reservation",
+      "fix": "Keep exclusive output-dir checks/mkdir in parent; child consumes separate fixed mint-intent key before provider. Existing-dir public invocation test refuses before hidden input; no uncertain POST retry."
+    },
+    {
+      "finding": "Direct new-key validation allowed missing new value to reach Vault creation",
+      "fix": "Bounded old/new string length and inequality validation before intent; explicit fixed reason code, None/equal cases tested."
+    },
+    {
+      "finding": "Existing period/access parent authentication still pointed to mint-01.vault",
+      "fix": "Optional internal authentication_path from the current hash-bound publication_mint_journal_path for timing-mode create phases; legacy default unchanged. Fresh key end-to-end test covers it."
+    },
+    {
+      "finding": "Dangling prior-state symlinks must count as occupied/uncertain",
+      "fix": "Reject old submission and new vault.next symlinks; focused checks added."
+    }
+  ],
+  "fresh_state_key": "Predecessor key is read-only verification input. A distinct new Vault passphrase encrypts successor state; existing files/keys are not reset or re-encrypted.",
+  "label": "SELF-REVIEW_NOT_INDEPENDENT_REVIEW",
+  "limitations": [
+    "Mocked DB activation/authentication/closure and provider outcomes are not live/native validation",
+    "New owner input step for a fresh state passphrase is required; no key guessing or reuse of a visibly exposed value",
+    "No secure memory-erasure guarantee; old/signing passphrase references are discarded before attended continuation",
+    "Another execution date requires explicit rebinding; no silent rollover",
+    "No token or B execution authority is conferred by preparation"
+  ],
+  "no_expiry_substitution": "revocation acknowledgement is required; no inference that expiry revoked a token or removed installation",
+  "preserved": [
+    "App/install/repository/scope",
+    "source qualification/reader/parser/budgets",
+    "frozen db05f5d artifact and consumed build allowance",
+    "D=T+2100, P=D-185, actual E, strict submission margin",
+    "operation-specific freshness, transaction-time guards and generation5",
+    "restricted roles/SQL/temp-permission lifecycle",
+    "one POST, one job, no retry, independent close/revoke/restore",
+    "all consumed historical records"
+  ],
+  "scope": "one fixed successor after token-revoked/pre-PUT-refused closed predecessor"
+}

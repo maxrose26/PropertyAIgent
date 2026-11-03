@@ -317,11 +317,11 @@ def vault_unlock(path, password):
     return True
 
 
-def vault_input(path, *, create=False, mint_bound=False):
+def vault_input(path, *, create=False, mint_bound=False, authentication_path=None):
     # Authenticate the common passphrase against the existing mint Vault for
     # new access/period vaults. No additional persistence or confirmation needed.
     from . import publication_mint as mint
-    authentication_path=mint.ROOT/'mint-01.vault' if mint_bound and create else path
+    authentication_path=(authentication_path if authentication_path is not None else mint.ROOT/'mint-01.vault') if mint_bound and create else path
     validate=None if create and not mint_bound else lambda password: vault_unlock(authentication_path,password)
     print('Retrieve the B-state Vault passphrase. This is distinct from the PREBUILD baseline and signing-key passphrases.',file=sys.stderr)
     return private_input('B-state Vault passphrase (hidden, >=24 characters): ',minimum=24,
@@ -507,7 +507,8 @@ def _main(argv, context):
     secret={}
     if vault:
         secret['vault_key']=vault_input(vault,create=phase in ('activate','period','publication-arm'),
-                                        mint_bound='publication_mint' in b)
+                                        mint_bound='publication_mint' in b,
+                                        authentication_path=Path(b['publication_mint_journal_path']) if phase in ('activate','period') and 'timing_policy' in b else None)
     if phase in ('activate','close','stop-disposition','readback','period'):
         print('Retrieve PropertyAIgent — Supabase postgres password for the existing owner connection; local format checks do not prove server authentication.',file=sys.stderr)
         secret['owner_password']=private_input('PropertyAIgent — Supabase postgres password (hidden): ')
