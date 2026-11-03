@@ -369,7 +369,7 @@ class Runtime:
                 if database:result['evidence']='READBACK_VERIFIED'
                 if self.authorities and result['status'] in ('RETAINED_AND_SCREENED','INCOMPLETE'):
                     path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
-                    if self.test:
+                    if self.test and not database:
                         dest=Path(self.args.disposable_archive)/(self.run_id+'-final.json')
                         dest.write_bytes(raw)
                         if dest.read_bytes()!=raw:raise Denied('FINAL_ARCHIVE_READBACK')
