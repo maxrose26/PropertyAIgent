@@ -15,6 +15,7 @@ def evidence_world(world):
  with world['connect']('provisioning_migrator') as c:c.execute(v3.CEREMONY_OPEN+definition_sql()+v3.CEREMONY_CLOSE)
  yield world
  world['boot'].execute('REVOKE EXECUTE ON FUNCTION ingestion_intake_evidence_read(text,text,text) FROM postgres')
+ world['boot'].execute('REVOKE EXECUTE ON FUNCTION ingestion_intake_owner_state(text,text,text,bytea) FROM postgres')
  world['boot'].execute('DROP ROLE postgres')
 
 def seed(w):
@@ -81,7 +82,7 @@ def test_pg17_missing_evidence_cannot_finalise(evidence_world):
 def test_pg17_actual_daily_command_database_audits_screens_backlog_no_github(evidence_world,tmp_path,monkeypatch,record_property):
  from tests.test_tameside_b_connection import connected_source,COUNTED_CONTRACT,QUAL
  w=evidence_world;reset(w);w['boot'].execute('DELETE FROM ingestion_run_evidence')
- p=policy(w);p.update(evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1)
+ p=policy(w);d=time.time()+2090;p.update(evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1,access_deadline=d,expires_at=d-185)
  p['councils']['tameside']=dict(contract=COUNTED_CONTRACT,qualification_sha256=QUAL);name='db-evidence-connected';authorise(w,name,p)
  env,sources=env_and_sources(w,tmp_path)
  row=dict(council='tameside',semantics='RECEIVED',start='2026-10-27',end='2026-11-02');d=tmp_path/'source-fixture';d.mkdir();audit,calls=connected_source(d,monkeypatch,row)
@@ -96,3 +97,13 @@ def test_pg17_actual_daily_command_database_audits_screens_backlog_no_github(evi
  assert not (tmp_path/'unused-local-archive').exists()
  assert w['boot'].execute("SELECT outcome::jsonb->'intake_run'->>'state' FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()==('VERIFIED',)
  record_property('server_version',w['server_version']);record_property('records',10);record_property('evidence_rows',4);record_property('source_transport','SYNTHETIC_ONLY')
+
+def test_pg17_queued_start_without_full_reserve_refuses_before_source(evidence_world,tmp_path):
+ w=evidence_world;reset(w);w['boot'].execute('DELETE FROM ingestion_run_evidence')
+ p=policy(w);d=time.time()+1490;p.update(evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1,access_deadline=d,expires_at=d-185)
+ name='db-queue-reserve';authorise(w,name,p);env,sources=env_and_sources(w,tmp_path);out=tmp_path/'result'
+ run=subprocess.run([sys.executable,'-B','-m','scripts.run_daily_councils','--period',name,'--output',str(out),'--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')],env=env,capture_output=True,text=True,timeout=30)
+ result=json.loads((out/'final-result.json').read_bytes())
+ assert run.returncode!=0 and result['status']=='STOP_RECONCILE_NO_RETRY' and result['usage']['requests']==0 and result['scopes']==[]
+ assert result['authority_closure']=='NOT_ISSUED' and result['usage']['all_connections_closed']
+ assert w['boot'].execute('SELECT count(*) FROM ingestion_run_evidence').fetchone()==(0,)

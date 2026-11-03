@@ -33,17 +33,21 @@ def private_path(b, key, path):
 
 def validate_policy(b, policy, *, now=None):
     op.validate_binding(b, opening=True, now=now)
-    op.require(type(policy) is dict and set(policy) == {'expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr','route','render_profile'}, 'PERIOD_EXACT_POLICY')
+    database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
+    extra={'evidence_backend','fixed_window','access_deadline'} if database else set()
+    op.require(type(policy) is dict and set(policy) == {'expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr','route','render_profile'}|extra, 'PERIOD_EXACT_POLICY')
     op.require(hashlib.sha256(canonical(policy)).hexdigest() == b.get('period_policy_sha256'), 'PERIOD_POLICY_HASH')
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
-    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == op.APPLICATION_BINDING and policy['expected_stop'] == op.ACCEPTED_STOP, 'PERIOD_REVIEWED_BINDINGS')
-    op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and policy['expires_at'] <= b.get('publication_valid_until',0), 'PERIOD_ROUTE_EXPIRY')
+    application=op.reviewed_application_binding() if database else op.APPLICATION_BINDING
+    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.ACCEPTED_STOP, 'PERIOD_REVIEWED_BINDINGS')
+    op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and (database or policy['expires_at'] <= b.get('publication_valid_until',0)), 'PERIOD_ROUTE_EXPIRY')
+    if database:op.require(policy['evidence_backend']==b['evidence_backend'] and policy['fixed_window']==b['fixed_window'] and policy['access_deadline']==b['valid_until'] and policy['expires_at']==b['valid_until']-185,'PERIOD_DATABASE_FIXED_DEADLINES')
     if 'timing_policy' in b:
         target=b['runtime_deadline'] if b['timing_policy']['version']=='SEPARATE_EXPIRY_V2_RESERVE' else b['valid_until']
         op.require(policy['expires_at']==target,'PERIOD_FIXED_DEADLINE')
     profile=policy['render_profile']
     fields={'mode','service_id','revision','browser_path','browser_sha256','aggregate_bytes','source_rss_bytes','controller_rss_bytes','reserve_bytes','source_seconds'}
-    op.require(type(profile) is dict and set(profile)==fields and profile==b.get('render_profile') and profile['mode']=='render-intake-v1' and profile['service_id']=='crn-d9sv93vavr4c73f98rb0' and profile['revision']==op.APPLICATION_BINDING['revision'], 'PERIOD_PROFILE')
+    op.require(type(profile) is dict and set(profile)==fields and profile==b.get('render_profile') and profile['mode']=='render-intake-v1' and profile['service_id']=='crn-d9sv93vavr4c73f98rb0' and profile['revision']==application['revision'], 'PERIOD_PROFILE')
     op.require(type(profile['browser_path']) is str and Path(profile['browser_path']).is_absolute() and '..' not in Path(profile['browser_path']).parts and re.fullmatch('[a-f0-9]{64}',profile['browser_sha256']) and all(type(profile[k]) is int for k in ('aggregate_bytes','source_rss_bytes','controller_rss_bytes','reserve_bytes','source_seconds')) and 1879048192<=profile['aggregate_bytes']<=2147483648 and (profile['source_rss_bytes'],profile['controller_rss_bytes'],profile['reserve_bytes'],profile['source_seconds'])==(1073741824,268435456,536870912,75), 'PERIOD_PROFILE')
     return policy
 

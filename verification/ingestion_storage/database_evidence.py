@@ -29,7 +29,7 @@ TABLE_SQL=r'''
 CREATE TABLE public.ingestion_run_evidence (
  period text NOT NULL CHECK (period ~ '^[A-Za-z0-9_-]{1,60}$'),
  run_id text NOT NULL CHECK (run_id ~ '^[a-f0-9]{32}$'),
- name text NOT NULL CHECK (name IN ('capture-1/source.json','capture-2/source.json','final/result-before-publication.json','final/events-before-publication.json')),
+ name text NOT NULL CHECK (name IN ('capture-1/source.json','capture-2/source.json','final/result-before-publication.json','final/events-before-publication.json') OR name ~ '^owner/state-[0-9]{3}$'),
  body bytea NOT NULL CHECK (octet_length(body)>0 AND octet_length(body)<=2097152),
  sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$' AND sha256=encode(sha256(body),'hex')),
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -110,7 +110,35 @@ REVOKE ALL ON FUNCTION public.ingestion_intake_evidence_read(text,text,text) FRO
 GRANT EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(text,text,text) TO ingestion_worker,postgres;
 '''
 
-def definition_sql():return TABLE_SQL+WRITE_SQL+READ_SQL
+OWNER_SQL=r'''
+CREATE FUNCTION public.ingestion_intake_owner_state(p_period text,p_run text,p_previous text,p_body bytea)
+RETURNS TABLE(ordinal integer,body bytea,sha256 text) LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $owner_state$
+DECLARE prior public.ingestion_run_evidence%ROWTYPE; n integer; h text;
+BEGIN
+ IF session_user<>'postgres' THEN RAISE EXCEPTION 'OWNER_STATE_OWNER_ONLY' USING ERRCODE='42501'; END IF;
+ IF p_period<>'b-dbpilot-20261027-1102-01_owner' OR p_run<>substr(encode(sha256(convert_to(p_period,'UTF8')),'hex'),1,32) THEN RAISE EXCEPTION 'OWNER_STATE_EXACT_PILOT'; END IF;
+ PERFORM 1 FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
+ SELECT * INTO prior FROM public.ingestion_run_evidence d WHERE d.period=p_period AND d.run_id=p_run AND d.name LIKE 'owner/state-%' ORDER BY d.name DESC LIMIT 1;
+ IF p_body IS NULL THEN
+  IF prior.name IS NOT NULL THEN RETURN QUERY SELECT substring(prior.name from 13)::integer,prior.body,prior.sha256; END IF;
+  RETURN;
+ END IF;
+ IF octet_length(p_body) NOT BETWEEN 1 AND 32768 THEN RAISE EXCEPTION 'OWNER_STATE_VAULT_BOUND'; END IF;
+ h:=encode(sha256(p_body),'hex');
+ IF prior.name IS NOT NULL AND prior.body=p_body THEN
+  RETURN QUERY SELECT substring(prior.name from 13)::integer,prior.body,prior.sha256;RETURN;
+ END IF;
+ IF coalesce(prior.sha256,'') IS DISTINCT FROM p_previous THEN RAISE EXCEPTION 'OWNER_STATE_CONCURRENT_OR_UNCERTAIN'; END IF;
+ n:=CASE WHEN prior.name IS NULL THEN 0 ELSE substring(prior.name from 13)::integer+1 END;
+ IF n>=64 THEN RAISE EXCEPTION 'OWNER_STATE_HISTORY_BOUND'; END IF;
+ INSERT INTO public.ingestion_run_evidence(period,run_id,name,body,sha256) VALUES(p_period,p_run,'owner/state-'||lpad(n::text,3,'0'),p_body,h);
+ RETURN QUERY SELECT n,p_body,h;
+END $owner_state$;
+REVOKE ALL ON FUNCTION public.ingestion_intake_owner_state(text,text,text,bytea) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ingestion_intake_owner_state(text,text,text,bytea) TO postgres;
+'''
+
+def definition_sql():return TABLE_SQL+WRITE_SQL+READ_SQL+OWNER_SQL
 
 FINISH_GUARD_SQL=r'''
    IF e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN
@@ -157,6 +185,13 @@ def migration_sql():
     from .operational_owner import Owner
     text=policy_sql();start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(');end=text.index('$register$;',start)+len('$register$;');register=text[start:end]
     expected=hashlib.sha256(Owner.daily_intake_inventory()['ingestion_register_bolton_exception'].encode()).hexdigest()
+    contracts=[]
+    for name,source,tag,grantees in (
+        ('ingestion_intake_evidence_write',WRITE_SQL,'evidence_write',['ingestion_storage_owner','ingestion_worker']),
+        ('ingestion_intake_evidence_read',READ_SQL,'evidence_read',['ingestion_storage_owner','ingestion_worker','postgres']),
+        ('ingestion_intake_owner_state',OWNER_SQL,'owner_state',['ingestion_storage_owner','postgres'])):
+        body=source.split('$'+tag+'$',2)[1]
+        contracts.append(dict(name=name,sha256=hashlib.sha256(body.encode()).hexdigest(),grantees=sorted(grantees)))
     return r'''
 BEGIN;
 SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s';
@@ -168,7 +203,7 @@ DO $pre$ BEGIN
  OR (SELECT count(*) FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole)<>1
  OR NOT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')
  OR to_regclass('public.ingestion_run_evidence') IS NOT NULL
- OR EXISTS(SELECT 1 FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname IN ('ingestion_intake_evidence_write','ingestion_intake_evidence_read'))
+ OR EXISTS(SELECT 1 FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname IN ('ingestion_intake_evidence_write','ingestion_intake_evidence_read','ingestion_intake_owner_state'))
  OR (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure) IS DISTINCT FROM '__PRE__'
  OR EXISTS(SELECT 1 FROM pg_roles r JOIN pg_authid a ON r.rolname=a.rolname WHERE r.rolname IN ('ingestion_worker_login','ingestion_effect_login') AND (r.rolcanlogin OR a.rolpassword IS NOT NULL))
  OR EXISTS(SELECT 1 FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_effect_login'::regrole]))
@@ -178,6 +213,7 @@ END $pre$;
 CREATE TEMP TABLE evidence_before ON COMMIT DROP AS SELECT
  (SELECT jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor) FROM pg_auth_members m) AS memberships,
  (SELECT nspacl::text FROM pg_namespace WHERE nspname='public') AS schema_acl,
+ (SELECT proacl::text FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure) AS registrar_acl,
  (SELECT jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),
   'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM public.ingestion_work_attempts a))) AS ledger;
 DO $stops$ DECLARE ctl jsonb; BEGIN
@@ -200,18 +236,28 @@ SET LOCAL ROLE ingestion_storage_owner;
 RESET ROLE;
 REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner;
 REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
-DO $post$ DECLARE b record; BEGIN
+DO $post$ DECLARE b record; required jsonb; BEGIN
  SELECT * INTO STRICT b FROM evidence_before;
  IF pg_has_role(current_user,'ingestion_storage_owner','SET') OR pg_has_role(current_user,'ingestion_storage_owner','USAGE')
  OR has_schema_privilege('ingestion_storage_owner','public','CREATE')
  OR b.memberships IS DISTINCT FROM (SELECT jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor) FROM pg_auth_members m)
  OR b.schema_acl IS DISTINCT FROM (SELECT nspacl::text FROM pg_namespace WHERE nspname='public')
+ OR b.registrar_acl IS DISTINCT FROM (SELECT proacl::text FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure)
  OR b.ledger IS DISTINCT FROM (SELECT jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),
  'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM public.ingestion_work_attempts a)))
  OR (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure) IS DISTINCT FROM '__AFTER__'
  OR EXISTS(SELECT 1 FROM pg_class c CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE c.oid='public.ingestion_run_evidence'::regclass AND a.grantee<>c.relowner)
  THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION'; END IF;
+ FOR required IN SELECT value FROM jsonb_array_elements('__CONTRACTS__'::jsonb) LOOP
+  IF (SELECT count(*) FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=required->>'name')<>1
+   OR NOT EXISTS(SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=required->>'name'
+    AND p.proowner='ingestion_storage_owner'::regrole AND p.prosecdef AND p.proconfig=ARRAY['search_path=pg_catalog']
+    AND encode(sha256(convert_to(p.prosrc,'UTF8')),'hex')=required->>'sha256'
+    AND (SELECT jsonb_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole::text) FROM aclexplode(p.proacl) a)=required->'grantees'
+    AND NOT EXISTS(SELECT 1 FROM aclexplode(p.proacl) a WHERE a.is_grantable OR a.privilege_type<>'EXECUTE' OR a.grantor<>'ingestion_storage_owner'::regrole))
+  THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING'; END IF;
+ END LOOP;
 END $post$;
 COMMIT;
 SELECT 'DATABASE_EVIDENCE_MIGRATION_COMMIT_ACKNOWLEDGED' AS status;
-''' .replace('__AFTER__',expected)
+''' .replace('__AFTER__',expected).replace('__CONTRACTS__',json.dumps(contracts))

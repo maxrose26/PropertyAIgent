@@ -1,0 +1,444 @@
+"""Fixed owner-only pilot bridge over the existing issuer, runtime and closure.
+
+No scheduler, token, role creation or source reader lives here. The existing
+web process supplies protected configuration; the actual daily job receives
+only the two finite restricted credentials. Recovery journals use the existing
+Vault format, encrypted in the approved private evidence table.
+"""
+import copy
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import socket
+import tempfile
+import time
+from contextlib import contextmanager
+from datetime import datetime,timezone,timedelta
+from zoneinfo import ZoneInfo
+
+from . import intake_owner as op
+from .intake_owner_io import Vault,env_values,service_guard,KEEP,handoff,submission_check,restore_handoff,reconcile_handoff
+from .intake_owner_operations import COUNCILS,SCREENING,issue_period
+from .database_evidence import BACKEND,canonical,migration_sql
+from .restricted_route import url,ROUTES
+from .tls_trust import verified_trust
+
+PERIOD='b-dbpilot-20261027-1102-01'
+OWNER_PERIOD=PERIOD+'_owner'
+OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
+SERVICE='crn-d9sv93vavr4c73f98rb0'
+WORKSPACE='tea-d9qbf8jm8hqs7385cu0g'
+WINDOW={'start':'2026-10-27','end':'2026-11-02'}
+RELEASE_PARENT=Path('/tmp')
+TERMINAL={'succeeded','failed','canceled'}
+DEPLOY_TERMINAL={'live','deactivated','build_failed','update_failed','canceled','pre_deploy_failed'}
+
+@contextmanager
+def envelope():
+    """Same60-second active envelope; never nested with another phase envelope."""
+    previous=signal.getsignal(signal.SIGALRM)
+    def refuse(*_):raise op.Denied('OWNER_PHASE_60_SECONDS')
+    signal.signal(signal.SIGALRM,refuse);signal.setitimer(signal.ITIMER_REAL,60)
+    try:yield
+    finally:signal.setitimer(signal.ITIMER_REAL,0);signal.signal(signal.SIGALRM,previous)
+
+class Database:
+    def __init__(self,environ=None):
+        from sqlalchemy.engine import make_url
+        env=os.environ if environ is None else environ
+        u=make_url(env.get('DATABASE_URL','sqlite://'))
+        op.require(u.get_backend_name() in ('postgres','postgresql') and (u.host,u.port,u.database,u.username)==('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres','postgres.zcikcfgpblzuzpanpdqd') and bool(u.password),'CONFIGURED_OWNER_SESSION_ROUTE_REQUIRED')
+        self.u=u
+        self.key=hashlib.sha256(('propertyaigent-owner-pilot-v1\0'+u.password).encode()).hexdigest()
+        # Fresh IPv4 DNS observation; no fallback endpoint or address guessing.
+        self.address=socket.getaddrinfo(u.host,u.port,socket.AF_INET,socket.SOCK_STREAM)[0][4][0]
+    @contextmanager
+    def connection(self):
+        import psycopg
+        ca,_=verified_trust()
+        with psycopg.connect(host=self.u.host,hostaddr=self.address,port=5432,dbname='postgres',user=self.u.username,password=self.u.password,
+                sslmode='verify-full',sslrootcert=str(ca),connect_timeout=5,gssencmode='disable',prepare_threshold=None,autocommit=True,
+                application_name='propertyaigent_owner_pilot',options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000') as c:
+            yield c
+        op.require(c.closed,'OWNER_CONNECTION_CLOSURE')
+
+class Journal:
+    def __init__(self,db):self.db=db;self.previous='';self.state=None
+    def _vault(self,raw=None,value=None):
+        # Only encrypted bytes touch the temporary filesystem. No new credential
+        # is persisted; recovery derives its key from existing protected config.
+        with tempfile.TemporaryDirectory(prefix='propertyaigent-owner-') as folder:
+            p=Path(folder)/'state.vault'
+            if raw is None:
+                v=Vault(p,self.db.key,create=True);v.save(value);return p.read_bytes()
+            fd=os.open(p,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            with os.fdopen(fd,'wb') as f:f.write(raw)
+            return Vault(p,self.db.key).load()
+    def load(self):
+        with self.db.connection() as c:
+            row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(OWNER_PERIOD,OWNER_RUN,'')).fetchone()
+        if row is None:return None
+        raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
+        self.previous=row[2];self.state=self._vault(raw=raw)
+        op.require(self.state.get('period')==PERIOD,'OWNER_JOURNAL_PERIOD')
+        return self.state
+    def save(self,state):
+        raw=self._vault(value=state);h=hashlib.sha256(raw).hexdigest()
+        with self.db.connection() as c:
+            row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,%s)',(OWNER_PERIOD,OWNER_RUN,self.previous,raw)).fetchone()
+        # No repetition after uncertain acknowledgement. Independent load is
+        # available even if this exact write committed but its reply was lost.
+        op.require(row is not None and bytes(row[1])==raw and row[2]==h,'OWNER_JOURNAL_ACK_RECONCILE')
+        self.previous=h;self.state=copy.deepcopy(state)
+
+class Render:
+    """Fixed-service transport, reviewed control-plane limits, no automatic retry."""
+    def __init__(self,token,*,session=None,clock=time.monotonic):
+        import requests
+        self.session=session or requests.Session();self.session.trust_env=False
+        self.token=token;self.clock=clock;self.started=clock();self.calls=0;self.total=0
+    def call(self,method,suffix='',body=None):
+        artifact=method=='GET' and re.fullmatch(r'artifact:[0-9TZ:.+-]{20,40}',suffix)
+        allowed=(method=='GET' and suffix in ('','/env-vars?limit=100','/jobs?limit=100','/deploys?limit=100','/secret-files?limit=100') or
+                 method=='GET' and re.fullmatch(r'/(jobs/job-|deploys/dep-)[a-z0-9]{20}',suffix) or
+                 method=='PUT' and suffix=='/env-vars' or method=='PATCH' and suffix=='' or
+                 method=='POST' and suffix in ('/resume','/suspend','/jobs') or artifact)
+        op.require(allowed,'OWNER_RENDER_FIXED_OPERATION')
+        op.require(self.calls<8 and self.clock()-self.started<40,'OWNER_RENDER_REQUEST_OR_TIME_LIMIT')
+        self.calls+=1;limit=524288 if suffix=='/deploys?limit=100' else 32768
+        target='https://api.render.com/v1/services/'+SERVICE+suffix
+        if artifact:
+            from urllib.parse import urlencode
+            target='https://api.render.com/v1/logs?'+urlencode(dict(ownerId=WORKSPACE,resource=SERVICE,text='DATABASE_PILOT_BUILD_RECEIPT',startTime=suffix.split(':',1)[1],limit=5,direction='backward'))
+        with self.session.request(method,target,
+                headers={'Authorization':'Bearer '+self.token,'Accept':'application/json'},json=body,
+                timeout=(3,5),allow_redirects=False,stream=True) as r:
+            expected=202 if suffix in ('/resume','/suspend') else 201 if method=='POST' and suffix=='/jobs' else 200
+            op.require(r.status_code==expected,'OWNER_RENDER_HTTP_REFUSED_OR_UNCERTAIN')
+            raw=bytearray()
+            for chunk in r.iter_content(4096):
+                raw.extend(chunk);self.total+=len(chunk)
+                hits=[]
+                if len(raw)>limit:hits.append('RESPONSE_BYTE_LIMIT')
+                if self.total>786432:hits.append('AGGREGATE_BYTE_LIMIT')
+                if self.clock()-self.started>=40:hits.append('CLIENT_TIME_LIMIT')
+                op.require(not hits,'OWNER_RENDER_'+('_AND_'.join(hits)))
+            return json.loads(raw) if raw else None
+    def close(self):self.session.close()
+
+def complete_inventory(value,kind):
+    op.require(type(value) is list and len(value)<100,'OWNER_COMPLETE_INVENTORY_REQUIRED')
+    result=[];seen=set()
+    for entry in value:
+        row=entry.get(kind,entry)
+        op.require(type(row) is dict and row.get('id') not in seen and isinstance(row.get('createdAt'),str),'OWNER_INVENTORY_SHAPE')
+        created=datetime.fromisoformat(row['createdAt'].replace('Z','+00:00')).timestamp()
+        op.require(created>0 and row.get('status') in (TERMINAL if kind=='job' else DEPLOY_TERMINAL),'OWNER_CURRENT_WORK_OR_UNKNOWN_STATUS')
+        op.require(row.get('finishedAt') or kind=='deploy' and row.get('status')=='deactivated','OWNER_INVENTORY_FINISH_REQUIRED')
+        seen.add(row['id']);result.append(row)
+    return result
+
+def source_profile(artifact,revision):
+    op.require(artifact.get('execution_binding',{}).get('revision')==revision and artifact.get('browser_canary')=='LAUNCHED_AND_CLOSED','OWNER_BUILD_RECEIPT_BINDING')
+    return dict(mode='render-intake-v1',service_id=SERVICE,revision=revision,browser_path=artifact['browser_path'],browser_sha256=artifact['browser_sha256'],
+                aggregate_bytes=2147483648,source_rss_bytes=1073741824,controller_rss_bytes=268435456,reserve_bytes=536870912,source_seconds=75)
+
+def fixed_binding(release,profile,address,guard,now=None):
+    now=time.time() if now is None else now
+    day=datetime.fromtimestamp(now,ZoneInfo('Europe/London'))
+    midnight=datetime.combine(day.date()+timedelta(days=1),datetime.min.time(),ZoneInfo('Europe/London')).timestamp()
+    op.require(now+2100<=midnight,'OWNER_FULL_DAY_AND_CLOSURE_MARGIN')
+    b=dict(version='FINITE_INTAKE_OWNER_V1',period=PERIOD,route='POOLER',hostaddr=address,owner_hostaddr=address,
+           execution_binding=release['execution_binding'],accepted_stop=op.ACCEPTED_STOP,evidence_backend=BACKEND,fixed_window=WINDOW,
+           render_profile=profile,render_config_sha256=guard,retained_deployment=release['deployment'],valid_until=now+2100,runtime_deadline=now+1915,
+           timing_policy=dict(version='SEPARATE_EXPIRY_V2_RESERVE',bound_at=now,execution_day=day.date().isoformat()))
+    policy=dict(expires_at=b['runtime_deadline'],max_runs=1,overlap_days=7,councils=COUNCILS,expected_stop=op.ACCEPTED_STOP,
+        execution_binding=b['execution_binding'],test_evidence=False,screening_config=SCREENING,hostaddr=address,route='POOLER',render_profile=profile,
+        evidence_backend=BACKEND,fixed_window=WINDOW,access_deadline=b['valid_until'])
+    b['period_policy_sha256']=hashlib.sha256(canonical(policy)).hexdigest()
+    op.validate_binding(b,opening=True,now=now)
+    return b,policy
+
+def safe_result(exc):
+    # A closed allowlist, never arbitrary exception messages or environment.
+    code=getattr(exc,'sqlstate',None)
+    known={'OWNER_FULL_DAY_AND_CLOSURE_MARGIN','OWNER_CURRENT_WORK_OR_UNKNOWN_STATUS','OWNER_COMPLETE_INVENTORY_REQUIRED',
+           'OWNER_JOURNAL_ACK_RECONCILE','OWNER_RENDER_HTTP_REFUSED_OR_UNCERTAIN','SETUP_TEN_MINUTE_BOUND',
+           'OWNER_DATABASE_PILOT_SCOPE','CONFIGURED_OWNER_SESSION_ROUTE_REQUIRED','OWNER_PRIOR_ATTEMPT_RECONCILE',
+           'OWNER_OPEN_OR_UNVERIFIED','OWNER_JOB_ACK_UNCERTAIN','OWNER_BUILD_REQUIRED','OWNER_INHERITED_BOUNDARY_REQUIRED'}
+    reason=str(exc) if type(exc) is op.Denied and str(exc) in known else 'UNKNOWN_FAILURE'
+    return dict(status='RECONCILIATION_REQUIRED',reason=reason,sqlstate=code if code in ('42501','28P01','28000','57014','P0001') else None)
+
+BUILD_COMMAND='export PLAYWRIGHT_BROWSERS_PATH=0; pip install -r requirements.txt && playwright install chromium && python -m scripts.verify_browser_runtime && python -m scripts.owner_pilot_artifact'
+
+class Pilot:
+    """One fixed accepted pilot. Each consequential phase has a durable intent.
+
+    This connects existing operations; it cannot select councils/windows, reset
+    a failed attempt or automatically replace an uncertain write/job/build.
+    """
+    def __init__(self,db=None,*,token=None,render_factory=None,sleep=time.sleep):
+        self.db=db or Database();self.journal=Journal(self.db)
+        self.token=token or os.environ.get('PROPERTYAIGENT_INTAKE_RENDER_API_KEY')
+        op.require(type(self.token) is str and bool(self.token),'CONFIGURED_RENDER_KEY_REQUIRED')
+        self.render_factory=render_factory or (lambda:Render(self.token));self.sleep=sleep
+        self.state=None
+    @contextmanager
+    def api(self):
+        api=self.render_factory()
+        try:yield api
+        finally:api.close()
+    def save(self):self.journal.save(self.state)
+    def intent(self,name):
+        op.require(name not in self.state['intents'],'OWNER_PRIOR_INTENT_RECONCILE')
+        self.state['intents'][name]={'at':time.time(),'state':'INTENT_NO_RETRY'};self.save()
+    def ack(self,name):self.state['intents'][name]['state']='ACKNOWLEDGED';self.save()
+    def access_save(self,value):self.state['access']=copy.deepcopy(value);self.save()
+    def period_save(self,value):self.state['period_journal']=copy.deepcopy(value);self.save()
+    def migrate(self):
+        # This explicit owner action is never performed by normal page loads.
+        # Unknown acknowledgement cannot fall through to activation.
+        with envelope(),self.db.connection() as c:
+            exists=c.execute("SELECT to_regclass('public.ingestion_run_evidence') IS NOT NULL").fetchone()[0]
+            if not exists:
+                from .storage_controller import split_sql
+                for statement in split_sql(migration_sql()):c.execute(statement)
+            op.inventory(c);op.owner_absent(c)
+    def preflight(self):
+        with envelope(),self.db.connection() as c:
+            op.identity(c);op.inventory(c);op.dormant(c);op.owner_absent(c)
+            ctl=op.control(c);op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
+            op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
+            op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
+        with self.api() as api:
+            service=api.call('GET');guard=service_guard(service)
+            op.require(service.get('ownerId')==WORKSPACE and service['serviceDetails']['plan']=='standard','OWNER_SERVICE_OR_PLAN_CHANGED')
+            jobs=complete_inventory(api.call('GET','/jobs?limit=100'),'job')
+            deploys=complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+            original=env_values(api.call('GET','/env-vars?limit=100'))
+        op.require(set(original)=={'DATABASE_URL','PLANNING_STATUS_VERIFICATION_ENABLED','PLAYWRIGHT_BROWSERS_PATH','PYTHONUNBUFFERED'},'OWNER_ENVIRONMENT_DRIFT')
+        # The configured harmless settings and inherited boundary are retained
+        # from the accepted owner inspection. Fresh direct-map equality is
+        # rechecked before handoff/submission; no secret value is exported.
+        return service,guard,jobs,deploys,original
+    def build(self):
+        service,guard,jobs,deploys,original=self.preflight()
+        release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        op.require(type(release.get('branch')) is str and release['branch']=='prep/b-timing-pg17-current-20261103','OWNER_SOURCE_BRANCH_BINDING')
+        self.state.update(original_service=service,original_environment=original,original_guard=guard,
+            original_deploy_ids=[x['id'] for x in deploys],source_revision=release['execution_binding']['revision'])
+        self.save()
+        harmless={k:v for k,v in original.items() if k in ('PLAYWRIGHT_BROWSERS_PATH','PYTHONUNBUFFERED')}
+        self.state['build_environment']=harmless
+        self.intent('BUILD_ENVIRONMENT')
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==guard and env_values(api.call('GET','/env-vars?limit=100'))==original,'OWNER_PREBUILD_DRIFT')
+            api.call('PUT','/env-vars',[{'key':k,'value':v} for k,v in sorted(harmless.items())])
+            op.require(env_values(api.call('GET','/env-vars?limit=100'))==harmless,'OWNER_PREBUILD_ENVIRONMENT_READBACK')
+        self.ack('BUILD_ENVIRONMENT')
+        self.intent('BUILD_CONFIGURATION')
+        patch={'branch':release['branch'],'serviceDetails':{'envSpecificDetails':{'buildCommand':BUILD_COMMAND,'startCommand':'/bin/true'}}}
+        expected=copy.deepcopy(service);expected['branch']=release['branch'];expected['serviceDetails']['envSpecificDetails'].update(patch['serviceDetails']['envSpecificDetails'])
+        self.state['build_guard']=service_guard(expected);self.save()
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==guard and env_values(api.call('GET','/env-vars?limit=100'))==harmless,'OWNER_PREBUILD_DRIFT')
+            complete_inventory(api.call('GET','/jobs?limit=100'),'job');complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+            api.call('PATCH','',patch);configured=api.call('GET')
+            op.require(service_guard(configured)==self.state['build_guard'],'OWNER_BUILD_CONFIGURATION_READBACK')
+        self.ack('BUILD_CONFIGURATION')
+        # Resume is the ONE build allowance. Never also POST /deploys.
+        self.intent('ONE_RESUME_BUILD')
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==self.state['build_guard'] and env_values(api.call('GET','/env-vars?limit=100'))==harmless,'OWNER_PREBUILD_DRIFT')
+            complete_inventory(api.call('GET','/jobs?limit=100'),'job')
+            prior=complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+            op.require({x['id'] for x in prior}==set(self.state['original_deploy_ids']),'OWNER_UNEXPECTED_BUILD')
+            api.call('POST','/resume')
+        self.ack('ONE_RESUME_BUILD')
+        new=None
+        for _ in range(20):
+            self.sleep(15)
+            with self.api() as api:rows=api.call('GET','/deploys?limit=100')
+            op.require(type(rows) is list and len(rows)<100,'OWNER_COMPLETE_INVENTORY_REQUIRED')
+            added=[x.get('deploy',x) for x in rows if x.get('deploy',x).get('id') not in self.state['original_deploy_ids']]
+            op.require(len(added)<=1,'OWNER_MORE_THAN_ONE_BUILD')
+            if added:
+                new=added[0]
+                op.require(new.get('commit',{}).get('id')==self.state['source_revision'],'OWNER_BUILD_REVISION_DRIFT')
+                if new.get('status') in DEPLOY_TERMINAL:break
+        op.require(new is not None and new.get('status')=='live','OWNER_BUILD_REQUIRED')
+        self.state['deployment']=new['id'];self.state['build_receipt_created_at']=new['createdAt'];self.save()
+        self.intent('RESUSPEND')
+        with self.api() as api:api.call('POST','/suspend');op.require(api.call('GET').get('suspended')=='suspended','OWNER_RESUSPEND_READBACK')
+        self.ack('RESUSPEND')
+        with self.api() as api:
+            logs=api.call('GET','artifact:'+new['createdAt'])
+        op.require(logs.get('hasMore') is False and len(logs.get('logs',[]))==1,'OWNER_BUILD_RECEIPT_REQUIRED')
+        line=logs['logs'][0]['message'];prefix='DATABASE_PILOT_BUILD_RECEIPT '
+        op.require(line.startswith(prefix),'OWNER_BUILD_RECEIPT_REQUIRED')
+        artifact=json.loads(line[len(prefix):]);profile=source_profile(artifact,self.state['source_revision'])
+        op.require(artifact['execution_binding']==release['execution_binding'],'OWNER_BUILD_FILE_BINDING')
+        self.state['artifact']=artifact;self.state['profile']=profile;self.save()
+        self.restore_build()
+    def restore_build(self):
+        service=self.state['original_service'];details=service['serviceDetails']['envSpecificDetails']
+        with self.api() as api:
+            current=api.call('GET');observed=service_guard(current)
+            if observed!=self.state['original_guard']:
+                op.require(observed==self.state['build_guard'],'OWNER_BUILD_RESTORE_DRIFT')
+                complete_inventory(api.call('GET','/jobs?limit=100'),'job');complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+                self.intent('RESTORE_BUILD_CONFIGURATION')
+                api.call('PATCH','',{'branch':service['branch'],'serviceDetails':{'envSpecificDetails':{'buildCommand':details['buildCommand'],'startCommand':'/bin/true'}}})
+                op.require(service_guard(api.call('GET'))==self.state['original_guard'],'OWNER_BUILD_RESTORE_READBACK')
+                self.ack('RESTORE_BUILD_CONFIGURATION')
+        with self.api() as api:
+            environment=env_values(api.call('GET','/env-vars?limit=100'))
+            if environment!=self.state['original_environment']:
+                op.require(environment==self.state['build_environment'] and service_guard(api.call('GET'))==self.state['original_guard'],'OWNER_BUILD_ENV_RESTORE_DRIFT')
+                complete_inventory(api.call('GET','/jobs?limit=100'),'job');complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+                self.intent('RESTORE_BUILD_ENVIRONMENT')
+                api.call('PUT','/env-vars',[{'key':k,'value':v} for k,v in sorted(self.state['original_environment'].items())])
+                op.require(env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'] and service_guard(api.call('GET'))==self.state['original_guard'],'OWNER_BUILD_ENV_RESTORE_READBACK')
+                self.ack('RESTORE_BUILD_ENVIRONMENT')
+    def prepare(self):
+        self.migrate()
+        op.require(self.journal.load() is None,'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED'}
+        self.save()
+        try:
+            self.build();self.state['status']='ARTIFACT_READY';self.save()
+        except BaseException as exc:
+            self.state['failure']=safe_result(exc);self.state['status']='PREPARATION_REFUSED';self.save()
+            self.recover_build();raise
+    def recover_build(self):
+        if 'original_service' not in self.state:return
+        with self.api() as api:current=api.call('GET')
+        if current.get('suspended')!='suspended':
+            op.require('ONE_RESUME_BUILD' in self.state['intents'],'OWNER_UNEXPECTED_RESUMPTION')
+            self.intent('RESUSPEND')
+            with self.api() as api:api.call('POST','/suspend');op.require(api.call('GET').get('suspended')=='suspended','OWNER_RESUSPEND_READBACK')
+            self.ack('RESUSPEND')
+        self.restore_build()
+    def observation(self,operation,owner_checked_at):
+        # Owner's single button confirms the Dashboard-only inherited-group
+        # fact; actual service/work/file reads are taken at their consuming
+        # operations, never copied from a historical receipt.
+        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
+        b=self.state['binding']
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==b['render_config_sha256'],'OWNER_CONFIGURATION_DRIFT')
+            complete_inventory(api.call('GET','/jobs?limit=100'),'job')
+            deploys=complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+            op.require(api.call('GET','/secret-files?limit=100')==[],'OWNER_SECRET_FILES_DRIFT')
+        ordered=sorted(deploys,key=lambda x:x['createdAt'],reverse=True)
+        op.require(ordered and ordered[0]['id']==b['retained_deployment'] and ordered[0]['commit']['id']==b['execution_binding']['revision'] and ordered[0]['status']=='live','OWNER_RETAINED_ARTIFACT_DRIFT')
+        now=time.time()
+        value=dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=operation,binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),
+            service_id=SERVICE,observed_at=now,env_groups=[],secret_files=[],inherited_credential_names=[],reviewed=True,no_current_work=True,
+            other_activity_stopped=True,deployment_id=b['retained_deployment'],revision=b['execution_binding']['revision'],suspended=True)
+        op.require(operation not in self.state.setdefault('observations',{}),'OWNER_OBSERVATION_ALREADY_USED')
+        self.state['observations'][operation]={'provider_observation':value,'owner_boundary_confirmed_at':owner_checked_at};self.save()
+        return value
+    def qualify(self):
+        from .operational_controller import DatabaseBudget
+        from .tls_trust import verified_trust
+        from sqlalchemy import text
+        b=self.state['binding'];ca,_=verified_trust()
+        out=[]
+        for role,cap in op.ROLES.items():
+            budget=DatabaseBudget(statements=4,connections=1,returned_bytes=8192,seconds=12)
+            try:
+                engine=budget.engine(url('POOLER',role,self.state['access']['passwords'][role]),ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr=b['hostaddr'],route='POOLER')
+                with engine.connect() as c:
+                    row=c.execute(text("SELECT current_user,session_user,pg_has_role(current_user,:cap,'USAGE'),current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout')"),{'cap':cap}).one()
+                    op.require(tuple(row)==(role,role,True,'10s','3s','20s'),'OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
+            finally:budget.close([])
+            op.require(all(c.closed for c in budget.opened) and budget.failed_native_closed,'OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
+            out.append({'role':role,'attempts':budget.attempts,'closed':True})
+        return out
+    def run(self,owner_checked_at):
+        self.state=self.journal.load()
+        op.require(self.state is not None and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        self.preflight()
+        release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        release['deployment']=self.state['deployment']
+        folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD);folder.mkdir(mode=0o700)
+        b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
+        b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'))
+        self.state.update(binding=b,policy=p,status='RELEASE_BOUND');self.intent('RELEASE')
+        try:
+            self.intent('PERIOD')
+            journal={'version':'FINITE_INTAKE_PERIOD_V1','state':'ARMED_NO_RETRY','binding':b,'policy':p}
+            self.state['period_journal']=journal;self.save()
+            with envelope(),self.db.connection() as c:period=issue_period(c,b,p,journal,self.period_save)
+            self.state['period_receipt']=period;self.ack('PERIOD')
+            self.intent('ACTIVATE')
+            with envelope(),self.db.connection() as c:self.state['activation_receipt']=op.activate(c,b,self.access_save)
+            self.ack('ACTIVATE')
+            self.intent('QUALIFY');self.state['qualification']=self.qualify();self.ack('QUALIFY')
+            observation=self.observation('HANDOFF',owner_checked_at)
+            self.intent('HANDOFF')
+            with self.api() as api:self.state['handoff_receipt']=handoff(api,self.state['access'],self.access_save,None,observation=observation)
+            self.ack('HANDOFF')
+            observation=self.observation('SUBMISSION',owner_checked_at)
+            with self.api() as api:submission_check(api,self.state['access'],self.access_save,observation)
+            command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --hostaddr '+b['hostaddr']
+            self.state['job_command']=command;self.intent('ONE_JOB')
+            with self.api() as api:
+                op.validate_binding(b,opening=True)
+                job=api.call('POST','/jobs',{'startCommand':command})
+            op.require(isinstance(job,dict) and re.fullmatch('job-[a-z0-9]{20}',job.get('id','')) and job.get('serviceId')==SERVICE and job.get('startCommand')==command,'OWNER_JOB_ACK_UNCERTAIN')
+            self.state['job']=job;self.ack('ONE_JOB')
+            for _ in range(32):
+                self.sleep(30)
+                with self.api() as api:job=api.call('GET','/jobs/'+job['id'])
+                if job.get('status') in TERMINAL and job.get('finishedAt'):break
+            self.state['job_terminal']=job;self.save()
+            op.require(job.get('status')=='succeeded' and job.get('finishedAt'),'OWNER_OPEN_OR_UNVERIFIED')
+            with envelope(),self.db.connection() as c:
+                ctl=op.control(c);run=ctl.get('intake_run') or {}
+                self.state['independent_result']=op.finalisation(c,b,{'run_id':run.get('id'),'publication':run.get('publication')})
+            self.state['pipeline_status']='VERIFIED_RETAINED_AND_SCREENED';self.save()
+        except BaseException as exc:
+            self.state['failure']=safe_result(exc);self.state['pipeline_status']='NOT_VERIFIED';self.save()
+        finally:
+            self.cleanup()
+        return self.summary()
+    def cleanup(self):
+        # Independent database containment never depends on GitHub or Render.
+        access=self.state.get('access')
+        if access and access.get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':
+            try:
+                with envelope(),self.db.connection() as c:self.state['closure_receipt']=op.close(c,access,self.access_save)
+                self.save()
+            except BaseException as exc:self.state['closure_failure']=safe_result(exc);self.save()
+        if access and access.get('render') and access.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED':
+            r=access['render']
+            if r.get('state')=='PUT_INTENT_NO_RETRY':
+                with self.api() as api:reconcile_handoff(api,access,self.access_save)
+            if r.get('state')=='PUT_ACKNOWLEDGED' or r.get('reconciliation')=='EXPECTED':
+                try:
+                    with self.api() as api:self.state['restoration_receipt']=restore_handoff(api,access,self.access_save,self.state.get('job',{}).get('id'))
+                    self.save()
+                except BaseException as exc:self.state['restoration_failure']=safe_result(exc);self.save()
+        with self.api() as api:
+            service=api.call('GET');environment=env_values(api.call('GET','/env-vars?limit=100'))
+        self.state['final_service']={'suspended':service.get('suspended')=='suspended','configuration_equal':service_guard(service)==self.state['original_guard'],
+            'environment_equal':environment==self.state['original_environment']}
+        self.state['status']='CLOSED' if (not access or access.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED') and all(self.state['final_service'].values()) else 'CONTAINMENT_REQUIRES_REVIEW'
+        self.save()
+    def recover(self):
+        self.state=self.journal.load();op.require(self.state is not None,'OWNER_NO_RECOVERY_STATE')
+        if 'binding' not in self.state:self.recover_build()
+        else:self.cleanup()
+        return self.summary()
+    def summary(self):
+        s=self.state
+        return {'period':PERIOD,'window':WINDOW,'date_fields':{'tameside':'RECEIVED','manchester':'VALIDATED'},'status':s['status'],
+                'pipeline_status':s.get('pipeline_status','NOT_RUN'),'github_publication':'NOT_REQUESTED','deployment':s.get('deployment'),
+                'job_id':s.get('job',{}).get('id'),'job_status':s.get('job_terminal',{}).get('status'),'final_service':s.get('final_service'),
+                'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
+                'independent_result':s.get('independent_result'),'closure_receipt':s.get('closure_receipt')}

@@ -47,7 +47,11 @@ REGISTRATION = r"""
    END LOOP;
    IF e ? 'evidence_backend' AND (e->>'evidence_backend' IS DISTINCT FROM 'POSTGRES_PILOT_V1'
      OR e->'max_runs' IS DISTINCT FROM '1'::jsonb OR (SELECT count(*) FROM jsonb_each(e->'councils'))<>2
-     OR e->'fixed_window' IS DISTINCT FROM '{"start":"2026-10-27","end":"2026-11-02"}'::jsonb)
+     OR e->'fixed_window' IS DISTINCT FROM '{"start":"2026-10-27","end":"2026-11-02"}'::jsonb
+     OR jsonb_typeof(e->'access_deadline') IS DISTINCT FROM 'number'
+     OR (e->>'access_deadline')::double precision<>(e->>'expires_at')::double precision+185
+     OR (e->>'access_deadline')::double precision>t+2100
+     OR (e->>'access_deadline')::double precision>extract(epoch FROM ((clock_timestamp() AT TIME ZONE 'Europe/London')::date+1)::timestamp AT TIME ZONE 'Europe/London'))
    THEN RAISE EXCEPTION 'INTAKE_DATABASE_PILOT_BINDING'; END IF;
    e:=e||jsonb_build_object('registered_at',t,'days','{}'::jsonb);
    ctl:=jsonb_set(ctl,'{intake_periods}',coalesce(ctl->'intake_periods','{}'::jsonb)||jsonb_build_object(a,e));

@@ -22,7 +22,7 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
-BOUND_FILES=('verification/ingestion_storage/database_evidence.py','verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+BOUND_FILES=('scripts/owner_pilot_job.py','docs/design/database-pilot-20261103/command-policy.json','verification/ingestion_storage/database_evidence.py','verification/discovery/pagination_calibration.py','verification/discovery/idox_sort.py','verification/discovery/four_council_proof.py','verification/discovery/source_diagnostics.py','verification/stage26b_l1/request_boundary.py','verification/bolton_recon/recon.py','app/scrapers/discovery_idox.py','app/ingestion/collection_mode.py','app/ingestion/listing_screening.py','docs/design/tameside-b-connection-20261101/tameside-qualification.json','app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
@@ -260,6 +260,9 @@ class Runtime:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
+            if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
+                d=self.policy.get('access_deadline')
+                if type(d) not in (int,float) or d!=self.policy['expires_at']+185 or d-time.time()<=1500:raise Denied('DATABASE_PILOT_STARTUP_RESERVE')
             self.memory=require_source_context(self.policy['councils'],disposable=self.test,profile=self.policy.get('render_profile'),binding=self.binding)
             if self.memory:
                 original_check=self.run.check

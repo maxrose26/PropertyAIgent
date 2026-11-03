@@ -143,12 +143,13 @@ def boundary(b,observation=None):
 
 def handoff(api, state, save, publication_token, *, observation=None):
     b = state['binding']; boundary(b,observation)
+    database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     if 'timing_policy' in b:validate_binding(b,opening=True)
     require(state.get('state') == 'ACTIVATION_ACKNOWLEDGED' and 'render' not in state, 'HANDOFF_SINGLE_USE')
     require(time.time() + 960 < b['valid_until'], 'HANDOFF_CREDENTIAL_WINDOW')
     from .intake_owner_operations import installation_token_allowed
-    require(installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
-    require(type(b.get('publication_valid_until')) in (int,float) and
+    require(publication_token is None if database else installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')
+    require(database or type(b.get('publication_valid_until')) in (int,float) and
             time.time()+960 < b['publication_valid_until'] and (b['valid_until']<=b['publication_valid_until'] if 'timing_policy' in b else b['publication_valid_until']<=b['valid_until']), 'FINITE_SELF_REVOCABLE_PUBLICATION_TOKEN')
     guard = service_guard(api.call('GET'))
     require(guard == b.get('render_config_sha256'), 'RENDER_REVIEWED_CONFIGURATION')
@@ -185,11 +186,11 @@ def handoff(api, state, save, publication_token, *, observation=None):
     for role, name in [('ingestion_worker_login', 'INGESTION_WORKER_DATABASE_URL'),
                        ('ingestion_effect_login', 'INGESTION_EFFECT_DATABASE_URL')]:
         new[name] = url(b['route'], role, state['passwords'][role])
-    new['GH_TOKEN'] = publication_token
+    if not database:new['GH_TOKEN'] = publication_token
     boundary(b,observation)
     if 'timing_policy' in b:validate_binding(b,opening=True)
     state['render'] = dict(original=original, expected=new, guard=guard, state='PUT_INTENT_NO_RETRY',
-                          publication_token=publication_token, publication_state='ACTIVE', mapped_at=time.time())
+                          publication_token=publication_token, publication_state='NOT_REQUESTED' if database else 'ACTIVE', mapped_at=time.time())
     if 'timing_policy' in b:state['render']['handoff_observation_sha256']=hashlib.sha256(canonical(observation)).hexdigest()
     save(state)
     api.call('PUT', '/env-vars', [{'key': k, 'value': v} for k, v in sorted(new.items())])

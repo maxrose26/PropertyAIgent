@@ -73,7 +73,10 @@ def validate_binding(b, *, opening=False, now=None):
     require(set(e) == {'revision', 'workflow_sha256', 'manifest_sha256'} and
             all(re.fullmatch('[a-f0-9]{%s}' % n, e.get(k, '')) for k, n in
                 [('revision', 40), ('workflow_sha256', 64), ('manifest_sha256', 64)]), 'OWNER_CODE_BINDING')
-    require(e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
+    database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
+    require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
+    if database:
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period']=='b-dbpilot-20261027-1102-01','OWNER_DATABASE_PILOT_SCOPE')
     require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')
     if 'publication_mint' in b:
         m=b['publication_mint']
@@ -89,7 +92,7 @@ def validate_binding(b, *, opening=False, now=None):
         day=datetime.fromtimestamp(t['bound_at'],ZoneInfo('Europe/London'))
         from datetime import timedelta
         midnight=datetime.combine(day.date()+timedelta(days=1),datetime.min.time(),ZoneInfo('Europe/London')).timestamp()
-        require(t['execution_day']==day.date().isoformat() and b.get('valid_until')==t['bound_at']+2100 and b['valid_until']<=b.get('publication_valid_until',0) and b['valid_until']<=midnight,'FINITE_FIXED_DEADLINE')
+        require(t['execution_day']==day.date().isoformat() and b.get('valid_until')==t['bound_at']+2100 and (database or b['valid_until']<=b.get('publication_valid_until',0)) and b['valid_until']<=midnight,'FINITE_FIXED_DEADLINE')
     if 'timing_policy' in b and b['timing_policy']['version']=='SEPARATE_EXPIRY_V2_RESERVE':
         require(b.get('runtime_deadline')==b['valid_until']-185,'FINITE_EXECUTION_RESERVE_BINDING')
     if opening:
@@ -101,6 +104,15 @@ def validate_binding(b, *, opening=False, now=None):
         elif 'publication_mint' in b:
             require(b['valid_until']-now > MINT_START_MIN_SECONDS,'MINT_B_AND_CLOSURE_WINDOW')
     return b
+
+
+def reviewed_application_binding():
+    """Protected owner-platform configuration; never a browser or runtime input."""
+    import os
+    try:value=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])['execution_binding']
+    except (KeyError,ValueError,TypeError):raise Denied('CONFIGURED_SOURCE_RELEASE_REQUIRED') from None
+    require(type(value) is dict and set(value)==set(APPLICATION_BINDING),'CONFIGURED_SOURCE_RELEASE_REQUIRED')
+    return value
 
 
 def identity(c, *, containment=False):
@@ -163,7 +175,7 @@ def inventory(c):
      AND x.grantor='ingestion_storage_owner'::regrole""").fetchall() == [(False,)], 'REGISTRAR_NARROW_ACL')
 
 
-def activation_gate(c):
+def activation_gate(c, *, database=False):
     """Existing two-login gate; only the reviewed worker registrar ACL is newly allowed."""
     text = (Path(__file__).resolve().parents[2] / 'docs/design/ingestion-operational-required-20261018/activate.sql').read_text()
     text = text.split('ALTER ROLE ingestion_worker_login LOGIN;')[0]
@@ -172,6 +184,8 @@ def activation_gate(c):
     require(text.count(marker) == 1, 'ACTIVATION_GATE_DERIVATION')
     text = text.replace(marker, "   AND NOT (login='ingestion_worker_login' AND "
         "p.oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure)\n" + marker)
+    if database:
+        text=text.replace(marker,"   AND NOT (login='ingestion_worker_login' AND p.oid IN ('public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure,'public.ingestion_intake_evidence_read(text,text,text)'::regprocedure))\n"+marker)
     c.execute(text.replace('BEGIN;', '', 1))
 
 
@@ -320,7 +334,7 @@ def activate(c, b, save, *, password_factory=None):
         for role, cap in ROLES.items():
             c.execute(sql.SQL('GRANT {} TO {} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE GRANTED BY postgres').format(
                 sql.Identifier(cap), sql.Identifier(role)))
-        activation_gate(c)
+        activation_gate(c,database=b.get('evidence_backend')=='POSTGRES_PILOT_V1')
         for role in ROLES:
             verifier = c.pgconn.encrypt_password(passwords[role].encode(), role.encode(), algorithm=b'scram-sha-256').decode()
             c.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),
@@ -437,11 +451,21 @@ def finalisation(c, b, expected):
                 policy.get('execution_binding') == b['execution_binding'] and run.get('state') == 'VERIFIED' and
                 run.get('status') == 'RETAINED_AND_SCREENED', 'INDEPENDENT_FINALISATION_BINDING')
         pub = run.get('publication')
+        database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
         require(isinstance(pub,dict) and json_equal(c,pub,expected.get('publication')) and pub.get('readback_verified') is True and
-                re.fullmatch('[a-f0-9]{40}', pub.get('commit', '')) and
+                (database or re.fullmatch('[a-f0-9]{40}', pub.get('commit', ''))) and
                 re.fullmatch('[a-f0-9]{64}', pub.get('sha256', '')) and
                 pub.get('path') == f"docs/design/ingestion-operational-execution-daily-intake/{b['period']}/{run['id']}/final/result-before-publication.json",
                 'INDEPENDENT_PUBLICATION_BINDING')
+        if database:
+            from .database_evidence import validate_descriptor,canonical
+            validate_descriptor(pub)
+            stored=bytes(c.execute('SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',(b['period'],run['id'],pub['name'])).fetchone()[0])
+            require(hashlib.sha256(stored).hexdigest()==pub['sha256'] and len(stored)==pub['bytes'],'INDEPENDENT_DATABASE_BYTES')
+            report=json.loads(stored)
+            require(report.get('status')=='RETAINED_AND_SCREENED' and report.get('cleanup')=='CLOSED' and report.get('authority_closure')=='INVALIDATED' and report.get('github_publication')=='NOT_REQUESTED' and report.get('period')==b['period'] and report.get('run_id')==run['id'] and report.get('execution_binding')==b['execution_binding'],'INDEPENDENT_DATABASE_REPORT')
+            events=bytes(c.execute('SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',(b['period'],run['id'],'final/events-before-publication.json')).fetchone()[0])
+            require(isinstance(json.loads(events),list),'INDEPENDENT_DATABASE_EVENTS')
         grants = {a: g for a, g in ctl.get('grants', {}).items() if g.get('intake_run') == run['id']}
         require(0 < len(grants) <= 4 and all(type(g.get('expires_at')) in (int,float) and g['expires_at'] == 0 and g.get('intake_period') == b['period'] and
                 g.get('execution_binding') == b['execution_binding'] for g in grants.values()), 'INDEPENDENT_AUTHORITY_CLOSURE')
@@ -457,12 +481,16 @@ def finalisation(c, b, expected):
             receipt = row[1] or {}; records = receipt.get('records')
             archive=receipt.get('durable_archive') or {}
             require(receipt.get('kind') == 'LISTING_RECEIPT_V1' and receipt.get('council')==council and
-                    archive.get('readback_verified') is True and re.fullmatch('[a-f0-9]{40}',archive.get('commit','')) and
+                    archive.get('readback_verified') is True and (database or re.fullmatch('[a-f0-9]{40}',archive.get('commit',''))) and
                     re.fullmatch('[a-f0-9]{64}',archive.get('sha256','')) and archive['sha256']==receipt.get('source_sha256') and
                     re.fullmatch(re.escape(f"docs/design/ingestion-operational-execution-daily-intake/{b['period']}/{run['id']}/")+
                                  r'capture-[12]/source\.json',archive.get('path','')) and
                     isinstance(records, list) and len(records) <= 60 and (records or (council=='manchester' and receipt.get('explicit_zero') is True)),
                     'INDEPENDENT_ARCHIVE_OR_ZERO')
+            if database:
+                validate_descriptor(archive)
+                raw=bytes(c.execute('SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',(b['period'],run['id'],archive['name'])).fetchone()[0])
+                require(hashlib.sha256(raw).hexdigest()==archive['sha256'] and len(raw)==archive['bytes'],'INDEPENDENT_DATABASE_SOURCE_BYTES')
             n = len(records)
             screens = c.execute("SELECT count(*) FILTER (WHERE state='COMPLETE'),count(*) FROM public.ingestion_work_items "
                                 "WHERE task='SCREENING' AND dependencies::jsonb=jsonb_build_array(%s::text)", (key,)).fetchone()
@@ -474,7 +502,7 @@ def finalisation(c, b, expected):
                                source_sha256=receipt.get('source_sha256'), capture_sha256=digest(receipt)))
         value = dict(status='INDEPENDENT_DATABASE_VERIFIED_SUCCESS', period=b['period'], run_id=run['id'],
                      publication=pub, authorities={a: 0 for a in grants}, captures=result, stop=stop_snapshot(ctl),
-                     independent_external_publication_check='REQUIRED', independent_render_terminal_check='REQUIRED')
+                     independent_external_publication_check='NOT_REQUESTED' if database else 'REQUIRED', independent_render_terminal_check='REQUIRED')
         require(len(json.dumps(value).encode()) <= 49152, 'READBACK_EXPORT_BOUND')
         return value
     finally:
