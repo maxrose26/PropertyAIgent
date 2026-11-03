@@ -3,10 +3,10 @@ import argparse,json,os,sys
 from pathlib import Path
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
     import ipaddress
     if ipaddress.ip_address(a.hostaddr).version!=4:raise SystemExit(2)
-    PERIOD='b-dbpilot-20261027-1102-01'
+    PERIOD=a.period
     allowed={'PATH','HOME','LANG','TZ','PYTHONUNBUFFERED','PLAYWRIGHT_BROWSERS_PATH','INGESTION_RENDER_PROFILE',
              'INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL','RENDER_SERVICE_ID','RENDER_GIT_COMMIT'}
     env={k:v for k,v in os.environ.items() if k in allowed}
