@@ -1,0 +1,31 @@
+{
+  "application_changed": false,
+  "base": "6c121fe9b9ddd81ffbfe3630a8c58f18645fd1b9",
+  "browser_launched": false,
+  "database_suite_rerun": false,
+  "errors": 0,
+  "failures": 0,
+  "final_selections": {
+    "affected-final": {
+      "log_sha256": "15c68ce6c0990c127ab70192a9c1d89d8373746169ec74ca5e1bf702f7694b71",
+      "tests": 2,
+      "xml_sha256": "537cbfb067487f5c2e2f583bb0bad473a776583dbe80cac0c0a967e9e55fc4e1"
+    },
+    "focused-03": {
+      "log_sha256": "f0fc542787cceb01530540dbedab7cdd820047cd5a173c8845a74ea5a59ab5bd",
+      "tests": 14,
+      "xml_sha256": "586013c3056ea1fce578fd25ae6ae33a6dc74e5bcf988b045257ad1a152edec5"
+    }
+  },
+  "final_test_environment": "Existing storage-controller Python/dependencies with existing prep-test pytest appended to sys.path; no package install/download",
+  "kind": "REAL_RETAINED_CODE_SYNTHETIC_FILES_AND_MOCKED_PROVIDER_PROCESS_DATABASE_BOUNDARIES",
+  "live_requests": 0,
+  "preserved_collection_errors": [
+    "focused-01: prep-test-venv lacks Playwright; no tests executed",
+    "focused-02: mixed dependency precedence selected incomplete pyee; no tests executed"
+  ],
+  "production_credentials_accessed": false,
+  "skips": 0,
+  "status": "FOCUSED_OFFLINE_PASS",
+  "unique_tests": 16
+}

@@ -1,0 +1,34 @@
+{
+  "change": "Only allow reserve-B handoff to retain an existing service browser selector independently of the profile directory; original value still kept/restored exactly",
+  "finite_scope": "SEPARATE_EXPIRY_V2_RESERVE; validate_binding already enforces reviewed application and timing before handoff",
+  "label": "SELF-REVIEW_NOT_INDEPENDENT_REVIEW",
+  "not_authorised": [
+    "new successor authority or fresh mint paths",
+    "token/key/Vault credential access",
+    "Render/database mutation",
+    "build/B run"
+  ],
+  "preserved": [
+    "all token/mint/seal/period/access/handoff/closure/revocation records",
+    "accepted aborted-run report0409e981670f2b404e1cb2e78de6cc33239d22e0a215d868ef4687a2b090056b",
+    "frozen application db05f5d and consumed build allowance",
+    "timing D/P/E, profiles, budgets, permissions, generation5"
+  ],
+  "remaining": "Review this code and pin slice before any separately approved successor preparation; closed failed attempt is never replayed",
+  "runtime_source_preservation": "daily_intake_runtime.py/render_intake.py/operational_supervisor.py bytes equal frozen db05f5d; actual collector called with stubbed connection/supervisor, actual supervisor called with intercepted Popen; fake browser bytes hashed, never executed",
+  "semantics": {
+    "child": "retained live Manchester path requires profile before collection and injects approved directory explicitly; fresh supervisor env copies it into Popen",
+    "preexisting_service_variable": "preserved unchanged; not treated as a source-child path",
+    "profile.browser_path": "absolute installation directory; runtime resolves and SHA256 checks executable under it",
+    "real_service_value": "not decrypted, not claimed to equal0; no need to read it for this correction"
+  },
+  "strict_guards_preserved": [
+    "profile shape/service/revision/absolute directory syntax/digest format/limits",
+    "runtime actual directory/executable digest",
+    "child exact profile-directory environment and secret allowlist",
+    "preexisting INGESTION_RENDER_PROFILE mismatch refusal",
+    "legacy owner equality",
+    "one PUT intent/no retry and exact encrypted baseline restore"
+  ],
+  "validation": "14+2 focused checks; only new/affected checks; no accepted suite rerun"
+}

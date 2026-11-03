@@ -170,7 +170,12 @@ def handoff(api, state, save, publication_token, *, observation=None):
             profile['service_id']==SERVICE and isinstance(profile['browser_path'],str) and
             Path(profile['browser_path']).is_absolute() and '..' not in Path(profile['browser_path']).parts and
             re.fullmatch('[a-f0-9]{64}',profile['browser_sha256']) and
-            new['PLAYWRIGHT_BROWSERS_PATH']==profile['browser_path'] and
+            # Reserve-B runtime supplies the approved directory explicitly to
+            # its restricted browser child. Keep the restored service setting
+            # (for example Playwright's build selector '0') unchanged; only the
+            # child environment must equal the profile. Legacy guards remain.
+            (b.get('timing_policy',{}).get('version')=='SEPARATE_EXPIRY_V2_RESERVE' or
+             new['PLAYWRIGHT_BROWSERS_PATH']==profile['browser_path']) and
             all(type(profile[k]) is int for k in ('source_rss_bytes','controller_rss_bytes','reserve_bytes','source_seconds')) and
             (profile['source_rss_bytes'],profile['controller_rss_bytes'],profile['reserve_bytes'],profile['source_seconds'])==
             (1073741824,268435456,536870912,75),'EXACT_RENDER_PROFILE_FIELDS_AND_LIMITS')
