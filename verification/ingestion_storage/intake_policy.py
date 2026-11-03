@@ -130,8 +130,8 @@ REGISTRATION = r"""
     OR jsonb_typeof(item->'subject'->'start') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'end') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'council') IS DISTINCT FROM 'string'
-    OR item->'subject'->>'end'<>CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'end' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text END
-    OR item->'subject'->>'start'<>CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'start' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text END
+    OR item->'subject'->>'end'<>(CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'end' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text END)
+    OR item->'subject'->>'start'<>(CASE WHEN e->>'evidence_backend'='POSTGRES_PILOT_V1' THEN e->'fixed_window'->>'start' ELSE ((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text END)
     OR item->'subject'->>'semantics' IS DISTINCT FROM (CASE WHEN item->'subject'->>'council'='manchester' THEN 'VALIDATED' ELSE 'RECEIVED' END)
     OR NOT (e->'councils' ? (item->'subject'->>'council'))
     OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'

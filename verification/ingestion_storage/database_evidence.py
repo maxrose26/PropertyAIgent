@@ -149,3 +149,65 @@ FINISH_GUARD_SQL=r'''
    ELSIF p->'publication' ? 'backend' THEN RAISE EXCEPTION 'INTAKE_EVIDENCE_BACKEND_NOT_AUTHORISED';
    END IF;
 '''
+
+PREDECESSOR_REGISTER_SHA='dba6b809c50b9bd937b2f509fc05c20de9d69499ca4394e9007ef3af196b481c'
+def migration_sql():
+    """One guarded additive migration, exact installed predecessor, no login/data effects."""
+    from .intake_policy import policy_sql
+    from .operational_owner import Owner
+    text=policy_sql();start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(');end=text.index('$register$;',start)+len('$register$;');register=text[start:end]
+    expected=hashlib.sha256(Owner.daily_intake_inventory()['ingestion_register_bolton_exception'].encode()).hexdigest()
+    return r'''
+BEGIN;
+SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s';
+DO $pre$ BEGIN
+ IF current_user<>'postgres' OR session_user<>'postgres' OR current_setting('server_version_num')::int<170000
+ OR pg_has_role(current_user,'ingestion_storage_owner','SET') OR pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+ OR has_schema_privilege('ingestion_storage_owner','public','CREATE')
+ OR (SELECT count(*) FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole AND grantor<>'postgres'::regrole AND admin_option AND NOT inherit_option AND NOT set_option)<>1
+ OR (SELECT count(*) FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=current_user::regrole)<>1
+ OR NOT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')
+ OR to_regclass('public.ingestion_run_evidence') IS NOT NULL
+ OR EXISTS(SELECT 1 FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname IN ('ingestion_intake_evidence_write','ingestion_intake_evidence_read'))
+ OR (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure) IS DISTINCT FROM '__PRE__'
+ OR EXISTS(SELECT 1 FROM pg_roles r JOIN pg_authid a ON r.rolname=a.rolname WHERE r.rolname IN ('ingestion_worker_login','ingestion_effect_login') AND (r.rolcanlogin OR a.rolpassword IS NOT NULL))
+ OR EXISTS(SELECT 1 FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_effect_login'::regrole]))
+ OR EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login'))
+ THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_MIGRATION_PRECONDITION'; END IF;
+END $pre$;
+LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE;
+CREATE TEMP TABLE evidence_before ON COMMIT DROP AS SELECT
+ (SELECT jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor) FROM pg_auth_members m) AS memberships,
+ (SELECT nspacl::text FROM pg_namespace WHERE nspname='public') AS schema_acl,
+ (SELECT jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),
+  'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM public.ingestion_work_attempts a))) AS ledger;
+DO $stops$ DECLARE ctl jsonb; BEGIN
+ SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items WHERE key=repeat('0',64);
+ IF ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb OR ctl->>'manual_stop' IS NOT NULL
+ OR ctl->>'hard_stop_generation'<>'5' OR ctl->>'last_hard_stop'<>'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+ OR EXISTS(SELECT 1 FROM public.ingestion_work_items WHERE phase IN ('SOURCE_INTENT','WRITE_INTENT') OR state='PERSISTENCE_UNCERTAIN')
+ OR (ctl ? 'intake_run' AND ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED')
+ THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_UNRESOLVED_STATE'; END IF;
+END $stops$;
+GRANT ingestion_storage_owner TO postgres WITH ADMIN FALSE, INHERIT FALSE, SET TRUE GRANTED BY postgres;
+GRANT CREATE ON SCHEMA public TO ingestion_storage_owner;
+SET LOCAL ROLE ingestion_storage_owner;
+''' .replace('__PRE__',PREDECESSOR_REGISTER_SHA)+definition_sql()+register+r'''
+RESET ROLE;
+REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner;
+REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
+DO $post$ DECLARE b record; BEGIN
+ SELECT * INTO STRICT b FROM evidence_before;
+ IF pg_has_role(current_user,'ingestion_storage_owner','SET') OR pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+ OR has_schema_privilege('ingestion_storage_owner','public','CREATE')
+ OR b.memberships IS DISTINCT FROM (SELECT jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor) FROM pg_auth_members m)
+ OR b.schema_acl IS DISTINCT FROM (SELECT nspacl::text FROM pg_namespace WHERE nspname='public')
+ OR b.ledger IS DISTINCT FROM (SELECT jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),
+ 'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM public.ingestion_work_attempts a)))
+ OR (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure) IS DISTINCT FROM '__AFTER__'
+ OR EXISTS(SELECT 1 FROM pg_class c CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE c.oid='public.ingestion_run_evidence'::regclass AND a.grantee<>c.relowner)
+ THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION'; END IF;
+END $post$;
+COMMIT;
+SELECT 'DATABASE_EVIDENCE_MIGRATION_COMMIT_ACKNOWLEDGED' AS status;
+''' .replace('__AFTER__',expected)
