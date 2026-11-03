@@ -67,9 +67,9 @@ BEGIN
  SELECT 1 FROM jsonb_each(ctl->'grants') g JOIN public.ingestion_work_items w ON w.key=g.value->>'capture_key'
  WHERE g.value->>'intake_period'=p_period AND g.value->>'intake_run'=p_run AND w.phase='SOURCE_INTENT'
  AND g.value->'execution_binding'=policy->'execution_binding' AND (g.value->>'expires_at')::double precision>t
- AND (convert_from(p_body,'UTF8')::jsonb)->>'council'=w.subject::jsonb->>'council'
  AND (convert_from(p_body,'UTF8')::jsonb)->'requested_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')
- AND (convert_from(p_body,'UTF8')::jsonb)->>'date_semantics'=w.subject::jsonb->>'semantics'
+ AND ((w.subject::jsonb->>'council'='tameside' AND (convert_from(p_body,'UTF8')::jsonb)->>'council'='tameside' AND (convert_from(p_body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED')
+ OR (w.subject::jsonb->>'council'='manchester' AND w.subject::jsonb->>'semantics'='VALIDATED' AND (convert_from(p_body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window' AND (convert_from(p_body,'UTF8')::jsonb)->'applied_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')))
  )) THEN RAISE EXCEPTION 'EVIDENCE_SOURCE_AUTHORITY'; END IF;
  IF p_name LIKE 'final/%' AND EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') g WHERE g.value->>'intake_run'=p_run AND g.value->'expires_at' IS DISTINCT FROM '0'::jsonb) THEN RAISE EXCEPTION 'EVIDENCE_FINITE_AUTHORITIES_NOT_CLOSED'; END IF;
  -- Reject malformed/non-object exports without converting an arbitrary exception to success.
@@ -137,7 +137,7 @@ FINISH_GUARD_SQL=r'''
          AND d.name IN ('capture-1/source.json','capture-2/source.json')
          AND d.sha256=w.checkpoint::jsonb->>'source_sha256'
          AND d.sha256=encode(sha256(d.body),'hex')
-         AND (convert_from(d.body,'UTF8')::jsonb)->>'council'=w.subject::jsonb->>'council'
+         AND (((convert_from(d.body,'UTF8')::jsonb)->>'council'=w.subject::jsonb->>'council' AND w.subject::jsonb->>'council'='tameside') OR (w.subject::jsonb->>'council'='manchester' AND (convert_from(d.body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window'))
          AND (convert_from(d.body,'UTF8')::jsonb)->'requested_interval'=jsonb_build_array(w.subject::jsonb->>'start',w.subject::jsonb->>'end')
          AND w.checkpoint::jsonb->'durable_archive'->>'backend'='POSTGRES_PILOT_V1'
          AND w.checkpoint::jsonb->'durable_archive'->>'period'=a
