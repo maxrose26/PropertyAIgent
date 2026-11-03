@@ -1,4 +1,5 @@
 import json,time
+from datetime import datetime,timezone
 from contextlib import contextmanager
 from types import SimpleNamespace
 import pytest
@@ -22,7 +23,7 @@ def test_actual_meter_bounded_same_secret_reconnect_and_suppression(failures,exp
                     raise RuntimeError('SENSITIVE_SENTINEL')
                 self.statements=8;self.returned_bytes=120;c=SimpleNamespace(closed=False)
                 worker=role=='ingestion_worker_login'
-                c.execute=lambda *_a,**_k:SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,deadline))
+                c.execute=lambda *_a,**_k:SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,datetime.fromtimestamp(deadline,timezone.utc).timestamp()))
                 self.opened.append(c)
                 try:yield c
                 finally:c.closed=True

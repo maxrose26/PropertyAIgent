@@ -3,9 +3,9 @@ import pytest
 from verification.ingestion_storage import owner_pilot as p,owner_pilot_continuation as step
 
 def closed():
-    return dict(period=p.PREDECESSOR,status='CLOSED',pipeline_status='NOT_VERIFIED',failure=dict(phase='QUALIFY',exception_class='Denied',reason='UNKNOWN_FAILURE'),
+    return dict(period=p.PREDECESSOR,status='CLOSED',pipeline_status='NOT_VERIFIED',failure=dict(phase='QUALIFY',exception_class='OperationalError',reason='UNKNOWN_FAILURE'),
         access={'state':'DATABASE_CLOSURE_ACKNOWLEDGED'},closure_receipt=dict(outcome='COMMIT_ACKNOWLEDGED',sessions='ABSENT',temporary_owner='REMOVED'),
-        final_service=dict(suspended=True,configuration_equal=True,environment_equal=True),intents={'RELEASE':{},'QUALIFY':{}})
+        final_service=dict(suspended=True,configuration_equal=True,environment_equal=True),intents={'RELEASE':{},'QUALIFY':{}},qualification_attempts=[{'driver_statements':0,'connection_diagnostics':[{'reason_code':'AUTHENTICATION_REJECTED'}]}])
 
 def test_closed_predecessor_binding_preserves_bytes_and_fixed_window():
     state=closed();before=copy.deepcopy(state);link=step.predecessor(state)
