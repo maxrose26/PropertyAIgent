@@ -58,13 +58,14 @@ local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Allocation Disco
 # destination in its own right yet).
 shortlist_page = st.Page("pages/3b_Shortlist.py", title="Shortlist", icon="⭐", visibility="hidden")
 council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️", visibility="visible" if actor.role == "operator" else "hidden")
+bounded_intake_page = st.Page("pages/8_Bounded_Intake.py", title="Bounded Intake", icon="📥", url_path="bounded-intake", visibility="visible" if actor.role == "operator" else "hidden")
 review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗", visibility="visible" if actor.role == "operator" else "hidden")
 
 pg = st.navigation(
     {
         "": [dashboard_page, explore_page, site_profile_page],
         "Policy": [council_intelligence_page, council_intelligence_detail_page, local_plan_page, shortlist_page],
-        "Administration": [council_operations_page, review_links_page],
+        "Administration": [council_operations_page, bounded_intake_page, review_links_page],
     },
     position="top",
 )
