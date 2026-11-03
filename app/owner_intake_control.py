@@ -18,6 +18,12 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     else:require_owner()
     if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
     if action=='run' and (type(checked_at) not in (int,float) or not 0<=time.time()-checked_at<=300):raise ValueError('OWNER_BOUNDARY_CONFIRMATION_EXPIRED')
+    if action=='run':
+        from verification.ingestion_storage.owner_pilot import start_availability
+        availability=start_availability()
+        if not availability['available']:
+            return dict(status='NOT_STARTED_TIME_WINDOW',next_available_at=availability['next_available_at'],
+                        child_started=False,provider_calls=0,authority_consumed=False)
     with _lock:
         if _process is not None and _process.poll() is None:
             if action!='recover':raise ValueError('OWNER_PILOT_PROCESS_ALREADY_RUNNING')

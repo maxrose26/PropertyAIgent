@@ -13,7 +13,7 @@ def test_preparation_readback_is_get_and_read_only_without_journal_mutation():
         def connection(self):yield self
         def execute(self,q,params=None):
             assert q.startswith(('BEGIN READ ONLY','SELECT ','ROLLBACK'));self.q=q;return self
-        def fetchone(self):return ({'intake_periods':{}},) if 'outcome::jsonb' in self.q else (True,)
+        def fetchone(self):return ({'intake_periods':{}},) if 'outcome::jsonb' in self.q else (0,) if 'count(*)' in self.q else (True,)
         def fetchall(self):return [('ingestion_worker_login',False,True),('ingestion_effect_login',False,True)]
     calls=[]
     class API:

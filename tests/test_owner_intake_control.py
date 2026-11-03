@@ -16,6 +16,7 @@ def test_owner_boundary_before_any_process(monkeypatch,subject,machine):
 
 def test_supported_launch_has_no_secret_arguments_and_excludes_unrelated_credentials(monkeypatch):
     owner(monkeypatch);monkeypatch.setattr(c,'_process',None)
+    monkeypatch.setattr(c.time,'time',lambda:1793782800.0)  # 4 Nov 2026 09:00 UTC; eligible synthetic start.
     monkeypatch.setenv('DATABASE_URL','SYNTHETIC_DATABASE_SENTINEL');monkeypatch.setenv('PROPERTYAIGENT_INTAKE_RENDER_API_KEY','SYNTHETIC_RENDER_SENTINEL');monkeypatch.setenv('OPENAI_API_KEY','SYNTHETIC_AI_SENTINEL')
     calls=[]
     def popen(command,**kw):calls.append((command,kw));return SimpleNamespace(poll=lambda:None)

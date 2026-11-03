@@ -173,6 +173,14 @@ def source_profile(artifact,revision):
     return dict(mode='render-intake-v1',service_id=SERVICE,revision=revision,browser_path=artifact['browser_path'],browser_sha256=artifact['browser_sha256'],
                 aggregate_bytes=2147483648,source_rss_bytes=1073741824,controller_rss_bytes=268435456,reserve_bytes=536870912,source_seconds=75)
 
+def start_availability(now=None):
+    """Display availability without consuming authority or sliding a deadline."""
+    now=time.time() if now is None else now
+    day=datetime.fromtimestamp(now,ZoneInfo('Europe/London'))
+    midnight=datetime.combine(day.date()+timedelta(days=1),datetime.min.time(),ZoneInfo('Europe/London')).timestamp()
+    return dict(available=now+2100<=midnight,next_available_at=now if now+2100<=midnight else midnight,
+                latest_start_today=midnight-2100,access_seconds=2100,window=WINDOW)
+
 def fixed_binding(release,profile,address,guard,now=None):
     now=time.time() if now is None else now
     day=datetime.fromtimestamp(now,ZoneInfo('Europe/London'))
@@ -758,12 +766,21 @@ class Pilot:
         value=self.summary();value['workflow_status']=value['status'];value['status']='READ_ONLY_EVIDENCE_SAVED';value['read_only']=True
         value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
         value['artifact_verified']='artifact' in self.state
+        value['release_intent_present']='RELEASE' in self.state.get('intents',{})
+        value['job_intent_present']='ONE_JOB' in self.state.get('intents',{})
+        value['job_recorded']=bool(self.state.get('job'))
+        value['access_state']=self.state.get('access',{}).get('state')
         with envelope(),self.db.connection() as c:
             c.execute('BEGIN READ ONLY')
             try:
                 roles=c.execute(op.ROLE_QUERY,(list(op.ROLES),)).fetchall()
                 value['runtime_roles']=[{'role':r[0],'login':r[1],'password_null':r[2]} for r in roles]
                 value['period_present']=PERIOD in op.control(c).get('intake_periods',{})
+                value['pipeline_session_count']=c.execute('SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)',(list(op.ROLES),)).fetchone()[0]
+                value['runtime_membership_count']=c.execute('SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(op.ROLES),)).fetchone()[0]
+                if self.state.get('stable_credentials'):
+                    observed=dict(c.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname=ANY(%s)",(list(op.ROLES),)).fetchall())
+                    value['stable_verifier_binding']='MATCH' if observed==self.state['stable_credentials']['verifier_sha256'] else 'DRIFT'
                 value['temporary_owner_absent']=c.execute("SELECT NOT pg_has_role(current_user,'ingestion_storage_owner','SET') AND NOT pg_has_role(current_user,'ingestion_storage_owner','USAGE') AND NOT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()[0]
             finally:c.execute('ROLLBACK')
         with self.api() as api:
