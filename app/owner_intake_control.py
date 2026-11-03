@@ -13,10 +13,10 @@ def require_owner():
 def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     global _process
     if server_prepare:
-        expected=PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else None
+        expected=PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
         if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
-    if action not in ('prepare','run','recover','status') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
+    if action not in ('prepare','run','recover','status','reconcile-artifact') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
     if action=='run' and (type(checked_at) not in (int,float) or not 0<=time.time()-checked_at<=300):raise ValueError('OWNER_BOUNDARY_CONFIRMATION_EXPIRED')
     with _lock:
         if _process is not None and _process.poll() is None:
@@ -28,10 +28,10 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
                 os.killpg(_process.pid,signal.SIGKILL);_process.wait(timeout=2)
         # Existing provider secret configuration is the only credential source.
         # No secrets enter command arguments, output files or a new store.
-        keep={'PATH','HOME','LANG','TZ','DATABASE_URL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY','PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'}
+        keep={'PATH','HOME','LANG','TZ','DATABASE_URL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY','PROPERTYAIGENT_INTAKE_SOURCE_RELEASE','PROPERTYAIGENT_INTAKE_BUILD_RECEIPT'}
         env={k:v for k,v in os.environ.items() if k in keep}
         env.update(PYTHONDONTWRITEBYTECODE='1',PROPERTYAIGENT_OWNER_PILOT_AUTHORITY=PERIOD)
-        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action=='prepare' else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
+        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action=='prepare' else '60s' if action in ('status','reconcile-artifact') else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
         if action=='run':command+=['--owner-checked-at',str(checked_at)]
         _process=subprocess.Popen(command,env=env,stdin=subprocess.DEVNULL,stdout=None,stderr=subprocess.DEVNULL,start_new_session=True)
         return {'status':'OWNER_PILOT_COMMAND_STARTED','action':action,'credentials':'EXISTING_PROTECTED_CONFIGURATION'}
@@ -51,3 +51,5 @@ def startup_prepare():
         print('PROPERTYAIGENT_OWNER_PILOT_PREPARATION '+str(start('prepare',server_prepare=True)['status']),flush=True)
     elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='READBACK:'+PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_READBACK '+str(start('status',server_prepare=True)['status']),flush=True)
+    elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='RECONCILE:'+PERIOD:
+        print('PROPERTYAIGENT_OWNER_PILOT_RECEIPT_RECONCILIATION '+str(start('reconcile-artifact',server_prepare=True)['status']),flush=True)

@@ -4,10 +4,10 @@ Only this fixed reviewed two-council pilot is exposed. Source work remains in
 scripts.run_daily_councils on the restricted, supervised Render job.
 """
 import argparse,json,os
-from verification.ingestion_storage.owner_pilot import Pilot,PERIOD,safe_result
+from verification.ingestion_storage.owner_pilot import Pilot,PERIOD,safe_result,private_failure
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','run','recover','status'),required=True)
+    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','run','recover','status','reconcile-artifact'),required=True)
     p.add_argument('--owner-checked-at',type=float);a=p.parse_args()
     pilot=None
     try:
@@ -17,9 +17,11 @@ def main():
         if a.action=='prepare':pilot.prepare()
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
+        elif a.action=='reconcile-artifact':pilot.reconcile_artifact()
         result=pilot.inspect() if a.action=='status' else pilot.summary()
     except BaseException as exc:
         result=safe_result(exc)
+        result['private_diagnostic']=private_failure(exc,a.action)
         if pilot is not None and pilot.state is not None:
             result.update(period=PERIOD,last_saved_status=pilot.state.get('status'),effects_require_readback=True)
     raw=json.dumps(result,sort_keys=True,separators=(',',':'))
