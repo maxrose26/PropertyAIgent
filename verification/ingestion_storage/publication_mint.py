@@ -244,11 +244,37 @@ SUCCESSOR_PREDECESSOR_PROOFS={
  CORRECTED_MARKER:'3823b52bf23e281e9ea8ce2bb742e2f67b68f30e42aa44930e83d20cfc90f485',
  CORRECTED_JOURNAL:'9bd3bdf320ad6ddc1a617abb2df6f50bf4a0fd5a549f8140db5776abba53a78e',
 }
+SUCCESSOR_PREDECESSOR_JOURNAL=CORRECTED_JOURNAL
+SUCCESSOR_ATTEMPT='ONE_B_EXPIRED_UNUSED_SUCCESSOR_V1'
 SUCCESSOR_UNUSED_RELEASE=Path('/home/maxrose26/stage4-owner/b-finite-release-20261103')
 SUCCESSOR_UNUSED_PHASES=('seal-evidence','period-evidence','activate-evidence','qualify-evidence','handoff-evidence',
     'close-evidence','publication-revoke-evidence','handoff-restore-evidence','readback-evidence','submission.intent.json',
     'terminal-expected.json','final-expected.json')
 
+
+
+# One fixed extension after the exact accepted, expired-unused successor. No
+# arbitrary journal/path input and no erasure or reset of predecessor authority.
+def select_reserve_successor():
+    global SUCCESSOR_MARKER,SUCCESSOR_JOURNAL,SUCCESSOR_OUTPUT,SUCCESSOR_CLOSURE,SUCCESSOR_CLOSURE_SHA
+    global PREDECESSOR_EXPIRY,PREDECESSOR_RECEIPT,SUCCESSOR_PREDECESSOR_PROOFS
+    global SUCCESSOR_UNUSED_RELEASE,SUCCESSOR_PREDECESSOR_JOURNAL,SUCCESSOR_ATTEMPT
+    SUCCESSOR_MARKER='mint-reserve-v2-20261103-01-consumed.json'
+    SUCCESSOR_JOURNAL='mint-reserve-v2-20261103-01.vault'
+    SUCCESSOR_OUTPUT='mint-evidence-reserve-v2-20261103-01'
+    SUCCESSOR_ATTEMPT='ONE_B_PUBLICATION_MINT_RESERVE_V2_20261103_01'
+    SUCCESSOR_CLOSURE=Path('/home/maxrose26/stage4-owner/b-successor-release-20261103/EXPIRED-UNUSED-SUCCESSOR-CLOSURE.json')
+    SUCCESSOR_CLOSURE_SHA='e681654cd008cfca30a6c63dba522bb92a4412edcf7cb2430446b4779e09e522'
+    PREDECESSOR_EXPIRY=1793708738
+    PREDECESSOR_RECEIPT='352342cda2dd05a03848be80faf31830748bf55e0c5e841a86c0d3476db829a1'
+    SUCCESSOR_PREDECESSOR_JOURNAL='mint-expired-unused-successor-01.vault'
+    SUCCESSOR_PREDECESSOR_PROOFS={
+        **SUCCESSOR_PREDECESSOR_PROOFS,
+        'mint-evidence-expired-unused-successor-01/result.json':'8f175f5ae06a6f020d3f020f7ff41c3de6cf32523ec28a7c1268ca4cff9b0508',
+        'mint-expired-unused-successor-01-consumed.json':'49b63877fd41cf60e132702e8963845a55715a4e97c21519db098f7456835e82',
+        'mint-expired-unused-successor-01.vault':'64862226d0f9d0681afa357dfbf2c2ab09c1c13ccfe024994350d6f9385ce1d5',
+    }
+    SUCCESSOR_UNUSED_RELEASE=Path('/home/maxrose26/stage4-owner/b-successor-release-20261103')
 
 def successor_preconditions(a,a_sha,vault_password=None,*,now=None):
     from zoneinfo import ZoneInfo
@@ -277,8 +303,18 @@ def successor_preconditions(a,a_sha,vault_password=None,*,now=None):
     local=datetime.fromtimestamp(stamp,ZoneInfo('Europe/London'))
     need(local.date().isoformat()=='2026-11-03','EXECUTION_DAY')
     need((datetime(2026,11,4,tzinfo=ZoneInfo('Europe/London'))-local).total_seconds()>3065,'MINT_DAY_MARGIN')
+    if SUCCESSOR_ATTEMPT=='ONE_B_PUBLICATION_MINT_RESERVE_V2_20261103_01':
+        from . import finite_release_binding as flow
+        flow.use_timing_release();static=flow.static()
+        need(static.get('execution_day')=='2026-11-03' and static.get('window')==dict(start='2026-10-27',end='2026-11-02',inclusive=True,tameside='RECEIVED',manchester='VALIDATED'),'EXECUTION_DAY')
+        need(static.get('mint_authority')==dict(attempt=SUCCESSOR_ATTEMPT,predecessor_closure_sha256=SUCCESSOR_CLOSURE_SHA,predecessor_receipt_sha256=PREDECESSOR_RECEIPT,max_mint_posts=1,approved_for_execution=False) and
+             static.get('mint_journal_path')==str(ROOT/SUCCESSOR_JOURNAL) and static.get('mint_result_path')==str(ROOT/SUCCESSOR_OUTPUT/'result.json'),'SUCCESSOR_PRECONDITION')
+        for name in (*SUCCESSOR_UNUSED_PHASES,'owner-binding.json','period-policy.json','FROZEN.json','ACTUAL-MINT-REVIEW.json','handoff-observation.json','submission-observation.json','submission-check-evidence'):
+            path=flow.ROOT/name;need(not path.exists() and not path.is_symlink(),'EXISTING_ATTEMPT')
+        for value in (static['access_vault'],static['binding_fields']['period_vault_path']):
+            path=Path(value);need(not path.exists() and not path.is_symlink() and not Path(str(path)+'.next').exists() and not Path(str(path)+'.next').is_symlink(),'EXISTING_ATTEMPT')
     if vault_password is not None:
-        state=Vault(ROOT/CORRECTED_JOURNAL,vault_password).load()
+        state=Vault(ROOT/SUCCESSOR_PREDECESSOR_JOURNAL,vault_password).load()
         need(state.get('version')=='ONE_B_MINT_V1' and state.get('post_started') is True and
              state.get('state')=='RECEIPT_VALIDATED_NOT_ARMED' and state.get('authority')==a and
              state.get('authority_sha256')==a_sha and state.get('receipt_sha256')==PREDECESSOR_RECEIPT and
@@ -307,7 +343,7 @@ def mint(a,a_sha,password,vault_password,*,transport_factory=Transport,clock=tim
         else:need(a_sha!=CORRECTED_A_SHA,'CORRECTED_REPLACEMENT')
         marker=SUCCESSOR_MARKER if successor else CORRECTED_MARKER if corrected_replacement else 'mint-01-consumed.json'
         intent=dict(attempt=ATTEMPT,authority_sha256=a_sha,retry=False)
-        if successor:intent.update(attempt='ONE_B_EXPIRED_UNUSED_SUCCESSOR_V1',predecessor_receipt_sha256=PREDECESSOR_RECEIPT,predecessor_closure_sha256=SUCCESSOR_CLOSURE_SHA)
+        if successor:intent.update(attempt=SUCCESSOR_ATTEMPT,predecessor_receipt_sha256=PREDECESSOR_RECEIPT,predecessor_closure_sha256=SUCCESSOR_CLOSURE_SHA)
         exclusive(marker,intent)
         journal=Vault(ROOT/mint_journal(a_sha,successor=successor),vault_password,create=True)
         state=dict(version='ONE_B_MINT_V1',authority=a,authority_sha256=a_sha,state='CONSUMED_POST_NOT_SENT',post_started=False)
@@ -444,9 +480,11 @@ def main(argv=None):
         parser.add_argument('--replace-issuer-refusal',action='store_true')
         parser.add_argument('--successor-expired-unused',action='store_true')
         parser.add_argument('--child',action='store_true');parser.add_argument('--secrets-fd',type=int)
-        parser.add_argument('--launch',action='store_true');parser.add_argument('--continue-owner-session',action='store_true');parser.add_argument('--timing-v2',action='store_true')
+        parser.add_argument('--reserve-v2',action='store_true');parser.add_argument('--launch',action='store_true');parser.add_argument('--continue-owner-session',action='store_true');parser.add_argument('--timing-v2',action='store_true')
         parser.error=lambda _: (_ for _ in ()).throw(Refusal('ARGUMENTS'))
         args=parser.parse_args(argv)
+        if args.reserve_v2:
+            need(args.successor_expired_unused and args.timing_v2,'ARGUMENTS');select_reserve_successor()
         if args.launch:
             need(not args.child and args.phase=='seal','ARGUMENTS')
             from . import finite_release_binding as flow
@@ -498,13 +536,13 @@ def main(argv=None):
         else:
             need(args.secrets_fd is None,'ARGUMENTS')
             need(sys.stdin.isatty() and sys.stderr.isatty(),'TTY')
-            phrase='EXECUTE_ONE_SUCCESSOR_AFTER_EXPIRED_UNUSED_MINT' if args.successor_expired_unused and args.phase=='mint' else 'EXECUTE_ONE_CORRECTED_ISSUER_B_PUBLICATION_TOKEN_MINT' if args.replace_issuer_refusal else 'EXECUTE_ONE_B_PUBLICATION_TOKEN_MINT' if args.phase=='mint' else 'SEAL_EXACT_B_PUBLICATION_TOKEN_ONCE'
+            phrase='EXECUTE_ONE_RESERVE_V2_20261103_MINT' if args.reserve_v2 and args.phase=='mint' else 'EXECUTE_ONE_SUCCESSOR_AFTER_EXPIRED_UNUSED_MINT' if args.successor_expired_unused and args.phase=='mint' else 'EXECUTE_ONE_CORRECTED_ISSUER_B_PUBLICATION_TOKEN_MINT' if args.replace_issuer_refusal else 'EXECUTE_ONE_B_PUBLICATION_TOKEN_MINT' if args.phase=='mint' else 'SEAL_EXACT_B_PUBLICATION_TOKEN_ONCE'
             need(input('Approved phrase ('+phrase+'): ').strip()==phrase,'APPROVAL')
             from . import intake_owner_client as client
             destination=ROOT/(SUCCESSOR_OUTPUT if args.successor_expired_unused and args.phase=='mint' else CORRECTED_OUTPUT if args.replace_issuer_refusal else REPLACEMENT_OUTPUT if args.replace_local_refusal else args.phase+'-evidence-01')
             need(not destination.exists() and not destination.is_symlink(),'EXISTING_ATTEMPT')
             if args.phase=='mint' and args.successor_expired_unused:
-                password=client.vault_input(ROOT/CORRECTED_JOURNAL)
+                password=client.vault_input(ROOT/SUCCESSOR_PREDECESSOR_JOURNAL)
                 successor_preconditions(a,a_sha,password)
                 print('Retrieve PropertyAIgent — GitHub signing-key passphrase; same existing encrypted key.',file=sys.stderr)
                 key_password=client.private_input('PropertyAIgent — GitHub signing-key passphrase (hidden): ',validator=lambda value:key_unlock(a,value),unlock_code='KEY')
@@ -541,6 +579,7 @@ def main(argv=None):
                 if args.replace_issuer_refusal:command+=['--replace-issuer-refusal']
                 if args.successor_expired_unused:command+=['--successor-expired-unused']
                 if args.timing_v2:command+=['--timing-v2']
+                if args.reserve_v2:command+=['--reserve-v2']
                 if b is not None:command+=['--binding',str(Path(args.binding).absolute()),'--binding-sha256',args.binding_sha256]
                 data,c=capture(command,dict(HOME=str(Path.home()),PATH='/usr/bin:/bin',LANG='C.UTF-8',PYTHONDONTWRITEBYTECODE='1',OPENBLAS_NUM_THREADS='1'),seconds=60,ceiling=4096,pass_fds=(readfd,))
             finally:

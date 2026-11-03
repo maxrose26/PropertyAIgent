@@ -1,0 +1,112 @@
+{
+  "B_command_sha256": "c088f8440636507dfd68be79566bf5d1153221bcd95461dc2bb889d210b2408b",
+  "access_vault": "/home/maxrose26/.local/share/propertyaigent/b-publication-app/b-20261103-tm-reserve01-access.vault",
+  "artifact": {
+    "commit": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+    "deployment": "dep-dbkfchcipgvc73ar53dg",
+    "tree": "fa3e9ffd3cb5e6fceecb6bdd56d84cf861d6c425"
+  },
+  "binding_fields": {
+    "accepted_stop": {
+      "global_stop": null,
+      "hard_stop_generation": 5,
+      "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+      "manual_stop": null
+    },
+    "execution_binding": {
+      "manifest_sha256": "3c04373b83801b89dd4b5fc0077ee5a533ae94bed4ee807b31bbe9e42b91d60e",
+      "revision": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+      "workflow_sha256": "5b87c6cbef2944fa05468314fc6daefc19b785644b04e04d1ff382b0596cadea"
+    },
+    "hostaddr": "18.135.253.94",
+    "owner_hostaddr": "18.135.253.94",
+    "period": "b-20261103-tm-reserve01",
+    "period_vault_path": "/home/maxrose26/.local/share/propertyaigent/b-publication-app/b-20261103-tm-reserve01-period.vault",
+    "publication_scope": {
+      "contents": "write",
+      "metadata": "read",
+      "repository": "maxrose26/PropertyAIgent"
+    },
+    "publication_vault_path": "/home/maxrose26/.local/share/propertyaigent/b-publication-app/publication-01.vault",
+    "render_config_sha256": "78b5f3a8f5b2730f5d675d214192b53e339edb07ceeb14e188ed1d2c3ab14257",
+    "render_profile": {
+      "aggregate_bytes": 2147483648,
+      "browser_path": "/opt/render/project/src/.venv/lib/python3.14/site-packages/playwright/driver/package/.local-browsers",
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "controller_rss_bytes": 268435456,
+      "mode": "render-intake-v1",
+      "reserve_bytes": 536870912,
+      "revision": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+      "service_id": "crn-d9sv93vavr4c73f98rb0",
+      "source_rss_bytes": 1073741824,
+      "source_seconds": 75
+    },
+    "route": "POOLER",
+    "version": "FINITE_INTAKE_OWNER_V1"
+  },
+  "execution_day": "2026-11-03",
+  "mint_authority": {
+    "approved_for_execution": false,
+    "attempt": "ONE_B_PUBLICATION_MINT_RESERVE_V2_20261103_01",
+    "max_mint_posts": 1,
+    "predecessor_closure_sha256": "e681654cd008cfca30a6c63dba522bb92a4412edcf7cb2430446b4779e09e522",
+    "predecessor_receipt_sha256": "352342cda2dd05a03848be80faf31830748bf55e0c5e841a86c0d3476db829a1"
+  },
+  "mint_journal_path": "/home/maxrose26/.local/share/propertyaigent/b-publication-app/mint-reserve-v2-20261103-01.vault",
+  "mint_result_path": "/home/maxrose26/.local/share/propertyaigent/b-publication-app/mint-evidence-reserve-v2-20261103-01/result.json",
+  "policy_fields": {
+    "councils": {
+      "manchester": {
+        "contract": "manchester-screening-metadata-v1",
+        "qualification_sha256": "4c602866c0d6f388854e85c00d2ca2bd1244eaaca1aed059cc5a20bbdd537aa1"
+      },
+      "tameside": {
+        "contract": "tameside-screening-metadata-five-v1",
+        "qualification_sha256": "6fcf084c2cf987471f7a81e389f918bb975044bcb24b6834d036b017c459d0f7"
+      }
+    },
+    "execution_binding": {
+      "manifest_sha256": "3c04373b83801b89dd4b5fc0077ee5a533ae94bed4ee807b31bbe9e42b91d60e",
+      "revision": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+      "workflow_sha256": "5b87c6cbef2944fa05468314fc6daefc19b785644b04e04d1ff382b0596cadea"
+    },
+    "expected_stop": {
+      "global_stop": null,
+      "hard_stop_generation": 5,
+      "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+      "manual_stop": null
+    },
+    "hostaddr": "18.135.253.94",
+    "max_runs": 1,
+    "overlap_days": 7,
+    "render_profile": {
+      "aggregate_bytes": 2147483648,
+      "browser_path": "/opt/render/project/src/.venv/lib/python3.14/site-packages/playwright/driver/package/.local-browsers",
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "controller_rss_bytes": 268435456,
+      "mode": "render-intake-v1",
+      "reserve_bytes": 536870912,
+      "revision": "db05f5d48ce0c70c048c99f538d8765dae669c17",
+      "service_id": "crn-d9sv93vavr4c73f98rb0",
+      "source_rss_bytes": 1073741824,
+      "source_seconds": 75
+    },
+    "route": "POOLER",
+    "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
+    "test_evidence": false
+  },
+  "post_mint_dynamic_fields_only": [
+    "actual acknowledged E/receipt/result digest",
+    "actual bind timeT and fixedD/P",
+    "genuine operation-specific HANDOFF/SUBMISSION observations"
+  ],
+  "status": "DATE_BOUND_INACTIVE_MINT_REQUIRES_SEPARATE_APPROVAL",
+  "version": "FINITE_TIMING_V2_STATIC",
+  "window": {
+    "end": "2026-11-02",
+    "inclusive": true,
+    "manchester": "VALIDATED",
+    "start": "2026-10-27",
+    "tameside": "RECEIVED"
+  }
+}

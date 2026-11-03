@@ -1,0 +1,39 @@
+{
+  "RUN-BINDING-INACTIVE.sh": {
+    "allow_extra_arguments": true,
+    "arguments": [
+      "--timing-v2"
+    ],
+    "module": "verification.ingestion_storage.finite_release_binding"
+  },
+  "RUN-MINT-INACTIVE.sh": {
+    "allow_extra_arguments": false,
+    "arguments": [
+      "--phase",
+      "mint",
+      "--successor-expired-unused",
+      "--reserve-v2",
+      "--timing-v2",
+      "--continue-owner-session",
+      "--authority",
+      "/home/maxrose26/stage4-owner/b-github-get-readonly-20261103/authority-client-id-corrected.json",
+      "--authority-sha256",
+      "28a039e7dae4358055113fd830ad3ca2e3d742c6060d43c5b46f1c394e079096"
+    ],
+    "module": "verification.ingestion_storage.publication_mint"
+  },
+  "RUN-OWNER-INACTIVE.sh": {
+    "allow_extra_arguments": true,
+    "arguments": [
+      "--launch"
+    ],
+    "module": "verification.ingestion_storage.intake_owner_client"
+  },
+  "RUN-SUCCESSOR-INACTIVE.sh": {
+    "allow_extra_arguments": true,
+    "arguments": [
+      "--launch"
+    ],
+    "module": "verification.ingestion_storage.publication_mint"
+  }
+}

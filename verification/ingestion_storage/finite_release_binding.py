@@ -57,8 +57,8 @@ def build_v2(s,r,bound_at):
  owner.validate_binding(b,opening=True,now=bound_at);extra.validate_policy(b,policy,now=bound_at)
  return b,policy
 
-TIMING_ROOT=Path('/home/maxrose26/stage4-owner/b-timing-amendment-20261103-owner/release')
-TIMING_STATIC_SHA='680fe28d32e12ae7d8b4b173c802693284c492d22d707befe307fb8116ceb3da'
+TIMING_ROOT=Path('/home/maxrose26/stage4-owner/b-reserve-date-successor-20261103-owner/release')
+TIMING_STATIC_SHA='3f34227266ecc0dfb7bc660b09b5d2725e38405c85b5ac16989a859dcf892a30'
 def use_timing_release():
  global ROOT,MINT_RESULT,STATIC_SHA,LAUNCHERS
  ROOT=TIMING_ROOT;STATIC_SHA=TIMING_STATIC_SHA;LAUNCHERS=TIMING_ROOT.parent
@@ -207,7 +207,7 @@ def next_command(*,now=None,expect=None):
  try:
   if phase in ('seal','period','activate') or 'timing_policy' in b:owner.validate_binding(b,opening=True,now=time.time() if now is None else now)
  except BaseException:raise PreparationError('RELEASE_WINDOW_CLOSED') from None
- if 'timing_policy' in b and phase=='seal':args+=['--timing-v2']
+ if 'timing_policy' in b and phase=='seal':args+=['--timing-v2','--reserve-v2']
  if expect is not None:check(expect==phase,'PHASE_ORDER_REFUSED')
  return phase,shlex.join(args)
 

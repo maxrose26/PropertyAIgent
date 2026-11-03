@@ -1,0 +1,50 @@
+{
+  "base": "40e21d39aba529ef6838d24b9cac3520ee40a421",
+  "changed_production_modules": [
+    "publication_mint.py",
+    "finite_release_binding.py"
+  ],
+  "changes": {
+    "explicit_selector": "--reserve-v2 requires successor and timing-v2 flags",
+    "new_attempt": "ONE_B_PUBLICATION_MINT_RESERVE_V2_20261103_01",
+    "new_unused_state_guard": "new freeze/observation/effect files and access/period vaults refuse before mint intent",
+    "predecessor_closure_sha256": "e681654cd008cfca30a6c63dba522bb92a4412edcf7cb2430446b4779e09e522",
+    "predecessor_journal": "mint-expired-unused-successor-01.vault",
+    "predecessor_receipt_sha256": "352342cda2dd05a03848be80faf31830748bf55e0c5e841a86c0d3476db829a1"
+  },
+  "label": "SELF-REVIEW_NOT_INDEPENDENT_REVIEW",
+  "limitations": [
+    "Connected test executes actual parent/child entry functions and real anonymous pipes/encrypted synthetic Vaults; in-process mock child simulates exec fd/timer isolation",
+    "Activation/qualification/DB closure are mocked; period uses existing mocked SQL; no claim of new PostgreSQL behaviour",
+    "No live latency or current permissions/connectivity established",
+    "No final executable release authority: mint approval and later actual-expiry-bound release remain separate",
+    "Owner-only implementation still requires publication through authorised GitHub write route before REVIEW-ready reporting"
+  ],
+  "review_findings_resolved": [
+    "Added explicit fixed selector/attempt rather than changing paths alone",
+    "New parent/child selector propagation and exact predecessor Vault path",
+    "Sealing next-command includes the selector; closure stays binding/token-specific",
+    "Static scope, source dates, journal/result paths and new release-slot drift checked before credentials/intent",
+    "Mint launcher arguments used by connected test and wrapper generation from the same pinned entry manifest"
+  ],
+  "scope": "fixed successor/predecessor identities and immutable3November date template; existing client/framework reused",
+  "unchanged": [
+    "provider expiryE",
+    "fixed35minuteD and P=D-185",
+    "strict >1500seconds submission guard",
+    "transaction-time guards and operation-specific300second observations",
+    "SQL/contracts/grants",
+    "appdb05f5d and consumed build allowance",
+    "source/runtime/resource budgets and Tameside30listing ceiling",
+    "key storage/Vault mechanisms",
+    "no-retry and independent closure"
+  ],
+  "validation": {
+    "connected_case_rerun_after_argument_manifest": 1,
+    "failures": 0,
+    "kind": "SYNTHETIC_MOCKED_NOT_POSTGRES_OR_LIVE",
+    "native_PG17_28_tests": "accepted evidence reused; SQL/owner deadline transaction modules unchanged",
+    "skips": 0,
+    "unique_new_tests_passed": 16
+  }
+}

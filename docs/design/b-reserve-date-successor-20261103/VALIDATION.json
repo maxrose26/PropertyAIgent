@@ -1,0 +1,31 @@
+{
+  "accepted_native_pg17": "28 pass reused, not rerun",
+  "base": "40e21d39aba529ef6838d24b9cac3520ee40a421",
+  "connected_case_rerun_after_entry_manifest": true,
+  "live_requests": 0,
+  "production_mutations": 0,
+  "real_credentials_accessed": false,
+  "records": {
+    "focused-final": {
+      "log_sha256": "b617d930bbec35c1f3575b0c4f6e3b10dd9cc1ec78698530981c0504f666f2e6",
+      "tests": 16,
+      "xml_sha256": "b457249388f464d9c2ffce1f509c6021f7f4bcbdc471153fe60ea65a24fc0df5"
+    },
+    "launcher-entry": {
+      "log_sha256": "89db0113529b5f4d4ace124f0cf24f08f43567753d5d23ce06b07b9bb4b9eabb",
+      "tests": 1,
+      "xml_sha256": "7805800d7920534ae868dd523070f256dc9a868a2769d603d5518ed233dadb95"
+    }
+  },
+  "source_sha256": {
+    "docs/design/b-reserve-date-successor-20261103/B-COMMAND.txt": "c088f8440636507dfd68be79566bf5d1153221bcd95461dc2bb889d210b2408b",
+    "docs/design/b-reserve-date-successor-20261103/LAUNCHER-ENTRIES.json": "4fb83a7b6b8d6c81947b9fbe744656e027b06aa59eb6102e9abece5d9d20a41d",
+    "docs/design/b-reserve-date-successor-20261103/STATIC-RELEASE.json": "3f34227266ecc0dfb7bc660b09b5d2725e38405c85b5ac16989a859dcf892a30",
+    "tests/test_reserve_date_successor.py": "545dc724bde9ebe193ca99ffd177ad48c05b36c72f23905ab3c155f8a4956bf6",
+    "verification/ingestion_storage/finite_release_binding.py": "5b1cc5cb9098939e94889ebc2bf7e84748e8ca1a55043b09dfc04e5029c02d48",
+    "verification/ingestion_storage/publication_mint.py": "55eb530f71afcbae6cb752ae52bae032107ed041a7bcedbd249be32156ac1ec6"
+  },
+  "sql_deadline_modules_unchanged": true,
+  "status": "LOCAL_OFFLINE_AMENDMENT_VALIDATED_PENDING_PUBLICATION",
+  "unique_checks": 16
+}
