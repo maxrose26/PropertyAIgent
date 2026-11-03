@@ -7,14 +7,15 @@ import argparse,json,os
 from verification.ingestion_storage.owner_pilot import Pilot,PERIOD,safe_result,private_failure
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','run','recover','status','reconcile-artifact'),required=True)
+    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','prepare-continuation','run','recover','status','reconcile-artifact'),required=True)
     p.add_argument('--owner-checked-at',type=float);a=p.parse_args()
     pilot=None
     try:
         if a.action!='status' and os.environ.get('PROPERTYAIGENT_OWNER_PILOT_AUTHORITY')!=PERIOD:
             raise ValueError()
         pilot=Pilot()
-        if a.action=='prepare':pilot.prepare()
+        if a.action=='prepare-continuation':pilot.prepare_continuation()
+        elif a.action=='prepare':pilot.prepare()
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
         elif a.action=='reconcile-artifact':pilot.reconcile_artifact()

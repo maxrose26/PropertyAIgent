@@ -26,7 +26,8 @@ from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
 
-PERIOD='b-dbpilot-20261027-1102-01'
+PREDECESSOR='b-dbpilot-20261027-1102-01'
+PERIOD='b-dbpilot-20261027-1102-02'
 OWNER_PERIOD=PERIOD+'_owner'
 OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
 SERVICE='crn-d9sv93vavr4c73f98rb0'
@@ -67,7 +68,9 @@ class Database:
         op.require(c.closed,'OWNER_CONNECTION_CLOSURE')
 
 class Journal:
-    def __init__(self,db):self.db=db;self.previous='';self.state=None
+    def __init__(self,db,period=PERIOD):
+        op.require(period in (PERIOD,PREDECESSOR),'OWNER_JOURNAL_PERIOD')
+        self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None
     def _vault(self,raw=None,value=None):
         # Only encrypted bytes touch the temporary filesystem. No new credential
         # is persisted; recovery derives its key from existing protected config.
@@ -80,11 +83,11 @@ class Journal:
             return Vault(p,self.db.key).load()
     def load(self):
         with self.db.connection() as c:
-            row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(OWNER_PERIOD,OWNER_RUN,'')).fetchone()
+            row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
         if row is None:return None
         raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
         self.previous=row[2];self.state=self._vault(raw=raw)
-        op.require(self.state.get('period')==PERIOD,'OWNER_JOURNAL_PERIOD')
+        op.require(self.state.get('period')==self.period,'OWNER_JOURNAL_PERIOD')
         return self.state
     def save(self,state,connection=None):
         raw=self._vault(value=state);h=hashlib.sha256(raw).hexdigest()
@@ -92,7 +95,7 @@ class Journal:
             if connection is not None:
                 from psycopg.pq import TransactionStatus
                 op.require(c.pgconn.transaction_status==TransactionStatus.IDLE,'OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY')
-            return c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,%s)',(OWNER_PERIOD,OWNER_RUN,self.previous,raw)).fetchone()
+            return c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,%s)',(self.owner_period,self.owner_run,self.previous,raw)).fetchone()
         if connection is not None:row=write(connection)
         else:
             with self.db.connection() as c:row=write(c)
@@ -194,6 +197,7 @@ def safe_result(exc):
      'ACTIVATION_SETTINGS_POSTCONDITION',
      'ACTIVATION_STOP_CHANGED',
      'BOTH_EXPLICIT_STOP_DECISIONS_REQUIRED',
+     'CONTROLLER_CEILING',
      'CLOSURE_AUTHORITY_BINDING',
      'CLOSURE_AUTHORITY_BOUND',
      'CLOSURE_AUTHORITY_READBACK',
@@ -381,8 +385,9 @@ def safe_result(exc):
     for n in range(1,4):
         known.update('OWNER_RENDER_'+'_AND_'.join(parts) for parts in combinations(('RESPONSE_BYTE_LIMIT','AGGREGATE_BYTE_LIMIT','CLIENT_TIME_LIMIT'),n))
     known.update({'OWNER_RENDER_REQUEST_LIMIT','OWNER_RENDER_REQUEST_LIMIT_AND_CLIENT_TIME_LIMIT'})
-    known.update({'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
+    known.update({'OWNER_CONTINUATION_PREDECESSOR','OWNER_CONTINUATION_DUPLICATE','OWNER_CONTINUATION_MIGRATION','OWNER_CONTINUATION_PRESERVATION','OWNER_CONTINUATION_QUALIFICATION', 'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
     known.update('ARTIFACT_RECONCILIATION_'+x for x in ('CONFIGURATION','HASH','CODE','BROWSER','STATE','CONFLICT','PREDECESSOR','REFUSAL','CURRENT_STATE','DURABLE_READBACK'))
+    known.update({'DRIVER_STATEMENT_BOUND','SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE','REVIEWED_TLS_ENDPOINT_REQUIRED','RESTRICTED_ROUTE_MISMATCH','LIBPQ_ENVIRONMENT_OVERRIDE','RUNTIME_TRANSACTION_MODE','PINNED_REVIEWED_ADDRESS_REQUIRED','CONNECTION_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
@@ -537,6 +542,18 @@ class Pilot:
                 api.call('PUT','/env-vars',[{'key':k,'value':v} for k,v in sorted(self.state['original_environment'].items())])
                 op.require(env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'] and service_guard(api.call('GET'))==self.state['original_guard'],'OWNER_BUILD_ENV_RESTORE_READBACK')
                 self.ack('RESTORE_BUILD_ENVIRONMENT')
+    def prepare_continuation(self):
+        from .owner_pilot_continuation import migrate_owner_namespace,predecessor
+        old=Journal(self.db,PREDECESSOR).load();link=predecessor(old)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c)
+        op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
+        self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
+        self.save()
+        try:
+            self.build();self.state['status']='ARTIFACT_READY';self.save()
+        except BaseException as exc:
+            self.state['failure']=safe_result(exc);self.state['failure']['phase']=max(self.state['intents'],key=lambda x:self.state['intents'][x]['at'],default='PREPARE');self.state['private_failure_detail']=private_failure(exc,self.state['failure']['phase']);self.state['status']='PREPARATION_REFUSED';self.save()
+            self.recover_build();raise
     def prepare(self):
         self.migrate()
         op.require(self.journal.load() is None,'OWNER_PRIOR_ATTEMPT_RECONCILE')
@@ -584,14 +601,18 @@ class Pilot:
         b=self.state['binding'];ca,_=verified_trust()
         out=[]
         for role,cap in op.ROLES.items():
-            budget=DatabaseBudget(statements=4,connections=1,returned_bytes=8192,seconds=12)
+            # Includes driver initialisation and the existing eight-statement
+            # cleanup reserve; four is below DatabaseBudget's admitted minimum.
+            budget=DatabaseBudget(statements=20,connections=1,returned_bytes=8192,seconds=12)
             try:
                 engine=budget.engine(url('POOLER',role,self.state['access']['passwords'][role]),ssl={'sslmode':'verify-full','sslrootcert':str(ca)},hostaddr=b['hostaddr'],route='POOLER')
                 with engine.connect() as c:
                     row=c.execute(text("SELECT current_user,session_user,pg_has_role(current_user,:cap,'USAGE'),current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout')"),{'cap':cap}).one()
                     op.require(tuple(row)==(role,role,True,'10s','3s','20s'),'OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
-            finally:budget.close([])
-            op.require(all(c.closed for c in budget.opened) and budget.failed_native_closed,'OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
+            finally:
+                closed=budget.close([])
+                self.state.setdefault('qualification_attempts',[]).append(dict(role=role,**{k:closed[k] for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds','connections_closed','cleanup','connection_diagnostics')}))
+            op.require(closed['connections_closed'] and closed['cleanup']=='CLOSED' and all(c.closed for c in budget.opened) and budget.failed_native_closed,'OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
             out.append({'role':role,'attempts':budget.attempts,'closed':True})
         return out
     def run(self,owner_checked_at):
@@ -633,7 +654,7 @@ class Pilot:
             self.ack('HANDOFF')
             observation=self.observation('SUBMISSION',owner_checked_at)
             with self.api() as api:submission_check(api,self.state['access'],self.access_save,observation)
-            command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --hostaddr '+b['hostaddr']
+            command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --period '+PERIOD+' --hostaddr '+b['hostaddr']
             self.state['job_command']=command;self.intent('ONE_JOB')
             with self.api() as api:
                 op.validate_binding(b,opening=True)
@@ -783,4 +804,5 @@ class Pilot:
                 'job_id':s.get('job',{}).get('id'),'job_status':s.get('job_terminal',{}).get('status'),'final_service':s.get('final_service'),
                 'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
-                'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure')}
+                'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
+                'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}

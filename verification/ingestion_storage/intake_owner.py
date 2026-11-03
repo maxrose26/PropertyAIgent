@@ -76,7 +76,7 @@ def validate_binding(b, *, opening=False, now=None):
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period']=='b-dbpilot-20261027-1102-01','OWNER_DATABASE_PILOT_SCOPE')
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02'),'OWNER_DATABASE_PILOT_SCOPE')
     require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')
     if 'publication_mint' in b:
         m=b['publication_mint']

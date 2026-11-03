@@ -116,7 +116,7 @@ RETURNS TABLE(ordinal integer,body bytea,sha256 text) LANGUAGE plpgsql SECURITY 
 DECLARE prior public.ingestion_run_evidence%ROWTYPE; n integer; h text;
 BEGIN
  IF session_user<>'postgres' THEN RAISE EXCEPTION 'OWNER_STATE_OWNER_ONLY' USING ERRCODE='42501'; END IF;
- IF p_period<>'b-dbpilot-20261027-1102-01_owner' OR p_run<>substr(encode(sha256(convert_to(p_period,'UTF8')),'hex'),1,32) THEN RAISE EXCEPTION 'OWNER_STATE_EXACT_PILOT'; END IF;
+ IF p_period NOT IN ('b-dbpilot-20261027-1102-01_owner','b-dbpilot-20261027-1102-02_owner') OR p_run<>substr(encode(sha256(convert_to(p_period,'UTF8')),'hex'),1,32) THEN RAISE EXCEPTION 'OWNER_STATE_EXACT_PILOT'; END IF;
  -- Owner journal transactions must never wait for the period/controller lock:
  -- they preserve intent before that transaction starts, or ack after COMMIT.
  IF NOT pg_try_advisory_xact_lock(1886547824,20261103) THEN RAISE EXCEPTION 'OWNER_STATE_BUSY'; END IF;
