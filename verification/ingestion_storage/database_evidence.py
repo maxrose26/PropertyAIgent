@@ -132,7 +132,7 @@ FINISH_GUARD_SQL=r'''
        AND jsonb_typeof(convert_from(d.body,'UTF8')::jsonb)='array')
      OR EXISTS(SELECT 1 FROM jsonb_each(e->'days'->(ctl->'intake_run'->>'day')) x
        JOIN public.ingestion_work_items w ON w.key=x.value#>>'{}'
-       WHERE w.state='COMPLETE' AND NOT EXISTS(
+       WHERE w.state IN ('COMPLETE','DEFERRED') AND NOT EXISTS(
         SELECT 1 FROM public.ingestion_run_evidence d WHERE d.period=a AND d.run_id=p->>'run_id'
          AND d.name IN ('capture-1/source.json','capture-2/source.json')
          AND d.sha256=w.checkpoint::jsonb->>'source_sha256'
@@ -175,7 +175,6 @@ DO $pre$ BEGIN
  OR EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login'))
  THEN RAISE EXCEPTION 'DATABASE_EVIDENCE_MIGRATION_PRECONDITION'; END IF;
 END $pre$;
-LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE;
 CREATE TEMP TABLE evidence_before ON COMMIT DROP AS SELECT
  (SELECT jsonb_agg(to_jsonb(m) ORDER BY roleid,member,grantor) FROM pg_auth_members m) AS memberships,
  (SELECT nspacl::text FROM pg_namespace WHERE nspname='public') AS schema_acl,
@@ -191,6 +190,11 @@ DO $stops$ DECLARE ctl jsonb; BEGIN
 END $stops$;
 GRANT ingestion_storage_owner TO postgres WITH ADMIN FALSE, INHERIT FALSE, SET TRUE GRANTED BY postgres;
 GRANT CREATE ON SCHEMA public TO ingestion_storage_owner;
+SET LOCAL ROLE ingestion_storage_owner;
+LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE;
+RESET ROLE;
+UPDATE pg_temp.evidence_before SET ledger=(SELECT jsonb_build_object('items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM public.ingestion_work_items w),
+  'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM public.ingestion_work_attempts a)));
 SET LOCAL ROLE ingestion_storage_owner;
 ''' .replace('__PRE__',PREDECESSOR_REGISTER_SHA)+definition_sql()+register+r'''
 RESET ROLE;

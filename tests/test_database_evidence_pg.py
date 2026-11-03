@@ -25,7 +25,7 @@ def seed(w):
  ctl['grants']={'FIXTURE_ONLY':dict(intake_period=period,intake_run=run,capture_key='b'*64,execution_binding={'fixture':True},expires_at=time.time()+1800)}
  w['boot'].execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat(\'0\',64)',(json.dumps(ctl),))
  row=dict(key='b'*64,subject=dict(kind='DISCOVERY_SCOPE',council='tameside',start='2026-10-27',end='2026-11-02',semantics='RECEIVED'),task='DISCOVERY',contract='fixture',revision='fixture',dependencies=[],priority=0,eligible_at=0,state='LEASED',next_action='WAIT',limits={},attempt_count=1,max_attempts=1,fence=1,phase='SOURCE_INTENT')
- w['boot'].execute('INSERT INTO ingestion_work_items SELECT * FROM jsonb_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(row),))
+ w['boot'].execute('INSERT INTO ingestion_work_items SELECT * FROM jsonb_populate_record(NULL::ingestion_work_items,%s::jsonb)',(json.dumps(row),))
  return period,run,ctl
 
 def source(size=None):
@@ -88,7 +88,7 @@ def test_pg17_actual_daily_command_database_audits_screens_backlog_no_github(evi
  (sources/'tameside.json').write_text(json.dumps(audit))
  man=arcus_audit('manchester',[entry('DATABASE/1/26',SCHEME)],date(2026,10,27),date(2026,11,2),budget='BROWSER_SOURCE_V2');(sources/'manchester.json').write_text(json.dumps(man))
  out=tmp_path/'result';run=subprocess.run([sys.executable,'-B','-m','scripts.run_daily_councils','--period',name,'--output',str(out),'--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'unused-local-archive')],env=env,capture_output=True,text=True,timeout=90)
- result=json.loads((out/'final-result.json').read_bytes());assert run.returncode==0,(result,run.stderr)
+ result=json.loads((out/'final-result.json').read_bytes());record_property('connected_result',json.dumps(result,sort_keys=True));assert run.returncode==0,json.dumps(result,sort_keys=True)
  assert result['status']=='RETAINED_AND_SCREENED' and result['finalisation']=='VERIFIED' and result['github_publication']=='NOT_REQUESTED' and result['usage']['github_actual_calls']==0
  assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED' and len(result['backlog']['records'])==10
  rows=w['boot'].execute('SELECT name,body,sha256 FROM ingestion_run_evidence ORDER BY name').fetchall();assert len(rows)==4

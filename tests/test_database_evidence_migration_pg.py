@@ -23,7 +23,8 @@ def test_exact_atomic_migration_cleanup_and_predecessor(migration_world,mode,rec
   assert c.execute('SELECT rolsuper FROM pg_roles WHERE rolname=current_user').fetchone()==(False,)
   if mode=='success':support.execute(c,sql)
   else:
-   with pytest.raises(Exception):support.execute(c,sql)
+   with pytest.raises(Exception) as failure:support.execute(c,sql)
+   assert getattr(failure.value,'sqlstate',None)==('22012' if mode=='late_failure' else 'P0001')
    c.execute('ROLLBACK')
  assert op.ledger_sha(b)==before and b.execute(op.MEMBERS).fetchall()==members
  assert support.actor_flags()==(False,False,False)
