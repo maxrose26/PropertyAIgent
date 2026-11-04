@@ -328,7 +328,7 @@ def prepare_activation(c,b,*,password_factory=None,stable_credentials=None):
     return dict(version='FINITE_INTAKE_ACCESS_STATE_V1',binding=copy.deepcopy(b),state='ARMED_BEFORE_ACTIVATION',
                 prior_settings=settings(c),original_memberships=[list(m) for m in members],passwords=passwords)
 
-def activate(c, b, save, *, password_factory=None,prepared=None):
+def activate(c, b, save, *, password_factory=None,prepared=None,deadline_observations=None):
     """Persist encrypted closure baseline BEFORE any access effect; one atomic activation."""
     validate_binding(b, opening=True)
     passwords = prepared['passwords'] if prepared is not None else {r: (password_factory or (lambda: secrets.token_urlsafe(48)))() for r in ROLES}
@@ -360,6 +360,10 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         for role in ROLES:
             if b.get('credential_policy')=='STABLE_RESTRICTED_V1':
                 c.execute(sql.SQL('ALTER ROLE {} LOGIN VALID UNTIL {}').format(sql.Identifier(role),sql.Literal(datetime.fromtimestamp(b['valid_until'], timezone.utc).isoformat())))
+                if deadline_observations is not None:
+                    from .deadline_evidence import deadline_evidence
+                    row=c.execute('SELECT extract(epoch FROM rolvaliduntil)::double precision,extract(epoch FROM rolvaliduntil) FROM pg_roles WHERE rolname=%s',(role,)).fetchone()
+                    deadline_observations[role]=deadline_evidence(b['valid_until'],row[0],row[1])
                 continue
             verifier = c.pgconn.encrypt_password(passwords[role].encode(), role.encode(), algorithm=b'scram-sha-256').decode()
             c.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {} VALID UNTIL {}').format(sql.Identifier(role),

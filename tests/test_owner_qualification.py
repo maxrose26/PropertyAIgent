@@ -18,7 +18,9 @@ def test_actual_diagnostic_sequence_has_one_job_no_period_and_independent_close(
     flags={'login':False,'memberships':0};actual=copy.deepcopy(original);jobs=[];puts=[]
     monkeypatch.setattr(p,'issue_period',lambda *a,**k:pytest.fail('COLLECTION_PERIOD_ISSUED'))
     monkeypatch.setattr(p.op,'prepare_activation',lambda c,b,**kw:dict(version='FINITE_INTAKE_ACCESS_STATE_V1',binding=copy.deepcopy(b),state='ARMED_BEFORE_ACTIVATION',prior_settings={},original_memberships=[],passwords=kw['stable_credentials']))
-    def activate(c,b,save,prepared):
+    def activate(c,b,save,prepared,deadline_observations):
+        from verification.ingestion_storage.deadline_evidence import deadline_evidence
+        deadline_observations.update({r:deadline_evidence(b['valid_until'],b['valid_until'],None) for r in p.op.ROLES})
         flags.update(login=True,memberships=2);prepared['state']='ACTIVATION_ACKNOWLEDGED';save(prepared);return {'outcome':'COMMIT_ACKNOWLEDGED'}
     def close(c,access,save):
         flags['login']=False;access['state']='ACCESS_DISABLED_ACKNOWLEDGED';save(access)
@@ -56,6 +58,8 @@ def test_actual_diagnostic_sequence_has_one_job_no_period_and_independent_close(
     obj.inspect=lambda:dict(stable_verifier_binding='MATCH',runtime_membership_count=flags['memberships'],pipeline_session_count=0,temporary_owner_absent=True,runtime_roles=[{'login':flags['login']}],attempt_authorities={'all_expiry_zero':True},current_readback=dict(suspended=True,configuration_equal=True,environment_equal=actual==original))
     result=obj.run(time.time());saved=obj.journal.load()
     assert jobs==[True] and len(puts)==2 and actual==original and not flags['login'] and flags['memberships']==0
+    assert len(saved['owner_deadline_observations'])==2
+    print('DIAGNOSTIC_CAPACITY',max(len(r[1]) for r in obj.db.rows),obj.journal.ordinal,saved['cleanup_reserve']['cleanup_writes'])
     assert result['status']=='CLOSED' and result['closure_verification']['status']=='VERIFIED'
     assert result['collection_period_issued'] is False and saved['runtime_qualification']['source_requests']==0
     assert saved['cleanup_reserve']['cleanup_writes']<=16 and all(len(r[1])<=32768 for r in obj.db.rows)
@@ -91,3 +95,13 @@ def test_protected_dispatch_rejects_stale_time_before_child(monkeypatch):
     monkeypatch.setenv('PROPERTYAIGENT_QUALIFICATION_CHECKED_AT',str(time.time()-301))
     monkeypatch.setattr(control.subprocess,'Popen',lambda *a,**kw:pytest.fail('CHILD_STARTED'))
     with pytest.raises(ValueError,match='EXPIRED'):control.start('qualification-run',server_prepare=True)
+
+def test_deadline_capacity_refuses_before_access_and_preserves_journal(pilot,monkeypatch):
+    base,state,_,_=pilot;b,_=base.release_preflight()
+    monkeypatch.setattr(p,'PERIOD',q.IDENTITY);monkeypatch.setattr(p,'PREDECESSOR',q.PREDECESSOR)
+    obj=object.__new__(q.Qualification);obj.db=MemoryDB();obj.journal=p.Journal(obj.db,q.IDENTITY)
+    s=copy.deepcopy(state);s['period']=q.IDENTITY;s['stable_credentials']['passwords']={r:'s'*64 for r in p.op.ROLES}
+    raw=obj.journal._vault(value=s);obj.db.rows=[(47,raw,hashlib.sha256(raw).hexdigest())];obj.state=obj.journal.load()
+    before=copy.deepcopy(obj.db.rows)
+    with pytest.raises(p.op.Denied,match='OWNER_CLEANUP_ROW_BOUND'):obj.verify_deadline_capacity(b)
+    assert obj.db.rows==before

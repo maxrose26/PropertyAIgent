@@ -14,7 +14,7 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     global _process
     if server_prepare:
         expected='VERIFY_BINDING:'+PERIOD if action=='verify-binding' else 'RECOVER:'+PERIOD if action=='recover' else 'CONTINUE:'+PERIOD if action=='prepare-continuation' else PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
-        if action.startswith('qualification-'):expected=action.upper()+':b-qualification-20261104-01'
+        if action.startswith('qualification-'):expected=action.upper()+':b-qualification-20261104-02'
         if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
     if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding','qualification-prepare','qualification-run','qualification-status','qualification-recover') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')

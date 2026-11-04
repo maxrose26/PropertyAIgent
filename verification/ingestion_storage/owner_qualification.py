@@ -6,20 +6,21 @@ from .database_evidence import canonical
 from .intake_owner_io import handoff,submission_check,env_values,service_guard
 from .owner_pilot_continuation import migrate_owner_namespace
 
-IDENTITY='b-qualification-20261104-01'
+IDENTITY='b-qualification-20261104-02'
+PREDECESSOR='b-qualification-20261104-01'
 CONTEXT='b-dbpilot-20261027-1102-05'
-CANDIDATE='7e94da928efdd81deda1fee9af5e5d4944c5a6b4'
+CANDIDATE='dc679ef23323701fe5a7963604f22e0ade45fedc'
 # Globals are confined to this dedicated existing owner's child process.
 
 class Qualification(p.Pilot):
     def __init__(self,*a,**kw):
-        p.PERIOD=IDENTITY;p.PREDECESSOR=CONTEXT
+        p.PERIOD=IDENTITY;p.PREDECESSOR=PREDECESSOR
         super().__init__(*a,**kw);self.journal=p.Journal(self.db,IDENTITY)
     def prepare(self):
-        prior=p.Journal(self.db,CONTEXT);old=prior.load()
-        op.require(old and old['status']=='CLOSED' and old.get('closure_verification',{}).get('status')=='VERIFIED' and old.get('job',{}).get('id')=='job-dblke3bm8hqs739hgmmg','OWNER_CONTINUATION_PREDECESSOR')
-        link=dict(period=CONTEXT,sha256=prior.previous,ordinal=prior.ordinal)
-        with p.envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],qualification=True)
+        prior=p.Journal(self.db,PREDECESSOR);old=prior.load()
+        op.require(old and old['status']=='CLOSED' and old.get('closure_verification',{}).get('status')=='VERIFIED' and old.get('job',{}).get('id')=='job-dbll9futlv9c73c2tjrg','OWNER_CONTINUATION_PREDECESSOR')
+        link=dict(period=PREDECESSOR,sha256=prior.previous,ordinal=prior.ordinal)
+        with p.envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],deadline=True)
         op.require(prior.load()==old and prior.previous==link['sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
@@ -40,6 +41,21 @@ class Qualification(p.Pilot):
         folder=Path('/tmp/propertyaigent-owner-'+IDENTITY)
         b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
         op.validate_binding(b,opening=True);return b
+    def verify_deadline_capacity(self,b):
+        # Same journal codec and normal ceiling; reserve worst bounded evidence
+        # before activation, including the access copy and provider/job records.
+        projected=self.reserved_candidate();projected['binding']=copy.deepcopy(b)
+        import random
+        rng=random.Random(2026110402)
+        noise=lambda n:''.join(rng.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(n))
+        projected['owner_deadline_observations']=noise(2048)
+        projected['runtime_qualification']=noise(8192)
+        projected['job_command']=noise(512)
+        projected['job']=noise(1024);projected['job_terminal']=noise(1024)
+        projected['access']=dict(binding=copy.deepcopy(b),passwords=copy.deepcopy(self.state['stable_credentials']['passwords']),prior_settings={},original_memberships=[],render=dict(original=copy.deepcopy(self.state['original_environment']),expected=copy.deepcopy(self.state['original_environment'])))
+        self.journal.save(projected,validate_only=True)
+        op.require(self.journal.ordinal+24+16<64,'OWNER_CLEANUP_SNAPSHOT_RESERVE')
+        print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(dict(normal_ciphertext_bytes=p.ciphertext_size(len(canonical(p.serialized_state(projected)))),normal_ceiling=22152,reserved_snapshots=16,current_ordinal=self.journal.ordinal),sort_keys=True),flush=True)
     def run(self,checked_at):
         op.require(type(checked_at) in (int,float) and 0<=time.time()-checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
         self.state=self.journal.load()
@@ -47,7 +63,7 @@ class Qualification(p.Pilot):
         self.preflight()
         with self.api() as api:
             op.require(service_guard(api.call('GET'))==self.state['original_guard'] and env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'],'OWNER_PREBUILD_DRIFT')
-        b=self.binding();self.arm_cleanup_reserve();self.state['binding']=b;self.intent('RELEASE')
+        b=self.binding();self.verify_deadline_capacity(b);self.arm_cleanup_reserve();self.state['binding']=b;self.intent('RELEASE')
         try:
             Path(b['release_root']).mkdir(mode=0o700)
             self.intent('ACTIVATE')
@@ -59,7 +75,9 @@ class Qualification(p.Pilot):
                 def saved(v):
                     self.state['access']=copy.deepcopy(v)
                     if v.get('state')=='ACTIVATION_ACKNOWLEDGED':self.journal.save(self.state,connection=c)
-                self.state['activation_receipt']=op.activate(c,b,saved,prepared=prepared)
+                self.state['owner_deadline_observations']={}
+                self.state['activation_receipt']=op.activate(c,b,saved,prepared=prepared,deadline_observations=self.state['owner_deadline_observations'])
+            op.require(len(canonical(self.state['owner_deadline_observations']))<=2048,'DEADLINE_EVIDENCE_BOUND')
             self.ack('ACTIVATE')
             observation=self.observation('HANDOFF',checked_at);self.intent('HANDOFF')
             with self.api() as api:self.state['handoff_receipt']=handoff(api,self.state['access'],self.access_save,None,observation=observation)
@@ -82,13 +100,14 @@ class Qualification(p.Pilot):
             line=value['logs'][0]['message'];prefix='DATABASE_PILOT_RUNTIME_QUALIFICATION '
             op.require(line.startswith(prefix),'RUNTIME_QUALIFICATION_EVIDENCE');receipt=json.loads(line[len(prefix):])
             op.require(receipt.get('period')==CONTEXT and receipt.get('execution_binding')==b['execution_binding'] and receipt.get('deadline')==b['valid_until'] and receipt.get('source_requests')==0,'RUNTIME_QUALIFICATION_EVIDENCE')
+            op.require(len(canonical(receipt))<=8192,'DEADLINE_EVIDENCE_BOUND')
             self.state['runtime_qualification']=receipt;self.state['pipeline_status']='QUALIFICATION_ONLY_'+receipt['status'];self.save()
             if receipt['status']!='VERIFIED_BOTH_RESTRICTED_ROLES':raise op.Denied('OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
         except BaseException as exc:self.record_first_failure(exc)
         finally:self.cleanup()
         return self.summary()
     def summary(self):
-        value=super().summary();value.update(diagnostic_only=True,source_context=CONTEXT,collection_period_issued=False,source_requests=0)
+        value=super().summary();value.update(diagnostic_only=True,source_context=CONTEXT,collection_period_issued=False,source_requests=0,owner_deadline_observations=self.state.get('owner_deadline_observations'),worker_deadline_argument=(self.state.get('binding') or {}).get('valid_until'))
         return value
     def reconcile_submission(self):
         """GET-only discovery after uncertain POST; never creates another job."""

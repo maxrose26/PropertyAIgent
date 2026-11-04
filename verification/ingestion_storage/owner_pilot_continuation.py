@@ -25,13 +25,16 @@ def predecessor(state, *, snapshot):
         'closure_evidence_sha256':'0547e7ba14ae750fcc002de9454f4c162bccf01e757ee2e288f2935088918790',
         'execution_identity':'b-dbpilot-20261027-1102-05'}
 
-def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False):
+def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False):
     """Exact04→05 namespace addition; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
     old=new.replace(",'b-dbpilot-20261027-1102-05_owner'",'')
     if qualification:
         from .database_evidence import QUALIFICATION_OWNER_SQL
         old=new;new=QUALIFICATION_OWNER_SQL.split('$owner_state$',2)[1]
+    if deadline:
+        from .database_evidence import QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL
+        old=QUALIFICATION_OWNER_SQL.split('$owner_state$',2)[1];new=DEADLINE_OWNER_SQL.split('$owner_state$',2)[1]
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c,stable_verifiers=stable_verifiers);op.owner_absent(c)
@@ -47,7 +50,7 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False):
         c.execute('SET LOCAL ROLE ingestion_storage_owner')
         c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
         snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
-        source=QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
+        source=DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
         c.execute(source.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
         c.execute('RESET ROLE')
