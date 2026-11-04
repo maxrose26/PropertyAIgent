@@ -64,6 +64,12 @@ def bounded_failure(exc,phase):
     op.require(len(canonical(value))<=512,'OWNER_CLEANUP_RECORD_BOUND')
     return value
 
+def period_checkpoint(value):
+    """Root binding/policy are already durable; retain exact references, not copies."""
+    return dict(version='ROOT_REFERENCED_PERIOD_CHECKPOINT_V1',state=value['state'],
+        binding_ref='binding',policy_ref='policy',binding_sha256=hashlib.sha256(canonical(value['binding'])).hexdigest(),
+        policy_sha256=hashlib.sha256(canonical(value['policy'])).hexdigest())
+
 @contextmanager
 def envelope(seconds=60):
     """Same60-second active envelope; never nested with another phase envelope."""
@@ -712,6 +718,29 @@ class Pilot:
         with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'])
         preserved=prior.load()
         op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==46 and prior.ciphertext_bytes==29084 and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        existing=self.journal.load()
+        if existing is not None:
+            op.require(existing.get('period')==PERIOD and existing.get('status')=='PREPARATION_REFUSED' and
+                existing.get('failure',{}).get('reason')=='OWNER_CLEANUP_RESERVE_BYTE_BOUND' and
+                not any(k in existing for k in ('binding','access','job','period_journal')) and
+                'RELEASE' not in existing.get('intents',{}) and 'ONE_JOB' not in existing.get('intents',{}),'OWNER_CONTINUATION_DUPLICATE')
+            self.state=existing;check=self.inspect();current=check['current_readback']
+            op.require(not check['period_present'] and check['runtime_membership_count']==0 and check['pipeline_session_count']==0 and check['temporary_owner_absent'] and check['stable_verifier_binding']=='MATCH' and
+                all(not r['login'] for r in check['runtime_roles']) and all(current[k] for k in ('suspended','configuration_equal','environment_equal')),'OWNER_CONTINUATION_PRESERVATION')
+            self.state['preparation_failure']=copy.deepcopy(self.state['failure'])
+            self.state['preparation_refusal_reference']=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
+                diagnostic_sha256=hashlib.sha256(canonical(self.state.get('private_failure_detail'))).hexdigest())
+            self.state.pop('private_failure_detail',None)
+            self.state['status']='ARTIFACT_READY'
+            release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']);release['deployment']=self.state['deployment']
+            b,policy=self.construct_release_binding(release)
+            self.preview_release_capacity(b,policy)  # refuse without spending another snapshot
+            self.save()
+            try:result=self.verify_release_binding()
+            except BaseException:
+                self.state['status']='PREPARATION_REFUSED';self.save();raise
+            print('PROPERTYAIGENT_OWNER_PILOT_RELEASE_CHECK '+json.dumps(result,sort_keys=True,separators=(',',':')),flush=True)
+            return
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()
@@ -804,25 +833,32 @@ class Pilot:
             startup['receipt']['tree']==release['tree'] and startup['receipt']['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION',
             'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
         release['deployment']=self.state['deployment']
-        folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
-        b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
-        b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
-        validate_policy(b,p)
+        b,p=self.construct_release_binding(release)
         self._release_capacity=self.preview_release_capacity(b,p)
         self._release_readback=dict(configuration_equal=True,environment_equal=True,suspended=True,
             runtime_roles_dormant=True,stable_verifiers='MATCH',pipeline_sessions='ABSENT',runtime_memberships='ABSENT',
             temporary_owner='ABSENT',complete_terminal_jobs=len(jobs),complete_terminal_deployments=len(deploys),
             latest_deployment=latest['id'],latest_revision=latest['commit']['id'],checked_at=time.time())
         return b,p
+    def construct_release_binding(self,release):
+        folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
+        b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
+        b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
+        validate_policy(b,p)
+        return b,p
     def preview_release_capacity(self,b,policy):
         """Exact retained values; projected phase records, no intent/effect/freeze."""
         starting=dict(ciphertext_bytes=self.journal.ciphertext_bytes,ordinal=self.journal.ordinal)
         projected=self.reserved_candidate();sizes={}
-        def measure(name):sizes[name]=self.journal.save(copy.deepcopy(projected),validate_only=True)
+        def measure(name):
+            try:sizes[name]=self.journal.save(copy.deepcopy(projected),validate_only=True)
+            except BaseException:
+                print('PROPERTYAIGENT_OWNER_PILOT_CAPACITY_REFUSAL '+json.dumps(dict(stage=name,plaintext_bytes=len(canonical(projected)),ciphertext_bytes=ciphertext_size(len(canonical(projected))),normal_ceiling=22152),sort_keys=True),flush=True)
+                raise
         measure('reserved')
         projected.update(binding=copy.deepcopy(b),policy=copy.deepcopy(policy),status='RELEASE_BOUND')
         for n in ('RELEASE','PERIOD'):projected['intents'][n]=dict(at=9999999999.999998,state='ACKNOWLEDGED')
-        projected['period_journal']=dict(version='FINITE_INTAKE_PERIOD_V1',state='COMMIT_ACKNOWLEDGED',binding=copy.deepcopy(b),policy=copy.deepcopy(policy))
+        projected['period_journal']=period_checkpoint(dict(state='COMMIT_ACKNOWLEDGED',binding=b,policy=policy))
         projected['period_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',period=PERIOD,policy_sha256=b['period_policy_sha256'],temporary_issuer='REMOVED',original_memberships='PRESERVED',readback='EXACT_ON_SAME_CONNECTION',connections=1,retry=False)
         measure('period')
         with envelope(),self.db.connection() as c:
@@ -869,10 +905,10 @@ class Pilot:
             folder.mkdir(mode=0o700)
             self.intent('PERIOD')
             journal={'version':'FINITE_INTAKE_PERIOD_V1','state':'ARMED_NO_RETRY','binding':b,'policy':p}
-            self.state['period_journal']=journal;self.save()
+            self.state['period_journal']=period_checkpoint(journal);self.save()
             with envelope(),self.db.connection() as c:
                 def period_saved(value):
-                    self.state['period_journal']=copy.deepcopy(value)
+                    self.state['period_journal']=period_checkpoint(value)
                     if value.get('state')=='COMMIT_ACKNOWLEDGED':self.journal.save(self.state,connection=c)
                 period=issue_period(c,b,p,journal,period_saved)
             self.state['period_receipt']=period;self.ack('PERIOD')
@@ -891,8 +927,8 @@ class Pilot:
                     self.state['access']=copy.deepcopy(value)
                     if value.get('state')=='ACTIVATION_ACKNOWLEDGED':self.journal.save(self.state,connection=c)
                 self.state['activation_receipt']=op.activate(c,b,access_saved,prepared=prepared)
+            self.state['qualification']={'status':'REQUIRED_IN_ACTUAL_RUNTIME_BEFORE_SOURCE'}
             self.ack('ACTIVATE')
-            self.state['qualification']={'status':'REQUIRED_IN_ACTUAL_RUNTIME_BEFORE_SOURCE'};self.save()
             observation=self.observation('HANDOFF',owner_checked_at)
             self.intent('HANDOFF')
             with self.api() as api:self.state['handoff_receipt']=handoff(api,self.state['access'],self.access_save,None,observation=observation)
