@@ -6,6 +6,7 @@ only the two finite restricted credentials. Recovery journals use the existing
 Vault format, encrypted in the approved private evidence table.
 """
 import copy
+import base64
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ import signal
 import socket
 import tempfile
 import time
+import zlib
 from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from zoneinfo import ZoneInfo
@@ -53,12 +55,40 @@ def serialized_state(value):
     stored=copy.deepcopy(value)
     if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and isinstance(stored.get('binding'),dict) and canonical(stored.get('access',{}).get('binding'))==canonical(stored['binding']):
         stored['access']['binding']=dict(version='ROOT_BINDING_REFERENCE_V1',sha256=hashlib.sha256(canonical(stored['binding'])).hexdigest())
+    if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1':
+        # Lossless, owner-only representation of repetitive metadata. Recovery
+        # receives the exact original values; intents/receipts are never pruned.
+        for parent,key in journal_metadata_fields(stored):
+            if key not in parent:continue
+            raw=canonical(parent[key])
+            if len(raw)>32768:continue  # existing journal guard still refuses it
+            packed=dict(version='JOURNAL_METADATA_DEFLATE_V1',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest(),data=base64.b64encode(zlib.compress(raw,9)).decode('ascii'))
+            if len(canonical(packed))+128<len(raw):parent[key]=packed
     return stored
+
+def journal_metadata_fields(state):
+    for key in ('profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result'):
+        yield state,key
+    if isinstance(state.get('access'),dict):
+        for key in ('original_memberships','prior_settings'):yield state['access'],key
 
 def state_size(value):return len(canonical(serialized_state(value)))
 
 def hydrated_state(stored):
     if isinstance(stored,dict):
+        for parent,key in journal_metadata_fields(stored):
+            packed=parent.get(key)
+            if not isinstance(packed,dict) or packed.get('version')!='JOURNAL_METADATA_DEFLATE_V1':continue
+            try:
+                op.require(set(packed)=={'version','bytes','sha256','data'} and type(packed['bytes']) is int and 0<=packed['bytes']<=32768,'OWNER_CODE_BINDING')
+                compressed=base64.b64decode(packed['data'],validate=True)
+                op.require(len(compressed)<=32768,'OWNER_CODE_BINDING')
+                decoder=zlib.decompressobj();raw=decoder.decompress(compressed,packed['bytes']+1)
+                op.require(decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail and len(raw)==packed['bytes'] and hashlib.sha256(raw).hexdigest()==packed['sha256'],'OWNER_CODE_BINDING')
+                decoded=json.loads(raw)
+                op.require(canonical(decoded)==raw,'OWNER_CODE_BINDING')
+                parent[key]=decoded
+            except (ValueError,TypeError,KeyError,zlib.error):raise op.Denied('OWNER_CODE_BINDING') from None
         binding=stored.get('access',{}).get('binding',{})
         if isinstance(binding,dict) and binding.get('version')=='ROOT_BINDING_REFERENCE_V1':
             op.require(set(binding)=={'version','sha256'} and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and
@@ -870,8 +900,10 @@ class Pilot:
     def preview_release_capacity(self,b,policy):
         """Exact retained values; projected phase records, no intent/effect/freeze."""
         starting=dict(ciphertext_bytes=self.journal.ciphertext_bytes,ordinal=self.journal.ordinal)
-        projected=self.reserved_candidate();sizes={}
+        op.require(self.journal.ordinal+23<=63-CLEANUP_SNAPSHOTS,'OWNER_CLEANUP_ROW_BOUND')
+        projected=self.reserved_candidate();sizes={};plaintext_sizes={}
         def measure(name):
+            plaintext_sizes[name]=state_size(projected)
             try:sizes[name]=self.journal.save(copy.deepcopy(projected),validate_only=True)
             except BaseException:
                 print('PROPERTYAIGENT_OWNER_PILOT_CAPACITY_REFUSAL '+json.dumps(dict(stage=name,plaintext_bytes=state_size(projected),ciphertext_bytes=ciphertext_size(state_size(projected)),normal_ceiling=22152),sort_keys=True),flush=True)
@@ -898,9 +930,39 @@ class Pilot:
         projected['intents']['HANDOFF']=dict(at=9999999999.999998,state='ACKNOWLEDGED')
         projected['handoff_receipt']=dict(status='RENDER_HANDOFF_ACKNOWLEDGED',service_id=SERVICE,names=sorted(expected),calls=5,observation_sha256='f'*64)
         measure('handoff_and_submission_observation')
+        projected['access']['render']['submission_state']='SUBMISSION_INTENT_NO_RETRY'
+        command='/usr/bin/timeout --signal=INT --kill-after=5s 960s python -u -m scripts.owner_pilot_job --period '+PERIOD+' --hostaddr '+b['hostaddr']+' --deadline '+str(b['valid_until'])
+        projected['job_command']=command
+        projected['intents']['ONE_JOB']=dict(at=9999999999.999998,state='ACKNOWLEDGED')
+        # Retained provider schema, not an assertion that a new job exists.
+        job=copy.deepcopy(self.state.get('startup_job_terminal') or self.state.get('startup_job') or {})
+        job.update(id='job-'+'z'*20,serviceId=SERVICE,startCommand=command,status='succeeded',createdAt='2026-11-04T23:59:59.999999Z',startedAt='2026-11-04T23:59:59.999999Z',finishedAt='2026-11-04T23:59:59.999999Z')
+        projected['job']=copy.deepcopy(job);projected['job']['status']='pending';projected['job']['finishedAt']=None
+        measure('job_acknowledged')
+        projected['job_terminal']=job;measure('job_terminal')
+        qualification=dict(version='RUNTIME_AUTHENTICATION_V1',period=PERIOD,execution_binding=b['execution_binding'],deadline=b['valid_until'],status='VERIFIED_BOTH_RESTRICTED_ROLES',roles=[],attempts=[],source_requests=0,max_attempts_per_role=2)
+        for role in sorted(op.ROLES):
+            qualification['roles'].append(dict(role=role,identity='VERIFIED',interface='VERIFIED',connection_closed=True))
+            for attempt in (1,2):
+                qualification['attempts'].append(dict(role=role,attempt=attempt,connection_attempts=1,driver_statements=20,returned_data_value_bytes=8192,elapsed_seconds=12.999999999,connections_closed=True,cleanup='CLOSED',connection_diagnostics=[dict(reason_code='AUTHENTICATION_REJECTED',failed_native_connection_finished=True,sqlstate='28P01',exception_class='OperationalError')]))
+        projected['runtime_qualification']=qualification;measure('runtime_qualification')
+        scopes=[dict(council=c,status='RETAINED_AND_SCREENED',records=n,failure=None) for c,n in (('tameside',30),('manchester',60))]
+        usage={k:999999999 for k in ('driver_statements','connection_attempts','cancel_requests','returned_bytes','source_requests','source_bytes','source_seconds','source_supervised_seconds','publication_bytes','publication_calls')}
+        usage.update(elapsed_seconds=999.999999999,all_connections_closed=True)
+        projected['source_result']=dict(period=PERIOD,run_id='a'*32,run_state='VERIFIED',pipeline_status='RETAINED_AND_SCREENED',scopes=scopes,cleanup='CLOSED',authority_closure='INVALIDATED',evidence_readback=dict(name='final/result-before-publication.json',sha256=hashlib.sha256(b'projected-result').hexdigest(),bytes=2097152),github_publication='NOT_REQUESTED',usage=usage,source_failure=None,runtime_qualification=qualification)
+        measure('source_result')
+        captures=[]
+        for index,scope in enumerate(scopes,1):
+            digest=lambda tag:hashlib.sha256((scope['council']+tag).encode()).hexdigest()
+            archive=dict(backend=BACKEND,period=PERIOD,run_id='a'*32,name='capture-'+str(index)+'/source.json',path='docs/design/ingestion-operational-execution-daily-intake/'+PERIOD+'/'+'a'*32+'/capture-'+str(index)+'/source.json',sha256=digest('archive'),bytes=524288,readback_verified=True)
+            captures.append(dict(council=scope['council'],capture_key=digest('capture'),record_count=scope['records'],screening_complete=scope['records'],batches_complete=(scope['records']+4)//5,archive=archive,source_sha256=digest('source'),capture_sha256=digest('receipt')))
+        projected['independent_result']=dict(status='INDEPENDENT_DATABASE_VERIFIED_SUCCESS',period=PERIOD,run_id='a'*32,publication=dict(captures[0]['archive'],name='final/result-before-publication.json'),authorities={hashlib.sha256(str(i).encode()).hexdigest():0 for i in range(4)},captures=captures,stop=op.ACCEPTED_STOP,independent_external_publication_check='NOT_REQUESTED',independent_render_terminal_check='REQUIRED')
+        projected['pipeline_status']='VERIFIED_RETAINED_AND_SCREENED';measure('independent_result')
         return dict(starting=starting,projected_ciphertext_bytes=sizes,normal_ciphertext_ceiling=22152,normal_last_ordinal=47,
             normal_snapshots_remaining=47-self.journal.ordinal,reserved_cleanup_snapshots=16,cleanup_growth_plaintext=6937,margin_plaintext=1024,worst_cleanup_ciphertext=32756,
-            remaining_normal_bytes=22152-max(sizes.values()),projection_only=True,provider_mutations=0)
+            remaining_normal_bytes=22152-max(sizes.values()),remaining_normal_writes=23,projected_last_normal_ordinal=self.journal.ordinal+23,
+            projected_plaintext_bytes=plaintext_sizes,projected_worst_cleanup_ciphertext=ciphertext_size(max(plaintext_sizes.values())+6937+1024),
+            modeled_record_shapes='RETAINED_PROVIDER_SCHEMA_TWO_COUNCILS_FOUR_AUTH_ATTEMPTS',projection_only=True,provider_mutations=0)
     def verify_release_binding(self):
         """Deployed read-only proof of the same boundary consumed by Run."""
         b,p=self.release_preflight()

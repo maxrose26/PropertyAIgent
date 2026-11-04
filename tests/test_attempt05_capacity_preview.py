@@ -23,4 +23,13 @@ def test_actual_preview_uses_prepared_baseline_and_never_writes_or_opens(pilot,m
         result=clone.preview_release_capacity(b,policy)
         assert result['starting']['ordinal']==22 and result['remaining_normal_bytes']>0 and result['provider_mutations']==0
         assert max(result['projected_ciphertext_bytes'].values())<=22152 and calls==['READ_ONLY_BASELINE']
+        assert set(result['projected_ciphertext_bytes'])=={'reserved','period','opening','handoff_and_submission_observation','job_acknowledged','job_terminal','runtime_qualification','source_result','independent_result'}
+        assert result['projected_last_normal_ordinal']==45 and result['remaining_normal_writes']==23
+        assert result['projected_worst_cleanup_ciphertext']<=32768
     assert len(clone.db.rows)==1 and clone.db.rows[0][1]==raw
+
+def test_normal_path_cannot_borrow_any_of_sixteen_cleanup_snapshots(pilot):
+    obj,state,_,_=pilot;b,policy=obj.release_preflight()
+    clone=pilot_with_retained_state(state);clone.state=state;clone.journal.ordinal=25
+    with pytest.raises(p.op.Denied,match='OWNER_CLEANUP_ROW_BOUND'):clone.preview_release_capacity(b,policy)
+    assert len(clone.db.rows)==1
