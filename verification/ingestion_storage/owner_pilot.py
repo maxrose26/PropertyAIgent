@@ -86,7 +86,7 @@ class Journal:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
         if row is None:return None
         raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
-        self.previous=row[2];self.ordinal=row[0];self.state=self._vault(raw=raw)
+        self.previous=row[2];self.ordinal=row[0];self.ciphertext_bytes=len(raw);self.state=self._vault(raw=raw)
         op.require(self.state.get('period')==self.period,'OWNER_JOURNAL_PERIOD')
         return self.state
     def save(self,state,connection=None):
@@ -845,10 +845,20 @@ class Pilot:
         No release, restoration intent, original environment, credential, job,
         policy or actual-result field is removed. No ciphertext/row limit grows.
         """
-        if self.state.get('access',{}).get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':return
+        access=self.state.get('access',{})
+        if not access:return
         fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
         present=[name for name in fields if name in self.state]
         if not present:return
+        early=access.get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED'
+        if early:
+            # Exact acknowledged pre-submission Attempt04 only. Recovery never
+            # consumes or clears its existing release/handoff intent.
+            op.require(self.state.get('period')==PERIOD=='b-dbpilot-20261027-1102-04' and
+                self.state.get('status')=='RELEASE_BOUND' and access.get('state')=='ACTIVATION_ACKNOWLEDGED' and
+                access.get('render',{}).get('state')=='PUT_ACKNOWLEDGED' and
+                all(self.state.get('intents',{}).get(n,{}).get('state')=='ACKNOWLEDGED' for n in ('PERIOD','ACTIVATE','HANDOFF')) and
+                'ONE_JOB' not in self.state.get('intents',{}) and not self.state.get('job'),'OWNER_CLOSURE_ARCHIVE_BINDING')
         required=('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')
         op.require(all(self.state.get('intents',{}).get(name,{}).get('state')=='ACKNOWLEDGED' for name in required)
             and self.state.get('original_guard')==self.state['binding'].get('render_config_sha256')
@@ -858,9 +868,38 @@ class Pilot:
         op.require(re.fullmatch('[a-f0-9]{64}',self.journal.previous or ''),'OWNER_JOURNAL_HASH')
         reference=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
             fields={name:hashlib.sha256(canonical(self.state[name])).hexdigest() for name in present})
-        for name in present:del self.state[name]
-        self.state['closed_build_archive']=reference
+        compact=copy.deepcopy(self.state)
+        for name in present:del compact[name]
+        compact['closed_build_archive']=reference
+        if early:
+            compact['recovery_capacity']=self.check_cleanup_capacity(compact)
+        self.state=compact
         self.save()
+    def check_cleanup_capacity(self,compact):
+        """Encrypt projections of the retained state; no SQL/provider effects.
+
+        Nine remaining snapshots: archive, four DB-close/receipt saves,
+        three restoration saves, final outcome. Existing 32KiB/64-row bounds.
+        Synthetic receipt shapes are measured only, never saved as outcomes.
+        """
+        stages=('archived','access_disabled','memberships_removed','database_closed','closure_receipt','restore_intent','restore_ack','restoration_receipt','final')
+        op.require(self.journal.ordinal+len(stages)<=63,'OWNER_STATE_HISTORY_BOUND')
+        projected=copy.deepcopy(compact)
+        def metadata(sizes):return dict(version='RETAINED_CLOSURE_CAPACITY_V1',ciphertext_limit=32768,remaining_snapshots=len(stages),projected_ciphertext_bytes=sizes)
+        projected['recovery_capacity']=metadata({n:32768 for n in stages})
+        sizes={}
+        def measure(name):sizes[name]=len(self.journal._vault(value=projected))
+        measure('archived')
+        projected['access']['state']='ACCESS_DISABLED_ACKNOWLEDGED';measure('access_disabled')
+        projected['access']['membership_closure']='RECONCILIATION_REQUIRED';measure('memberships_removed')
+        projected['access'].update(state='DATABASE_CLOSURE_ACKNOWLEDGED',passwords={});measure('database_closed')
+        projected['closure_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',runtime_access='DISABLED',password_verifiers='RETAINED',authorities=['f'*64]*4,authority_expiry=0,temporary_owner='REMOVED',sessions='ABSENT',stop_preserved=projected['binding']['accepted_stop'],intake_run_state='PERSISTENCE_UNCERTAIN',open_run_requires_reconciliation=False)
+        measure('closure_receipt')
+        projected['access']['render'].update(state='RESTORE_INTENT_NO_RETRY',submission_ack_timing='NO_JOB_VERIFIED');measure('restore_intent')
+        projected['access']['render'].update(state='RESTORATION_ACKNOWLEDGED',expected={});measure('restore_ack')
+        projected['restoration_receipt']=dict(status='RESTORATION_VERIFIED',service_id=SERVICE,job_id=None,calls=8,publication_token='WITHDRAWN_FROM_SERVICE_SNAPSHOT_NOT_PROVIDER_REVOKED',submission_ack_timing='NO_JOB_VERIFIED');measure('restoration_receipt')
+        projected.update(status='CLOSED',final_service=dict(suspended=True,configuration_equal=True,environment_equal=True));measure('final')
+        return metadata(sizes)
     def inspect(self):
         """Read-only reconciliation; never calls prepare, recovery or save."""
         self.state=self.journal.load()
@@ -869,6 +908,8 @@ class Pilot:
         value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
         value['artifact_verified']='artifact' in self.state
         value['journal_snapshot_ordinal']=self.journal.ordinal
+        value['journal_ciphertext_bytes']=getattr(self.journal,'ciphertext_bytes',None)
+        value['journal_sha256']=getattr(self.journal,'previous',None)
         value['remaining_snapshot_slots']=63-self.journal.ordinal
         value['release_intent_present']='RELEASE' in self.state.get('intents',{})
         value['job_intent_present']='ONE_JOB' in self.state.get('intents',{})
@@ -880,7 +921,13 @@ class Pilot:
             try:
                 roles=c.execute(op.ROLE_QUERY,(list(op.ROLES),)).fetchall()
                 value['runtime_roles']=[{'role':r[0],'login':r[1],'password_null':r[2]} for r in roles]
-                value['period_present']=PERIOD in op.control(c).get('intake_periods',{})
+                control=op.control(c);policy=control.get('intake_periods',{}).get(PERIOD)
+                value['period_present']=policy is not None
+                grants={k:v for k,v in control.get('grants',{}).items() if v.get('intake_period')==PERIOD}
+                value['attempt_authorities']={'count':len(grants),'all_expiry_zero':all(g.get('expires_at')==0 for g in grants.values()),'ids':sorted(grants)}
+                value['period_policy_readback']=None if policy is None else {'max_runs':policy.get('max_runs'),'expires_at':policy.get('expires_at'),'execution_binding':policy.get('execution_binding'),'retained_history':True}
+                run=control.get('intake_run') or {}
+                value['attempt_run_state']=run.get('state') if run.get('period')==PERIOD else None
                 value['pipeline_session_count']=c.execute('SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)',(list(op.ROLES),)).fetchone()[0]
                 value['runtime_membership_count']=c.execute('SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(op.ROLES),)).fetchone()[0]
                 if self.state.get('stable_credentials'):
@@ -946,4 +993,4 @@ class Pilot:
                 'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'recovery_capacity':s.get('recovery_capacity'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
