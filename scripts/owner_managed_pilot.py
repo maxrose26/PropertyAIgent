@@ -28,7 +28,10 @@ def main():
         elif a.action=='prepare':pilot.prepare()
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
-        elif a.action=='reconcile-artifact':pilot.reconcile_artifact()
+        elif a.action=='reconcile-artifact':
+            pilot.reconcile_artifact()
+            if pilot.state.get('startup_reconciliation'):
+                print('PROPERTYAIGENT_OWNER_PILOT_RELEASE_CHECK '+json.dumps(pilot.verify_release_binding(),sort_keys=True,separators=(',',':')),flush=True)
         result=pilot.verify_release_binding() if a.action=='verify-binding' else pilot.inspect() if a.action in ('status','recover') else pilot.summary()
     except BaseException as exc:
         result=safe_result(exc)

@@ -1245,6 +1245,9 @@ class Pilot:
         remain unchanged. An identical entry is a read, a conflict refuses.
         """
         cfg=configuration or json.loads(os.environ['PROPERTYAIGENT_INTAKE_BUILD_RECEIPT'])
+        if cfg.get('version')=='ATTEMPT06_STARTUP_RECEIPT_V1':
+            from .owner_startup_reconciliation import reconcile
+            return reconcile(self,cfg)
         op.require(type(cfg) is dict and set(cfg)=={'version','deployment','receipt_sha256','receipt','preparation_failure_sha256'} and cfg['version']=='AUTHORITATIVE_RENDER_RECEIPT_V1','ARTIFACT_RECONCILIATION_CONFIGURATION')
         receipt=cfg['receipt'];sha=hashlib.sha256(canonical(receipt)).hexdigest()
         op.require(sha==cfg['receipt_sha256'],'ARTIFACT_RECONCILIATION_HASH')
