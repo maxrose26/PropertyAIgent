@@ -48,15 +48,26 @@ class Qualification(p.Pilot):
     def verify_deadline_capacity(self,b):
         # Same journal codec and normal ceiling; reserve worst bounded evidence
         # before activation, including the access copy and provider/job records.
+        op.require(self.journal.ordinal+24+16<64,'OWNER_CLEANUP_ROW_BOUND')
         projected=self.reserved_candidate();projected['binding']=copy.deepcopy(b)
         import random
         rng=random.Random(2026110402)
         noise=lambda n:''.join(rng.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(n))
         projected['owner_deadline_observations']=noise(2048)
-        projected['runtime_qualification']=noise(8192)
+        projected['runtime_qualification']=noise(6144)
         projected['job_command']=noise(512)
         projected['job']=noise(1024);projected['job_terminal']=noise(1024)
-        projected['access']=dict(binding=copy.deepcopy(b),passwords=copy.deepcopy(self.state['stable_credentials']['passwords']),prior_settings={},original_memberships=[],render=dict(original=copy.deepcopy(self.state['original_environment']),expected=copy.deepcopy(self.state['original_environment'])))
+        with p.envelope(),self.db.connection() as c:
+            projected['access']=op.prepare_activation(c,b,stable_credentials=self.state['stable_credentials']['passwords'])
+        original=self.state['original_environment'];expected={k:v for k,v in original.items() if k in p.KEEP}
+        expected['INGESTION_RENDER_PROFILE']=canonical(b['render_profile']).decode()
+        for role,name in (('ingestion_worker_login','INGESTION_WORKER_DATABASE_URL'),('ingestion_effect_login','INGESTION_EFFECT_DATABASE_URL')):expected[name]=p.url(b['route'],role,projected['access']['passwords'][role])
+        projected['access']['render']=dict(original=copy.deepcopy(original),expected=expected,guard=b['render_config_sha256'],state='PUT_ACKNOWLEDGED',publication_token=None,publication_state='NOT_REQUESTED',mapped_at=9999999999.999998,handoff_observation_sha256='f'*64)
+        for name in ('RELEASE','ACTIVATE','HANDOFF','ONE_JOB'):projected['intents'][name]=dict(at=9999999999.999998,state='ACKNOWLEDGED')
+        projected['activation_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',runtime_roles=sorted(op.ROLES),credentials='ENCRYPTED_LOCAL_ONLY',valid_until=b['valid_until'])
+        projected['handoff_receipt']=noise(512)
+        projected['observations']={name:dict(provider_observation=dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=name,binding_sha256='f'*64,service_id=p.SERVICE,observed_at=9999999999.999998,env_groups=[],secret_files=[],inherited_credential_names=[],reviewed=True,no_current_work=True,other_activity_stopped=True,deployment_id=b['retained_deployment'],revision=b['execution_binding']['revision'],suspended=True),owner_boundary_confirmed_at=9999999999.999998) for name in ('HANDOFF','SUBMISSION')}
+
         self.journal.save(projected,validate_only=True)
         op.require(self.journal.ordinal+24+16<64,'OWNER_CLEANUP_SNAPSHOT_RESERVE')
         print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(dict(normal_ciphertext_bytes=p.ciphertext_size(len(canonical(p.serialized_state(projected)))),normal_ceiling=22152,reserved_snapshots=16,current_ordinal=self.journal.ordinal),sort_keys=True),flush=True)
@@ -104,7 +115,7 @@ class Qualification(p.Pilot):
             line=value['logs'][0]['message'];prefix='DATABASE_PILOT_RUNTIME_QUALIFICATION '
             op.require(line.startswith(prefix),'RUNTIME_QUALIFICATION_EVIDENCE');receipt=json.loads(line[len(prefix):])
             op.require(receipt.get('period')==CONTEXT and receipt.get('execution_binding')==b['execution_binding'] and receipt.get('deadline')==b['valid_until'] and receipt.get('source_requests')==0,'RUNTIME_QUALIFICATION_EVIDENCE')
-            op.require(len(canonical(receipt))<=8192,'DEADLINE_EVIDENCE_BOUND')
+            op.require(len(canonical(receipt))<=6144,'DEADLINE_EVIDENCE_BOUND')
             self.state['runtime_qualification']=receipt;self.state['pipeline_status']='QUALIFICATION_ONLY_'+receipt['status'];self.save()
             if receipt['status']!='VERIFIED_BOTH_RESTRICTED_ROLES':raise op.Denied('OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
         except BaseException as exc:self.record_first_failure(exc)
