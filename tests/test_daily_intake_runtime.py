@@ -480,7 +480,7 @@ def test_failed_run_retirement_prototype_pg(world,fault):
     boot.execute('GRANT ingestion_recovery_operator TO provisioning_migrator WITH ADMIN TRUE,INHERIT FALSE,SET FALSE')
     boot.execute('CREATE TABLE IF NOT EXISTS ingestion_run_evidence(period text,run_id text,name text,body bytea,sha256 text)')
     boot.execute('TRUNCATE ingestion_run_evidence')
-    boot.execute('GRANT SELECT ON ingestion_run_evidence TO provisioning_migrator')
+    boot.execute('GRANT SELECT,UPDATE ON ingestion_run_evidence TO provisioning_migrator')
     ctl=op.control(boot);ctl.update(global_stop={'reason':'DAILY_INTAKE_SHARED_FAILURE'},manual_stop='DAILY_INTAKE_SHARED_FAILURE',last_hard_stop='DAILY_INTAKE_SHARED_FAILURE',hard_stop_generation=6,
         intake_run=dict(id=run_id,period=period,state='OPEN',day='2026-11-02'),intake_periods={period:{'days':{'2026-11-02':{'tameside':key}}}})
     boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
