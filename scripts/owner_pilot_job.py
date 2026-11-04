@@ -36,7 +36,7 @@ def startup_check(Runtime,period,hostaddr):
     return 0 if receipt['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION' else 2
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float);p.add_argument('--startup-check-only',action='store_true');p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float);p.add_argument('--startup-check-only',action='store_true');p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
     import ipaddress
     if ipaddress.ip_address(a.hostaddr).version!=4:raise SystemExit(2)
     PERIOD=a.period
@@ -48,12 +48,12 @@ def main():
     os.environ.clear();os.environ.update(env)
     sys.argv=['scripts.run_daily_councils','--period',PERIOD,'--output','/tmp/propertyaigent-'+PERIOD,'--hostaddr',a.hostaddr]
     from scripts.run_daily_councils import main as daily
-    if PERIOD in ('b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'):
+    if PERIOD in ('b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'):
         from argparse import Namespace
         from verification.ingestion_storage.daily_intake_runtime import Runtime
         from verification.ingestion_storage.runtime_authentication import qualify
         if a.startup_check_only:
-            if PERIOD!='b-dbpilot-20261027-1102-04':raise SystemExit(2)
+            if PERIOD not in ('b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'):raise SystemExit(2)
             return startup_check(Runtime,PERIOD,a.hostaddr)
         if a.deadline is None:raise SystemExit(2)
         args=Namespace(period=PERIOD,output='/tmp/propertyaigent-'+PERIOD,hostaddr=a.hostaddr,disposable_sources=None,disposable_archive=None,backlog=False,after=None,page_size=3)

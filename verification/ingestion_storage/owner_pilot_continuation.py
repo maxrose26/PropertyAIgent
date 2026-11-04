@@ -3,36 +3,32 @@ import hashlib
 from . import intake_owner as op
 from .database_evidence import OWNER_SQL,canonical,verify_inventory
 
-def predecessor(state):
-    op.require(type(state) is dict and state.get('period')=='b-dbpilot-20261027-1102-03'
-        and state.get('status')=='CLOSED' and state.get('pipeline_status')=='NOT_VERIFIED'
-        and state.get('failure')==dict(phase='ONE_JOB',exception_class='ReadTimeout',reason='UNKNOWN_FAILURE',sqlstate=None,status='RECONCILIATION_REQUIRED')
-        and state.get('job',{}).get('id')=='job-dbl7bs7b9u1s73dp48sg'
-        and state.get('job_terminal',{}).get('status')=='failed'
-        and state.get('deployment')=='dep-dbl6kfdbedkc7385k7t0'
-        and state.get('binding',{}).get('execution_binding',{}).get('revision')=='681f1a1cc886eb09efe70020dd34829f15e3817d'
+def predecessor(state, *, snapshot):
+    op.require(snapshot=={'ordinal':46,'bytes':29084,'sha256':'313352066984874f46af4f9cb767caab2cc17d220ac9d694127fee3b8bd51631'}
+        and type(state) is dict and state.get('period')=='b-dbpilot-20261027-1102-04' and state.get('status')=='CLOSED'
+        and state.get('pipeline_status','NOT_RUN')=='NOT_RUN' and not state.get('job') and 'ONE_JOB' not in state.get('intents',{})
+        and state.get('deployment')=='dep-dblhmq3m8hqs739auu5g'
+        and state.get('binding',{}).get('execution_binding',{}).get('revision')=='938f3f18d8b75c6467290461139b03bf9b95a338'
         and state.get('access',{}).get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED'
-        and state.get('closure_receipt',{}).get('outcome')=='COMMIT_ACKNOWLEDGED'
-        and state['closure_receipt'].get('sessions')=='ABSENT'
-        and state['closure_receipt'].get('temporary_owner')=='REMOVED'
-        and state['closure_receipt'].get('password_verifiers')=='RETAINED'
+        and state['access'].get('render',{}).get('state')=='RESTORATION_ACKNOWLEDGED'
+        and hashlib.sha256(canonical(state.get('closure_receipt'))).hexdigest()=='c8eaff0e5ebce43e8be31ebd092b17161cf321024a8ec686a8dafcdfd7d23f3c'
         and state.get('final_service')==dict(suspended=True,configuration_equal=True,environment_equal=True)
         and state.get('stable_credentials',{}).get('version')=='STABLE_RESTRICTED_V1'
         and set(state['stable_credentials'].get('passwords',{}))==set(op.ROLES)
         and set(state['stable_credentials'].get('verifier_sha256',{}))==set(op.ROLES)
         and state.get('runtime_qualification') is None and state.get('source_result') is None and state.get('independent_result') is None
-        and all(state.get('intents',{}).get(k,{}).get('state')=='ACKNOWLEDGED' for k in ('PERIOD','ACTIVATE','HANDOFF','ONE_JOB')),
+        and all(state.get('intents',{}).get(k,{}).get('state')=='ACKNOWLEDGED' for k in ('PERIOD','ACTIVATE','HANDOFF')),
         'OWNER_CONTINUATION_PREDECESSOR')
     return {'period':state['period'],'state_sha256':hashlib.sha256(canonical(state)).hexdigest(),
         'closure_sha256':hashlib.sha256(canonical(state['closure_receipt'])).hexdigest(),
-        'source_requests':'NOT_REACHED_IN_RETAINED_RUNTIME_TRACE','predecessor_job':'job-dbl7bs7b9u1s73dp48sg',
-        'trace_evidence_sha256':'ae69bb02adff11c3187ee2e8690858d3aa9f8f7ba2c402748043160709655f96',
-        'execution_identity':'b-dbpilot-20261027-1102-04'}
+        'snapshot':snapshot,'source_requests':'NOT_REACHED_NO_INTAKE_JOB',
+        'closure_evidence_sha256':'0547e7ba14ae750fcc002de9454f4c162bccf01e757ee2e288f2935088918790',
+        'execution_identity':'b-dbpilot-20261027-1102-05'}
 
 def migrate_owner_namespace(c, *, stable_verifiers=None):
-    """Exact03→04 namespace addition; unchanged ACL, ledger and evidence."""
+    """Exact04→05 namespace addition; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
-    old=new.replace(",'b-dbpilot-20261027-1102-04_owner'",'')
+    old=new.replace(",'b-dbpilot-20261027-1102-05_owner'",'')
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c,stable_verifiers=stable_verifiers);op.owner_absent(c)

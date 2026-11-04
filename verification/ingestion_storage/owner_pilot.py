@@ -21,13 +21,13 @@ from zoneinfo import ZoneInfo
 
 from . import intake_owner as op
 from .intake_owner_io import Vault,env_values,service_guard,KEEP,handoff,submission_check,restore_handoff,reconcile_handoff
-from .intake_owner_operations import COUNCILS,SCREENING,issue_period
+from .intake_owner_operations import COUNCILS,SCREENING,issue_period,validate_policy
 from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
 
-PREDECESSOR='b-dbpilot-20261027-1102-03'
-PERIOD='b-dbpilot-20261027-1102-04'
+PREDECESSOR='b-dbpilot-20261027-1102-04'
+PERIOD='b-dbpilot-20261027-1102-05'
 OWNER_PERIOD=PERIOD+'_owner'
 OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
 SERVICE='crn-d9sv93vavr4c73f98rb0'
@@ -36,6 +36,33 @@ WINDOW={'start':'2026-10-27','end':'2026-11-02'}
 RELEASE_PARENT=Path('/tmp')
 TERMINAL={'succeeded','failed','canceled'}
 DEPLOY_TERMINAL={'live','deactivated','build_failed','update_failed','canceled','pre_deploy_failed'}
+
+# Serialized VALUE ceilings; keys/separators are included in the reserve below.
+# These are owner-journal bounds, not new source, provider or database budgets.
+CLEANUP_RECORD_LIMITS={'first_failure':512,'failure':512,'closure_failure':512,'restoration_failure':512,
+    'closure_receipt':2048,'restoration_receipt':1024,'final_service':128,'closure_verification':1024}
+CLEANUP_STATE_GROWTH=512  # access/render state flags, status, counters and base-size metadata
+CLEANUP_MARGIN=1024      # additional plaintext margin, beyond supported record maxima
+CLEANUP_SNAPSHOTS=16     # 8 cleanup + first failure + verification + 4 reconciliation + 2 margin
+
+def ciphertext_size(n):
+    # Existing Vault: 16-byte salt + base64(Fernet 57-byte overhead + PKCS7 AES).
+    return 16+4*((57+16*(n//16+1)+2)//3)
+
+def cleanup_reserve_policy():
+    growth=sum(len(canonical(k))+1+n+1 for k,n in CLEANUP_RECORD_LIMITS.items())+CLEANUP_STATE_GROWTH
+    maximum=max(n for n in range(32769) if ciphertext_size(n+growth+CLEANUP_MARGIN)<=32768)
+    return dict(version='CLEANUP_RESERVE_V1',record_limits=dict(CLEANUP_RECORD_LIMITS),
+        growth_bytes=growth,margin_bytes=CLEANUP_MARGIN,normal_plaintext_ceiling=maximum,
+        reserved_snapshots=CLEANUP_SNAPSHOTS)
+
+def bounded_failure(exc,phase):
+    result=safe_result(exc)
+    value={k:result[k] for k in ('reason','exception_class','sqlstate')}
+    value['phase']=phase if phase in {'RUN','RELEASE','PERIOD','ACTIVATE','HANDOFF','ONE_JOB','CLEANUP'} else 'RUN'
+    if type(result.get('http_status')) is int:value['http_status']=result['http_status']
+    op.require(len(canonical(value))<=512,'OWNER_CLEANUP_RECORD_BOUND')
+    return value
 
 @contextmanager
 def envelope(seconds=60):
@@ -86,11 +113,40 @@ class Journal:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
         if row is None:return None
         raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
-        self.previous=row[2];self.ordinal=row[0];self.state=self._vault(raw=raw)
+        self.previous=row[2];self.ordinal=row[0];self.ciphertext_bytes=len(raw);self.state=self._vault(raw=raw)
         op.require(self.state.get('period')==self.period,'OWNER_JOURNAL_PERIOD')
-        return self.state
-    def save(self,state,connection=None):
+        return copy.deepcopy(self.state)
+    def save(self,state,connection=None,*,validate_only=False):
+        reserve=state.get('cleanup_reserve')
+        if self.state and self.state.get('cleanup_reserve'):
+            op.require(reserve is not None,'OWNER_CLEANUP_RESERVE_IMMUTABLE')
+            if 'first_failure' in self.state:op.require(state.get('first_failure')==self.state['first_failure'],'OWNER_FIRST_FAILURE_IMMUTABLE')
+        if reserve is not None:
+            policy=cleanup_reserve_policy()
+            op.require(all(reserve.get(k)==v for k,v in policy.items()),'OWNER_CLEANUP_RESERVE_IMMUTABLE')
+            prior=(self.state or {}).get('cleanup_reserve',{})
+            used=prior.get('cleanup_writes',0)
+            op.require(type(used) is int and 0<=used<=CLEANUP_SNAPSHOTS,'OWNER_CLEANUP_ROW_BOUND')
+            for k,limit in CLEANUP_RECORD_LIMITS.items():
+                op.require(k not in state or len(canonical(state[k]))<=limit,'OWNER_CLEANUP_RECORD_BOUND')
+            reserve=copy.deepcopy(reserve);state['cleanup_reserve']=reserve
+            if getattr(self,'cleanup_mode',False):
+                op.require(used<CLEANUP_SNAPSHOTS and self.ordinal<63,'OWNER_CLEANUP_ROW_BOUND')
+                if 'cleanup_base_bytes' not in prior:
+                    reserve['cleanup_base_bytes']=len(canonical(self.state))
+                    reserve['cleanup_base_access_bytes']=len(canonical((self.state or {}).get('access',{})))
+                else:
+                    for k in ('cleanup_base_bytes','cleanup_base_access_bytes'):reserve[k]=prior[k]
+                reserve['cleanup_writes']=used+1
+                op.require(len(canonical(state.get('access',{})))<=reserve['cleanup_base_access_bytes']+CLEANUP_STATE_GROWTH,'OWNER_CLEANUP_RECORD_BOUND')
+                op.require(len(canonical(state))<=reserve['cleanup_base_bytes']+policy['growth_bytes']+CLEANUP_MARGIN,'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
+            else:
+                op.require(used==0,'OWNER_NO_NORMAL_AFTER_CLEANUP')
+                reserve['cleanup_writes']=0
+                op.require(self.ordinal+1<=63-CLEANUP_SNAPSHOTS,'OWNER_CLEANUP_ROW_BOUND')
+                op.require(len(canonical(state))<=policy['normal_plaintext_ceiling'],'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
         raw=self._vault(value=state);h=hashlib.sha256(raw).hexdigest()
+        if validate_only:return len(raw)  # same checks/encryption, no SQL or state advance
         def write(c):
             if connection is not None:
                 from psycopg.pq import TransactionStatus
@@ -102,7 +158,7 @@ class Journal:
         # No repetition after uncertain acknowledgement. Independent load is
         # available even if this exact write committed but its reply was lost.
         op.require(row is not None and bytes(row[1])==raw and row[2]==h,'OWNER_JOURNAL_ACK_RECONCILE')
-        self.previous=h;self.ordinal=row[0];self.state=copy.deepcopy(state)
+        self.previous=h;self.ordinal=row[0];self.ciphertext_bytes=len(raw);self.state=copy.deepcopy(state)
 
 class Render:
     """Fixed-service transport, reviewed control-plane limits, no automatic retry."""
@@ -405,6 +461,7 @@ def safe_result(exc):
     known.update('ARTIFACT_RECONCILIATION_'+x for x in ('CONFIGURATION','HASH','CODE','BROWSER','STATE','CONFLICT','PREDECESSOR','REFUSAL','CURRENT_STATE','DURABLE_READBACK'))
     known.update({'DRIVER_STATEMENT_BOUND','SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE','REVIEWED_TLS_ENDPOINT_REQUIRED','RESTRICTED_ROUTE_MISMATCH','LIBPQ_ENVIRONMENT_OVERRIDE','RUNTIME_TRANSACTION_MODE','PINNED_REVIEWED_ADDRESS_REQUIRED','CONNECTION_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE'})
     known.update({'OWNER_CLOSURE_ARCHIVE_BINDING','STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
+    known.update({'OWNER_CLEANUP_RESERVE_BYTE_BOUND','OWNER_CLEANUP_ROW_BOUND','OWNER_CLEANUP_RECORD_BOUND','OWNER_CLEANUP_RESERVE_IMMUTABLE','OWNER_FIRST_FAILURE_IMMUTABLE','OWNER_NO_NORMAL_AFTER_CLEANUP'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
@@ -454,6 +511,56 @@ class Pilot:
     def ack(self,name):self.state['intents'][name]['state']='ACKNOWLEDGED';self.save()
     def access_save(self,value):self.state['access']=copy.deepcopy(value);self.save()
     def period_save(self,value):self.state['period_journal']=copy.deepcopy(value);self.save()
+    @contextmanager
+    def cleanup_writes(self):
+        journal=getattr(self,'journal',None)
+        before=getattr(journal,'cleanup_mode',False)
+        if journal is not None:journal.cleanup_mode=True
+        try:yield
+        finally:
+            if journal is not None:journal.cleanup_mode=before
+    def arm_cleanup_reserve(self):
+        op.require(self.state.get('status')=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        if 'cleanup_reserve' in self.state:
+            policy=cleanup_reserve_policy();reserve=self.state['cleanup_reserve']
+            op.require(all(reserve.get(k)==v for k,v in policy.items()) and reserve.get('cleanup_writes')==0 and
+                not any(k in self.state for k in ('binding','access','first_failure')),'OWNER_PRIOR_ATTEMPT_RECONCILE')
+            return  # confirmed pre-intent reservation; no new write or deadline
+        candidate=self.reserved_candidate()
+        self.journal.save(candidate);self.state=candidate
+    def reserved_candidate(self):
+        candidate=copy.deepcopy(self.state)
+        fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
+        present=[n for n in fields if n in candidate]
+        if present:
+            op.require('closed_build_archive' not in candidate and all(candidate['intents'].get(n,{}).get('state')=='ACKNOWLEDGED' for n in ('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')),'OWNER_CLOSURE_ARCHIVE_BINDING')
+            candidate['closed_build_archive']=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
+                fields={n:hashlib.sha256(canonical(candidate[n])).hexdigest() for n in present})
+            for n in present:del candidate[n]
+        candidate['cleanup_reserve']=dict(cleanup_reserve_policy(),cleanup_writes=0)
+        return candidate
+    def record_first_failure(self,exc):
+        # A rejected oversized working copy must not prevent its failure record.
+        # Reload only the last acknowledged baseline; durable effect intents stay.
+        names=list(self.state.get('intents',{}))
+        phase=max(enumerate(names),key=lambda item:(self.state['intents'][item[1]].get('at',0),item[0]),default=(0,'RUN'))[1]
+        diagnostic=bounded_failure(exc,phase)
+        print('PROPERTYAIGENT_OWNER_PILOT_FAILURE_OBSERVED '+json.dumps(diagnostic,sort_keys=True,separators=(',',':')),flush=True)
+        self.state=self.journal.load()
+        if self.state.get('first_failure') is not None:return
+        print('PROPERTYAIGENT_OWNER_PILOT_FIRST_FAILURE '+json.dumps(diagnostic,sort_keys=True,separators=(',',':')),flush=True)
+        self.state['first_failure']=diagnostic
+        self.state['failure']=copy.deepcopy(diagnostic);self.state['pipeline_status']='NOT_VERIFIED'
+        with self.cleanup_writes():self.save()
+    def record_cleanup_failure(self,exc,key):
+        op.require(key in ('closure_failure','restoration_failure'),'OWNER_CLEANUP_RECORD_BOUND')
+        diagnostic=bounded_failure(exc,'CLEANUP')
+        if self.state.get('cleanup_reserve') and not self.state.get('first_failure'):
+            self.state['first_failure']=copy.deepcopy(diagnostic)
+            self.state['failure']=copy.deepcopy(diagnostic)
+            print('PROPERTYAIGENT_OWNER_PILOT_FIRST_FAILURE '+json.dumps(diagnostic,sort_keys=True,separators=(',',':')),flush=True)
+        self.state[key]=diagnostic
+        with self.cleanup_writes():self.save()
     def migrate(self):
         # This explicit owner action is never performed by normal page loads.
         # Unknown acknowledgement cannot fall through to activation.
@@ -601,8 +708,10 @@ class Pilot:
 
     def prepare_continuation(self):
         from .owner_pilot_continuation import migrate_owner_namespace,predecessor
-        old=Journal(self.db,PREDECESSOR).load();link=predecessor(old)
+        prior=Journal(self.db,PREDECESSOR);old=prior.load();link=predecessor(old,snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous})
         with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'])
+        preserved=prior.load()
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==46 and prior.ciphertext_bytes==29084 and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()
@@ -611,7 +720,9 @@ class Pilot:
             self.state['stable_configuration']=copy.deepcopy(old['stable_configuration'])
             self.state['credential_reuse']={'predecessor':PREDECESSOR,'verifiers':'UNCHANGED_NO_CONFIGURATION_WRITE'}
             self.save()
+            print('PROPERTYAIGENT_OWNER_PILOT_INITIAL_JOURNAL '+json.dumps(dict(period=PERIOD,ciphertext_bytes=self.journal.ciphertext_bytes,ordinal=self.journal.ordinal,predecessor_snapshot=link['snapshot']),sort_keys=True),flush=True)
             self.build();self.startup_preflight();self.state['status']='ARTIFACT_READY';self.save()
+            result=self.verify_release_binding();print('PROPERTYAIGENT_OWNER_PILOT_RELEASE_CHECK '+json.dumps(result,sort_keys=True,separators=(',',':')),flush=True)
         except BaseException as exc:
             self.state['failure']=safe_result(exc);self.state['failure']['phase']=max(self.state['intents'],key=lambda x:self.state['intents'][x]['at'],default='PREPARE');self.state['private_failure_detail']=private_failure(exc,self.state['failure']['phase']);self.state['status']='PREPARATION_REFUSED';self.save()
             self.recover_build();raise
@@ -676,16 +787,82 @@ class Pilot:
             op.require(closed['connections_closed'] and closed['cleanup']=='CLOSED' and all(c.closed for c in budget.opened) and budget.failed_native_closed,'OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
             out.append({'role':role,'attempts':budget.attempts,'closed':True})
         return out
-    def run(self,owner_checked_at):
-        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
+    def release_preflight(self):
+        """Shared Run boundary; reads and validation only, before release intent."""
         self.state=self.journal.load()
-        op.require(self.state is not None and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
-        self.preflight()
+        op.require(self.state is not None and self.state.get('period')==PERIOD and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        service,guard,jobs,deploys,environment=self.preflight()
+        op.require(guard==self.state['original_guard'] and environment==self.state['original_environment'],'OWNER_PREBUILD_DRIFT')
         release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        latest=max(deploys,key=lambda row:row['createdAt'])
+        op.require(latest['id']==self.state['deployment'] and latest['commit']['id']==release['execution_binding']['revision'] and
+            self.state['artifact']['execution_binding']==release['execution_binding'] and
+            self.state['profile']==source_profile(self.state['artifact'],release['execution_binding']['revision']),'OWNER_BUILD_RECEIPT_BINDING')
+        startup=self.state['startup_preflight']
+        op.require(startup['sha256']==hashlib.sha256(canonical(startup['receipt'])).hexdigest() and
+            startup['receipt']['period']==PERIOD and startup['receipt']['execution_binding']==release['execution_binding'] and
+            startup['receipt']['tree']==release['tree'] and startup['receipt']['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION',
+            'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
         release['deployment']=self.state['deployment']
         folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
         b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
         b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
+        validate_policy(b,p)
+        self._release_capacity=self.preview_release_capacity(b,p)
+        self._release_readback=dict(configuration_equal=True,environment_equal=True,suspended=True,
+            runtime_roles_dormant=True,stable_verifiers='MATCH',pipeline_sessions='ABSENT',runtime_memberships='ABSENT',
+            temporary_owner='ABSENT',complete_terminal_jobs=len(jobs),complete_terminal_deployments=len(deploys),
+            latest_deployment=latest['id'],latest_revision=latest['commit']['id'],checked_at=time.time())
+        return b,p
+    def preview_release_capacity(self,b,policy):
+        """Exact retained values; projected phase records, no intent/effect/freeze."""
+        starting=dict(ciphertext_bytes=self.journal.ciphertext_bytes,ordinal=self.journal.ordinal)
+        projected=self.reserved_candidate();sizes={}
+        def measure(name):sizes[name]=self.journal.save(copy.deepcopy(projected),validate_only=True)
+        measure('reserved')
+        projected.update(binding=copy.deepcopy(b),policy=copy.deepcopy(policy),status='RELEASE_BOUND')
+        for n in ('RELEASE','PERIOD'):projected['intents'][n]=dict(at=9999999999.999998,state='ACKNOWLEDGED')
+        projected['period_journal']=dict(version='FINITE_INTAKE_PERIOD_V1',state='COMMIT_ACKNOWLEDGED',binding=copy.deepcopy(b),policy=copy.deepcopy(policy))
+        projected['period_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',period=PERIOD,policy_sha256=b['period_policy_sha256'],temporary_issuer='REMOVED',original_memberships='PRESERVED',readback='EXACT_ON_SAME_CONNECTION',connections=1,retry=False)
+        measure('period')
+        with envelope(),self.db.connection() as c:
+            prepared=op.prepare_activation(c,b,stable_credentials=self.state['stable_credentials']['passwords'])
+        projected['access']=prepared;projected['access']['state']='ACTIVATION_ACKNOWLEDGED'
+        projected['intents']['ACTIVATE']=dict(at=9999999999.999998,state='ACKNOWLEDGED')
+        projected['activation_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',runtime_roles=sorted(op.ROLES),credentials='ENCRYPTED_LOCAL_ONLY',valid_until=b['valid_until'])
+        projected['qualification']={'status':'REQUIRED_IN_ACTUAL_RUNTIME_BEFORE_SOURCE'};measure('opening')
+        original=self.state['original_environment'];expected={k:v for k,v in original.items() if k in KEEP}
+        expected['INGESTION_RENDER_PROFILE']=canonical(b['render_profile']).decode()
+        for role,name in (('ingestion_worker_login','INGESTION_WORKER_DATABASE_URL'),('ingestion_effect_login','INGESTION_EFFECT_DATABASE_URL')):expected[name]=url(b['route'],role,prepared['passwords'][role])
+        projected['access']['render']=dict(original=copy.deepcopy(original),expected=expected,guard=b['render_config_sha256'],state='PUT_ACKNOWLEDGED',publication_token=None,publication_state='NOT_REQUESTED',mapped_at=9999999999.999998,handoff_observation_sha256='f'*64)
+        for operation in ('HANDOFF','SUBMISSION'):
+            observation=dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=operation,binding_sha256='f'*64,service_id=SERVICE,observed_at=9999999999.999998,env_groups=[],secret_files=[],inherited_credential_names=[],reviewed=True,no_current_work=True,other_activity_stopped=True,deployment_id=b['retained_deployment'],revision=b['execution_binding']['revision'],suspended=True)
+            projected.setdefault('observations',{})[operation]=dict(provider_observation=observation,owner_boundary_confirmed_at=9999999999.999998)
+        projected['intents']['HANDOFF']=dict(at=9999999999.999998,state='ACKNOWLEDGED')
+        projected['handoff_receipt']=dict(status='RENDER_HANDOFF_ACKNOWLEDGED',service_id=SERVICE,names=sorted(expected),calls=5,observation_sha256='f'*64)
+        measure('handoff_and_submission_observation')
+        return dict(starting=starting,projected_ciphertext_bytes=sizes,normal_ciphertext_ceiling=22152,normal_last_ordinal=47,
+            normal_snapshots_remaining=47-self.journal.ordinal,reserved_cleanup_snapshots=16,cleanup_growth_plaintext=6937,margin_plaintext=1024,worst_cleanup_ciphertext=32756,
+            remaining_normal_bytes=22152-max(sizes.values()),projection_only=True,provider_mutations=0)
+    def verify_release_binding(self):
+        """Deployed read-only proof of the same boundary consumed by Run."""
+        b,p=self.release_preflight()
+        before=(self.journal.previous,self.journal.ordinal)
+        self.journal.load()
+        op.require((self.journal.previous,self.journal.ordinal)==before,'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        return dict(status='RELEASE_BINDING_VERIFIED_READ_ONLY',period=PERIOD,window=WINDOW,
+            date_fields={'tameside':'RECEIVED','manchester':'VALIDATED'},deployment=b['retained_deployment'],
+            execution_binding=b['execution_binding'],binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),
+            policy_sha256=b['period_policy_sha256'],max_runs=p['max_runs'],render_profile=b['render_profile'],
+            readback=self._release_readback,capacity=self._release_capacity,
+            journal_sha256=before[0],journal_ordinal=before[1],journal_unchanged=True,
+            release_intent_present=False,access_opened=False,job_created=False,provider_mutations=0,
+            deadline_frozen=False,validation_only=True)
+    def run(self,owner_checked_at):
+        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
+        b,p=self.release_preflight()
+        folder=Path(b['release_root'])
+        self.arm_cleanup_reserve()
         if 'preparation_failure' in self.state:self.state.pop('failure',None)
         self.state.update(binding=b,policy=p,status='RELEASE_BOUND');self.intent('RELEASE')
         try:
@@ -703,6 +880,13 @@ class Pilot:
             with envelope(),self.db.connection() as c:
                 prepared=op.prepare_activation(c,b,stable_credentials=self.state['stable_credentials']['passwords'])
                 self.state['access']=copy.deepcopy(prepared);self.journal.save(self.state,connection=c)
+                opening=copy.deepcopy(self.state)
+                opening['access']['state']='ACTIVATION_ACKNOWLEDGED'
+                opening['activation_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',runtime_roles=sorted(op.ROLES),credentials='ENCRYPTED_LOCAL_ONLY',valid_until=b['valid_until'])
+                opening['intents']['ACTIVATE']['state']='ACKNOWLEDGED'
+                opening['qualification']={'status':'REQUIRED_IN_ACTUAL_RUNTIME_BEFORE_SOURCE'}
+                op.require(self.journal.ordinal+3<=63-CLEANUP_SNAPSHOTS,'OWNER_CLEANUP_ROW_BOUND')
+                self.journal.save(opening,validate_only=True)
                 def access_saved(value):
                     self.state['access']=copy.deepcopy(value)
                     if value.get('state')=='ACTIVATION_ACKNOWLEDGED':self.journal.save(self.state,connection=c)
@@ -735,8 +919,7 @@ class Pilot:
                 self.state['independent_result']=op.finalisation(c,b,{'run_id':run.get('id'),'publication':run.get('publication')})
             self.state['pipeline_status']='VERIFIED_RETAINED_AND_SCREENED';self.save()
         except BaseException as exc:
-            self.state['failure']=safe_result(exc);self.state['failure']['phase']=max(self.state['intents'],key=lambda x:self.state['intents'][x]['at'],default='RUN');self.state['pipeline_status']='NOT_VERIFIED';self.save()
-            self.state['private_failure_detail']=private_failure(exc,self.state['failure']['phase']);self.save()
+            self.record_first_failure(exc)
         finally:
             self.cleanup()
         return self.summary()
@@ -766,6 +949,24 @@ class Pilot:
             finally:c.execute('ROLLBACK')
         self.save()
     def cleanup(self):
+        if self.state.get('cleanup_reserve'):self.state=self.journal.load()
+        with self.cleanup_writes():
+            self._cleanup()
+            if self.state.get('cleanup_reserve') and self.state.get('status')=='CLOSED' and not self.state.get('closure_verification'):
+                try:check=self.inspect()
+                except BaseException as exc:
+                    self.state=self.journal.load()
+                    self.record_cleanup_failure(exc,'closure_failure')
+                    self.state['status']='CONTAINMENT_REQUIRES_REVIEW';self.save()
+                    return
+                good=(check['stable_verifier_binding']=='MATCH' and check['runtime_membership_count']==0 and check['pipeline_session_count']==0 and check['temporary_owner_absent'] and
+                    all(not r['login'] for r in check['runtime_roles']) and all(check['current_readback'][k] for k in ('suspended','configuration_equal','environment_equal')) and check['attempt_authorities']['all_expiry_zero'])
+                self.state['closure_verification']=dict(status='VERIFIED' if good else 'REFUSED',runtime_memberships=check['runtime_membership_count'],sessions=check['pipeline_session_count'],
+                    temporary_owner_absent=check['temporary_owner_absent'],stable_verifiers=check['stable_verifier_binding'],suspended=check['current_readback']['suspended'],
+                    configuration_equal=check['current_readback']['configuration_equal'],environment_equal=check['current_readback']['environment_equal'],authorities_closed=check['attempt_authorities']['all_expiry_zero'])
+                if not good:self.state['status']='CONTAINMENT_REQUIRES_REVIEW'
+                self.save()
+    def _cleanup(self):
         # Independent database containment never depends on GitHub or Render.
         access=self.state.get('access')
         if access and access.get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':
@@ -775,7 +976,7 @@ class Pilot:
                         self.state['access']=copy.deepcopy(value);self.journal.save(self.state,connection=c)
                     self.state['closure_receipt']=op.close(c,access,closed_saved)
                 self.save()
-            except BaseException as exc:self.state['closure_failure']=safe_result(exc);self.save()
+            except BaseException as exc:self.record_cleanup_failure(exc,'closure_failure')
         if access and access.get('render') and access.get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED':
             r=access['render']
             if r.get('state')=='RESTORE_INTENT_NO_RETRY':
@@ -790,7 +991,7 @@ class Pilot:
                 try:
                     with self.api() as api:self.state['restoration_receipt']=restore_handoff(api,access,self.access_save,self.state.get('job',{}).get('id'))
                     self.save()
-                except BaseException as exc:self.state['restoration_failure']=safe_result(exc);self.save()
+                except BaseException as exc:self.record_cleanup_failure(exc,'restoration_failure')
         with self.api() as api:
             service=api.call('GET');environment=env_values(api.call('GET','/env-vars?limit=100'))
         self.state['final_service']={'suspended':service.get('suspended')=='suspended','configuration_equal':service_guard(service)==self.state['original_guard'],
@@ -800,7 +1001,10 @@ class Pilot:
         self.save()
     def recover(self):
         self.state=self.journal.load();op.require(self.state is not None,'OWNER_NO_RECOVERY_STATE')
-        if self.state.get('status')=='CLOSED':return self.summary()
+        if self.state.get('status')=='CLOSED':
+            if self.state.get('cleanup_reserve') and not self.state.get('closure_verification'):
+                with self.cleanup_writes():self.cleanup()
+            return self.summary()
         self.reserve_closure_space()
         if 'binding' not in self.state:self.recover_build()
         else:self.cleanup()
@@ -811,10 +1015,20 @@ class Pilot:
         No release, restoration intent, original environment, credential, job,
         policy or actual-result field is removed. No ciphertext/row limit grows.
         """
-        if self.state.get('access',{}).get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':return
+        access=self.state.get('access',{})
+        if not access:return
         fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
         present=[name for name in fields if name in self.state]
         if not present:return
+        early=access.get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED'
+        if early:
+            # Exact acknowledged pre-submission Attempt04 only. Recovery never
+            # consumes or clears its existing release/handoff intent.
+            op.require(self.state.get('period')==PERIOD=='b-dbpilot-20261027-1102-04' and
+                self.state.get('status')=='RELEASE_BOUND' and access.get('state')=='ACTIVATION_ACKNOWLEDGED' and
+                access.get('render',{}).get('state')=='PUT_ACKNOWLEDGED' and
+                all(self.state.get('intents',{}).get(n,{}).get('state')=='ACKNOWLEDGED' for n in ('PERIOD','ACTIVATE','HANDOFF')) and
+                'ONE_JOB' not in self.state.get('intents',{}) and not self.state.get('job'),'OWNER_CLOSURE_ARCHIVE_BINDING')
         required=('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')
         op.require(all(self.state.get('intents',{}).get(name,{}).get('state')=='ACKNOWLEDGED' for name in required)
             and self.state.get('original_guard')==self.state['binding'].get('render_config_sha256')
@@ -824,9 +1038,38 @@ class Pilot:
         op.require(re.fullmatch('[a-f0-9]{64}',self.journal.previous or ''),'OWNER_JOURNAL_HASH')
         reference=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
             fields={name:hashlib.sha256(canonical(self.state[name])).hexdigest() for name in present})
-        for name in present:del self.state[name]
-        self.state['closed_build_archive']=reference
+        compact=copy.deepcopy(self.state)
+        for name in present:del compact[name]
+        compact['closed_build_archive']=reference
+        if early:
+            compact['recovery_capacity']=self.check_cleanup_capacity(compact)
+        self.state=compact
         self.save()
+    def check_cleanup_capacity(self,compact):
+        """Encrypt projections of the retained state; no SQL/provider effects.
+
+        Nine remaining snapshots: archive, four DB-close/receipt saves,
+        three restoration saves, final outcome. Existing 32KiB/64-row bounds.
+        Synthetic receipt shapes are measured only, never saved as outcomes.
+        """
+        stages=('archived','access_disabled','memberships_removed','database_closed','closure_receipt','restore_intent','restore_ack','restoration_receipt','final')
+        op.require(self.journal.ordinal+len(stages)<=63,'OWNER_STATE_HISTORY_BOUND')
+        projected=copy.deepcopy(compact)
+        def metadata(sizes):return dict(version='RETAINED_CLOSURE_CAPACITY_V1',ciphertext_limit=32768,remaining_snapshots=len(stages),projected_ciphertext_bytes=sizes)
+        projected['recovery_capacity']=metadata({n:32768 for n in stages})
+        sizes={}
+        def measure(name):sizes[name]=len(self.journal._vault(value=projected))
+        measure('archived')
+        projected['access']['state']='ACCESS_DISABLED_ACKNOWLEDGED';measure('access_disabled')
+        projected['access']['membership_closure']='RECONCILIATION_REQUIRED';measure('memberships_removed')
+        projected['access'].update(state='DATABASE_CLOSURE_ACKNOWLEDGED',passwords={});measure('database_closed')
+        projected['closure_receipt']=dict(outcome='COMMIT_ACKNOWLEDGED',runtime_access='DISABLED',password_verifiers='RETAINED',authorities=['f'*64]*4,authority_expiry=0,temporary_owner='REMOVED',sessions='ABSENT',stop_preserved=projected['binding']['accepted_stop'],intake_run_state='PERSISTENCE_UNCERTAIN',open_run_requires_reconciliation=False)
+        measure('closure_receipt')
+        projected['access']['render'].update(state='RESTORE_INTENT_NO_RETRY',submission_ack_timing='NO_JOB_VERIFIED');measure('restore_intent')
+        projected['access']['render'].update(state='RESTORATION_ACKNOWLEDGED',expected={});measure('restore_ack')
+        projected['restoration_receipt']=dict(status='RESTORATION_VERIFIED',service_id=SERVICE,job_id=None,calls=8,publication_token='WITHDRAWN_FROM_SERVICE_SNAPSHOT_NOT_PROVIDER_REVOKED',submission_ack_timing='NO_JOB_VERIFIED');measure('restoration_receipt')
+        projected.update(status='CLOSED',final_service=dict(suspended=True,configuration_equal=True,environment_equal=True));measure('final')
+        return metadata(sizes)
     def inspect(self):
         """Read-only reconciliation; never calls prepare, recovery or save."""
         self.state=self.journal.load()
@@ -835,6 +1078,8 @@ class Pilot:
         value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
         value['artifact_verified']='artifact' in self.state
         value['journal_snapshot_ordinal']=self.journal.ordinal
+        value['journal_ciphertext_bytes']=getattr(self.journal,'ciphertext_bytes',None)
+        value['journal_sha256']=getattr(self.journal,'previous',None)
         value['remaining_snapshot_slots']=63-self.journal.ordinal
         value['release_intent_present']='RELEASE' in self.state.get('intents',{})
         value['job_intent_present']='ONE_JOB' in self.state.get('intents',{})
@@ -846,7 +1091,13 @@ class Pilot:
             try:
                 roles=c.execute(op.ROLE_QUERY,(list(op.ROLES),)).fetchall()
                 value['runtime_roles']=[{'role':r[0],'login':r[1],'password_null':r[2]} for r in roles]
-                value['period_present']=PERIOD in op.control(c).get('intake_periods',{})
+                control=op.control(c);policy=control.get('intake_periods',{}).get(PERIOD)
+                value['period_present']=policy is not None
+                grants={k:v for k,v in control.get('grants',{}).items() if v.get('intake_period')==PERIOD}
+                value['attempt_authorities']={'count':len(grants),'all_expiry_zero':all(g.get('expires_at')==0 for g in grants.values()),'ids':sorted(grants)}
+                value['period_policy_readback']=None if policy is None else {'max_runs':policy.get('max_runs'),'expires_at':policy.get('expires_at'),'execution_binding':policy.get('execution_binding'),'retained_history':True}
+                run=control.get('intake_run') or {}
+                value['attempt_run_state']=run.get('state') if run.get('period')==PERIOD else None
                 value['pipeline_session_count']=c.execute('SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)',(list(op.ROLES),)).fetchone()[0]
                 value['runtime_membership_count']=c.execute('SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(op.ROLES),)).fetchone()[0]
                 if self.state.get('stable_credentials'):
@@ -909,7 +1160,7 @@ class Pilot:
         return {'period':PERIOD,'window':WINDOW,'date_fields':{'tameside':'RECEIVED','manchester':'VALIDATED'},'status':s['status'],
                 'pipeline_status':s.get('pipeline_status','NOT_RUN'),'github_publication':'NOT_REQUESTED','deployment':s.get('deployment'),
                 'job_id':s.get('job',{}).get('id'),'job_status':s.get('job_terminal',{}).get('status'),'final_service':s.get('final_service'),
-                'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
+                'failure':s.get('failure'),'first_failure':s.get('first_failure'),'cleanup_reserve':s.get('cleanup_reserve'),'closure_verification':s.get('closure_verification'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'recovery_capacity':s.get('recovery_capacity'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
