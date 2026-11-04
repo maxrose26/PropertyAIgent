@@ -29,3 +29,25 @@ def test_actual_runtime_guard_preflight_never_qualifies(monkeypatch,tmp_path,cap
     assert r['status']==('CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION' if kind=='clean' else 'REFUSED')
     assert r.get('reason')==({'dirty':'CLEAN_REVIEWED_CHECKOUT_REQUIRED','git_failure':'GIT_STATUS_UNVERIFIED'}.get(kind))
 
+
+@pytest.mark.parametrize('status',['VERIFIED_BOTH_RESTRICTED_ROLES','REFUSED'])
+def test_qualification_only_never_reaches_daily_on_either_outcome(monkeypatch,capsys,status):
+    from scripts import owner_pilot_job as job
+    from scripts import run_daily_councils as daily
+    from verification.ingestion_storage import daily_intake_runtime as native,runtime_authentication as auth
+    monkeypatch.setattr(native,'Runtime',lambda args:object())
+    monkeypatch.setattr(auth,'qualify',lambda *a:{'status':status,'source_requests':0})
+    monkeypatch.setattr(daily,'main',lambda **kw:pytest.fail('DAILY_OR_COUNCIL_REACHED'))
+    monkeypatch.setattr(job.os,'environ',{'PATH':'/usr/bin','DATABASE_URL':'SECRET_SENTINEL'})
+    monkeypatch.setattr(sys,'argv',['job','--period',p.PERIOD,'--hostaddr','127.0.0.1','--deadline','9999999999','--qualification-only'])
+    assert job.main()==(0 if status=='VERIFIED_BOTH_RESTRICTED_ROLES' else 2)
+    raw=capsys.readouterr().out
+    assert 'SECRET_SENTINEL' not in raw and 'DATABASE_PILOT_RUNTIME_QUALIFICATION' in raw
+
+
+def test_observation_modes_are_exclusive_and_legacy_period_cannot_bypass_native_gate(monkeypatch):
+    from scripts import owner_pilot_job as job
+    for args in (['--startup-check-only','--qualification-only'],['--qualification-only','--period','b-dbpilot-20261027-1102-01']):
+        monkeypatch.setattr(sys,'argv',['job','--hostaddr','127.0.0.1']+args)
+        with pytest.raises(SystemExit) as exc:job.main()
+        assert exc.value.code==2

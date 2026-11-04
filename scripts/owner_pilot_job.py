@@ -36,7 +36,10 @@ def startup_check(Runtime,period,hostaddr):
     return 0 if receipt['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION' else 2
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float);p.add_argument('--startup-check-only',action='store_true');p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float)
+    mode=p.add_mutually_exclusive_group();mode.add_argument('--startup-check-only',action='store_true');mode.add_argument('--qualification-only',action='store_true')
+    p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
+    if a.qualification_only and a.period not in ('b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'):raise SystemExit(2)
     import ipaddress
     if ipaddress.ip_address(a.hostaddr).version!=4:raise SystemExit(2)
     PERIOD=a.period
@@ -60,6 +63,7 @@ def main():
         runtime=Runtime(args);receipt=qualify(runtime,a.deadline)
         print('DATABASE_PILOT_RUNTIME_QUALIFICATION '+json.dumps(receipt,sort_keys=True,separators=(',',':')),flush=True)
         if receipt['status']!='VERIFIED_BOTH_RESTRICTED_ROLES':return 2
+        if a.qualification_only:return 0  # no daily(), policy/authority issuance or source calls
         return daily(prepared_runtime=runtime)
     return daily()
 
