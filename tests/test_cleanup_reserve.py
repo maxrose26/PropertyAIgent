@@ -176,3 +176,9 @@ def test_preopening_validation_uses_real_vault_without_persisting_or_advancing()
     state['padding']='x'*18000
     with pytest.raises(p.op.Denied,match='RESERVE_BYTE_BOUND'):obj.journal.save(state,validate_only=True)
     assert len(obj.db.rows)==1
+
+def test_first_observed_failure_survives_an_unavailable_journal_read(capsys):
+    obj=SimpleNamespace(state={'intents':{}},journal=SimpleNamespace(load=lambda:(_ for _ in ()).throw(ConnectionError('SECRET_SENTINEL'))))
+    with pytest.raises(ConnectionError):p.Pilot.record_first_failure(obj,p.op.Denied('OWNER_CLEANUP_RESERVE_BYTE_BOUND'))
+    output=capsys.readouterr().out
+    assert 'FAILURE_OBSERVED' in output and 'OWNER_CLEANUP_RESERVE_BYTE_BOUND' in output and 'SECRET_SENTINEL' not in output

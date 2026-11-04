@@ -542,6 +542,7 @@ class Pilot:
         names=list(self.state.get('intents',{}))
         phase=max(enumerate(names),key=lambda item:(self.state['intents'][item[1]].get('at',0),item[0]),default=(0,'RUN'))[1]
         diagnostic=bounded_failure(exc,phase)
+        print('PROPERTYAIGENT_OWNER_PILOT_FAILURE_OBSERVED '+json.dumps(diagnostic,sort_keys=True,separators=(',',':')),flush=True)
         self.state=self.journal.load()
         if self.state.get('first_failure') is not None:return
         print('PROPERTYAIGENT_OWNER_PILOT_FIRST_FAILURE '+json.dumps(diagnostic,sort_keys=True,separators=(',',':')),flush=True)
