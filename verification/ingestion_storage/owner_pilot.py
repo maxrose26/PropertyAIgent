@@ -28,8 +28,8 @@ from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
 
-PREDECESSOR='b-dbpilot-20261027-1102-04'
-PERIOD='b-dbpilot-20261027-1102-05'
+PREDECESSOR='b-dbpilot-20261027-1102-05'
+PERIOD='b-dbpilot-20261027-1102-06'
 OWNER_PERIOD=PERIOD+'_owner'
 OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
 SERVICE='crn-d9sv93vavr4c73f98rb0'
@@ -148,7 +148,7 @@ class Database:
 
 class Journal:
     def __init__(self,db,period=PERIOD):
-        op.require(period in (PERIOD,PREDECESSOR),'OWNER_JOURNAL_PERIOD')
+        op.require(period in (PERIOD,PREDECESSOR,'b-qualification-20261104-02'),'OWNER_JOURNAL_PERIOD')
         self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None;self.ordinal=-1
     def _vault(self,raw=None,value=None):
         # Only encrypted bytes touch the temporary filesystem. No new credential
@@ -764,11 +764,14 @@ class Pilot:
         self.save()
 
     def prepare_continuation(self):
-        from .owner_pilot_continuation import migrate_owner_namespace,predecessor
+        from .owner_pilot_continuation import migrate_owner_namespace,predecessor,diagnostic02_closed
         prior=Journal(self.db,PREDECESSOR);old=prior.load();link=predecessor(old,snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous})
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'])
+        diagnostic=Journal(self.db,'b-qualification-20261104-02');closed=diagnostic.load()
+        diagnostic_link=diagnostic02_closed(closed,snapshot={'ordinal':diagnostic.ordinal,'bytes':diagnostic.ciphertext_bytes,'sha256':diagnostic.previous},stable_credentials=old['stable_credentials'])
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],attempt06=True)
+        op.require(diagnostic.load()==closed and diagnostic.previous==diagnostic_link['snapshot']['sha256'],'OWNER_CONTINUATION_PRESERVATION')
         preserved=prior.load()
-        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==46 and prior.ciphertext_bytes==29084 and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==link['snapshot']['ordinal'] and prior.ciphertext_bytes==link['snapshot']['bytes'] and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         existing=self.journal.load()
         if existing is not None:
             op.require(existing.get('period')==PERIOD and existing.get('status')=='PREPARATION_REFUSED' and
@@ -793,7 +796,7 @@ class Pilot:
             print('PROPERTYAIGENT_OWNER_PILOT_RELEASE_CHECK '+json.dumps(result,sort_keys=True,separators=(',',':')),flush=True)
             return
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
-        self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
+        self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link,'diagnostic_closure':diagnostic_link}
         self.save()
         try:
             self.state['stable_credentials']=copy.deepcopy(old['stable_credentials'])
