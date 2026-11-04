@@ -6,6 +6,22 @@ from .operational_controller import DatabaseBudget
 from .owner_pilot import envelope,safe_result
 from . import intake_owner as op
 
+PROFILE_FIELDS=('current_user','session_user','capability_usage','statement_timeout','lock_timeout',
+    'idle_in_transaction_session_timeout','worker_step_execute','registration_execute',
+    'evidence_write_execute','evidence_read_execute','credential_deadline')
+
+def profile_comparison(row,role,deadline):
+    """Same exact guard, with fixed names/booleans only; no observed values."""
+    op.require(role in op.ROLES,'OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
+    worker=role=='ingestion_worker_login'
+    expected=(role,role,True,'10s','3s','20s',True,worker,worker,worker,
+              datetime.fromtimestamp(deadline,timezone.utc).timestamp())
+    shape=isinstance(row,tuple) and len(row)==len(expected)
+    checks={name:bool(shape and row[i]==expected[i]) for i,name in enumerate(PROFILE_FIELDS)}
+    first=next((name for name,passed in checks.items() if not passed),None) if shape else 'ROW_SHAPE'
+    return dict(version='RESTRICTED_PROFILE_COMPARISON_V1',row_shape=shape,checks=checks,
+                first_mismatch=first,status='MATCH' if shape and all(checks.values()) else 'MISMATCH')
+
 def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
     receipt=dict(version='RUNTIME_AUTHENTICATION_V1',period=runtime.args.period,execution_binding=runtime.binding,
         deadline=deadline,status='REFUSED',roles=[],attempts=[],source_requests=0,max_attempts_per_role=2)
@@ -16,7 +32,7 @@ def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
             for role,cap in op.ROLES.items():
                 for attempt in (1,2):
                     budget=budget_factory(**runtime.run.database_limits(dict(statements=20,connections=1,returned_bytes=8192,seconds=12)))
-                    runtime.run.budgets.append(budget);error=None
+                    runtime.run.budgets.append(budget);error=None;comparison=None
                     try:
                         engine=budget.engine(runtime.urls[role],**runtime.options)
                         with engine.connect() as c:
@@ -27,12 +43,17 @@ def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_write(text,text,text,bytea)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_read(text,text,text)','EXECUTE'),
                               (SELECT extract(epoch FROM rolvaliduntil)::double precision FROM pg_roles WHERE rolname=current_user)"""),dict(cap=cap)).one())
-                            worker=role=='ingestion_worker_login'
-                            op.require(row==(role,role,True,'10s','3s','20s',True,worker,worker,worker,datetime.fromtimestamp(deadline,timezone.utc).timestamp()),'OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
+                            comparison=profile_comparison(row,role,deadline)
+                            if comparison['status']!='MATCH':
+                                # Store BEFORE cleanup can fail; subsequent failures
+                                # cannot replace this first comparison evidence.
+                                receipt.setdefault('first_qualification_failure',dict(role=role,attempt=attempt,comparison=comparison))
+                            op.require(comparison['status']=='MATCH','OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
                     except BaseException as exc:error=exc
                     finally:
                         closed=budget.close([])
                         record=dict(role=role,attempt=attempt,**{k:closed[k] for k in ('connection_attempts','driver_statements','returned_data_value_bytes','elapsed_seconds','connections_closed','cleanup','connection_diagnostics')})
+                        if comparison is not None:record['profile_comparison']=comparison
                         receipt['attempts'].append(record)
                     op.require(closed['connections_closed'] and closed['cleanup']=='CLOSED','OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
                     if error is None:receipt['roles'].append(dict(role=role,identity='VERIFIED',interface='VERIFIED',connection_closed=True));break
