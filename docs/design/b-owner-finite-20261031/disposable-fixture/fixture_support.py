@@ -18,6 +18,7 @@ from tests.e2e_pg_world import disposable_world
 FIXTURE_PASSWORD='disposable_fixture_only';PGENV=dict(os.environ,PGPASSWORD=FIXTURE_PASSWORD)
 PGBIN=os.environ.get('PG_BIN',str(Path(shutil.which('psql') or '/usr/bin/psql').parent))
 FIXTURE_CONTAINER=os.environ.get('BOLTON_TEST_PG_CONTAINER')
+FIXTURE_DATABASE='postgres'  # unchanged default; connected runtime test selects its fixed disposable database
 def pg_tool(name):
  return ['docker','exec','-i','-e','PGPASSWORD',FIXTURE_CONTAINER,name] if FIXTURE_CONTAINER else [str(Path(PGBIN)/name)]
 SQL=(PKG/'bolton-intake-install.sql').read_text()
@@ -49,11 +50,12 @@ def world():
  from verification.ingestion_storage.operational_owner import PKG as OPKG,GENERATION3_SCREENING_V3_POLICY
  from verification.ingestion_storage import oldham_policy,screening_v3_worker_sql
  settings();assert os.environ.get('BOLTON_TEST_PG_CONTAINER'), 'PRIVATE_DISPOSABLE_SERVICE_REQUIRED'
- b=psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='provisioning_bootstrap',password=FIXTURE_PASSWORD,autocommit=True)
+ assert FIXTURE_DATABASE in ('postgres','ingestion_provisioning_test'), 'FIXED_DISPOSABLE_DATABASE'
+ b=psycopg.connect(host='127.0.0.1',port=5432,dbname=FIXTURE_DATABASE,user='provisioning_bootstrap',password=FIXTURE_PASSWORD,autocommit=True)
  version=b.info.server_version;assert 170000<=version<180000
  b.execute('CREATE ROLE provisioning_migrator NOLOGIN NOSUPERUSER CREATEROLE NOINHERIT')
  b.execute('GRANT USAGE,CREATE ON SCHEMA public TO provisioning_migrator WITH GRANT OPTION')
- b.execute('GRANT CONNECT ON DATABASE postgres TO provisioning_migrator WITH GRANT OPTION')
+ b.execute(psycopg.sql.SQL('GRANT CONNECT ON DATABASE {} TO provisioning_migrator WITH GRANT OPTION').format(psycopg.sql.Identifier(FIXTURE_DATABASE)))
  b.execute('SET SESSION AUTHORIZATION provisioning_migrator')
  try:
   initial=Path('docs/design/ingestion-provisioning-20261016/install.sql').read_text()
@@ -129,7 +131,7 @@ def snapshot(b):
  return (fn,)+tuple(b.execute(x).fetchone()[0] for x in q)
 
 
-def actor():return psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='postgres',password='disposable_actor_password',autocommit=True,prepare_threshold=None)
+def actor():return psycopg.connect(host='127.0.0.1',port=5432,dbname=FIXTURE_DATABASE,user='postgres',password='disposable_actor_password',autocommit=True,prepare_threshold=None)
 
 
 def execute(c,sql=SQL):
@@ -329,7 +331,7 @@ def test_failure_at_each_stage_rolls_back_definitions_acls_memberships_and_ledge
 
 def test_a_lock_held_on_the_ledger_stops_the_preflight_before_any_change(seeded):
  b=seeded['boot'];before=snapshot(b)
- blocker=psycopg.connect(host='127.0.0.1',port=5432,dbname='postgres',user='provisioning_bootstrap',password=FIXTURE_PASSWORD,autocommit=False)
+ blocker=psycopg.connect(host='127.0.0.1',port=5432,dbname=FIXTURE_DATABASE,user='provisioning_bootstrap',password=FIXTURE_PASSWORD,autocommit=False)
  try:
   blocker.execute('LOCK TABLE public.ingestion_work_items IN ACCESS EXCLUSIVE MODE')      # a second session holds the ledger: the preflight read must time out (3 s) before any change
   with actor() as c:

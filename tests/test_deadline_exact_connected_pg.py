@@ -21,19 +21,11 @@ from verification.ingestion_storage.operational_controller import DatabaseBudget
 
 @pytest.fixture(scope='module')
 def world():
-    # Reuse the full existing owner fixture in the application's fixed
-    # disposable database. Only bootstrap/owner fixture connections are mapped;
-    # DatabaseBudget and psycopg runtime connections remain completely unchanged.
-    original=support.psycopg
-    class FixtureDriver:
-        def __getattr__(self,name):return getattr(original,name)
-        def connect(self,*args,**kw):
-            assert not args and kw['host']=='127.0.0.1' and kw['port']==5432
-            assert kw['dbname']=='postgres' and kw['user'] in ('provisioning_bootstrap','postgres')
-            return original.connect(**{**kw,'dbname':'ingestion_provisioning_test'})
-    support.psycopg=FixtureDriver()
+    # Only fixture database selection changes. Runtime clients are unmodified.
+    original=support.FIXTURE_DATABASE
+    support.FIXTURE_DATABASE='ingestion_provisioning_test'
     try:yield from support.world.__wrapped__()
-    finally:support.psycopg=original
+    finally:support.FIXTURE_DATABASE=original
 
 RECORDED=1793827036.7709913
 
