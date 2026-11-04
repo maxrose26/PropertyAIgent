@@ -19,7 +19,7 @@ def main():
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
         elif a.action=='reconcile-artifact':pilot.reconcile_artifact()
-        result=pilot.inspect() if a.action=='status' else pilot.summary()
+        result=pilot.inspect() if a.action in ('status','recover') else pilot.summary()
     except BaseException as exc:
         result=safe_result(exc)
         result['private_diagnostic']=private_failure(exc,a.action)

@@ -13,7 +13,7 @@ def require_owner():
 def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     global _process
     if server_prepare:
-        expected='CONTINUE:'+PERIOD if action=='prepare-continuation' else PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
+        expected='RECOVER:'+PERIOD if action=='recover' else 'CONTINUE:'+PERIOD if action=='prepare-continuation' else PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
         if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
     if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
@@ -53,7 +53,9 @@ def status():
     except Exception as exc:return safe_result(exc)
 
 def startup_prepare():
-    if os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='CONTINUE:'+PERIOD:
+    if os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='RECOVER:'+PERIOD:
+        print('PROPERTYAIGENT_OWNER_PILOT_RECOVERY '+str(start('recover',server_prepare=True)['status']),flush=True)
+    elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='CONTINUE:'+PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_CONTINUATION '+str(start('prepare-continuation',server_prepare=True)['status']),flush=True)
     elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')==PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_PREPARATION '+str(start('prepare',server_prepare=True)['status']),flush=True)

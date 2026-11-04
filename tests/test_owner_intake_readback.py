@@ -24,7 +24,7 @@ def test_preparation_readback_is_get_and_read_only_without_journal_mutation():
             return []
         def close(self):pass
     pilot=object.__new__(p.Pilot);pilot.db=DB();pilot.render_factory=API
-    pilot.journal=SimpleNamespace(load=lambda:copy.deepcopy(state),save=lambda *_a,**_k:(_ for _ in ()).throw(AssertionError('READBACK_MUTATION')))
+    pilot.journal=SimpleNamespace(ordinal=0,load=lambda:copy.deepcopy(state),save=lambda *_a,**_k:(_ for _ in ()).throw(AssertionError('READBACK_MUTATION')))
     result=pilot.inspect()
     assert result['status']=='READ_ONLY_EVIDENCE_SAVED' and result['workflow_status']=='PREPARATION_REFUSED'
     assert result['current_readback']['environment_equal'] and result['current_readback']['configuration_equal'] and result['temporary_owner_absent']

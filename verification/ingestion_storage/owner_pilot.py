@@ -70,7 +70,7 @@ class Database:
 class Journal:
     def __init__(self,db,period=PERIOD):
         op.require(period in (PERIOD,PREDECESSOR),'OWNER_JOURNAL_PERIOD')
-        self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None
+        self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None;self.ordinal=-1
     def _vault(self,raw=None,value=None):
         # Only encrypted bytes touch the temporary filesystem. No new credential
         # is persisted; recovery derives its key from existing protected config.
@@ -86,7 +86,7 @@ class Journal:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
         if row is None:return None
         raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
-        self.previous=row[2];self.state=self._vault(raw=raw)
+        self.previous=row[2];self.ordinal=row[0];self.state=self._vault(raw=raw)
         op.require(self.state.get('period')==self.period,'OWNER_JOURNAL_PERIOD')
         return self.state
     def save(self,state,connection=None):
@@ -102,7 +102,7 @@ class Journal:
         # No repetition after uncertain acknowledgement. Independent load is
         # available even if this exact write committed but its reply was lost.
         op.require(row is not None and bytes(row[1])==raw and row[2]==h,'OWNER_JOURNAL_ACK_RECONCILE')
-        self.previous=h;self.state=copy.deepcopy(state)
+        self.previous=h;self.ordinal=row[0];self.state=copy.deepcopy(state)
 
 class Render:
     """Fixed-service transport, reviewed control-plane limits, no automatic retry."""
@@ -400,7 +400,7 @@ def safe_result(exc):
     known.update({'OWNER_CONTINUATION_PREDECESSOR','OWNER_CONTINUATION_DUPLICATE','OWNER_CONTINUATION_MIGRATION','OWNER_CONTINUATION_PRESERVATION','OWNER_CONTINUATION_QUALIFICATION', 'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
     known.update('ARTIFACT_RECONCILIATION_'+x for x in ('CONFIGURATION','HASH','CODE','BROWSER','STATE','CONFLICT','PREDECESSOR','REFUSAL','CURRENT_STATE','DURABLE_READBACK'))
     known.update({'DRIVER_STATEMENT_BOUND','SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE','REVIEWED_TLS_ENDPOINT_REQUIRED','RESTRICTED_ROUTE_MISMATCH','LIBPQ_ENVIRONMENT_OVERRIDE','RUNTIME_TRANSACTION_MODE','PINNED_REVIEWED_ADDRESS_REQUIRED','CONNECTION_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE'})
-    known.update({'STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
+    known.update({'OWNER_CLOSURE_ARCHIVE_BINDING','STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
@@ -742,7 +742,7 @@ class Pilot:
                 self.state['restoration_receipt']={'status':'EXACT_RESTORATION_VERIFIED_BY_READBACK','original_acknowledgement':'UNKNOWN','provider_mutations':0};self.save()
             if r.get('state')=='PUT_INTENT_NO_RETRY':
                 with self.api() as api:reconcile_handoff(api,access,self.access_save)
-            if r.get('state')=='PUT_ACKNOWLEDGED' or r.get('reconciliation')=='EXPECTED':
+            if r.get('state')=='PUT_ACKNOWLEDGED' or r.get('state')=='PUT_INTENT_NO_RETRY' and r.get('reconciliation')=='EXPECTED':
                 try:
                     with self.api() as api:self.state['restoration_receipt']=restore_handoff(api,access,self.access_save,self.state.get('job',{}).get('id'))
                     self.save()
@@ -756,9 +756,33 @@ class Pilot:
         self.save()
     def recover(self):
         self.state=self.journal.load();op.require(self.state is not None,'OWNER_NO_RECOVERY_STATE')
+        if self.state.get('status')=='CLOSED':return self.summary()
+        self.reserve_closure_space()
         if 'binding' not in self.state:self.recover_build()
         else:self.cleanup()
         return self.summary()
+    def reserve_closure_space(self):
+        """Keep concluded build detail in immutable prior rows, not every copy.
+
+        No release, restoration intent, original environment, credential, job,
+        policy or actual-result field is removed. No ciphertext/row limit grows.
+        """
+        if self.state.get('access',{}).get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':return
+        fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
+        present=[name for name in fields if name in self.state]
+        if not present:return
+        required=('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')
+        op.require(all(self.state.get('intents',{}).get(name,{}).get('state')=='ACKNOWLEDGED' for name in required)
+            and self.state.get('original_guard')==self.state['binding'].get('render_config_sha256')
+            and self.state['access'].get('render',{}).get('guard')==self.state['original_guard']
+            and self.state['access']['render'].get('original')==self.state.get('original_environment'),'OWNER_CLOSURE_ARCHIVE_BINDING')
+        op.require(type(self.journal.ordinal) is int and 0<=self.journal.ordinal<=59,'OWNER_STATE_HISTORY_BOUND')
+        op.require(re.fullmatch('[a-f0-9]{64}',self.journal.previous or ''),'OWNER_JOURNAL_HASH')
+        reference=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
+            fields={name:hashlib.sha256(canonical(self.state[name])).hexdigest() for name in present})
+        for name in present:del self.state[name]
+        self.state['closed_build_archive']=reference
+        self.save()
     def inspect(self):
         """Read-only reconciliation; never calls prepare, recovery or save."""
         self.state=self.journal.load()
@@ -766,10 +790,13 @@ class Pilot:
         value=self.summary();value['workflow_status']=value['status'];value['status']='READ_ONLY_EVIDENCE_SAVED';value['read_only']=True
         value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
         value['artifact_verified']='artifact' in self.state
+        value['journal_snapshot_ordinal']=self.journal.ordinal
+        value['remaining_snapshot_slots']=63-self.journal.ordinal
         value['release_intent_present']='RELEASE' in self.state.get('intents',{})
         value['job_intent_present']='ONE_JOB' in self.state.get('intents',{})
         value['job_recorded']=bool(self.state.get('job'))
         value['access_state']=self.state.get('access',{}).get('state')
+        value['handoff_state']=self.state.get('access',{}).get('render',{}).get('state')
         with envelope(),self.db.connection() as c:
             c.execute('BEGIN READ ONLY')
             try:
@@ -841,4 +868,4 @@ class Pilot:
                 'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'closed_build_archive':s.get('closed_build_archive'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
