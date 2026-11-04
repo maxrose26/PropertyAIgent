@@ -7,12 +7,21 @@ import argparse,json,os
 from verification.ingestion_storage.owner_pilot import Pilot,PERIOD,safe_result,private_failure,start_availability
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding'),required=True)
+    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding','qualification-prepare','qualification-run','qualification-status','qualification-recover'),required=True)
     p.add_argument('--owner-checked-at',type=float);a=p.parse_args()
     pilot=None
     try:
         if a.action!='status' and os.environ.get('PROPERTYAIGENT_OWNER_PILOT_AUTHORITY')!=PERIOD:
             raise ValueError()
+        if a.action.startswith('qualification-'):
+            from verification.ingestion_storage.owner_qualification import Qualification
+            pilot=Qualification()
+            if a.action=='qualification-prepare':pilot.prepare()
+            elif a.action=='qualification-run':pilot.run(a.owner_checked_at)
+            elif a.action=='qualification-recover':pilot.recover()
+            result=pilot.inspect() if a.action in ('qualification-status','qualification-recover') else pilot.summary()
+            print('PROPERTYAIGENT_QUALIFICATION_RESULT '+json.dumps(result,sort_keys=True,separators=(',',':')),flush=True)
+            return 0 if result.get('status') in ('ARTIFACT_READY','CLOSED','READ_ONLY_EVIDENCE_SAVED') else 2
         pilot=Pilot()
         if a.action=='prepare-continuation':pilot.prepare_continuation()
         elif a.action=='prepare':pilot.prepare()
