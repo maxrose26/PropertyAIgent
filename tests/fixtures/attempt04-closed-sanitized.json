@@ -1,0 +1,87 @@
+{
+  "period": "b-dbpilot-20261027-1102-04",
+  "status": "CLOSED",
+  "pipeline_status": "NOT_RUN",
+  "deployment": "dep-dblhmq3m8hqs739auu5g",
+  "binding": {
+    "execution_binding": {
+      "manifest_sha256": "26a07287b6d7ebf89eedb04b29e36c56e2d8a67acb7282b1821ed5273509de99",
+      "revision": "938f3f18d8b75c6467290461139b03bf9b95a338",
+      "workflow_sha256": "5b87c6cbef2944fa05468314fc6daefc19b785644b04e04d1ff382b0596cadea"
+    }
+  },
+  "access": {
+    "state": "DATABASE_CLOSURE_ACKNOWLEDGED",
+    "render": {
+      "state": "RESTORATION_ACKNOWLEDGED"
+    }
+  },
+  "closure_receipt": {
+    "authorities": [],
+    "authority_expiry": 0,
+    "intake_run_state": null,
+    "open_run_requires_reconciliation": false,
+    "outcome": "COMMIT_ACKNOWLEDGED",
+    "password_verifiers": "RETAINED",
+    "runtime_access": "DISABLED",
+    "sessions": "ABSENT",
+    "stop_preserved": {
+      "global_stop": null,
+      "hard_stop_generation": 5,
+      "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+      "manual_stop": null
+    },
+    "temporary_owner": "REMOVED"
+  },
+  "final_service": {
+    "configuration_equal": true,
+    "environment_equal": true,
+    "suspended": true
+  },
+  "intents": {
+    "ACTIVATE": {
+      "state": "ACKNOWLEDGED"
+    },
+    "BUILD_CONFIGURATION": {
+      "state": "ACKNOWLEDGED"
+    },
+    "BUILD_ENVIRONMENT": {
+      "state": "ACKNOWLEDGED"
+    },
+    "HANDOFF": {
+      "state": "ACKNOWLEDGED"
+    },
+    "ONE_RESUME_BUILD": {
+      "state": "ACKNOWLEDGED"
+    },
+    "PERIOD": {
+      "state": "ACKNOWLEDGED"
+    },
+    "RELEASE": {
+      "state": "INTENT_NO_RETRY"
+    },
+    "RESTORE_BUILD_CONFIGURATION": {
+      "state": "ACKNOWLEDGED"
+    },
+    "RESTORE_BUILD_ENVIRONMENT": {
+      "state": "ACKNOWLEDGED"
+    },
+    "RESUSPEND": {
+      "state": "ACKNOWLEDGED"
+    },
+    "STARTUP_PREFLIGHT_JOB": {
+      "state": "ACKNOWLEDGED"
+    }
+  },
+  "stable_credentials": {
+    "version": "STABLE_RESTRICTED_V1",
+    "passwords": {
+      "ingestion_worker_login": "SYNTHETIC_ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+      "ingestion_effect_login": "SYNTHETIC_ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+    },
+    "verifier_sha256": {
+      "ingestion_worker_login": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ingestion_effect_login": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

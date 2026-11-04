@@ -76,7 +76,7 @@ def validate_binding(b, *, opening=False, now=None):
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'),'OWNER_DATABASE_PILOT_SCOPE')
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05'),'OWNER_DATABASE_PILOT_SCOPE')
     if 'credential_policy' in b:
         require(database and b['credential_policy']=='STABLE_RESTRICTED_V1' and type(b.get('credential_verifier_sha256')) is dict and set(b['credential_verifier_sha256'])==set(ROLES) and all(re.fullmatch('[a-f0-9]{64}',v) for v in b['credential_verifier_sha256'].values()),'STABLE_VERIFIER_BINDING')
     require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')

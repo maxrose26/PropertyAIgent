@@ -26,6 +26,7 @@ def pilot(monkeypatch):
     pilot=object.__new__(p.Pilot);pilot.journal=Journal();pilot.db=SimpleNamespace(address='192.0.2.1')
     deploys=[dict(id=state['deployment'],createdAt='2026-11-04T11:47:52Z',commit={'id':e['revision']})]
     pilot.preflight=lambda:(service,service_guard(service),[],deploys,env)
+    pilot.preview_release_capacity=lambda *a:{'synthetic_io_fixture':True}
     pilot.intent=lambda *a:pytest.fail('INTENT_REACHED')
     return pilot,state,deploys,env
 
@@ -70,7 +71,7 @@ def test_artifact_and_state_drift_refuse_before_intent(pilot,drift):
 
 def test_scope_and_policy_still_refuse_wrong_window_attempt_and_limits(pilot):
     obj,_,_,_=pilot;b,policy=obj.release_preflight()
-    for change in ({'period':'b-dbpilot-20261027-1102-05'},{'fixed_window':{'start':'2026-10-28','end':'2026-11-03'}}):
+    for change in ({'period':'b-dbpilot-20261027-1102-06'},{'fixed_window':{'start':'2026-10-28','end':'2026-11-03'}}):
         bad=dict(b,**change)
         with pytest.raises(op.Denied,match='OWNER_DATABASE_PILOT_SCOPE'):op.validate_binding(bad)
     bad=copy.deepcopy(policy);bad['max_runs']=2
