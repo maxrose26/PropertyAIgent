@@ -66,11 +66,11 @@ def test_connected_deadline_both_roles_and_cleanup(runtime_world,record_property
         # valid, then query the historical epoch. PostgreSQL cannot authenticate
         # a password whose historical VALID UNTIL has already elapsed.
         for role,cap in roles.items():
-            set_deadline(role,time.time()+2100)
-            budget=DatabaseBudget(statements=20,connections=1,returned_bytes=8192,seconds=12)
-            try:
-                with budget.engine(urls[role]).connect() as conn:
-                    for offset in (-1,0,1):
+            for offset in (-1,0,1):
+                set_deadline(role,time.time()+2100)
+                budget=DatabaseBudget(statements=20,connections=1,returned_bytes=8192,seconds=12)
+                try:
+                    with budget.engine(urls[role]).connect() as conn:
                         set_deadline(role,RECORDED,offset)
                         row=tuple(conn.execute(text(query),dict(cap=cap)).one())
                         comparison=auth.profile_comparison(row,role,RECORDED)
@@ -78,9 +78,9 @@ def test_connected_deadline_both_roles_and_cleanup(runtime_world,record_property
                         assert all(v for k,v in comparison['checks'].items() if k!='credential_deadline')
                         assert row[10]==Decimal('1793827036.770991')+Decimal(offset)/1000000
                         results.append(dict(case='recorded_query',role=role,offset_us=offset,numeric_epoch=str(row[10]),comparison=comparison))
-            finally:
-                closed=budget.close([])
-                assert closed['connections_closed'] and closed['cleanup']=='CLOSED'
+                finally:
+                    closed=budget.close([])
+                    assert closed['connections_closed'] and closed['cleanup']=='CLOSED'
         # Unmodified qualification + unmodified DatabaseBudget/SQLAlchemy/psycopg.
         for failed_role,offset in [(None,0)]+[(r,o) for r in roles for o in (-1,1)]:
             deadline=float(str(int(time.time())+2100)+'.7709913')
