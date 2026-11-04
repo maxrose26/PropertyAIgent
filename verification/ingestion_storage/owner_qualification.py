@@ -14,8 +14,12 @@ CANDIDATE='dc679ef23323701fe5a7963604f22e0ade45fedc'
 
 class Qualification(p.Pilot):
     def __init__(self,*a,**kw):
-        p.PERIOD=IDENTITY;p.PREDECESSOR=PREDECESSOR
-        super().__init__(*a,**kw);self.journal=p.Journal(self.db,IDENTITY)
+        # Pilot's default Journal argument was fixed to CONTEXT at import.
+        # Construct without loading it, then bind the exact fresh journal.
+        p.PERIOD=IDENTITY;p.PREDECESSOR=CONTEXT
+        try:super().__init__(*a,**kw)
+        finally:p.PREDECESSOR=PREDECESSOR
+        self.journal=p.Journal(self.db,IDENTITY)
     def prepare(self):
         prior=p.Journal(self.db,PREDECESSOR);old=prior.load()
         op.require(old and old['status']=='CLOSED' and old.get('closure_verification',{}).get('status')=='VERIFIED' and old.get('job',{}).get('id')=='job-dbll9futlv9c73c2tjrg','OWNER_CONTINUATION_PREDECESSOR')

@@ -105,3 +105,12 @@ def test_deadline_capacity_refuses_before_access_and_preserves_journal(pilot,mon
     before=copy.deepcopy(obj.db.rows)
     with pytest.raises(p.op.Denied,match='OWNER_CLEANUP_ROW_BOUND'):obj.verify_deadline_capacity(b)
     assert obj.db.rows==before
+
+
+def test_real_successor_constructor_never_loads_default_or_prior_journal(monkeypatch):
+    monkeypatch.setattr(p,'PERIOD',q.IDENTITY);monkeypatch.setattr(p,'PREDECESSOR',q.PREDECESSOR)
+    db=MemoryDB()
+    for _ in range(2):
+        obj=q.Qualification(db=db,token='SYNTHETIC_ONLY')
+        assert obj.journal.period==q.IDENTITY and obj.journal.ordinal==-1
+        assert p.PREDECESSOR==q.PREDECESSOR and db.rows==[]
