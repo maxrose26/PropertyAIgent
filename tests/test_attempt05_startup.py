@@ -35,7 +35,8 @@ def test_qualification_only_never_reaches_daily_on_either_outcome(monkeypatch,ca
     from scripts import owner_pilot_job as job
     from scripts import run_daily_councils as daily
     from verification.ingestion_storage import daily_intake_runtime as native,runtime_authentication as auth
-    monkeypatch.setattr(native,'Runtime',lambda args:object())
+    from types import SimpleNamespace
+    monkeypatch.setattr(native,'Runtime',lambda args:SimpleNamespace())
     monkeypatch.setattr(auth,'qualify',lambda *a:{'status':status,'source_requests':0})
     monkeypatch.setattr(daily,'main',lambda **kw:pytest.fail('DAILY_OR_COUNCIL_REACHED'))
     monkeypatch.setattr(job.os,'environ',{'PATH':'/usr/bin','DATABASE_URL':'SECRET_SENTINEL'})

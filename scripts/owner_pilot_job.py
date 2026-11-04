@@ -60,7 +60,7 @@ def main():
             return startup_check(Runtime,PERIOD,a.hostaddr)
         if a.deadline is None:raise SystemExit(2)
         args=Namespace(period=PERIOD,output='/tmp/propertyaigent-'+PERIOD,hostaddr=a.hostaddr,disposable_sources=None,disposable_archive=None,backlog=False,after=None,page_size=3)
-        runtime=Runtime(args);receipt=qualify(runtime,a.deadline)
+        runtime=Runtime(args);runtime.deadline_diagnostic=a.qualification_only;receipt=qualify(runtime,a.deadline)
         print('DATABASE_PILOT_RUNTIME_QUALIFICATION '+json.dumps(receipt,sort_keys=True,separators=(',',':')),flush=True)
         if receipt['status']!='VERIFIED_BOTH_RESTRICTED_ROLES':return 2
         if a.qualification_only:return 0  # no daily(), policy/authority issuance or source calls

@@ -86,3 +86,32 @@ def test_first_comparison_failure_precedes_cleanup_and_survives_it(cleanup_fails
     assert result['first_qualification_failure']['comparison']['checks']['evidence_write_execute'] is False
     assert result['first_qualification_failure']['comparison']['first_mismatch']=='evidence_write_execute'
     assert 'SECRET_SENTINEL' not in json.dumps(result)
+
+@pytest.mark.parametrize('mismatch',[False,True])
+def test_deadline_diagnostic_actual_query_retains_exact_values_on_pass_and_refusal(monkeypatch,mismatch):
+    from decimal import Decimal
+    deadline=time.time()+2100
+    expected=datetime.fromtimestamp(deadline,timezone.utc).timestamp()
+    observed=expected+(0.001 if mismatch else 0)
+    runtime=SimpleNamespace(args=SimpleNamespace(period='diagnostic'),binding={},run=IntakeRun(),urls={r:'SECRET_SENTINEL' for r in auth.op.ROLES},options={},emit=lambda *_:None,deadline_diagnostic=True)
+    class Budget:
+        statements=8;attempts=1;returned_bytes=300;prior_cancel_attempts=0;hard_deadline_events=[];opened=[]
+        def __init__(self,**kw):pass
+        def engine(self,*a,**kw):
+            role=list(auth.op.ROLES)[len(runtime.runtime_qualification['roles'])];worker=role=='ingestion_worker_login'
+            @contextmanager
+            def connect():
+                def execute(query,params):
+                    assert str(query).count('FROM pg_roles WHERE rolname=current_user')==2
+                    return SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,observed,Decimal(str(observed))))
+                yield SimpleNamespace(execute=execute)
+            return SimpleNamespace(connect=connect)
+        def close(self,_):
+            assert runtime.runtime_qualification['deadline_observations']
+            return dict(connection_attempts=1,driver_statements=8,returned_data_value_bytes=300,elapsed_seconds=.1,connections_closed=True,cleanup='CLOSED',connection_diagnostics=[])
+    result=auth.qualify(runtime,deadline,budget_factory=Budget)
+    assert (result['status']=='VERIFIED_BOTH_RESTRICTED_ROLES') != mismatch
+    for item in result['deadline_observations']:
+        d=item['evidence'];assert d['observed']['hex']==observed.hex() and d['input']['hex']==deadline.hex()
+        assert d['strict_equal'] != mismatch and d['database_numeric_epoch']['type']=='Decimal'
+    assert len(json.dumps(result))<8192 and 'SECRET_SENTINEL' not in json.dumps(result)

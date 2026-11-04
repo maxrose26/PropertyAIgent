@@ -140,6 +140,10 @@ REVOKE ALL ON FUNCTION public.ingestion_intake_owner_state(text,text,text,bytea)
 GRANT EXECUTE ON FUNCTION public.ingestion_intake_owner_state(text,text,text,bytea) TO postgres;
 '''
 
+QUALIFICATION_OWNER_SQL=OWNER_SQL.replace("'b-dbpilot-20261027-1102-05_owner'","'b-dbpilot-20261027-1102-05_owner','b-qualification-20261104-01_owner'")
+
+DEADLINE_OWNER_SQL=QUALIFICATION_OWNER_SQL.replace("'b-qualification-20261104-01_owner'","'b-qualification-20261104-01_owner','b-qualification-20261104-02_owner'")
+
 def definition_sql():return TABLE_SQL+WRITE_SQL+READ_SQL+OWNER_SQL
 
 FINISH_GUARD_SQL=r'''
@@ -199,7 +203,9 @@ def verify_inventory(c):
          (SELECT array_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole::text) FROM aclexplode(p.proacl) a),
          (SELECT bool_or(a.is_grantable OR a.privilege_type<>'EXECUTE' OR a.grantor<>'ingestion_storage_owner'::regrole) FROM aclexplode(p.proacl) a)
          FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=%s""",(contract['name'],)).fetchall()
-        require(rows==[(contract['sha256'],'ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False)],'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
+        hashes={contract['sha256']}
+        if contract['name']=='ingestion_intake_owner_state':hashes.update(hashlib.sha256(x.split('$owner_state$',2)[1].encode()).hexdigest() for x in (QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL))
+        require(len(rows)==1 and rows[0][0] in hashes and rows[0][1:]==('ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False),'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
     row=c.execute("""SELECT c.relowner::regrole::text,c.relrowsecurity,c.relforcerowsecurity,
      (SELECT count(*) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)
      FROM pg_class c WHERE c.oid='public.ingestion_run_evidence'::regclass""").fetchone()

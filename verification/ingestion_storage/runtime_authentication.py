@@ -32,17 +32,24 @@ def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
             for role,cap in op.ROLES.items():
                 for attempt in (1,2):
                     budget=budget_factory(**runtime.run.database_limits(dict(statements=20,connections=1,returned_bytes=8192,seconds=12)))
-                    runtime.run.budgets.append(budget);error=None;comparison=None
+                    runtime.run.budgets.append(budget);error=None;comparison=None;deadline_observation=None
                     try:
                         engine=budget.engine(runtime.urls[role],**runtime.options)
                         with engine.connect() as c:
-                            row=tuple(c.execute(text("""SELECT current_user,session_user,pg_has_role(current_user,:cap,'USAGE'),
+                            diagnostic=getattr(runtime,"deadline_diagnostic",False)
+                            query="""SELECT current_user,session_user,pg_has_role(current_user,:cap,'USAGE'),
                               current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout'),
                               has_function_privilege(current_user,'public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_write(text,text,text,bytea)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_read(text,text,text)','EXECUTE'),
-                              (SELECT extract(epoch FROM rolvaliduntil)::double precision FROM pg_roles WHERE rolname=current_user)"""),dict(cap=cap)).one())
+                              (SELECT extract(epoch FROM rolvaliduntil)::double precision FROM pg_roles WHERE rolname=current_user)"""
+                            if diagnostic:query+=", (SELECT extract(epoch FROM rolvaliduntil) FROM pg_roles WHERE rolname=current_user)"
+                            raw=tuple(c.execute(text(query),dict(cap=cap)).one());row=raw[:11] if diagnostic else raw
+                            if diagnostic:
+                                from .deadline_evidence import deadline_evidence
+                                deadline_observation=deadline_evidence(deadline,row[10],raw[11])
+                                receipt.setdefault("deadline_observations",[]).append(dict(role=role,attempt=attempt,evidence=deadline_observation))
                             comparison=profile_comparison(row,role,deadline)
                             if comparison['status']!='MATCH':
                                 # Store BEFORE cleanup can fail; subsequent failures
@@ -54,6 +61,7 @@ def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
                         closed=budget.close([])
                         record=dict(role=role,attempt=attempt,**{k:closed[k] for k in ('connection_attempts','driver_statements','returned_data_value_bytes','elapsed_seconds','connections_closed','cleanup','connection_diagnostics')})
                         if comparison is not None:record['profile_comparison']=comparison
+                        if deadline_observation is not None:record['deadline_observation']=deadline_observation
                         receipt['attempts'].append(record)
                     op.require(closed['connections_closed'] and closed['cleanup']=='CLOSED','OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
                     if error is None:receipt['roles'].append(dict(role=role,identity='VERIFIED',interface='VERIFIED',connection_closed=True));break
