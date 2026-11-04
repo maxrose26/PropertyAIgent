@@ -45,8 +45,9 @@ def test_run_consumes_same_validated_boundary_before_intent(pilot):
     class AtIntent(Exception):pass
     def intent(name):seen.append(name);raise AtIntent()
     obj.intent=intent
+    obj.arm_cleanup_reserve=lambda:seen.append('RESERVE')
     with pytest.raises(AtIntent):obj.run(time.time())
-    assert seen==['RELEASE'] and state['status']=='ARTIFACT_READY' and state['intents']=={}
+    assert seen==['RESERVE','RELEASE'] and state['status']=='ARTIFACT_READY' and state['intents']=={}
 
 @pytest.mark.parametrize('period',['b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'])
 def test_consumed_or_historical_journals_never_reopen(pilot,period):
