@@ -49,6 +49,23 @@ def ciphertext_size(n):
     # Existing Vault: 16-byte salt + base64(Fernet 57-byte overhead + PKCS7 AES).
     return 16+4*((57+16*(n//16+1)+2)//3)
 
+def serialized_state(value):
+    stored=copy.deepcopy(value)
+    if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and isinstance(stored.get('binding'),dict) and canonical(stored.get('access',{}).get('binding'))==canonical(stored['binding']):
+        stored['access']['binding']=dict(version='ROOT_BINDING_REFERENCE_V1',sha256=hashlib.sha256(canonical(stored['binding'])).hexdigest())
+    return stored
+
+def state_size(value):return len(canonical(serialized_state(value)))
+
+def hydrated_state(stored):
+    if isinstance(stored,dict):
+        binding=stored.get('access',{}).get('binding',{})
+        if isinstance(binding,dict) and binding.get('version')=='ROOT_BINDING_REFERENCE_V1':
+            op.require(set(binding)=={'version','sha256'} and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and
+                binding['sha256']==hashlib.sha256(canonical(stored.get('binding'))).hexdigest(),'OWNER_CODE_BINDING')
+            stored['access']['binding']=copy.deepcopy(stored['binding'])
+    return stored
+
 def cleanup_reserve_policy():
     growth=sum(len(canonical(k))+1+n+1 for k,n in CLEANUP_RECORD_LIMITS.items())+CLEANUP_STATE_GROWTH
     maximum=max(n for n in range(32769) if ciphertext_size(n+growth+CLEANUP_MARGIN)<=32768)
@@ -110,10 +127,10 @@ class Journal:
         with tempfile.TemporaryDirectory(prefix='propertyaigent-owner-') as folder:
             p=Path(folder)/'state.vault'
             if raw is None:
-                v=Vault(p,self.db.key,create=True);v.save(value);return p.read_bytes()
+                v=Vault(p,self.db.key,create=True);v.save(serialized_state(value));return p.read_bytes()
             fd=os.open(p,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             with os.fdopen(fd,'wb') as f:f.write(raw)
-            return Vault(p,self.db.key).load()
+            return hydrated_state(Vault(p,self.db.key).load())
     def load(self):
         with self.db.connection() as c:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
@@ -139,18 +156,18 @@ class Journal:
             if getattr(self,'cleanup_mode',False):
                 op.require(used<CLEANUP_SNAPSHOTS and self.ordinal<63,'OWNER_CLEANUP_ROW_BOUND')
                 if 'cleanup_base_bytes' not in prior:
-                    reserve['cleanup_base_bytes']=len(canonical(self.state))
+                    reserve['cleanup_base_bytes']=state_size(self.state)
                     reserve['cleanup_base_access_bytes']=len(canonical((self.state or {}).get('access',{})))
                 else:
                     for k in ('cleanup_base_bytes','cleanup_base_access_bytes'):reserve[k]=prior[k]
                 reserve['cleanup_writes']=used+1
                 op.require(len(canonical(state.get('access',{})))<=reserve['cleanup_base_access_bytes']+CLEANUP_STATE_GROWTH,'OWNER_CLEANUP_RECORD_BOUND')
-                op.require(len(canonical(state))<=reserve['cleanup_base_bytes']+policy['growth_bytes']+CLEANUP_MARGIN,'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
+                op.require(state_size(state)<=reserve['cleanup_base_bytes']+policy['growth_bytes']+CLEANUP_MARGIN,'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
             else:
                 op.require(used==0,'OWNER_NO_NORMAL_AFTER_CLEANUP')
                 reserve['cleanup_writes']=0
                 op.require(self.ordinal+1<=63-CLEANUP_SNAPSHOTS,'OWNER_CLEANUP_ROW_BOUND')
-                op.require(len(canonical(state))<=policy['normal_plaintext_ceiling'],'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
+                op.require(state_size(state)<=policy['normal_plaintext_ceiling'],'OWNER_CLEANUP_RESERVE_BYTE_BOUND')
         raw=self._vault(value=state);h=hashlib.sha256(raw).hexdigest()
         if validate_only:return len(raw)  # same checks/encryption, no SQL or state advance
         def write(c):
@@ -536,13 +553,17 @@ class Pilot:
         self.journal.save(candidate);self.state=candidate
     def reserved_candidate(self):
         candidate=copy.deepcopy(self.state)
-        fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
+        fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at','startup_job','startup_job_terminal','startup_command','source_revision')
         present=[n for n in fields if n in candidate]
+        artifact_keys={'execution_binding','browser_canary','browser_path','browser_sha256'}
+        if isinstance(candidate.get('artifact'),dict) and set(candidate['artifact'])-artifact_keys:present.append('artifact')
         if present:
             op.require('closed_build_archive' not in candidate and all(candidate['intents'].get(n,{}).get('state')=='ACKNOWLEDGED' for n in ('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')),'OWNER_CLOSURE_ARCHIVE_BINDING')
             candidate['closed_build_archive']=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
                 fields={n:hashlib.sha256(canonical(candidate[n])).hexdigest() for n in present})
+            artifact={k:v for k,v in candidate.get('artifact',{}).items() if k in artifact_keys}
             for n in present:del candidate[n]
+            if 'artifact' in present:candidate['artifact']=artifact
         candidate['cleanup_reserve']=dict(cleanup_reserve_policy(),cleanup_writes=0)
         return candidate
     def record_first_failure(self,exc):
@@ -853,7 +874,7 @@ class Pilot:
         def measure(name):
             try:sizes[name]=self.journal.save(copy.deepcopy(projected),validate_only=True)
             except BaseException:
-                print('PROPERTYAIGENT_OWNER_PILOT_CAPACITY_REFUSAL '+json.dumps(dict(stage=name,plaintext_bytes=len(canonical(projected)),ciphertext_bytes=ciphertext_size(len(canonical(projected))),normal_ceiling=22152),sort_keys=True),flush=True)
+                print('PROPERTYAIGENT_OWNER_PILOT_CAPACITY_REFUSAL '+json.dumps(dict(stage=name,plaintext_bytes=state_size(projected),ciphertext_bytes=ciphertext_size(state_size(projected)),normal_ceiling=22152),sort_keys=True),flush=True)
                 raise
         measure('reserved')
         projected.update(binding=copy.deepcopy(b),policy=copy.deepcopy(policy),status='RELEASE_BOUND')
@@ -1199,4 +1220,4 @@ class Pilot:
                 'failure':s.get('failure'),'first_failure':s.get('first_failure'),'cleanup_reserve':s.get('cleanup_reserve'),'closure_verification':s.get('closure_verification'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'recovery_capacity':s.get('recovery_capacity'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id') or s.get('startup_preflight',{}).get('job_id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'recovery_capacity':s.get('recovery_capacity'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
