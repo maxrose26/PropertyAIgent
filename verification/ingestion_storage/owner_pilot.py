@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 from . import intake_owner as op
 from .intake_owner_io import Vault,env_values,service_guard,KEEP,handoff,submission_check,restore_handoff,reconcile_handoff
-from .intake_owner_operations import COUNCILS,SCREENING,issue_period
+from .intake_owner_operations import COUNCILS,SCREENING,issue_period,validate_policy
 from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
@@ -676,16 +676,50 @@ class Pilot:
             op.require(closed['connections_closed'] and closed['cleanup']=='CLOSED' and all(c.closed for c in budget.opened) and budget.failed_native_closed,'OWNER_RESTRICTED_CONNECTION_NOT_CLOSED')
             out.append({'role':role,'attempts':budget.attempts,'closed':True})
         return out
-    def run(self,owner_checked_at):
-        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
+    def release_preflight(self):
+        """Shared Run boundary; reads and validation only, before release intent."""
         self.state=self.journal.load()
-        op.require(self.state is not None and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
-        self.preflight()
+        op.require(self.state is not None and self.state.get('period')==PERIOD and self.state['status']=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        service,guard,jobs,deploys,environment=self.preflight()
+        op.require(guard==self.state['original_guard'] and environment==self.state['original_environment'],'OWNER_PREBUILD_DRIFT')
         release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        latest=max(deploys,key=lambda row:row['createdAt'])
+        op.require(latest['id']==self.state['deployment'] and latest['commit']['id']==release['execution_binding']['revision'] and
+            self.state['artifact']['execution_binding']==release['execution_binding'] and
+            self.state['profile']==source_profile(self.state['artifact'],release['execution_binding']['revision']),'OWNER_BUILD_RECEIPT_BINDING')
+        startup=self.state['startup_preflight']
+        op.require(startup['sha256']==hashlib.sha256(canonical(startup['receipt'])).hexdigest() and
+            startup['receipt']['period']==PERIOD and startup['receipt']['execution_binding']==release['execution_binding'] and
+            startup['receipt']['tree']==release['tree'] and startup['receipt']['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION',
+            'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
         release['deployment']=self.state['deployment']
         folder=RELEASE_PARENT/('propertyaigent-owner-'+PERIOD)
         b,p=fixed_binding(release,self.state['profile'],self.db.address,self.state['original_guard'])
         b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
+        validate_policy(b,p)
+        self._release_readback=dict(configuration_equal=True,environment_equal=True,suspended=True,
+            runtime_roles_dormant=True,stable_verifiers='MATCH',pipeline_sessions='ABSENT',runtime_memberships='ABSENT',
+            temporary_owner='ABSENT',complete_terminal_jobs=len(jobs),complete_terminal_deployments=len(deploys),
+            latest_deployment=latest['id'],latest_revision=latest['commit']['id'],checked_at=time.time())
+        return b,p
+    def verify_release_binding(self):
+        """Deployed read-only proof of the same boundary consumed by Run."""
+        b,p=self.release_preflight()
+        before=(self.journal.previous,self.journal.ordinal)
+        self.journal.load()
+        op.require((self.journal.previous,self.journal.ordinal)==before,'OWNER_PRIOR_ATTEMPT_RECONCILE')
+        return dict(status='RELEASE_BINDING_VERIFIED_READ_ONLY',period=PERIOD,window=WINDOW,
+            date_fields={'tameside':'RECEIVED','manchester':'VALIDATED'},deployment=b['retained_deployment'],
+            execution_binding=b['execution_binding'],binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),
+            policy_sha256=b['period_policy_sha256'],max_runs=p['max_runs'],render_profile=b['render_profile'],
+            readback=self._release_readback,
+            journal_sha256=before[0],journal_ordinal=before[1],journal_unchanged=True,
+            release_intent_present=False,access_opened=False,job_created=False,provider_mutations=0,
+            deadline_frozen=False,validation_only=True)
+    def run(self,owner_checked_at):
+        op.require(type(owner_checked_at) in (int,float) and 0<=time.time()-owner_checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
+        b,p=self.release_preflight()
+        folder=Path(b['release_root'])
         if 'preparation_failure' in self.state:self.state.pop('failure',None)
         self.state.update(binding=b,policy=p,status='RELEASE_BOUND');self.intent('RELEASE')
         try:

@@ -13,10 +13,10 @@ def require_owner():
 def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
     global _process
     if server_prepare:
-        expected='RECOVER:'+PERIOD if action=='recover' else 'CONTINUE:'+PERIOD if action=='prepare-continuation' else PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
+        expected='VERIFY_BINDING:'+PERIOD if action=='verify-binding' else 'RECOVER:'+PERIOD if action=='recover' else 'CONTINUE:'+PERIOD if action=='prepare-continuation' else PERIOD if action=='prepare' else 'READBACK:'+PERIOD if action=='status' else 'RECONCILE:'+PERIOD if action=='reconcile-artifact' else None
         if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
-    if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
+    if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
     if action=='run' and (type(checked_at) not in (int,float) or not 0<=time.time()-checked_at<=300):raise ValueError('OWNER_BOUNDARY_CONFIRMATION_EXPIRED')
     if action=='run':
         from verification.ingestion_storage.owner_pilot import start_availability
@@ -37,7 +37,7 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
         keep={'PATH','HOME','LANG','TZ','DATABASE_URL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY','PROPERTYAIGENT_INTAKE_SOURCE_RELEASE','PROPERTYAIGENT_INTAKE_BUILD_RECEIPT'}
         env={k:v for k,v in os.environ.items() if k in keep}
         env.update(PYTHONDONTWRITEBYTECODE='1',PROPERTYAIGENT_OWNER_PILOT_AUTHORITY=PERIOD)
-        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action in ('prepare','prepare-continuation') else '60s' if action in ('status','reconcile-artifact') else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
+        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action in ('prepare','prepare-continuation') else '60s' if action in ('status','reconcile-artifact','verify-binding') else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
         if action=='run':command+=['--owner-checked-at',str(checked_at)]
         _process=subprocess.Popen(command,env=env,stdin=subprocess.DEVNULL,stdout=None,stderr=subprocess.DEVNULL,start_new_session=True)
         return {'status':'OWNER_PILOT_COMMAND_STARTED','action':action,'credentials':'EXISTING_PROTECTED_CONFIGURATION'}
@@ -53,7 +53,9 @@ def status():
     except Exception as exc:return safe_result(exc)
 
 def startup_prepare():
-    if os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='RECOVER:'+PERIOD:
+    if os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='VERIFY_BINDING:'+PERIOD:
+        print('PROPERTYAIGENT_OWNER_PILOT_BINDING_CHECK '+str(start('verify-binding',server_prepare=True)['status']),flush=True)
+    elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='RECOVER:'+PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_RECOVERY '+str(start('recover',server_prepare=True)['status']),flush=True)
     elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='CONTINUE:'+PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_CONTINUATION '+str(start('prepare-continuation',server_prepare=True)['status']),flush=True)

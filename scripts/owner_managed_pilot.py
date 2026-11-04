@@ -7,7 +7,7 @@ import argparse,json,os
 from verification.ingestion_storage.owner_pilot import Pilot,PERIOD,safe_result,private_failure,start_availability
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','prepare-continuation','run','recover','status','reconcile-artifact'),required=True)
+    p=argparse.ArgumentParser();p.add_argument('--action',choices=('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding'),required=True)
     p.add_argument('--owner-checked-at',type=float);a=p.parse_args()
     pilot=None
     try:
@@ -19,7 +19,7 @@ def main():
         elif a.action=='run':pilot.run(a.owner_checked_at)
         elif a.action=='recover':pilot.recover()
         elif a.action=='reconcile-artifact':pilot.reconcile_artifact()
-        result=pilot.inspect() if a.action in ('status','recover') else pilot.summary()
+        result=pilot.verify_release_binding() if a.action=='verify-binding' else pilot.inspect() if a.action in ('status','recover') else pilot.summary()
     except BaseException as exc:
         result=safe_result(exc)
         result['private_diagnostic']=private_failure(exc,a.action)
@@ -31,6 +31,6 @@ def main():
     raw=json.dumps(result,sort_keys=True,separators=(',',':'))
     if len(raw.encode())>49152:raw=json.dumps({'status':'RECONCILIATION_REQUIRED','reason':'RESULT_BOUND','period':PERIOD})
     print('PROPERTYAIGENT_OWNER_PILOT_RESULT '+raw,flush=True)
-    return 0 if result.get('status') in ('ARTIFACT_READY','CLOSED','READ_ONLY_EVIDENCE_SAVED') else 2
+    return 0 if result.get('status') in ('ARTIFACT_READY','CLOSED','READ_ONLY_EVIDENCE_SAVED','RELEASE_BINDING_VERIFIED_READ_ONLY') else 2
 
 if __name__=='__main__':raise SystemExit(main())
