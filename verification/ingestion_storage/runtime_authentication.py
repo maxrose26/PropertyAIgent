@@ -1,6 +1,7 @@
 """Actual runtime authentication only; existing meter, route and strict TLS."""
 import time
 from datetime import datetime,timezone
+from decimal import Decimal
 from sqlalchemy import text
 from .operational_controller import DatabaseBudget
 from .owner_pilot import envelope,safe_result
@@ -10,14 +11,21 @@ PROFILE_FIELDS=('current_user','session_user','capability_usage','statement_time
     'idle_in_transaction_session_timeout','worker_step_execute','registration_execute',
     'evidence_write_execute','evidence_read_execute','credential_deadline')
 
+def exact_deadline_epoch(deadline):
+    """Exact microsecond epoch of the same UTC datetime written by the owner."""
+    delta=datetime.fromtimestamp(deadline,timezone.utc)-datetime(1970,1,1,tzinfo=timezone.utc)
+    micros=(delta.days*86400+delta.seconds)*1000000+delta.microseconds
+    return Decimal((int(micros<0),tuple(int(d) for d in str(abs(micros))),-6))
+
 def profile_comparison(row,role,deadline):
     """Same exact guard, with fixed names/booleans only; no observed values."""
     op.require(role in op.ROLES,'OWNER_RESTRICTED_AUTHENTICATION_REFUSED')
     worker=role=='ingestion_worker_login'
     expected=(role,role,True,'10s','3s','20s',True,worker,worker,worker,
-              datetime.fromtimestamp(deadline,timezone.utc).timestamp())
+              exact_deadline_epoch(deadline))
     shape=isinstance(row,tuple) and len(row)==len(expected)
-    checks={name:bool(shape and row[i]==expected[i]) for i,name in enumerate(PROFILE_FIELDS)}
+    checks={name:bool(shape and row[i]==expected[i]) for i,name in enumerate(PROFILE_FIELDS[:-1])}
+    checks['credential_deadline']=bool(shape and type(row[10]) is Decimal and row[10].is_finite() and row[10]==expected[10])
     first=next((name for name,passed in checks.items() if not passed),None) if shape else 'ROW_SHAPE'
     return dict(version='RESTRICTED_PROFILE_COMPARISON_V1',row_shape=shape,checks=checks,
                 first_mismatch=first,status='MATCH' if shape and all(checks.values()) else 'MISMATCH')
@@ -43,12 +51,13 @@ def qualify(runtime,deadline,*,budget_factory=DatabaseBudget):
                               has_function_privilege(current_user,'public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_write(text,text,text,bytea)','EXECUTE'),
                               has_function_privilege(current_user,'public.ingestion_intake_evidence_read(text,text,text)','EXECUTE'),
-                              (SELECT extract(epoch FROM rolvaliduntil)::double precision FROM pg_roles WHERE rolname=current_user)"""
-                            if diagnostic:query+=", (SELECT extract(epoch FROM rolvaliduntil) FROM pg_roles WHERE rolname=current_user)"
+                              (SELECT extract(epoch FROM rolvaliduntil) FROM pg_roles WHERE rolname=current_user)"""
+                            if diagnostic:query+=", (SELECT extract(epoch FROM rolvaliduntil)::double precision FROM pg_roles WHERE rolname=current_user)"
                             raw=tuple(c.execute(text(query),dict(cap=cap)).one());row=raw[:11] if diagnostic else raw
                             if diagnostic:
                                 from .deadline_evidence import deadline_evidence
-                                deadline_observation=deadline_evidence(deadline,row[10],raw[11])
+                                deadline_observation=deadline_evidence(deadline,raw[11],row[10])
+                                deadline_observation.update(qualification_comparison='EXACT_MICROSECOND_EPOCH_V1',qualification_expected_numeric_epoch=str(exact_deadline_epoch(deadline)),qualification_strict_equal=type(row[10]) is Decimal and row[10].is_finite() and row[10]==exact_deadline_epoch(deadline))
                                 receipt.setdefault("deadline_observations",[]).append(dict(role=role,attempt=attempt,evidence=deadline_observation))
                             comparison=profile_comparison(row,role,deadline)
                             if comparison['status']!='MATCH':

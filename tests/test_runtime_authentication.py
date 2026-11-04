@@ -23,7 +23,7 @@ def test_actual_meter_bounded_same_secret_reconnect_and_suppression(failures,exp
                     raise RuntimeError('SENSITIVE_SENTINEL')
                 self.statements=8;self.returned_bytes=120;c=SimpleNamespace(closed=False)
                 worker=role=='ingestion_worker_login'
-                c.execute=lambda *_a,**_k:SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,datetime.fromtimestamp(deadline,timezone.utc).timestamp()))
+                c.execute=lambda *_a,**_k:SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,auth.exact_deadline_epoch(deadline)))
                 self.opened.append(c)
                 try:yield c
                 finally:c.closed=True
@@ -42,11 +42,11 @@ def test_insufficient_reserve_refuses_before_connection():
 
 
 @pytest.mark.parametrize('index',range(11))
-def test_exact_old_comparison_and_fixed_field_diagnostics(index):
+def test_exact_comparison_and_fixed_field_diagnostics(index):
     deadline=1793806134.7721088
     for role in auth.op.ROLES:
         worker=role=='ingestion_worker_login'
-        expected=(role,role,True,'10s','3s','20s',True,worker,worker,worker,datetime.fromtimestamp(deadline,timezone.utc).timestamp())
+        expected=(role,role,True,'10s','3s','20s',True,worker,worker,worker,auth.exact_deadline_epoch(deadline))
         assert auth.profile_comparison(expected,role,deadline)['status']=='MATCH'
         row=list(expected);row[index]='SECRET_SENTINEL_AND_ARBITRARY_DATABASE_VALUE'
         result=auth.profile_comparison(tuple(row),role,deadline)
@@ -74,7 +74,7 @@ def test_first_comparison_failure_precedes_cleanup_and_survives_it(cleanup_fails
             @contextmanager
             def connect():
                 role='ingestion_worker_login'
-                row=(role,role,True,'10s','3s','20s',True,True,False,True,datetime.fromtimestamp(deadline,timezone.utc).timestamp())
+                row=(role,role,True,'10s','3s','20s',True,True,False,True,auth.exact_deadline_epoch(deadline))
                 yield SimpleNamespace(execute=lambda *_a,**_k:SimpleNamespace(one=lambda:row))
             return SimpleNamespace(connect=connect)
         def close(self,_):
@@ -88,12 +88,12 @@ def test_first_comparison_failure_precedes_cleanup_and_survives_it(cleanup_fails
     assert 'SECRET_SENTINEL' not in json.dumps(result)
 
 @pytest.mark.parametrize('mismatch',[False,True])
-def test_deadline_diagnostic_actual_query_retains_exact_values_on_pass_and_refusal(monkeypatch,mismatch):
+def test_deadline_diagnostic_actual_query_retains_exact_values_on_pass_and_refusal(monkeypatch,mismatch,record_property):
     from decimal import Decimal
     deadline=time.time()+2100
-    expected=datetime.fromtimestamp(deadline,timezone.utc).timestamp()
-    observed=expected+(0.001 if mismatch else 0)
-    runtime=SimpleNamespace(args=SimpleNamespace(period='diagnostic'),binding={},run=IntakeRun(),urls={r:'SECRET_SENTINEL' for r in auth.op.ROLES},options={},emit=lambda *_:None,deadline_diagnostic=True)
+    expected=auth.exact_deadline_epoch(deadline)
+    observed=expected+(Decimal('0.001') if mismatch else Decimal(0))
+    runtime=SimpleNamespace(args=SimpleNamespace(period='b-qualification-20261104-02'),binding=auth.op.APPLICATION_BINDING,run=IntakeRun(),urls={r:'SECRET_SENTINEL' for r in auth.op.ROLES},options={},emit=lambda *_:None,deadline_diagnostic=True)
     class Budget:
         statements=8;attempts=1;returned_bytes=300;prior_cancel_attempts=0;hard_deadline_events=[];opened=[]
         def __init__(self,**kw):pass
@@ -103,7 +103,7 @@ def test_deadline_diagnostic_actual_query_retains_exact_values_on_pass_and_refus
             def connect():
                 def execute(query,params):
                     assert str(query).count('FROM pg_roles WHERE rolname=current_user')==2
-                    return SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,observed,Decimal(str(observed))))
+                    return SimpleNamespace(one=lambda:(role,role,True,'10s','3s','20s',True,worker,worker,worker,observed,float(observed)))
                 yield SimpleNamespace(execute=execute)
             return SimpleNamespace(connect=connect)
         def close(self,_):
@@ -112,6 +112,8 @@ def test_deadline_diagnostic_actual_query_retains_exact_values_on_pass_and_refus
     result=auth.qualify(runtime,deadline,budget_factory=Budget)
     assert (result['status']=='VERIFIED_BOTH_RESTRICTED_ROLES') != mismatch
     for item in result['deadline_observations']:
-        d=item['evidence'];assert d['observed']['hex']==observed.hex() and d['input']['hex']==deadline.hex()
-        assert d['strict_equal'] != mismatch and d['database_numeric_epoch']['type']=='Decimal'
-    assert len(json.dumps(result))<8192 and 'SECRET_SENTINEL' not in json.dumps(result)
+        d=item['evidence'];assert d['observed']['hex']==float(observed).hex() and d['input']['hex']==deadline.hex()
+        assert d['qualification_strict_equal'] != mismatch and d['database_numeric_epoch']['type']=='Decimal'
+    size=len(json.dumps(result,sort_keys=True,separators=(',',':')).encode())
+    record_property('receipt_bytes',size)
+    assert size<6144 and 'SECRET_SENTINEL' not in json.dumps(result)
