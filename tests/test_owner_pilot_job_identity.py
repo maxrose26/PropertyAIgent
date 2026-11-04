@@ -21,12 +21,13 @@ def test_unapproved_execution_identity_refuses_before_daily(monkeypatch):
     with pytest.raises(SystemExit) as exc:job.main()
     assert exc.value.code==2
 
+@pytest.mark.parametrize('period',['b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'])
 @pytest.mark.parametrize('accepted',[True,False])
-def test_stable_job_qualifies_on_actual_runtime_meter_before_daily(monkeypatch,accepted):
+def test_stable_job_qualifies_on_actual_runtime_meter_before_daily(monkeypatch,accepted,period):
     import verification.ingestion_storage.daily_intake_runtime as daily_runtime
     import verification.ingestion_storage.runtime_authentication as authentication
     events=[]
-    monkeypatch.setattr(sys,'argv',['job','--hostaddr','192.0.2.1','--period','b-dbpilot-20261027-1102-03','--deadline','1793740000'])
+    monkeypatch.setattr(sys,'argv',['job','--hostaddr','192.0.2.1','--period',period,'--deadline','1793740000'])
     monkeypatch.setattr(job.os,'environ',{'PATH':'/usr/bin','DATABASE_URL':'SECRET_SENTINEL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY':'SECRET_SENTINEL'})
     sentinel=SimpleNamespace()
     monkeypatch.setattr(daily_runtime,'Runtime',lambda args:events.append('runtime') or sentinel)

@@ -2,8 +2,41 @@
 import argparse,json,os,sys
 from pathlib import Path
 
+def startup_check(Runtime,period,hostaddr):
+    """Actual packaged Runtime guard only; no qualify/daily/database call."""
+    import subprocess
+    from argparse import Namespace
+    observed={};original=subprocess.check_output
+    command=['git','status','--porcelain','--untracked-files=no']
+    def inspect(cmd,*args,**kwargs):
+        if cmd!=command:return original(cmd,*args,**kwargs)
+        try:value=original(cmd,*args,**kwargs)
+        except subprocess.CalledProcessError as exc:
+            observed.update(exit_status=exc.returncode);raise
+        except OSError:
+            observed.update(exit_status=None);raise
+        observed.update(exit_status=0,tracked_changes=bool(value.strip()))
+        return value
+    os.environ['INGESTION_WORKER_DATABASE_URL']='postgresql://ingestion_worker_login:SYNTHETIC_STARTUP_ONLY@127.0.0.1:5432/ingestion_provisioning_test'
+    os.environ['INGESTION_EFFECT_DATABASE_URL']='postgresql://ingestion_effect_login:SYNTHETIC_STARTUP_ONLY@127.0.0.1:5432/ingestion_provisioning_test'
+    subprocess.check_output=inspect
+    receipt=dict(version='RENDER_STARTUP_GUARD_V1',period=period,status='REFUSED',authentication_attempts=0,source_requests=0)
+    try:
+        args=Namespace(period=period,output='/tmp/propertyaigent-startup-'+period,hostaddr=hostaddr,disposable_sources=None,disposable_archive=None,backlog=False,after=None,page_size=3)
+        runtime=Runtime(args)
+        if observed!={'exit_status':0,'tracked_changes':False}:raise ValueError('GIT_STATUS_UNVERIFIED')
+        receipt.update(status='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION',execution_binding=runtime.binding,
+                       cwd=str(Path.cwd()),tree=original(['git','rev-parse','HEAD^{tree}'],text=True,stderr=subprocess.DEVNULL).strip())
+    except BaseException as exc:
+        known={'CLEAN_REVIEWED_CHECKOUT_REQUIRED','INTAKE_CODE_IDENTITY','GIT_STATUS_UNVERIFIED','FRESH_OUTPUT_REQUIRED'}
+        receipt['reason']=str(exc) if str(exc) in known else 'UNKNOWN'
+    finally:subprocess.check_output=original
+    receipt['git']=observed
+    print('DATABASE_PILOT_STARTUP_GUARD '+json.dumps(receipt,sort_keys=True,separators=(',',':')),flush=True)
+    return 0 if receipt['status']=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION' else 2
+
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float);p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--hostaddr',required=True);p.add_argument('--deadline',type=float);p.add_argument('--startup-check-only',action='store_true');p.add_argument('--period',choices=('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'),default='b-dbpilot-20261027-1102-01');a=p.parse_args()
     import ipaddress
     if ipaddress.ip_address(a.hostaddr).version!=4:raise SystemExit(2)
     PERIOD=a.period
@@ -15,10 +48,13 @@ def main():
     os.environ.clear();os.environ.update(env)
     sys.argv=['scripts.run_daily_councils','--period',PERIOD,'--output','/tmp/propertyaigent-'+PERIOD,'--hostaddr',a.hostaddr]
     from scripts.run_daily_councils import main as daily
-    if PERIOD=='b-dbpilot-20261027-1102-03':
+    if PERIOD in ('b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04'):
         from argparse import Namespace
         from verification.ingestion_storage.daily_intake_runtime import Runtime
         from verification.ingestion_storage.runtime_authentication import qualify
+        if a.startup_check_only:
+            if PERIOD!='b-dbpilot-20261027-1102-04':raise SystemExit(2)
+            return startup_check(Runtime,PERIOD,a.hostaddr)
         if a.deadline is None:raise SystemExit(2)
         args=Namespace(period=PERIOD,output='/tmp/propertyaigent-'+PERIOD,hostaddr=a.hostaddr,disposable_sources=None,disposable_archive=None,backlog=False,after=None,page_size=3)
         runtime=Runtime(args);receipt=qualify(runtime,a.deadline)

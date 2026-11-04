@@ -26,8 +26,8 @@ from .database_evidence import BACKEND,canonical,migration_sql,verify_inventory
 from .restricted_route import url,ROUTES
 from .tls_trust import verified_trust
 
-PREDECESSOR='b-dbpilot-20261027-1102-02'
-PERIOD='b-dbpilot-20261027-1102-03'
+PREDECESSOR='b-dbpilot-20261027-1102-03'
+PERIOD='b-dbpilot-20261027-1102-04'
 OWNER_PERIOD=PERIOD+'_owner'
 OWNER_RUN=hashlib.sha256(OWNER_PERIOD.encode()).hexdigest()[:32]
 SERVICE='crn-d9sv93vavr4c73f98rb0'
@@ -70,7 +70,7 @@ class Database:
 class Journal:
     def __init__(self,db,period=PERIOD):
         op.require(period in (PERIOD,PREDECESSOR),'OWNER_JOURNAL_PERIOD')
-        self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None
+        self.db=db;self.period=period;self.owner_period=period+'_owner';self.owner_run=hashlib.sha256(self.owner_period.encode()).hexdigest()[:32];self.previous='';self.state=None;self.ordinal=-1
     def _vault(self,raw=None,value=None):
         # Only encrypted bytes touch the temporary filesystem. No new credential
         # is persisted; recovery derives its key from existing protected config.
@@ -86,7 +86,7 @@ class Journal:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
         if row is None:return None
         raw=bytes(row[1]);op.require(hashlib.sha256(raw).hexdigest()==row[2],'OWNER_JOURNAL_HASH')
-        self.previous=row[2];self.state=self._vault(raw=raw)
+        self.previous=row[2];self.ordinal=row[0];self.state=self._vault(raw=raw)
         op.require(self.state.get('period')==self.period,'OWNER_JOURNAL_PERIOD')
         return self.state
     def save(self,state,connection=None):
@@ -102,7 +102,7 @@ class Journal:
         # No repetition after uncertain acknowledgement. Independent load is
         # available even if this exact write committed but its reply was lost.
         op.require(row is not None and bytes(row[1])==raw and row[2]==h,'OWNER_JOURNAL_ACK_RECONCILE')
-        self.previous=h;self.state=copy.deepcopy(state)
+        self.previous=h;self.ordinal=row[0];self.state=copy.deepcopy(state)
 
 class Render:
     """Fixed-service transport, reviewed control-plane limits, no automatic retry."""
@@ -117,18 +117,19 @@ class Render:
             'elapsed_ms':min(60000,max(0,int((self.clock()-self.started)*1000))),'client_time_limit_ms':40000,'limit_hits':hits}
         raise exc
     def call(self,method,suffix='',body=None):
+        startup=method=='GET' and re.fullmatch(r'startup:job-[a-z0-9]{20}',suffix)
         qualification=method=='GET' and re.fullmatch(r'qualification:job-[a-z0-9]{20}',suffix)
         artifact=method=='GET' and re.fullmatch(r'artifact:[0-9TZ:.+-]{20,40}',suffix)
         allowed=(method=='GET' and suffix in ('','/env-vars?limit=100','/jobs?limit=100','/deploys?limit=100','/secret-files?limit=100') or
                  method=='GET' and re.fullmatch(r'/(jobs/job-|deploys/dep-)[a-z0-9]{20}',suffix) or
                  method=='PUT' and suffix=='/env-vars' or method=='PATCH' and suffix=='' or
-                 method=='POST' and suffix in ('/resume','/suspend','/jobs') or artifact or qualification)
+                 method=='POST' and suffix in ('/resume','/suspend','/jobs') or artifact or qualification or startup)
         op.require(allowed,'OWNER_RENDER_FIXED_OPERATION')
         before=[]
         if self.calls>=8:before.append('REQUEST_LIMIT')
         if self.clock()-self.started>=40:before.append('CLIENT_TIME_LIMIT')
         if before:self.limit_refusal(before)
-        self.calls+=1;limit=524288 if suffix=='/deploys?limit=100' else 32768
+        self.calls+=1;limit=524288 if suffix=='/deploys?limit=100' else 65536 if method=='GET' and suffix=='/jobs?limit=100' else 32768
         target='https://api.render.com/v1/services/'+SERVICE+suffix
         if artifact:
             from urllib.parse import urlencode
@@ -136,6 +137,9 @@ class Render:
         if qualification:
             from urllib.parse import urlencode
             target='https://api.render.com/v1/logs?'+urlencode(dict(ownerId=WORKSPACE,resource=suffix.split(':',1)[1],text='DATABASE_PILOT_RUNTIME_QUALIFICATION',limit=5,direction='backward'))
+        if startup:
+            from urllib.parse import urlencode
+            target='https://api.render.com/v1/logs?'+urlencode(dict(ownerId=WORKSPACE,resource=suffix.split(':',1)[1],text='DATABASE_PILOT_STARTUP_GUARD',limit=5,direction='backward'))
         with self.session.request(method,target,
                 headers={'Authorization':'Bearer '+self.token,'Accept':'application/json'},json=body,
                 timeout=(3,5),allow_redirects=False,stream=True) as r:
@@ -173,6 +177,14 @@ def source_profile(artifact,revision):
     return dict(mode='render-intake-v1',service_id=SERVICE,revision=revision,browser_path=artifact['browser_path'],browser_sha256=artifact['browser_sha256'],
                 aggregate_bytes=2147483648,source_rss_bytes=1073741824,controller_rss_bytes=268435456,reserve_bytes=536870912,source_seconds=75)
 
+def start_availability(now=None):
+    """Display availability without consuming authority or sliding a deadline."""
+    now=time.time() if now is None else now
+    day=datetime.fromtimestamp(now,ZoneInfo('Europe/London'))
+    midnight=datetime.combine(day.date()+timedelta(days=1),datetime.min.time(),ZoneInfo('Europe/London')).timestamp()
+    return dict(available=now+2100<=midnight,next_available_at=now if now+2100<=midnight else midnight,
+                latest_start_today=midnight-2100,access_seconds=2100,window=WINDOW)
+
 def fixed_binding(release,profile,address,guard,now=None):
     now=time.time() if now is None else now
     day=datetime.fromtimestamp(now,ZoneInfo('Europe/London'))
@@ -192,7 +204,7 @@ def fixed_binding(release,profile,address,guard,now=None):
 def safe_result(exc):
     # A closed allowlist, never arbitrary exception messages or environment.
     code=getattr(exc,'sqlstate',None)
-    known={'ACCESS_DISABLED_BUT_MEMBERSHIP_RECONCILIATION_REQUIRED',
+    known={'OWNER_STARTUP_PREFLIGHT_DRIFT','OWNER_STARTUP_PREFLIGHT_JOB','OWNER_STARTUP_PREFLIGHT_EVIDENCE','OWNER_CONTINUATION_PREDECESSOR','ACCESS_DISABLED_BUT_MEMBERSHIP_RECONCILIATION_REQUIRED',
      'ACCESS_DISABLE_READBACK',
      'ACTIVATION_COMMITTED_READBACK',
      'ACTIVATION_GATE_DERIVATION',
@@ -392,7 +404,7 @@ def safe_result(exc):
     known.update({'OWNER_CONTINUATION_PREDECESSOR','OWNER_CONTINUATION_DUPLICATE','OWNER_CONTINUATION_MIGRATION','OWNER_CONTINUATION_PRESERVATION','OWNER_CONTINUATION_QUALIFICATION', 'OWNER_RESULT_RUN_BINDING','OWNER_RESULT_EVIDENCE_BINDING','OWNER_JOURNAL_REQUIRES_AUTOCOMMIT_BOUNDARY'})
     known.update('ARTIFACT_RECONCILIATION_'+x for x in ('CONFIGURATION','HASH','CODE','BROWSER','STATE','CONFLICT','PREDECESSOR','REFUSAL','CURRENT_STATE','DURABLE_READBACK'))
     known.update({'DRIVER_STATEMENT_BOUND','SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE','REVIEWED_TLS_ENDPOINT_REQUIRED','RESTRICTED_ROUTE_MISMATCH','LIBPQ_ENVIRONMENT_OVERRIDE','RUNTIME_TRANSACTION_MODE','PINNED_REVIEWED_ADDRESS_REQUIRED','CONNECTION_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE'})
-    known.update({'STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
+    known.update({'OWNER_CLOSURE_ARCHIVE_BINDING','STABLE_CREDENTIALS_REQUIRED','STABLE_VERIFIER_BINDING','STABLE_CONFIGURATION_PRECONDITION','STABLE_CONFIGURATION_PRESERVATION','RUNTIME_AUTHENTICATION_REFUSED','RUNTIME_QUALIFICATION_EVIDENCE'})
     reason=str(exc) if isinstance(exc,op.Denied) and str(exc) in known else 'UNKNOWN_FAILURE'
     sql_reason=getattr(getattr(exc,'diag',None),'message_primary',None)
     if sql_reason in ('DATABASE_EVIDENCE_MIGRATION_PRECONDITION','DATABASE_EVIDENCE_UNRESOLVED_STATE','DATABASE_EVIDENCE_EXACT_CLEANUP_OR_PRESERVATION','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','OWNER_STATE_BUSY','OWNER_STATE_HISTORY_BOUND','OWNER_STATE_CONCURRENT_OR_UNCERTAIN','OWNER_STATE_VAULT_BOUND'):reason=sql_reason
@@ -547,19 +559,59 @@ class Pilot:
                 api.call('PUT','/env-vars',[{'key':k,'value':v} for k,v in sorted(self.state['original_environment'].items())])
                 op.require(env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'] and service_guard(api.call('GET'))==self.state['original_guard'],'OWNER_BUILD_ENV_RESTORE_READBACK')
                 self.ack('RESTORE_BUILD_ENVIRONMENT')
+    def startup_preflight(self):
+        """One packaged-runtime guard check, before any finite-access opening."""
+        release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        command='/usr/bin/timeout --signal=TERM --kill-after=2s 30s python -B -u -m scripts.owner_pilot_job --period '+PERIOD+' --hostaddr 127.0.0.1 --startup-check-only'
+        self.state['startup_command']=command
+        self.intent('STARTUP_PREFLIGHT_JOB')
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==self.state['original_guard'] and env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'],'OWNER_STARTUP_PREFLIGHT_DRIFT')
+            complete_inventory(api.call('GET','/jobs?limit=100'),'job')
+            deployments=complete_inventory(api.call('GET','/deploys?limit=100'),'deploy')
+            latest=max(deployments,key=lambda x:x['createdAt'])
+            op.require(latest['id']==self.state['deployment'] and latest['commit']['id']==release['execution_binding']['revision'],'OWNER_STARTUP_PREFLIGHT_DRIFT')
+            job=api.call('POST','/jobs',{'startCommand':command})
+        op.require(type(job) is dict and re.fullmatch('job-[a-z0-9]{20}',job.get('id','')) and job.get('serviceId')==SERVICE and job.get('startCommand')==command,'OWNER_JOB_ACK_UNCERTAIN')
+        self.state['startup_job']=job;self.ack('STARTUP_PREFLIGHT_JOB')
+        for _ in range(30):
+            self.sleep(2)
+            with self.api() as api:observed=api.call('GET','/jobs/'+job['id'])
+            op.require(observed.get('id')==job['id'] and observed.get('status') in TERMINAL|{'pending','running'},'OWNER_STARTUP_PREFLIGHT_JOB')
+            if observed['status'] in TERMINAL:break
+        self.state['startup_job_terminal']=observed;self.save()
+        op.require(observed.get('status')=='succeeded' and observed.get('finishedAt'),'OWNER_STARTUP_PREFLIGHT_JOB')
+        with self.api() as api:logs=api.call('GET','startup:'+job['id'])
+        op.require(logs.get('hasMore') is False and len(logs.get('logs',[]))==1,'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
+        line=logs['logs'][0]['message'];prefix='DATABASE_PILOT_STARTUP_GUARD '
+        op.require(line.startswith(prefix),'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
+        receipt=json.loads(line[len(prefix):])
+        op.require(receipt.get('status')=='CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION' and receipt.get('period')==PERIOD and
+            receipt.get('execution_binding')==release['execution_binding'] and receipt.get('tree')==release['tree'] and
+            receipt.get('cwd')=='/opt/render/project/src' and receipt.get('git')==dict(exit_status=0,tracked_changes=False) and
+            receipt.get('authentication_attempts')==0 and receipt.get('source_requests')==0,'OWNER_STARTUP_PREFLIGHT_EVIDENCE')
+        with self.api() as api:
+            op.require(service_guard(api.call('GET'))==self.state['original_guard'] and env_values(api.call('GET','/env-vars?limit=100'))==self.state['original_environment'],'OWNER_STARTUP_PREFLIGHT_DRIFT')
+        with envelope(),self.db.connection() as c:
+            op.dormant(c,stable_verifiers=self.state['stable_credentials']['verifier_sha256']);op.owner_absent(c)
+            op.no_hazards(c,op.control(c))
+        self.state['startup_preflight']={'job_id':job['id'],'receipt':receipt,'sha256':hashlib.sha256(canonical(receipt)).hexdigest(),
+            'readback':dict(runtime_access='DISABLED',configuration_equal=True,environment_equal=True,suspended=True)}
+        self.save()
+
     def prepare_continuation(self):
         from .owner_pilot_continuation import migrate_owner_namespace,predecessor
         old=Journal(self.db,PREDECESSOR).load();link=predecessor(old)
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'])
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()
         try:
-            from .stable_runtime_credentials import prepare,configure
-            with envelope(),self.db.connection() as c:
-                self.state['stable_credentials']=prepare(c);op.require('STABLE_CREDENTIAL_CONFIGURATION' not in self.state['intents'],'OWNER_PRIOR_INTENT_RECONCILE');self.state['intents']['STABLE_CREDENTIAL_CONFIGURATION']={'at':time.time(),'state':'INTENT_NO_RETRY'};self.journal.save(self.state,connection=c)
-                self.state['stable_configuration']=configure(c,self.state['stable_credentials']);self.state['intents']['STABLE_CREDENTIAL_CONFIGURATION']['state']='ACKNOWLEDGED';self.journal.save(self.state,connection=c)
-            self.build();self.state['status']='ARTIFACT_READY';self.save()
+            self.state['stable_credentials']=copy.deepcopy(old['stable_credentials'])
+            self.state['stable_configuration']=copy.deepcopy(old['stable_configuration'])
+            self.state['credential_reuse']={'predecessor':PREDECESSOR,'verifiers':'UNCHANGED_NO_CONFIGURATION_WRITE'}
+            self.save()
+            self.build();self.startup_preflight();self.state['status']='ARTIFACT_READY';self.save()
         except BaseException as exc:
             self.state['failure']=safe_result(exc);self.state['failure']['phase']=max(self.state['intents'],key=lambda x:self.state['intents'][x]['at'],default='PREPARE');self.state['private_failure_detail']=private_failure(exc,self.state['failure']['phase']);self.state['status']='PREPARATION_REFUSED';self.save()
             self.recover_build();raise
@@ -734,7 +786,7 @@ class Pilot:
                 self.state['restoration_receipt']={'status':'EXACT_RESTORATION_VERIFIED_BY_READBACK','original_acknowledgement':'UNKNOWN','provider_mutations':0};self.save()
             if r.get('state')=='PUT_INTENT_NO_RETRY':
                 with self.api() as api:reconcile_handoff(api,access,self.access_save)
-            if r.get('state')=='PUT_ACKNOWLEDGED' or r.get('reconciliation')=='EXPECTED':
+            if r.get('state')=='PUT_ACKNOWLEDGED' or r.get('state')=='PUT_INTENT_NO_RETRY' and r.get('reconciliation')=='EXPECTED':
                 try:
                     with self.api() as api:self.state['restoration_receipt']=restore_handoff(api,access,self.access_save,self.state.get('job',{}).get('id'))
                     self.save()
@@ -748,9 +800,33 @@ class Pilot:
         self.save()
     def recover(self):
         self.state=self.journal.load();op.require(self.state is not None,'OWNER_NO_RECOVERY_STATE')
+        if self.state.get('status')=='CLOSED':return self.summary()
+        self.reserve_closure_space()
         if 'binding' not in self.state:self.recover_build()
         else:self.cleanup()
         return self.summary()
+    def reserve_closure_space(self):
+        """Keep concluded build detail in immutable prior rows, not every copy.
+
+        No release, restoration intent, original environment, credential, job,
+        policy or actual-result field is removed. No ciphertext/row limit grows.
+        """
+        if self.state.get('access',{}).get('state')!='DATABASE_CLOSURE_ACKNOWLEDGED':return
+        fields=('original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at')
+        present=[name for name in fields if name in self.state]
+        if not present:return
+        required=('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')
+        op.require(all(self.state.get('intents',{}).get(name,{}).get('state')=='ACKNOWLEDGED' for name in required)
+            and self.state.get('original_guard')==self.state['binding'].get('render_config_sha256')
+            and self.state['access'].get('render',{}).get('guard')==self.state['original_guard']
+            and self.state['access']['render'].get('original')==self.state.get('original_environment'),'OWNER_CLOSURE_ARCHIVE_BINDING')
+        op.require(type(self.journal.ordinal) is int and 0<=self.journal.ordinal<=59,'OWNER_STATE_HISTORY_BOUND')
+        op.require(re.fullmatch('[a-f0-9]{64}',self.journal.previous or ''),'OWNER_JOURNAL_HASH')
+        reference=dict(prior_ciphertext_sha256=self.journal.previous,prior_ordinal=self.journal.ordinal,
+            fields={name:hashlib.sha256(canonical(self.state[name])).hexdigest() for name in present})
+        for name in present:del self.state[name]
+        self.state['closed_build_archive']=reference
+        self.save()
     def inspect(self):
         """Read-only reconciliation; never calls prepare, recovery or save."""
         self.state=self.journal.load()
@@ -758,12 +834,24 @@ class Pilot:
         value=self.summary();value['workflow_status']=value['status'];value['status']='READ_ONLY_EVIDENCE_SAVED';value['read_only']=True
         value['preparation_progress']={name:entry['state'] for name,entry in self.state.get('intents',{}).items()}
         value['artifact_verified']='artifact' in self.state
+        value['journal_snapshot_ordinal']=self.journal.ordinal
+        value['remaining_snapshot_slots']=63-self.journal.ordinal
+        value['release_intent_present']='RELEASE' in self.state.get('intents',{})
+        value['job_intent_present']='ONE_JOB' in self.state.get('intents',{})
+        value['job_recorded']=bool(self.state.get('job'))
+        value['access_state']=self.state.get('access',{}).get('state')
+        value['handoff_state']=self.state.get('access',{}).get('render',{}).get('state')
         with envelope(),self.db.connection() as c:
             c.execute('BEGIN READ ONLY')
             try:
                 roles=c.execute(op.ROLE_QUERY,(list(op.ROLES),)).fetchall()
                 value['runtime_roles']=[{'role':r[0],'login':r[1],'password_null':r[2]} for r in roles]
                 value['period_present']=PERIOD in op.control(c).get('intake_periods',{})
+                value['pipeline_session_count']=c.execute('SELECT count(*) FROM pg_stat_activity WHERE usename=ANY(%s)',(list(op.ROLES),)).fetchone()[0]
+                value['runtime_membership_count']=c.execute('SELECT count(*) FROM pg_auth_members WHERE member=ANY(%s::regrole[])',(list(op.ROLES),)).fetchone()[0]
+                if self.state.get('stable_credentials'):
+                    observed=dict(c.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname=ANY(%s)",(list(op.ROLES),)).fetchall())
+                    value['stable_verifier_binding']='MATCH' if observed==self.state['stable_credentials']['verifier_sha256'] else 'DRIFT'
                 value['temporary_owner_absent']=c.execute("SELECT NOT pg_has_role(current_user,'ingestion_storage_owner','SET') AND NOT pg_has_role(current_user,'ingestion_storage_owner','USAGE') AND NOT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()[0]
             finally:c.execute('ROLLBACK')
         with self.api() as api:
@@ -824,4 +912,4 @@ class Pilot:
                 'failure':s.get('failure'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),
                 'independent_result':s.get('independent_result'),'source_result':s.get('source_result'),'closure_receipt':s.get('closure_receipt'),
                 'artifact_reconciliation':s.get('artifact_reconciliation'),'preparation_failure':s.get('preparation_failure'),
-                'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
+                'startup_preflight':s.get('startup_preflight'),'startup_job_id':s.get('startup_job',{}).get('id'),'credential_reuse':s.get('credential_reuse'),'closed_build_archive':s.get('closed_build_archive'),'stable_configuration':s.get('stable_configuration'),'credential_policy':(s.get('binding') or {}).get('credential_policy'),'runtime_qualification':s.get('runtime_qualification'),'predecessor':s.get('predecessor'),'qualification':s.get('qualification'),'qualification_attempts':s.get('qualification_attempts')}
