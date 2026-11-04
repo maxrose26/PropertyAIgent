@@ -63,7 +63,7 @@ def test_access_binding_reference_roundtrips_exactly_and_refuses_tamper():
     stored=p.serialized_state(value)
     assert len(p.canonical(stored))<len(p.canonical(value))-1800
     assert p.hydrated_state(copy.deepcopy(stored))==value
-    stored['binding']['fixed_window']={}
+    stored['journal_metadata']['sha256']='0'*64
     with pytest.raises(p.op.Denied,match='OWNER_CODE_BINDING'):p.hydrated_state(stored)
     legacy={'binding':binding,'access':{'binding':binding}}
     assert p.serialized_state(legacy)==legacy and p.hydrated_state(copy.deepcopy(legacy))==legacy

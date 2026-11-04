@@ -51,41 +51,40 @@ def ciphertext_size(n):
     # Existing Vault: 16-byte salt + base64(Fernet 57-byte overhead + PKCS7 AES).
     return 16+4*((57+16*(n//16+1)+2)//3)
 
+# Fixed normal metadata only. Cleanup records/counters and durable intents stay
+# outside this lossless container, so their reserved growth remains unchanged.
+JOURNAL_METADATA_FIELDS=frozenset(('binding','access','artifact','profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result','original_environment','stable_credentials','stable_configuration'))
+
 def serialized_state(value):
     stored=copy.deepcopy(value)
-    if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and isinstance(stored.get('binding'),dict) and canonical(stored.get('access',{}).get('binding'))==canonical(stored['binding']):
-        stored['access']['binding']=dict(version='ROOT_BINDING_REFERENCE_V1',sha256=hashlib.sha256(canonical(stored['binding'])).hexdigest())
     if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1':
-        # Lossless, owner-only representation of repetitive metadata. Recovery
-        # receives the exact original values; intents/receipts are never pruned.
-        for parent,key in journal_metadata_fields(stored):
-            if key not in parent:continue
-            raw=canonical(parent[key])
-            if len(raw)>32768:continue  # existing journal guard still refuses it
+        if isinstance(stored.get('binding'),dict) and canonical(stored.get('access',{}).get('binding'))==canonical(stored['binding']):
+            stored['access']['binding']=dict(version='ROOT_BINDING_REFERENCE_V1',sha256=hashlib.sha256(canonical(stored['binding'])).hexdigest())
+        metadata={k:stored[k] for k in JOURNAL_METADATA_FIELDS if k in stored}
+        raw=canonical(metadata)
+        if len(raw)<=65536:
             packed=dict(version='JOURNAL_METADATA_DEFLATE_V1',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest(),data=base64.b64encode(zlib.compress(raw,9)).decode('ascii'))
-            if len(canonical(packed))+128<len(raw):parent[key]=packed
+            if len(canonical(packed))+128<len(raw):
+                op.require('journal_metadata' not in stored,'OWNER_CODE_BINDING')
+                for key in metadata:del stored[key]
+                stored['journal_metadata']=packed
     return stored
-
-def journal_metadata_fields(state):
-    for key in ('binding','access','artifact','profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result'):
-        yield state,key
 
 def state_size(value):return len(canonical(serialized_state(value)))
 
 def hydrated_state(stored):
     if isinstance(stored,dict):
-        for parent,key in journal_metadata_fields(stored):
-            packed=parent.get(key)
-            if not isinstance(packed,dict) or packed.get('version')!='JOURNAL_METADATA_DEFLATE_V1':continue
+        packed=stored.get('journal_metadata')
+        if packed is not None:
             try:
-                op.require(set(packed)=={'version','bytes','sha256','data'} and type(packed['bytes']) is int and 0<=packed['bytes']<=32768,'OWNER_CODE_BINDING')
+                op.require(stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and isinstance(packed,dict) and set(packed)=={'version','bytes','sha256','data'} and packed['version']=='JOURNAL_METADATA_DEFLATE_V1' and type(packed['bytes']) is int and 0<=packed['bytes']<=65536,'OWNER_CODE_BINDING')
                 compressed=base64.b64decode(packed['data'],validate=True)
                 op.require(len(compressed)<=32768,'OWNER_CODE_BINDING')
                 decoder=zlib.decompressobj();raw=decoder.decompress(compressed,packed['bytes']+1)
                 op.require(decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail and len(raw)==packed['bytes'] and hashlib.sha256(raw).hexdigest()==packed['sha256'],'OWNER_CODE_BINDING')
                 decoded=json.loads(raw)
-                op.require(canonical(decoded)==raw,'OWNER_CODE_BINDING')
-                parent[key]=decoded
+                op.require(isinstance(decoded,dict) and set(decoded)<=JOURNAL_METADATA_FIELDS and not set(decoded).intersection(stored) and canonical(decoded)==raw,'OWNER_CODE_BINDING')
+                del stored['journal_metadata'];stored.update(decoded)
             except (ValueError,TypeError,KeyError,zlib.error):raise op.Denied('OWNER_CODE_BINDING') from None
         binding=stored.get('access',{}).get('binding',{})
         if isinstance(binding,dict) and binding.get('version')=='ROOT_BINDING_REFERENCE_V1':

@@ -14,7 +14,7 @@ def test_lossless_metadata_and_real_encryption_preserve_intents_failure_and_secr
     original=example();before=copy.deepcopy(original)
     packed=p.serialized_state(original)
     assert original==before and len(p.canonical(packed))<len(p.canonical(original))-5000
-    assert packed['access']['version']=='JOURNAL_METADATA_DEFLATE_V1'
+    assert packed['journal_metadata']['version']=='JOURNAL_METADATA_DEFLATE_V1'
     assert p.hydrated_state(copy.deepcopy(packed))==original
     obj=pilot_with_retained_state(original)
     assert obj.journal.load()==original and b'SECRET_SENTINEL' not in obj.db.rows[-1][1]
@@ -23,7 +23,7 @@ def test_lossless_metadata_and_real_encryption_preserve_intents_failure_and_secr
 
 @pytest.mark.parametrize('change',['hash','length','trailing','bomb'])
 def test_corruption_or_unbounded_decompression_refuses(change):
-    packed=p.serialized_state(example());item=packed['policy']
+    packed=p.serialized_state(example());item=packed['journal_metadata']
     if change=='hash':item['sha256']='0'*64
     if change=='length':item['bytes']+=1
     if change=='trailing':item['data']=base64.b64encode(base64.b64decode(item['data'])+b'extra').decode()
