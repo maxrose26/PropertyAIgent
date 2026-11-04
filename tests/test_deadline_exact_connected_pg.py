@@ -4,6 +4,7 @@ import inspect
 import json
 import os
 import time
+import subprocess
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -13,25 +14,31 @@ import pytest
 from psycopg import sql
 from sqlalchemy import text
 from sqlalchemy.engine import URL
-from tests.test_database_evidence_migration_pg import migration_world, installed, support
+from tests.test_database_evidence_migration_pg import migration_world, installed, world, support
 from verification.ingestion_storage import runtime_authentication as auth
 from verification.ingestion_storage.database_evidence import migration_sql
 from verification.ingestion_storage.intake_budget import IntakeRun
 from verification.ingestion_storage.operational_controller import DatabaseBudget
 
-@pytest.fixture(scope='module')
-def world():
-    # Only fixture database selection changes. Runtime clients are unmodified.
-    original=support.FIXTURE_DATABASE
-    support.FIXTURE_DATABASE='ingestion_provisioning_test'
-    try:yield from support.world.__wrapped__()
-    finally:support.FIXTURE_DATABASE=original
+@pytest.fixture
+def runtime_world(migration_world):
+    # Preserve the original guarded install in postgres. Reuse pg_dump/psql to
+    # copy that real schema/data/ACLs into the fixed disposable runtime database.
+    with support.actor() as owner:support.execute(owner,migration_sql())
+    dump=subprocess.run(support.pg_tool('pg_dump')+['-U','provisioning_bootstrap','-d','postgres','--schema=public','--clean','--if-exists'],env=support.PGENV,capture_output=True,check=True,timeout=20).stdout
+    subprocess.run(support.pg_tool('psql')+['-U','provisioning_bootstrap','-d','ingestion_provisioning_test','-v','ON_ERROR_STOP=1','-X'],input=dump,env=support.PGENV,capture_output=True,check=True,timeout=20)
+    boot=psycopg.connect(host='127.0.0.1',port=5432,dbname='ingestion_provisioning_test',user='provisioning_bootstrap',password=support.FIXTURE_PASSWORD,autocommit=True)
+    try:
+        assert auth.op.ledger_sha(boot)==auth.op.ledger_sha(migration_world['boot'])
+        yield {**migration_world,'boot':boot}
+    finally:
+        boot.execute('DROP SCHEMA public CASCADE;CREATE SCHEMA public')
+        boot.close()
 
 RECORDED=1793827036.7709913
 
-def test_connected_deadline_both_roles_and_cleanup(migration_world,record_property):
-    boot=migration_world['boot'];results=[];roles=auth.op.ROLES
-    with support.actor() as owner:support.execute(owner,migration_sql())
+def test_connected_deadline_both_roles_and_cleanup(runtime_world,record_property):
+    boot=runtime_world['boot'];results=[];roles=auth.op.ROLES
     ledger_before=auth.op.ledger_sha(boot)
     passwords={r:'synthetic-deadline-'+r for r in roles}
     urls={r:URL.create('postgresql+psycopg',username=r,password=passwords[r],host='127.0.0.1',port=5432,database='ingestion_provisioning_test').render_as_string(hide_password=False) for r in roles}
@@ -109,9 +116,9 @@ def test_connected_deadline_both_roles_and_cleanup(migration_world,record_proper
             results.append(dict(case='server_expired_password',role=r,cleanup=closed))
     finally:
         closure=cleanup()
-    report=dict(server_version=migration_world['server_version'],psycopg=psycopg.__version__,cases=results,case_count=len(results),cleanup=closure,source_requests=0)
+    report=dict(server_version=runtime_world['server_version'],psycopg=psycopg.__version__,cases=results,case_count=len(results),cleanup=closure,source_requests=0)
     raw=json.dumps(report,sort_keys=True,indent=2)
     assert all(v not in raw for v in passwords.values()) and 'postgresql://' not in raw
     out=Path(os.environ['DEADLINE_PROOF_DIR']);out.mkdir(exist_ok=True)
     (out/'connected-results.json').write_text(raw+'\n')
-    record_property('connected_cases',len(results));record_property('server_version',migration_world['server_version'])
+    record_property('connected_cases',len(results));record_property('server_version',runtime_world['server_version'])
