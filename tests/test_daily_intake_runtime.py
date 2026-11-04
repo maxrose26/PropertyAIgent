@@ -518,8 +518,10 @@ def test_failed_run_retirement_prototype_pg(world,fault):
         receipt=after['intake_periods'][period]['failed_runs'][run_id]
         assert receipt['original_marker']==ctl['intake_run'] and receipt['request_count_status']=='UNKNOWN' and receipt['manchester']=='NOT_ATTEMPTED'
         assert after['global_stop']==ctl['global_stop'] and after['manual_stop']=='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+        assert boot.execute('SELECT phase,finished_at IS NOT NULL FROM ingestion_work_attempts WHERE work_key=%s',(key,)).fetchone()==('RECOVERED',True)
+        assert boot.execute("SELECT name,sha256,sha256=encode(sha256(body),'hex') FROM ingestion_run_evidence ORDER BY name").fetchall()==[(n,h,True) for n,h in sorted(evidence.items())]
         # Unchanged owner guard must reject generation 7; no test bypass.
-        b=dict(version='FINITE_INTAKE_OWNER_V1',period='successor',route='POOLER',hostaddr='192.0.2.1',owner_hostaddr='192.0.2.2',execution_binding=op.APPLICATION_BINDING,accepted_stop=op.stop_snapshot(after))
+        b=dict(version='FINITE_INTAKE_OWNER_V1',period='successor',route='POOLER',hostaddr='192.0.2.1',owner_hostaddr='192.0.2.2',execution_binding=op.APPLICATION_BINDING,accepted_stop=dict(op.ACCEPTED_STOP,hard_stop_generation=7))
         with pytest.raises(Denied,match='OWNER_STOP_BINDING'):op.validate_binding(b)
         # Test the existing SQL issuer separately after fixture-only exact stop disposition.
         after.update(global_stop=None,manual_stop=None)
