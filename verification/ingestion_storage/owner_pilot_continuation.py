@@ -25,7 +25,7 @@ def predecessor(state, *, snapshot):
         'closure_evidence_sha256':'0547e7ba14ae750fcc002de9454f4c162bccf01e757ee2e288f2935088918790',
         'execution_identity':'b-dbpilot-20261027-1102-05'}
 
-def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False):
+def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False,diagnostic_cap=False):
     """Exact04→05 namespace addition; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
     old=new.replace(",'b-dbpilot-20261027-1102-05_owner'",'')
@@ -35,6 +35,9 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
     if deadline:
         from .database_evidence import QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL
         old=QUALIFICATION_OWNER_SQL.split('$owner_state$',2)[1];new=DEADLINE_OWNER_SQL.split('$owner_state$',2)[1]
+    if diagnostic_cap:
+        from .database_evidence import DEADLINE_OWNER_SQL,DIAGNOSTIC02_CAP_OWNER_SQL
+        old=DEADLINE_OWNER_SQL.split('$owner_state$',2)[1];new=DIAGNOSTIC02_CAP_OWNER_SQL.split('$owner_state$',2)[1]
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c,stable_verifiers=stable_verifiers);op.owner_absent(c)
@@ -44,13 +47,13 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
         definition=c.execute("SELECT prosrc,proacl::text,proowner::regrole::text,prosecdef,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
         op.require(definition[0] in (old,new) and definition[2:]==('ingestion_storage_owner',True,['search_path=pg_catalog']),'OWNER_CONTINUATION_MIGRATION')
         if definition[0]==new:
-            verify_inventory(c);c.execute('COMMIT');return
+            verify_inventory(c);op.owner_absent(c);c.execute('COMMIT');return dict(status='ALREADY_EXACT_READBACK',function_sha256=hashlib.sha256(new.encode()).hexdigest(),mutation=False)
         c.execute('GRANT ingestion_storage_owner TO postgres WITH INHERIT FALSE,SET TRUE GRANTED BY postgres')
         c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner')
         c.execute('SET LOCAL ROLE ingestion_storage_owner')
         c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
         snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
-        source=DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
+        source=DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
         c.execute(source.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
         c.execute('RESET ROLE')
@@ -61,5 +64,8 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             and c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()==schema,'OWNER_CONTINUATION_PRESERVATION')
         verify_inventory(c);op.owner_absent(c);c.execute('COMMIT')
         verify_inventory(c);op.owner_absent(c)
+        observed=c.execute("SELECT prosrc FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
+        op.require(observed==(new,),'OWNER_CONTINUATION_MIGRATION')
+        return dict(status='COMMIT_ACKNOWLEDGED_AND_READ_BACK',function_sha256=hashlib.sha256(new.encode()).hexdigest(),mutation=True,evidence_rows=snapshot[0],evidence_inventory_md5=snapshot[1],ledger_sha256=ledger,permissions_restored=True)
     except BaseException:
         c.execute('ROLLBACK');raise

@@ -24,7 +24,9 @@ KEEP = {'PYTHONUNBUFFERED', 'PLAYWRIGHT_BROWSERS_PATH', 'INGESTION_RENDER_PROFIL
 
 class Vault:
     """Authenticated encrypted closure baseline, fsynced before effects; key stays in memory."""
-    def __init__(self, path, passphrase, *, create=False):
+    def __init__(self, path, passphrase, *, create=False, limit=VAULT_LIMIT):
+        require(limit in (32768,36864), 'VAULT_LIMIT_POLICY')
+        self.limit=limit
         self.path = Path(path)
         require(len(passphrase) >= 24, 'VAULT_PASSPHRASE_LENGTH')
         if create:
@@ -41,12 +43,12 @@ class Vault:
     def _check(self):
         s = self.path.lstat()
         require(stat.S_ISREG(s.st_mode) and s.st_uid == os.getuid() and stat.S_IMODE(s.st_mode) == 0o600
-                and s.st_nlink == 1 and s.st_size <= VAULT_LIMIT, 'PRIVATE_VAULT_REQUIRED')
+                and s.st_nlink == 1 and s.st_size <= self.limit, 'PRIVATE_VAULT_REQUIRED')
 
     def save(self, value):
         self._check()
         raw = self.salt + self.cipher.encrypt(canonical(value))
-        require(len(raw) <= VAULT_LIMIT, 'VAULT_32K_BOUND')
+        require(len(raw) <= self.limit, 'VAULT_32K_BOUND' if self.limit==32768 else 'VAULT_36K_BOUND')
         temporary = self.path.with_name(self.path.name + '.next')
         fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
         try:

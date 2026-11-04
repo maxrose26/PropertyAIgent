@@ -57,7 +57,7 @@ JOURNAL_METADATA_FIELDS=frozenset(('binding','access','artifact','profile','poli
 
 def serialized_state(value):
     stored=copy.deepcopy(value)
-    if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1':
+    if isinstance(stored,dict) and stored.get('cleanup_reserve',{}).get('version') in ('CLEANUP_RESERVE_V1','CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1'):
         if isinstance(stored.get('binding'),dict) and canonical(stored.get('access',{}).get('binding'))==canonical(stored['binding']):
             stored['access']['binding']=dict(version='ROOT_BINDING_REFERENCE_V1',sha256=hashlib.sha256(canonical(stored['binding'])).hexdigest())
         metadata={k:stored[k] for k in JOURNAL_METADATA_FIELDS if k in stored}
@@ -77,7 +77,7 @@ def hydrated_state(stored):
         packed=stored.get('journal_metadata')
         if packed is not None:
             try:
-                op.require(stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and isinstance(packed,dict) and set(packed)=={'version','bytes','sha256','data'} and packed['version']=='JOURNAL_METADATA_DEFLATE_V1' and type(packed['bytes']) is int and 0<=packed['bytes']<=65536,'OWNER_CODE_BINDING')
+                op.require(stored.get('cleanup_reserve',{}).get('version') in ('CLEANUP_RESERVE_V1','CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1') and isinstance(packed,dict) and set(packed)=={'version','bytes','sha256','data'} and packed['version']=='JOURNAL_METADATA_DEFLATE_V1' and type(packed['bytes']) is int and 0<=packed['bytes']<=65536,'OWNER_CODE_BINDING')
                 compressed=base64.b64decode(packed['data'],validate=True)
                 op.require(len(compressed)<=32768,'OWNER_CODE_BINDING')
                 decoder=zlib.decompressobj();raw=decoder.decompress(compressed,packed['bytes']+1)
@@ -88,15 +88,17 @@ def hydrated_state(stored):
             except (ValueError,TypeError,KeyError,zlib.error):raise op.Denied('OWNER_CODE_BINDING') from None
         binding=stored.get('access',{}).get('binding',{})
         if isinstance(binding,dict) and binding.get('version')=='ROOT_BINDING_REFERENCE_V1':
-            op.require(set(binding)=={'version','sha256'} and stored.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_V1' and
+            op.require(set(binding)=={'version','sha256'} and stored.get('cleanup_reserve',{}).get('version') in ('CLEANUP_RESERVE_V1','CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1') and
                 binding['sha256']==hashlib.sha256(canonical(stored.get('binding'))).hexdigest(),'OWNER_CODE_BINDING')
             stored['access']['binding']=copy.deepcopy(stored['binding'])
     return stored
 
-def cleanup_reserve_policy():
+def cleanup_reserve_policy(period=None,version=None):
+    expanded=period=='b-qualification-20261104-02' and version!='CLEANUP_RESERVE_V1'
+    limit=36864 if expanded else 32768
     growth=sum(len(canonical(k))+1+n+1 for k,n in CLEANUP_RECORD_LIMITS.items())+CLEANUP_STATE_GROWTH
-    maximum=max(n for n in range(32769) if ciphertext_size(n+growth+CLEANUP_MARGIN)<=32768)
-    return dict(version='CLEANUP_RESERVE_V1',record_limits=dict(CLEANUP_RECORD_LIMITS),
+    maximum=max(n for n in range(limit+1) if ciphertext_size(n+growth+CLEANUP_MARGIN)<=limit)
+    return dict(version='CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1' if expanded else 'CLEANUP_RESERVE_V1',record_limits=dict(CLEANUP_RECORD_LIMITS),
         growth_bytes=growth,margin_bytes=CLEANUP_MARGIN,normal_plaintext_ceiling=maximum,
         reserved_snapshots=CLEANUP_SNAPSHOTS)
 
@@ -154,10 +156,11 @@ class Journal:
         with tempfile.TemporaryDirectory(prefix='propertyaigent-owner-') as folder:
             p=Path(folder)/'state.vault'
             if raw is None:
-                v=Vault(p,self.db.key,create=True);v.save(serialized_state(value));return p.read_bytes()
+                limit=36864 if self.period=='b-qualification-20261104-02' and value.get('cleanup_reserve',{}).get('version')=='CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1' else 32768
+                v=Vault(p,self.db.key,create=True,limit=limit);v.save(serialized_state(value));return p.read_bytes()
             fd=os.open(p,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             with os.fdopen(fd,'wb') as f:f.write(raw)
-            return hydrated_state(Vault(p,self.db.key).load())
+            return hydrated_state(Vault(p,self.db.key,limit=36864 if self.period=='b-qualification-20261104-02' else 32768).load())
     def load(self):
         with self.db.connection() as c:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
@@ -169,10 +172,10 @@ class Journal:
     def save(self,state,connection=None,*,validate_only=False):
         reserve=state.get('cleanup_reserve')
         if self.state and self.state.get('cleanup_reserve'):
-            op.require(reserve is not None,'OWNER_CLEANUP_RESERVE_IMMUTABLE')
+            op.require(reserve is not None and all(reserve.get(k)==self.state['cleanup_reserve'].get(k) for k in cleanup_reserve_policy(self.period,self.state['cleanup_reserve'].get('version'))),'OWNER_CLEANUP_RESERVE_IMMUTABLE')
             if 'first_failure' in self.state:op.require(state.get('first_failure')==self.state['first_failure'],'OWNER_FIRST_FAILURE_IMMUTABLE')
         if reserve is not None:
-            policy=cleanup_reserve_policy()
+            policy=cleanup_reserve_policy(self.period,reserve.get('version'))
             op.require(all(reserve.get(k)==v for k,v in policy.items()),'OWNER_CLEANUP_RESERVE_IMMUTABLE')
             prior=(self.state or {}).get('cleanup_reserve',{})
             used=prior.get('cleanup_writes',0)
@@ -500,7 +503,7 @@ def safe_result(exc):
      'UNEXPIRED_OR_UNREADABLE_AUTHORITY',
      'UNFINISHED_INTAKE_RUN',
      'UNRESOLVED_EFFECT_INTENT',
-     'VAULT_32K_BOUND',
+     'VAULT_32K_BOUND','VAULT_36K_BOUND',
      'VAULT_INCOMPLETE',
      'VAULT_PASSPHRASE_LENGTH'}
     from itertools import combinations
@@ -572,7 +575,7 @@ class Pilot:
     def arm_cleanup_reserve(self):
         op.require(self.state.get('status')=='ARTIFACT_READY' and 'RELEASE' not in self.state['intents'],'OWNER_PRIOR_ATTEMPT_RECONCILE')
         if 'cleanup_reserve' in self.state:
-            policy=cleanup_reserve_policy();reserve=self.state['cleanup_reserve']
+            reserve=self.state['cleanup_reserve'];policy=cleanup_reserve_policy(self.state.get('period'),reserve.get('version'))
             op.require(all(reserve.get(k)==v for k,v in policy.items()) and reserve.get('cleanup_writes')==0 and
                 not any(k in self.state for k in ('binding','access','first_failure')),'OWNER_PRIOR_ATTEMPT_RECONCILE')
             return  # confirmed pre-intent reservation; no new write or deadline
@@ -591,7 +594,7 @@ class Pilot:
             artifact={k:v for k,v in candidate.get('artifact',{}).items() if k in artifact_keys}
             for n in present:del candidate[n]
             if 'artifact' in present:candidate['artifact']=artifact
-        candidate['cleanup_reserve']=dict(cleanup_reserve_policy(),cleanup_writes=0)
+        candidate['cleanup_reserve']=dict(cleanup_reserve_policy(candidate.get('period')),cleanup_writes=0)
         return candidate
     def record_first_failure(self,exc):
         # A rejected oversized working copy must not prevent its failure record.

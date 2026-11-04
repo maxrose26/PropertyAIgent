@@ -17,7 +17,7 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
         if action.startswith('qualification-'):expected=action.upper()+':b-qualification-20261104-02'
         if expected is None or os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')!=expected:raise ValueError('CONFIGURED_PREPARATION_ONLY')
     else:require_owner()
-    if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding','qualification-prepare','qualification-run','qualification-status','qualification-recover') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
+    if action not in ('prepare','prepare-continuation','run','recover','status','reconcile-artifact','verify-binding','qualification-prepare','qualification-run','qualification-status','qualification-recover','qualification-cap') or action=='run' and not owner_checked:raise ValueError('OWNER_PILOT_ACTION_REQUIRED')
     if action=='qualification-run':checked_at=float(os.environ.get('PROPERTYAIGENT_QUALIFICATION_CHECKED_AT','0'))
     if action in ('run','qualification-run') and (type(checked_at) not in (int,float) or not 0<=time.time()-checked_at<=300):raise ValueError('OWNER_BOUNDARY_CONFIRMATION_EXPIRED')
     if action=='run':
@@ -39,7 +39,7 @@ def start(action,*,owner_checked=False,checked_at=None,server_prepare=False):
         keep={'PATH','HOME','LANG','TZ','DATABASE_URL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY','PROPERTYAIGENT_INTAKE_SOURCE_RELEASE','PROPERTYAIGENT_INTAKE_BUILD_RECEIPT'}
         env={k:v for k,v in os.environ.items() if k in keep}
         env.update(PYTHONDONTWRITEBYTECODE='1',PROPERTYAIGENT_OWNER_PILOT_AUTHORITY=PERIOD)
-        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action in ('prepare','prepare-continuation','qualification-prepare') else '60s' if action in ('status','reconcile-artifact','verify-binding','qualification-status') else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
+        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','600s' if action in ('prepare','prepare-continuation','qualification-prepare') else '60s' if action in ('status','reconcile-artifact','verify-binding','qualification-status','qualification-cap') else '2100s',sys.executable,'-B','-u','-m','scripts.owner_managed_pilot','--action',action]
         if action=='qualification-run':checked_at=float(os.environ.get('PROPERTYAIGENT_QUALIFICATION_CHECKED_AT','0'))
         if action in ('run','qualification-run'):command+=['--owner-checked-at',str(checked_at)]
         _process=subprocess.Popen(command,env=env,stdin=subprocess.DEVNULL,stdout=None,stderr=subprocess.DEVNULL,start_new_session=True)

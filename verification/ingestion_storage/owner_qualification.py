@@ -68,14 +68,14 @@ class Qualification(p.Pilot):
         projected['handoff_receipt']=noise(512)
         projected['observations']={name:dict(provider_observation=dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=name,binding_sha256='f'*64,service_id=p.SERVICE,observed_at=9999999999.999998,env_groups=[],secret_files=[],inherited_credential_names=[],reviewed=True,no_current_work=True,other_activity_stopped=True,deployment_id=b['retained_deployment'],revision=b['execution_binding']['revision'],suspended=True),owner_boundary_confirmed_at=9999999999.999998) for name in ('HANDOFF','SUBMISSION')}
 
-        plain=p.state_size(projected);cipher=p.ciphertext_size(plain);policy=p.cleanup_reserve_policy()
+        plain=p.state_size(projected);cipher=p.ciphertext_size(plain);policy=p.cleanup_reserve_policy(IDENTITY)
         report=dict(version='DEADLINE_CAPACITY_MEASUREMENT_V1',journal_sha256=self.journal.previous,
             starting_ciphertext_bytes=self.journal.ciphertext_bytes,starting_ordinal=self.journal.ordinal,
-            projected_plaintext_bytes=plain,projected_ciphertext_bytes=cipher,normal_ciphertext_ceiling=22152,
-            normal_plaintext_ceiling=policy['normal_plaintext_ceiling'],normal_headroom_bytes=22152-cipher,
+            projected_plaintext_bytes=plain,projected_ciphertext_bytes=cipher,normal_ciphertext_ceiling=p.ciphertext_size(policy['normal_plaintext_ceiling']),
+            normal_plaintext_ceiling=policy['normal_plaintext_ceiling'],normal_headroom_bytes=p.ciphertext_size(policy['normal_plaintext_ceiling'])-cipher,
             cleanup_growth_plaintext=policy['growth_bytes'],cleanup_margin_plaintext=p.CLEANUP_MARGIN,
             worst_cleanup_ciphertext_bytes=p.ciphertext_size(plain+policy['growth_bytes']+p.CLEANUP_MARGIN),
-            hard_ciphertext_ceiling=32768,normal_snapshots_reserved=24,cleanup_snapshots_reserved=16,
+            hard_ciphertext_ceiling=36864,normal_snapshots_reserved=24,cleanup_snapshots_reserved=16,
             worst_final_ordinal=self.journal.ordinal+24+16,maximum_ordinal=63,
             component_plaintext_bytes={k:len(canonical(v)) for k,v in projected.items()},
             component_removal_ciphertext_savings={k:cipher-p.ciphertext_size(p.state_size({n:v for n,v in projected.items() if n!=k})) for k in projected})
@@ -83,13 +83,22 @@ class Qualification(p.Pilot):
             self.journal.save(projected,validate_only=True)
             report['status']='CAPACITY_VERIFIED_READ_ONLY'
         except op.Denied as exc:
-            if str(exc) not in ('OWNER_CLEANUP_RESERVE_BYTE_BOUND','VAULT_32K_BOUND','OWNER_CLEANUP_ROW_BOUND'):raise
+            if str(exc) not in ('OWNER_CLEANUP_RESERVE_BYTE_BOUND','VAULT_32K_BOUND','VAULT_36K_BOUND','OWNER_CLEANUP_ROW_BOUND'):raise
             report.update(status='CAPACITY_REFUSED_READ_ONLY',reason=str(exc))
             if not report_only:
                 print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(report,sort_keys=True),flush=True)
                 raise
         if not report_only:print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(report,sort_keys=True),flush=True)
         return report
+    def amend_capacity(self):
+        self.state=self.journal.load()
+        op.require(self.state and self.state.get('status')=='ARTIFACT_READY' and self.journal.previous=='8601f8a074a52218a0261c3706df817320475f1444eb0b88da4f02b1ef427729' and self.journal.ordinal==17 and self.journal.ciphertext_bytes==8776 and 'RELEASE' not in self.state.get('intents',{}) and not self.state.get('access') and not self.state.get('cleanup_reserve'),'OWNER_PRIOR_INTENT_RECONCILE')
+        before=copy.deepcopy(self.state)
+        self.preflight()
+        with p.envelope(),self.db.connection() as c:
+            receipt=migrate_owner_namespace(c,stable_verifiers=self.state['stable_credentials']['verifier_sha256'],diagnostic_cap=True)
+        print('PROPERTYAIGENT_DIAGNOSTIC_CAP_MIGRATION '+json.dumps(receipt,sort_keys=True),flush=True)
+        op.require(self.journal.load()==before and self.journal.previous=='8601f8a074a52218a0261c3706df817320475f1444eb0b88da4f02b1ef427729' and self.journal.ordinal==17,'OWNER_CONTINUATION_PRESERVATION')
     def inspect(self):
         result=super().inspect()
         if result.get('workflow_status')=='ARTIFACT_READY' and not result.get('release_intent_present'):
@@ -98,6 +107,14 @@ class Qualification(p.Pilot):
             observed=self.journal.load()
             op.require((self.journal.previous,self.journal.ordinal,observed)==prior,'OWNER_CONTINUATION_PRESERVATION')
             result['capacity_journal_unchanged']=True
+            with p.envelope(),self.db.connection() as c:
+                from .database_evidence import verify_inventory,DIAGNOSTIC02_CAP_OWNER_SQL
+                verify_inventory(c)
+                row=c.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
+            result['journal_sql_cap_binding']=dict(sha256=row[0],matches=row[0]==hashlib.sha256(DIAGNOSTIC02_CAP_OWNER_SQL.split('$owner_state$',2)[1].encode()).hexdigest())
+            prior_journal=p.Journal(self.db,PREDECESSOR);historical=prior_journal.load()
+            historical_reserve=historical.get('cleanup_reserve',{})
+            result['historical_journal_readback']=dict(period=PREDECESSOR,sha256=prior_journal.previous,ordinal=prior_journal.ordinal,ciphertext_bytes=prior_journal.ciphertext_bytes,reserve_version=historical_reserve.get('version'),policy_equal=historical_reserve.get('normal_plaintext_ceiling')==p.cleanup_reserve_policy()['normal_plaintext_ceiling'],ciphertext_limit=32768)
         return result
     def run(self,checked_at):
         op.require(type(checked_at) in (int,float) and 0<=time.time()-checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
