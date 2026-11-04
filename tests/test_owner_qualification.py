@@ -114,3 +114,19 @@ def test_real_successor_constructor_never_loads_default_or_prior_journal(monkeyp
         obj=q.Qualification(db=db,token='SYNTHETIC_ONLY')
         assert obj.journal.period==q.IDENTITY and obj.journal.ordinal==-1
         assert p.PREDECESSOR==q.PREDECESSOR and db.rows==[]
+
+@pytest.mark.parametrize('padding',[0,10000])
+def test_read_only_capacity_reports_without_consuming_state(pilot,monkeypatch,padding):
+    import json,random
+    base,state,_,_=pilot;b,_=base.release_preflight()
+    monkeypatch.setattr(p,'PERIOD',q.IDENTITY);monkeypatch.setattr(p,'PREDECESSOR',q.PREDECESSOR)
+    obj=q.Qualification(db=MemoryDB(),token='SYNTHETIC_ONLY')
+    s=copy.deepcopy(state);s['period']=q.IDENTITY;s['stable_credentials']['passwords']={r:'s'*64 for r in p.op.ROLES}
+    rng=random.Random(7);s['bounded_padding']=''.join(rng.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(padding))
+    raw=obj.journal._vault(value=s);obj.db.rows=[(17,raw,hashlib.sha256(raw).hexdigest())];obj.state=obj.journal.load();before=copy.deepcopy(obj.db.rows)
+    monkeypatch.setattr(p.op,'prepare_activation',lambda c,b,**kw:dict(version='FINITE_INTAKE_ACCESS_STATE_V1',binding=copy.deepcopy(b),state='ARMED_BEFORE_ACTIVATION',prior_settings={},original_memberships=[],passwords=kw['stable_credentials']))
+    report=obj.verify_deadline_capacity(b,report_only=True)
+    assert obj.db.rows==before and obj.journal.ordinal==17
+    assert (report['status']=='CAPACITY_VERIFIED_READ_ONLY')==(padding==0)
+    assert report['component_plaintext_bytes']['owner_deadline_observations']==2050
+    assert 'SYNTHETIC_ONLY' not in json.dumps(report) and 'SECRET_SENTINEL' not in json.dumps(report)

@@ -45,7 +45,7 @@ class Qualification(p.Pilot):
         folder=Path('/tmp/propertyaigent-owner-'+IDENTITY)
         b.update(release_root=str(folder),submission_intent_path=str(folder/'submission.intent.json'),credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=self.state['stable_credentials']['verifier_sha256'])
         op.validate_binding(b,opening=True);return b
-    def verify_deadline_capacity(self,b):
+    def verify_deadline_capacity(self,b,*,report_only=False):
         # Same journal codec and normal ceiling; reserve worst bounded evidence
         # before activation, including the access copy and provider/job records.
         op.require(self.journal.ordinal+24+16<64,'OWNER_CLEANUP_ROW_BOUND')
@@ -68,9 +68,37 @@ class Qualification(p.Pilot):
         projected['handoff_receipt']=noise(512)
         projected['observations']={name:dict(provider_observation=dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=name,binding_sha256='f'*64,service_id=p.SERVICE,observed_at=9999999999.999998,env_groups=[],secret_files=[],inherited_credential_names=[],reviewed=True,no_current_work=True,other_activity_stopped=True,deployment_id=b['retained_deployment'],revision=b['execution_binding']['revision'],suspended=True),owner_boundary_confirmed_at=9999999999.999998) for name in ('HANDOFF','SUBMISSION')}
 
-        self.journal.save(projected,validate_only=True)
-        op.require(self.journal.ordinal+24+16<64,'OWNER_CLEANUP_SNAPSHOT_RESERVE')
-        print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(dict(normal_ciphertext_bytes=p.ciphertext_size(len(canonical(p.serialized_state(projected)))),normal_ceiling=22152,reserved_snapshots=16,current_ordinal=self.journal.ordinal),sort_keys=True),flush=True)
+        plain=p.state_size(projected);cipher=p.ciphertext_size(plain);policy=p.cleanup_reserve_policy()
+        report=dict(version='DEADLINE_CAPACITY_MEASUREMENT_V1',journal_sha256=self.journal.previous,
+            starting_ciphertext_bytes=self.journal.ciphertext_bytes,starting_ordinal=self.journal.ordinal,
+            projected_plaintext_bytes=plain,projected_ciphertext_bytes=cipher,normal_ciphertext_ceiling=22152,
+            normal_plaintext_ceiling=policy['normal_plaintext_ceiling'],normal_headroom_bytes=22152-cipher,
+            cleanup_growth_plaintext=policy['growth_bytes'],cleanup_margin_plaintext=p.CLEANUP_MARGIN,
+            worst_cleanup_ciphertext_bytes=p.ciphertext_size(plain+policy['growth_bytes']+p.CLEANUP_MARGIN),
+            hard_ciphertext_ceiling=32768,normal_snapshots_reserved=24,cleanup_snapshots_reserved=16,
+            worst_final_ordinal=self.journal.ordinal+24+16,maximum_ordinal=63,
+            component_plaintext_bytes={k:len(canonical(v)) for k,v in projected.items()},
+            component_removal_ciphertext_savings={k:cipher-p.ciphertext_size(p.state_size({n:v for n,v in projected.items() if n!=k})) for k in projected})
+        try:
+            self.journal.save(projected,validate_only=True)
+            report['status']='CAPACITY_VERIFIED_READ_ONLY'
+        except op.Denied as exc:
+            if str(exc) not in ('OWNER_CLEANUP_RESERVE_BYTE_BOUND','VAULT_32K_BOUND','OWNER_CLEANUP_ROW_BOUND'):raise
+            report.update(status='CAPACITY_REFUSED_READ_ONLY',reason=str(exc))
+            if not report_only:
+                print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(report,sort_keys=True),flush=True)
+                raise
+        if not report_only:print('DEADLINE_DIAGNOSTIC_CAPACITY '+json.dumps(report,sort_keys=True),flush=True)
+        return report
+    def inspect(self):
+        result=super().inspect()
+        if result.get('workflow_status')=='ARTIFACT_READY' and not result.get('release_intent_present'):
+            prior=(self.journal.previous,self.journal.ordinal,copy.deepcopy(self.state))
+            result['deadline_capacity']=self.verify_deadline_capacity(self.binding(),report_only=True)
+            observed=self.journal.load()
+            op.require((self.journal.previous,self.journal.ordinal,observed)==prior,'OWNER_CONTINUATION_PRESERVATION')
+            result['capacity_journal_unchanged']=True
+        return result
     def run(self,checked_at):
         op.require(type(checked_at) in (int,float) and 0<=time.time()-checked_at<=300,'OWNER_INHERITED_BOUNDARY_REQUIRED')
         self.state=self.journal.load()
