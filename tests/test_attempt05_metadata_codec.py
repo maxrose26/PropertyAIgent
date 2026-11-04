@@ -14,7 +14,7 @@ def test_lossless_metadata_and_real_encryption_preserve_intents_failure_and_secr
     original=example();before=copy.deepcopy(original)
     packed=p.serialized_state(original)
     assert original==before and len(p.canonical(packed))<len(p.canonical(original))-5000
-    assert packed['access']['original_memberships']['version']=='JOURNAL_METADATA_DEFLATE_V1'
+    assert packed['access']['version']=='JOURNAL_METADATA_DEFLATE_V1'
     assert p.hydrated_state(copy.deepcopy(packed))==original
     obj=pilot_with_retained_state(original)
     assert obj.journal.load()==original and b'SECRET_SENTINEL' not in obj.db.rows[-1][1]

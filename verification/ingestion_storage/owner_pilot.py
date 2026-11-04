@@ -67,10 +67,8 @@ def serialized_state(value):
     return stored
 
 def journal_metadata_fields(state):
-    for key in ('profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result'):
+    for key in ('binding','access','artifact','profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result'):
         yield state,key
-    if isinstance(state.get('access'),dict):
-        for key in ('original_memberships','prior_settings'):yield state['access'],key
 
 def state_size(value):return len(canonical(serialized_state(value)))
 
