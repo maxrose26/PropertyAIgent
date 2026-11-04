@@ -372,3 +372,157 @@ def test_stop_during_owned_source_closes_worker_and_preserves_original_stop(worl
     assert restricted_sessions(world['boot'])==0 and not (output/'manchester-source.json').exists()
     control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
     assert control['manual_stop']=='DISPOSABLE_ATTENDED_STOP'
+    assert result['usage']['requests'] is None and result['usage']['requests_status']=='UNKNOWN'
+    events=json.loads((output/'events.json').read_text())
+    assert any(e['event']=='source_poll_failed' and e['data']['category']=='SHARED_STOP_CHANGED' for e in events)
+
+
+def test_delayed_sources_cross_poll_boundary_with_real_restricted_postgres(world,tmp_path):
+    """Fast fixtures previously completed before the first defective poll."""
+    reset(world);authorise(world,'delayed-poll');env,sources=env_and_sources(world,tmp_path)
+    for file in sources.glob('*.json'):
+        audit=json.loads(file.read_text());audit['_test_delay_seconds']=3;file.write_text(json.dumps(audit))
+    output=tmp_path/'result'
+    process=subprocess.run([sys.executable,'-m','scripts.run_daily_councils','--period','delayed-poll','--output',str(output),
+        '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')],env=env,capture_output=True,text=True,timeout=60)
+    result=json.loads((output/'final-result.json').read_text())
+    assert process.returncode==0 and result['status']=='RETAINED_AND_SCREENED',result
+    assert len(result['scopes'])==2 and len(result['backlog']['records'])==2
+    assert result['usage']['requests_status']=='COMPLETE' and result['usage']['all_connections_closed']
+    assert restricted_sessions(world['boot'])==0
+
+
+def test_original_background_database_deadline_failure_is_reproducible():
+    import threading
+    from verification.ingestion_storage.operational_controller import DatabaseBudget
+    budget=DatabaseBudget();failures=[]
+    def original_poll():
+        try:budget.guarded(None,lambda:None)
+        except Exception as error:failures.append(error.args)
+    thread=threading.Thread(target=original_poll);thread.start();thread.join(timeout=2)
+    assert failures==[('HARD_DEADLINE_MAIN_THREAD_ONLY',)]
+
+
+@pytest.mark.parametrize('failure',[None,'INTAKE_SHARED_STOP_CHANGED','INTAKE_PERIOD_EXPIRED','database'])
+def test_source_poll_uses_main_thread_and_preserves_unknown_on_interruption(tmp_path,monkeypatch,failure):
+    """Real deadline guard with a synthetic supervisor; no network or SQL."""
+    import threading
+    from contextlib import contextmanager
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from verification.ingestion_storage.operational_controller import DatabaseBudget
+    runtime=object.__new__(Runtime);runtime.root=tmp_path/'output';runtime.root.mkdir()
+    sources=tmp_path/'sources';sources.mkdir()
+    (sources/'tameside.json').write_text(json.dumps(dict(_test_delay_seconds=3,
+        resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
+    runtime.args=SimpleNamespace(disposable_sources=str(sources));runtime.test=True;runtime.policy={}
+    runtime.run=IntakeRun();runtime.memory=None;runtime.events=[]
+    def synthetic_supervisor(command,*,check,root,**kw):
+        root.mkdir();end=time.monotonic()+3
+        try:
+            while time.monotonic()<end:check();time.sleep(.025)
+            (runtime.root/'tameside-source.json').write_text(json.dumps(dict(resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
+        except Denied:pass
+        outer=dict(cleanup='CLOSED',exit_code=0,limit_hit=None,live_owned_survivors=0,elapsed_seconds=3)
+        (root/'supervisor.json').write_text(json.dumps(outer));return outer
+    monkeypatch.setattr('verification.ingestion_storage.daily_intake_runtime.supervise',synthetic_supervisor)
+    budget=DatabaseBudget();calls=[]
+    @contextmanager
+    def connection(**kw):yield None,budget
+    runtime.connection=connection
+    def read(c):
+        calls.append(threading.current_thread())
+        budget.guarded(None,lambda:None)
+        if failure and len(calls)==2:
+            if failure=='database':raise RuntimeError('postgresql://secret-user:secret-password@private-host')
+            raise Denied(failure)
+    runtime.policy_read=read
+    if failure:
+        with pytest.raises(Denied,match='SOURCE_STOP_OR_ACCESS_CHANGED'):runtime.collect(dict(council='tameside'))
+        totals=runtime.run.totals()
+        assert totals['requests'] is None and totals['requests_accounted']==0 and totals['requests_status']=='UNKNOWN'
+        with pytest.raises(Denied,match='UNKNOWN_NO_CONTINUATION'):runtime.run.before_scope('arcus')
+        diagnostic=runtime.events[0]['data']
+        assert diagnostic['category']==('SHARED_STOP_CHANGED' if failure=='INTAKE_SHARED_STOP_CHANGED' else 'POLL_ERROR')
+        assert 'secret' not in json.dumps(runtime.events) and 'private-host' not in json.dumps(runtime.events)
+        outer=json.loads((runtime.root/'tameside-owned'/'supervisor.json').read_text())
+        assert outer['live_owned_survivors']==0
+    else:
+        _,outer=runtime.collect(dict(council='tameside'))
+        assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0
+        assert runtime.run.totals()['requests']==4 and runtime.run.totals()['requests_status']=='COMPLETE'
+    assert len(calls)>=2 and all(t is threading.main_thread() for t in calls)
+
+
+def test_poll_diagnostic_does_not_export_unrecognised_code_or_driver_parameters():
+    from verification.ingestion_storage.daily_intake_runtime import poll_diagnostic
+    from sqlalchemy.exc import OperationalError
+    from psycopg import OperationalError as NativeError
+    for error in (Denied('PRIVATE_CREDENTIAL'),OperationalError('SECRET_SQL',{'password':'SECRET'},NativeError('SECRET_URL'))):
+        result=poll_diagnostic(error)
+        assert result['category']=='POLL_ERROR' and result['code']=='UNCLASSIFIED'
+        assert 'PRIVATE' not in json.dumps(result) and 'SECRET' not in json.dumps(result)
+
+
+def test_interrupted_accounting_keeps_previous_count_only_as_partial():
+    run=IntakeRun();run.source(dict(requests=7,source_bytes=20,source_seconds=1,supervised_seconds=1))
+    run.begin_source()
+    assert run.totals()['requests'] is None and run.totals()['requests_accounted']==7
+    with pytest.raises(Denied):run.source(dict(requests=-1,source_bytes=0,source_seconds=0,supervised_seconds=0))
+    assert run.totals()['requests'] is None
+
+@pytest.mark.parametrize('fault',['none','before_commit','lost_ack'])
+def test_failed_run_retirement_prototype_pg(world,fault):
+    from verification.ingestion_storage.failed_run_prototype import retire
+    from verification.ingestion_storage import intake_owner as op
+    import hashlib
+    reset(world);boot=world['boot'];period='prototype-failed';run_id='a'*32;key='b'*64
+    boot.execute('GRANT ingestion_storage_owner TO provisioning_migrator WITH INHERIT TRUE')
+    boot.execute('GRANT ingestion_recovery_operator TO provisioning_migrator WITH ADMIN TRUE,INHERIT FALSE,SET FALSE')
+    boot.execute('CREATE TABLE IF NOT EXISTS ingestion_run_evidence(period text,run_id text,name text,body bytea,sha256 text)')
+    boot.execute('TRUNCATE ingestion_run_evidence')
+    boot.execute('GRANT SELECT ON ingestion_run_evidence TO provisioning_migrator')
+    ctl=op.control(boot);ctl.update(global_stop={'reason':'DAILY_INTAKE_SHARED_FAILURE'},manual_stop='DAILY_INTAKE_SHARED_FAILURE',last_hard_stop='DAILY_INTAKE_SHARED_FAILURE',hard_stop_generation=6,
+        intake_run=dict(id=run_id,period=period,state='OPEN',day='2026-11-02'),intake_periods={period:{'days':{'2026-11-02':{'tameside':key}}}})
+    boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
+    item=boot.execute('SELECT to_jsonb(w) FROM ingestion_work_items w WHERE key=%s',(op.CONTROL,)).fetchone()[0]
+    item.update(key=key,state='CLAIMED',phase='SOURCE_INTENT',fence=1,attempt_count=1,lease_until=time.time()-10,authority='SYNTHETIC',owner='SYNTHETIC',outcome=None)
+    boot.execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(item),))
+    boot.execute("INSERT INTO ingestion_work_attempts(work_key,fence,owner,started_at,authority,phase) VALUES(%s,1,'SYNTHETIC',0,'SYNTHETIC','SOURCE_INTENT')",(key,))
+    evidence={}
+    for name in ('final/result-before-publication.json','final/events-before-publication.json'):
+        body=b'{"synthetic":true}';evidence[name]=hashlib.sha256(body).hexdigest()
+        boot.execute('INSERT INTO ingestion_run_evidence VALUES(%s,%s,%s,%s,%s)',(period,run_id,name,body,evidence[name]))
+    members=boot.execute(op.MEMBERS).fetchall()
+    class Lost:
+        def __init__(self,c):self.c=c
+        def __getattr__(self,n):return getattr(self.c,n)
+        def execute(self,s,p=None):
+            r=self.c.execute(s,p)
+            if s=='COMMIT':raise RuntimeError('SYNTHETIC_LOST_ACK')
+            return r
+    def fail():raise RuntimeError('SYNTHETIC_PRECOMMIT')
+    with world['connect']('provisioning_migrator') as c:
+        kw=dict(period=period,run_id=run_id,key=key,expected_control=ctl,expected_item=item,evidence=evidence,fault=fail if fault=='before_commit' else lambda:None)
+        if fault=='none':retire(c,**kw)
+        else:
+            with pytest.raises(RuntimeError):retire(Lost(c) if fault=='lost_ack' else c,**kw)
+    # Independent readback only; NEVER repeat retirement after lost acknowledgement.
+    assert boot.execute(op.MEMBERS).fetchall()==members
+    after=op.control(boot)
+    if fault=='before_commit':
+        assert after==ctl
+        assert boot.execute('SELECT state,fence FROM ingestion_work_items WHERE key=%s',(key,)).fetchone()==('CLAIMED',1)
+        assert boot.execute('SELECT finished_at FROM ingestion_work_attempts WHERE work_key=%s',(key,)).fetchone()==(None,)
+    else:
+        assert 'intake_run' not in after and after['hard_stop_generation']==7
+        receipt=after['intake_periods'][period]['failed_runs'][run_id]
+        assert receipt['original_marker']==ctl['intake_run'] and receipt['request_count_status']=='UNKNOWN' and receipt['manchester']=='NOT_ATTEMPTED'
+        assert after['global_stop']==ctl['global_stop'] and after['manual_stop']=='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+        # Unchanged owner guard must reject generation 7; no test bypass.
+        b=dict(version='FINITE_INTAKE_OWNER_V1',period='successor',route='POOLER',hostaddr='192.0.2.1',owner_hostaddr='192.0.2.2',execution_binding=op.APPLICATION_BINDING,accepted_stop=op.stop_snapshot(after))
+        with pytest.raises(Denied,match='OWNER_STOP_BINDING'):op.validate_binding(b)
+        # Test the existing SQL issuer separately after fixture-only exact stop disposition.
+        after.update(global_stop=None,manual_stop=None)
+        boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(after),op.CONTROL))
+        authorise(world,'prototype-successor')
+        assert op.control(boot)['intake_periods'][period]['failed_runs'][run_id]==receipt
