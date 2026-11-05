@@ -2,14 +2,14 @@
 import copy
 import hashlib
 import json
-from . import attempt06_recovery as a06, period08_settlement as p07, intake_owner as op
+from . import attempt06_recovery as a06, period08_settlement as settlement, intake_owner as op
 
 SUCCESSOR='b-dbpilot-20261027-1102-09'
 RECEIPT_SHA='838d00b6b6a87dba856027bf5a4e60852d0f3ae3688db3e5baae4f35d0b1f24f'
 BINDING=dict(revision='3adb65d06d0492d3b8f9b798e49e3be20699b082',workflow_sha256='a111c858189389df02d3fa2360c5d5d31520c472e85402ed2eab12993d90f2c2',manifest_sha256='4cc667f3727fc1f27fc0b305a4186174fcc2590185d1b7bd9384932dd96ee5ad')
 TREE='62b685ac7a2e826ad1f14bc4bb8ba98e42fe15eb'
 BRANCH='prep/b-timing-pg17-current-20261103'
-ACCEPTED=dict(p07.STOP11,global_stop=None,manual_stop=None)
+ACCEPTED=dict(settlement.STOP11,global_stop=None,manual_stop=None)
 
 def require(ok,code):op.require(ok,'P09_'+code)
 
@@ -24,12 +24,12 @@ def release(value):
 
 def disposition():
     return dict(version='PERIOD08_DISPOSITION_V1',receipt_sha256=RECEIPT_SHA,successor=SUCCESSOR,
-        execution_binding=BINDING,tree=TREE,branch=BRANCH,councils=['manchester'],before=p07.STOP11,after=ACCEPTED)
+        execution_binding=BINDING,tree=TREE,branch=BRANCH,councils=['manchester'],before=settlement.STOP11,after=ACCEPTED)
 
 def history(c,ctl):
-    p07.predecessor.history(c,ctl);p07.evidence(c);p07.tameside(c)
-    r=p07.history(c,ctl);require(a06.sha(r)==RECEIPT_SHA,'RECEIPT_BINDING')
-    require(op.json_equal(c,ctl['intake_periods'][p07.predecessor.p07.PERIOD].get('failure_disposition'),p07.predecessor.disposition()),'PRIOR_DISPOSITION')
+    settlement.predecessor.history(c,ctl);settlement.evidence(c);settlement.tameside(c)
+    r=settlement.history(c,ctl);require(a06.sha(r)==RECEIPT_SHA,'RECEIPT_BINDING')
+    require(op.json_equal(c,ctl['intake_periods'][settlement.predecessor.p07.PERIOD].get('failure_disposition'),settlement.predecessor.disposition()),'PRIOR_DISPOSITION')
     return r
 
 
@@ -54,16 +54,16 @@ def successor_guard(c,b,ctl,*,require_namespace=False):
     if b.get('period')!=SUCCESSOR:return
     validate_binding(b);history(c,ctl)
     if require_namespace:namespace(c,migrated=True)
-    require(ctl['intake_periods'][p07.PERIOD].get('failure_disposition')==disposition(),'DISPOSITION')
+    require(ctl['intake_periods'][settlement.PERIOD].get('failure_disposition')==disposition(),'DISPOSITION')
     require(op.json_equal(c,op.stop_snapshot(ctl),ACCEPTED),'STOP_DRIFT')
 
 def inspect(c,b):
     validate_binding(b);c.execute('BEGIN READ ONLY')
     try:
-        ctl=op.control(c);p07.common(c,b,ctl);history(c,ctl);op.no_hazards(c,ctl)
-        d=ctl['intake_periods'][p07.PERIOD].get('failure_disposition')
+        ctl=op.control(c);settlement.common(c,b,ctl);history(c,ctl);op.no_hazards(c,ctl)
+        d=ctl['intake_periods'][settlement.PERIOD].get('failure_disposition')
         if d is None:
-            require(op.json_equal(c,op.stop_snapshot(ctl),p07.STOP11),'STOP_DRIFT');unused(c,ctl,journal=True)
+            require(op.json_equal(c,op.stop_snapshot(ctl),settlement.STOP11),'STOP_DRIFT');unused(c,ctl,journal=True)
             namespace(c,migrated=False);status='PRE_DISPOSITION_VERIFIED'
         else:
             successor_guard(c,b,ctl);namespace(c);unused(c,ctl,journal=False);status='DISPOSITION_COMMITTED_VERIFIED'
@@ -73,13 +73,13 @@ def inspect(c,b):
 def dispose(c,b):
     validate_binding(b);op.validate_binding(b);op.begin(c)
     try:
-        ctl=op.control(c);members=p07.common(c,b,ctl);namespace(c,migrated=False)
+        ctl=op.control(c);members=settlement.common(c,b,ctl);namespace(c,migrated=False)
         ctl=a06.lock(c);history(c,ctl);unused(c,ctl,journal=True);op.no_hazards(c,ctl)
-        require(op.json_equal(c,op.stop_snapshot(ctl),p07.STOP11),'STOP_DRIFT')
-        require('failure_disposition' not in ctl['intake_periods'][p07.PERIOD],'ALREADY_DISPOSED')
-        require(c.execute('SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name',(p07.PERIOD,p07.RUN)).fetchall()==[(n,) for n in sorted(p07.EVIDENCE)],'ARCHIVE_INVENTORY')
+        require(op.json_equal(c,op.stop_snapshot(ctl),settlement.STOP11),'STOP_DRIFT')
+        require('failure_disposition' not in ctl['intake_periods'][settlement.PERIOD],'ALREADY_DISPOSED')
+        require(c.execute('SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name',(settlement.PERIOD,settlement.RUN)).fetchall()==[(n,) for n in sorted(settlement.EVIDENCE)],'ARCHIVE_INVENTORY')
         after=copy.deepcopy(ctl);after.update(global_stop=None,manual_stop=None)
-        after['intake_periods'][p07.PERIOD]['failure_disposition']=disposition()
+        after['intake_periods'][settlement.PERIOD]['failure_disposition']=disposition()
         expected=op.ledger_sha(c,after)
         c.execute('UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(after),op.CONTROL))
         require(op.ledger_sha(c)==expected,'DISPOSITION_EFFECTS')
@@ -92,26 +92,26 @@ def dispose(c,b):
 
 def configure():
     from . import owner_pilot as pilot
-    pilot.PERIOD=SUCCESSOR;pilot.PREDECESSOR=p07.PERIOD
+    pilot.PERIOD=SUCCESSOR;pilot.PREDECESSOR=settlement.PERIOD
     pilot.OWNER_PERIOD=SUCCESSOR+'_owner';pilot.OWNER_RUN=hashlib.sha256(pilot.OWNER_PERIOD.encode()).hexdigest()[:32]
 
 def predecessor(state,*,snapshot):
-    require(snapshot.get('ordinal')==56 and snapshot.get('sha256')==p07.JOURNAL_SHA,'JOURNAL_BINDING')
-    require(state.get('period')==p07.PERIOD and state.get('status')=='CLOSED' and state.get('job',{}).get('id')==p07.JOB
-        and state.get('job_terminal',{}).get('status')=='failed' and state.get('binding',{}).get('execution_binding')==p07.BINDING,'PREDECESSOR_BINDING')
+    require(snapshot.get('ordinal')==56 and snapshot.get('sha256')==settlement.JOURNAL_SHA,'JOURNAL_BINDING')
+    require(state.get('period')==settlement.PERIOD and state.get('status')=='CLOSED' and state.get('job',{}).get('id')==settlement.JOB
+        and state.get('job_terminal',{}).get('status')=='failed' and state.get('binding',{}).get('execution_binding')==settlement.BINDING,'PREDECESSOR_BINDING')
     require(state.get('closure_verification')==dict(status='VERIFIED',runtime_memberships=0,sessions=0,temporary_owner_absent=True,stable_verifiers='MATCH',suspended=True,configuration_equal=True,environment_equal=True,authorities_closed=True)
         and state.get('final_service')==dict(suspended=True,configuration_equal=True,environment_equal=True),'PREDECESSOR_CLOSURE')
     require(state.get('stable_credentials',{}).get('version')=='STABLE_RESTRICTED_V1'
         and set(state['stable_credentials'].get('passwords',{}))==set(op.ROLES)
         and set(state['stable_credentials'].get('verifier_sha256',{}))==set(op.ROLES),'PREDECESSOR_CREDENTIALS')
-    return dict(period=p07.PERIOD,job_id=p07.JOB,snapshot=snapshot,state_sha256=a06.sha(state),
+    return dict(period=settlement.PERIOD,job_id=settlement.JOB,snapshot=snapshot,state_sha256=a06.sha(state),
         receipt_sha256=RECEIPT_SHA,source_requests=9,request_count_status='COMPLETE',coverage='PARTIAL_TAMESIDE_ONLY',manchester='COVERAGE_NOT_ESTABLISHED',execution_identity=SUCCESSOR)
 
 def binding_from_saved_state(db):
     from .owner_pilot import Journal
     import os
     release(json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']))
-    prior=Journal(db,p07.PERIOD);old=prior.load()
+    prior=Journal(db,settlement.PERIOD);old=prior.load()
     predecessor(old,snapshot=dict(ordinal=prior.ordinal,bytes=prior.ciphertext_bytes,sha256=prior.previous))
     return dict(version='FINITE_INTAKE_OWNER_V1',period=SUCCESSOR,route='POOLER',hostaddr=db.address,owner_hostaddr=db.address,
         execution_binding=BINDING,evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},accepted_stop=ACCEPTED,

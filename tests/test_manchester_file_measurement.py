@@ -36,7 +36,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  server_thread=threading.Thread(target=server.serve_forever,daemon=True);server_thread.start()
  from urllib.parse import urlsplit,urlunsplit
  original=dated_config(MANCHESTER,'2026-10-27','2026-11-02');url=urlsplit(original.destination)
- config=replace(original,destination=urlunsplit((url.scheme,'127.0.0.1:'+str(server.server_port),url.path,url.query,'')),capture_metadata=True,assessment_metadata=True)
+ config=replace(original,capture_metadata=True,assessment_metadata=True)
  monkeypatch.setitem(p.UI_CASES,'discovery_manchester_ui_window',config)
  html='<button>Show the search criteria</button>'
  for label,value in {'Valid date from':'27/10/2026','Valid date to':'02/11/2026',**{k:'' for k in config.blank_inputs}}.items():
@@ -44,7 +44,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  for label in config.blank_combos:html+=f'<div role="combobox" aria-label="{label}">Select an option</div>'
  html+='<div role="combobox" aria-label="Category">Planning Applications</div><p class="pr-pagination__results"></p><section id="rows"></section><a class="pr-pagination__link" href="#" onclick="event.preventDefault();page++;render()">Next</a>'
  html+='''<script>let page=0;function render(){let first=page*10+1,last=first+9;document.querySelector('p').textContent=`Showing ${first} to ${last} of 60 results`;let out='';for(let n=first;n<=last;n++){out+=`<div role="list" class="slds-box"><a href="/pr/s/detail/${String(n).padStart(18,'0')}?c__r=Arcus_BE_Public_Register">M/${n}</a><div role="listitem">Reference<br>M/${n}</div><div role="listitem">Valid Date<br>28/10/2026</div><div role="listitem">Proposal<br>Erection of 12 dwellings</div><div role="listitem">Site Address<br>Fixture site ${n}</div><div role="listitem">Application type<br>Full</div></div>`}document.querySelector('#rows').innerHTML=out;if(page===5)document.querySelector('a.pr-pagination__link').remove()}render()</script>'''
- monkeypatch.setenv('TMPDIR',str(root));peak={};done=threading.Event();calls=[]
+ monkeypatch.setenv('TMPDIR',str(root));monkeypatch.setenv('HOME',str(root));peak={};done=threading.Event();calls=[]
  def scan():
   while not done.is_set():
    for f in root.rglob('*'):
@@ -73,7 +73,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
    outer=self
    class Chromium:
     async def launch(self,**kw):
-     kw['args']=['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1','--no-proxy-server']
+     kw['args']=[f'--host-resolver-rules=MAP {url.hostname} 127.0.0.1:{server.server_port}, MAP * ~NOTFOUND','--no-proxy-server']
      browser=await outer.pw.chromium.launch(**kw);original=browser.new_context
      async def context(**opts):
       opts['ignore_https_errors']=True

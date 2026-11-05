@@ -1,18 +1,18 @@
 """Fixed owner continuation. Each action is explicit; uncertainty never retries."""
 import argparse,json,os,re
-from verification.ingestion_storage import period09_successor as p08, owner_pilot as pilot, intake_owner as op
+from verification.ingestion_storage import period09_successor as p09, owner_pilot as pilot, intake_owner as op
 
 def main(argv=None):
     p=argparse.ArgumentParser()
     p.add_argument('--action',required=True,choices=('inspect','dispose','prepare-successor','verify-successor','run-successor','close-successor','status'))
     p.add_argument('--owner-checked-at',type=float);args=p.parse_args(argv)
     try:
-        p08.require(os.environ.get('PROPERTYAIGENT_OWNER_PILOT_AUTHORITY')==p08.SUCCESSOR,'EXACT_AUTHORITY')
-        p08.configure();db=pilot.Database();b=p08.binding_from_saved_state(db)
+        p09.require(os.environ.get('PROPERTYAIGENT_OWNER_PILOT_AUTHORITY')==p09.SUCCESSOR,'EXACT_AUTHORITY')
+        p09.configure();db=pilot.Database();b=p09.binding_from_saved_state(db)
         if args.action in ('inspect','dispose'):
             if args.action=='dispose':
-                with pilot.envelope(),db.connection() as c:p08.dispose(c,b)
-            with pilot.envelope(),db.connection() as c:result=p08.inspect(c,b)
+                with pilot.envelope(),db.connection() as c:p09.dispose(c,b)
+            with pilot.envelope(),db.connection() as c:result=p09.inspect(c,b)
         else:
             instance=pilot.Pilot(db)
             if args.action=='prepare-successor':instance.prepare_continuation();result=instance.summary()
