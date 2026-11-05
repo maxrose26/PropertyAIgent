@@ -108,6 +108,9 @@ def test_settlement_preserves_completed_tameside(failed08,mode):
   with w['actor']() as actor:
    with pytest.raises(op.Denied):s.recover(actor,w['binding'])
   assert op.ledger_sha(c)==snapshot
+  if mode=='normal':
+   c.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(w)||%s::jsonb)).* FROM ingestion_work_items w WHERE key=%s",(json.dumps(dict(key='f'*64,task='DISCOVERY',checkpoint=None)),op.CONTROL))
+   assert s.history(c,op.control(c))['tameside']['records']==24
  else:assert op.ledger_sha(c)==before
 
 @pytest.mark.parametrize('drift',['marker','stop','fence','checkpoint','lease','tameside','screen','batch','evidence','prior'])
@@ -122,8 +125,8 @@ def test_changed_state_refuses_atomically(failed08,drift):
   c.execute(sql.SQL('UPDATE ingestion_work_items SET {}=%s WHERE key=%s').format(sql.Identifier(field)),(value,s.KEY))
  elif drift=='tameside':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=%s",(s.TAMESIDE,))
  elif drift in ('screen','batch'):c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task=%s AND state='COMPLETE' LIMIT 1)",('SCREENING' if drift=='screen' else 'LISTING_METADATA',))
- elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body='bad'::bytea WHERE period=%s AND name='capture-2/source.json'",(s.PERIOD,))
+ elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body='bad'::bytea,sha256=encode(sha256('bad'::bytea),'hex') WHERE period=%s AND name='capture-2/source.json'",(s.PERIOD,))
  c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL));before=op.ledger_sha(c)
  with w['actor']() as actor:
-  with pytest.raises(Exception):s.recover(actor,w['binding'])
+  with pytest.raises(op.Denied):s.recover(actor,w['binding'])
  assert op.ledger_sha(c)==before and c.execute(op.MEMBERS).fetchall()==w['members']
