@@ -81,6 +81,8 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             from .attempt06_recovery import successor_guard,SUCCESSOR,ACCEPTED
             import os,json
             h=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']).get('attempt06_receipt_sha256')
+            ctl=op.control(c);op.no_hazards(c,ctl);op.retained_cleanup(c,ctl)
+            op.require(SUCCESSOR not in ctl.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             successor_guard(c,dict(period=SUCCESSOR,evidence_backend='POSTGRES_PILOT_V1',accepted_stop=ACCEPTED,attempt06_receipt_sha256=h),op.control(c))
         before=c.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(c)
         schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()

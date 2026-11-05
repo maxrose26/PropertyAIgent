@@ -34,15 +34,15 @@ def receipt(marker):
 
 def check_evidence(c):
     for name,h in EVIDENCE.items():
-        raw=c.execute('SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',(PERIOD,RUN,name)).fetchone()[0]
-        op.require(raw is not None and hashlib.sha256(bytes(raw)).hexdigest()==h,'A06_EVIDENCE')
+        observed=c.execute("SELECT encode(sha256(public.ingestion_intake_evidence_read(%s,%s,%s)),'hex')",(PERIOD,RUN,name)).fetchone()[0]
+        op.require(observed==h,'A06_EVIDENCE')
 
 def history(c,ctl,*,disposed=False,expected_sha=None):
     p=ctl.get('intake_periods',{}).get(PERIOD,{})
     r=p.get('failed_runs',{}).get(RUN)
     op.require(type(r) is dict and op.json_equal(c,r,receipt(r.get('original_marker'))),'A06_RECEIPT')
     if expected_sha is not None:op.require(sha(r)==expected_sha,'A06_RECEIPT_BINDING')
-    op.require(p.get('execution_binding')==BINDING and p.get('days')=={'2026-11-02':{'tameside':KEY}},'A06_PERIOD_BINDING')
+    op.require(p.get('execution_binding')==BINDING and p.get('evidence_backend')=='POSTGRES_PILOT_V1' and p.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and p.get('max_runs')==1 and set(p.get('councils',{}))=={'tameside','manchester'} and p.get('days')=={'2026-11-02':{'tameside':KEY}},'A06_PERIOD_BINDING')
     check_evidence(c)
     row=c.execute('SELECT state,phase,fence,owner,lease_until,reason,next_action,checkpoint,outcome::jsonb FROM public.ingestion_work_items WHERE key=%s',(KEY,)).fetchone()
     op.require(row==('SAFETY_BLOCKED','RECOVERED',2,None,None,'ABANDONED_SOURCE_INTENT','RECONCILE',None,{'outcome':'ABANDONED_SOURCE_INTENT','source_or_write_replay_authorised':False}),'A06_RECOVERED_ITEM')
@@ -82,7 +82,7 @@ def recover(c,b):
         op.require(op.json_equal(c,op.stop_snapshot(ctl),STOP6),'A06_STOP_DRIFT')
         marker=ctl.get('intake_run');marker_valid(marker)
         p=ctl.get('intake_periods',{}).get(PERIOD,{})
-        op.require(p.get('execution_binding')==BINDING and p.get('days')=={'2026-11-02':{'tameside':KEY}} and not p.get('failed_runs') and not p.get('failure_disposition') and SUCCESSOR not in ctl.get('intake_periods',{}),'A06_PERIOD_BINDING')
+        op.require(p.get('execution_binding')==BINDING and p.get('evidence_backend')=='POSTGRES_PILOT_V1' and p.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and p.get('max_runs')==1 and set(p.get('councils',{}))=={'tameside','manchester'} and p.get('days')=={'2026-11-02':{'tameside':KEY}} and not p.get('failed_runs') and not p.get('failure_disposition') and SUCCESSOR not in ctl.get('intake_periods',{}),'A06_PERIOD_BINDING')
         g=ctl.get('grants',{}).get(AUTHORITY,{})
         op.require(g.get('intake_run')==RUN and g.get('intake_period')==PERIOD and g.get('capture_key')==KEY and g.get('execution_binding')==BINDING and type(g.get('expires_at')) is int and g['expires_at']==0,'A06_GRANT_BINDING')
         op.require(not c.execute("SELECT pid FROM pg_stat_activity WHERE usename=ANY(%s)",(list(op.ROLES)+['ingestion_application_login','ingestion_recovery_login'],)).fetchall(),'EXISTING_PIPELINE_SESSION')
@@ -139,9 +139,7 @@ def readback(c,b,phase):
     try:
         members=baseline(c,b);ctl=op.control(c);op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
         # Evidence table has no postgres table ACL. Use its existing owner-only reader.
-        for name,h in EVIDENCE.items():
-            raw=c.execute('SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',(PERIOD,RUN,name)).fetchone()[0]
-            op.require(hashlib.sha256(bytes(raw)).hexdigest()==h,'A06_EVIDENCE')
+        check_evidence(c)
         r=ctl.get('intake_periods',{}).get(PERIOD,{}).get('failed_runs',{}).get(RUN)
         op.require(type(r) is dict and op.json_equal(c,r,receipt(r.get('original_marker'))) and sha(r)==b['attempt06_receipt_sha256'],'A06_RECEIPT_BINDING')
         op.require('intake_run' not in ctl and op.stop_snapshot(ctl)==(STOP7 if phase=='recovery' else ACCEPTED),'A06_STOP_DRIFT')
@@ -156,6 +154,7 @@ def readback(c,b,phase):
 def predecessor06(state,*,snapshot):
     """Reuse existing encrypted credentials only from the exact closed Attempt06 job."""
     op.require(type(state) is dict and state.get('period')==PERIOD and state.get('status')=='CLOSED' and state.get('job',{}).get('id')==JOB
+        and state.get('binding',{}).get('period')==PERIOD and state['binding'].get('execution_binding')==BINDING
         and state.get('access',{}).get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED'
         and state['access'].get('render',{}).get('state')=='RESTORATION_ACKNOWLEDGED'
         and state.get('closure_verification',{}).get('status')=='VERIFIED'

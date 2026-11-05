@@ -111,7 +111,7 @@ def validate_binding(b, *, opening=False, now=None):
 def accepted_stop(b):
     from . import attempt06_recovery as a06
     if b.get('period')==a06.SUCCESSOR:
-        require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and re.fullmatch('[a-f0-9]{64}',b.get('attempt06_receipt_sha256','')),'A06_SUCCESSOR_BINDING')
+        require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and type(b.get('attempt06_receipt_sha256')) is str and re.fullmatch('[a-f0-9]{64}',b['attempt06_receipt_sha256']),'A06_SUCCESSOR_BINDING')
         return a06.ACCEPTED
     require('attempt06_receipt_sha256' not in b,'A06_SUCCESSOR_BINDING')
     return ACCEPTED_STOP

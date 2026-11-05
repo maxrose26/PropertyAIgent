@@ -50,7 +50,7 @@ def world(monkeypatch):
     boot.execute("INSERT INTO ingestion_work_attempts(work_key,fence,owner,started_at,finished_at,authority,phase) VALUES(%s,1,'synthetic',0,1,'synthetic','RECOVERED')",(key,))
    marker=dict(id=a06.RUN,period=a06.PERIOD,state='OPEN',day='2026-11-02',publication_path=de.path(a06.PERIOD,a06.RUN,'final/result-before-publication.json'))
    ctl['intake_run']=marker
-   ctl['intake_periods']={a06.PERIOD:dict(execution_binding=a06.BINDING,days={'2026-11-02':{'tameside':a06.KEY}})}
+   ctl['intake_periods']={a06.PERIOD:dict(execution_binding=a06.BINDING,evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1,councils=extra.COUNCILS,days={'2026-11-02':{'tameside':a06.KEY}})}
    ctl['grants'][a06.AUTHORITY]=dict(intake_run=a06.RUN,intake_period=a06.PERIOD,capture_key=a06.KEY,execution_binding=a06.BINDING,expires_at=0)
    boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
    patch=dict(key=a06.KEY,authority=a06.AUTHORITY,revision=a06.PERIOD+'-2026-11-02-tameside',state='CLAIMED',phase='SOURCE_INTENT',fence=1,attempt_count=1,checkpoint=None,lease_until=time.time()-20,owner='synthetic',task='DISCOVERY',contract='tameside-screening-metadata-five-v1',subject=a06.SCOPE)
@@ -160,8 +160,12 @@ def test_actual_owner_sequence_and_bounded_successor(world,tmp_path,monkeypatch,
  def source(row):
   runtime.run.begin_source();start,end=date.fromisoformat(row['start']),date.fromisoformat(row['end'])
   records=[entry('SYNTHETIC/26',SCHEME)]
-  audit=idox_audit('tameside',records,start,end) if row['council']=='tameside' else arcus_audit('manchester',records,start,end,budget='BROWSER_SOURCE_V2')
   folder=tmp_path/row['council'];folder.mkdir()
+  if row['council']=='tameside':
+   from tests.test_tameside_b_connection import connected_source
+   prep=folder/'prepare';prep.mkdir();audit,physical_calls=connected_source(prep,monkeypatch,row)
+   assert len(physical_calls)==5
+  else:audit=arcus_audit('manchester',records,start,end,budget='BROWSER_SOURCE_V2')
   if row['council']=='tameside':
    audit,outer=idox_supervised(folder,audit);r=audit['resource']
    metrics=dict(requests=r['requests_attempted'],source_bytes=r['received_bytes'],source_seconds=r['elapsed_seconds'])
@@ -203,3 +207,13 @@ def test_successor_namespace_preserves_encrypted_history(world,monkeypatch):
   assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(old,rid,'')).fetchone()==prior
   new=a06.SUCCESSOR+'_owner';newid=hashlib.sha256(new.encode()).hexdigest()[:32]
   assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)',(new,newid,'',b'synthetic-successor')).fetchone()[0]==0
+
+
+def test_successor_issuer_rejects_changed_receipt(world):
+ w=world;act(w,a06.recover);read(w,'recovery');act(w,a06.dispose);read(w,'disposition')
+ b=copy.deepcopy(w['binding']);b['attempt06_receipt_sha256']='0'*64
+ journal=dict(version='FINITE_INTAKE_PERIOD_V1',state='ARMED_NO_RETRY',binding=b,policy=w['policy'])
+ before=op.ledger_sha(w['boot'])
+ with w['actor']() as c:
+  with pytest.raises(op.Denied,match='A06_RECEIPT_BINDING'):extra.issue_period(c,b,w['policy'],journal,lambda _:None)
+ assert op.ledger_sha(w['boot'])==before and w['boot'].execute(op.MEMBERS).fetchall()==w['members']
