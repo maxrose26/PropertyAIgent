@@ -470,7 +470,10 @@ def source_worker(args):
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
     seconds=75 if row['council']=='manchester' else 45;resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
     if plan.get('diagnostic_mode') is not None:
-        from verification.discovery.tameside_diagnostic import MODE,ROW,live
+        if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
+            from verification.discovery.manchester_navigation_diagnostic import MODE,ROW,live
+        else:
+            from verification.discovery.tameside_diagnostic import MODE,ROW,live
         if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
         raw=canonical(live())
         if len(raw)>524288:raise Denied('DIAGNOSTIC_OUTPUT_BOUND')

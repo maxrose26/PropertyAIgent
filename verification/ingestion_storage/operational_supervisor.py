@@ -9,7 +9,11 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None,render_profile=None):
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None,render_profile=None,diagnostic_mode=None):
+ if diagnostic_mode is not None:
+  if diagnostic_mode!='MANCHESTER_INITIAL_NAVIGATION_V1' or not source or seconds!=45 or execution_budget is not None or render_profile is not None:raise ValueError('FIXED_DIAGNOSTIC_ENVELOPE')
+  if set(environment)!={'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH'} or environment['INGESTION_SOURCE_PRIVATE']!='ONCE':raise ValueError('DIAGNOSTIC_ENVIRONMENT')
+  if environment['PLAYWRIGHT_BROWSERS_PATH']!='/tmp/propertyaigent-manchester-diagnostic-browser':raise ValueError('DIAGNOSTIC_BROWSER_PATH')
  if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
  single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
  if execution_budget is not None:
@@ -19,7 +23,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
  if not 0<seconds<=ceiling:raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
- if source and not set(environment)<=({'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH','INGESTION_RENDER_PROFILE'} if render_profile else {'INGESTION_SOURCE_PRIVATE'}):raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
+ if source and not set(environment)<=({'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH','INGESTION_RENDER_PROFILE'} if render_profile else {'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH'} if diagnostic_mode else {'INGESTION_SOURCE_PRIVATE'}):raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
  if source and any('DATABASE' in k or 'PASSWORD' in k or 'TOKEN' in k or 'SECRET' in k for k in environment):raise ValueError('SOURCE_CREDENTIAL_FREE')
  if memory_group is not None:
   memory_group=Path(memory_group)
