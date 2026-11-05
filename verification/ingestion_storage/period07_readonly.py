@@ -51,6 +51,7 @@ def predecessor06(state,*,snapshot):
 
 RELEASE=dict(revision='54700366bab5434a5cda30abc853e0dc6dcc5d33',workflow_sha256='e5289d43dbd05f2ffa051529c4feeb6aa32fb719c621de00df3638e077bf78e4',manifest_sha256='482e137a9a62fdd1007ee351845a4fc2c0825693dfc3472217c2ac8d4c3b74fc')
 SAFE_CODES={'P07_ADMIN_ONLY_REQUIRED','P07_TEMPORARY_PERMISSION_PRESENT','P07_RECOVERY_EXECUTE','P07_OWNER_READERS','P07_SCHEMA_GRANTABILITY','P07_PIPELINE_SESSION','P07_OTHER_LOGIN_ENABLED','P07_AUTHORITY_NOT_CLOSED','P07_PERIOD_USED','P07_SUCCESSOR_WORK_EXISTS','P07_RELEASE_BINDING','P07_SCRAPER_STATE','P07_SECRET_FILES','P07_SCRAPER_ENVIRONMENT','A06_RUN_IDENTITY','A06_STOP_DRIFT','A06_PERIOD_BINDING','A06_GRANT_BINDING','A06_ITEM_BINDING','A06_ATTEMPT_BINDING','A06_OTHER_WORK','A06_EVIDENCE','A06_PREDECESSOR_CLOSURE','OWNER_IDENTITY','OWNER_SESSION_VISIBILITY','INTAKE_OWNER_FUNCTION_INVENTORY','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','RUNTIME_NOT_DORMANT','STABLE_VERIFIER_BINDING','EXISTING_RUNTIME_ADMIN_CAPABILITIES_REQUIRED','OWNER_CURRENT_WORK_OR_UNKNOWN_STATUS','OWNER_JOURNAL_HASH'}
+SAFE_CODES.update({'P07_SELECT_ONLY','INTAKE_OWNER_CAPABILITY_ACL','REGISTRAR_NARROW_ACL','DATABASE_EVIDENCE_TABLE_PRIVILEGES'})
 CHECKS=('identity_inventory','journal','dormant','permissions','attempt06','evidence','successor_unused','release','provider')
 
 class ReadOnly:
@@ -136,7 +137,14 @@ def run(*,db_factory=pilot.Database,render_factory=None,environ=None):
             raw.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');out['transaction']='READ_ONLY'
             try:
                 c=ReadOnly(raw)
-                def inventory():op.identity(c);op.inventory(c);verify_inventory(c)
+                def inventory():
+                    out['inventory_stage']='IDENTITY'
+                    op.identity(c)
+                    out['inventory_stage']='FUNCTION_METADATA_AND_CAPABILITY_ACL'
+                    op.inventory(c)
+                    out['inventory_stage']='EVIDENCE_FUNCTION_AND_TABLE_ACL'
+                    verify_inventory(c)
+                    out['inventory_stage']='COMPLETE'
                 check('identity_inventory',inventory)
                 def journal():
                     with same_connection(db,c) as view:
@@ -161,10 +169,35 @@ def run(*,db_factory=pilot.Database,render_factory=None,environ=None):
     except Exception:
         if all(v=='UNVERIFIED' for v in out['checks'].values()):out['checks']['identity_inventory']='REFUSED'
     def release():
-        r=json.loads(env['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
-        observed=r.get('execution_binding',{})
-        if type(observed) is dict and set(observed)==set(RELEASE) and all(type(observed[k]) is str and re.fullmatch('[a-f0-9]{'+str(40 if k=='revision' else 64)+'}',observed[k]) for k in RELEASE):out['binding_hashes']['configured_successor_execution']=sha(observed)
-        op.require(r.get('execution_binding')==RELEASE and r.get('tree')=='95bfb2677cddfe539b8b69945d870f6c8b5eb62e' and r.get('branch')=='prep/b-timing-pg17-current-20261103','P07_RELEASE_BINDING')
+        raw=env.get('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE')
+        fields=('revision','workflow_sha256','manifest_sha256','tree','branch')
+        out['release_fields']={k:'UNVERIFIED' for k in fields}
+        if raw is None:
+            out['release_document']='MISSING'
+            out['release_fields']={k:'MISSING' for k in fields}
+            op.require(False,'P07_RELEASE_BINDING')
+        try:r=json.loads(raw)
+        except (ValueError,TypeError):r=None
+        if type(r) is not dict:
+            out['release_document']='MALFORMED'
+            out['release_fields']={k:'MALFORMED' for k in fields}
+            op.require(False,'P07_RELEASE_BINDING')
+        out['release_document']='VALID_OBJECT'
+        observed=r.get('execution_binding')
+        expected=dict(RELEASE,tree='95bfb2677cddfe539b8b69945d870f6c8b5eb62e',branch='prep/b-timing-pg17-current-20261103')
+        for k in fields:
+            parent=observed if k in RELEASE else r
+            if k in RELEASE and 'execution_binding' not in r:status='MISSING'
+            elif type(parent) is not dict:status='MALFORMED'
+            elif k not in parent:status='MISSING'
+            else:
+                v=parent[k]
+                pattern=r'[A-Za-z0-9_./-]{1,200}' if k=='branch' else '[a-f0-9]{'+str(40 if k in ('revision','tree') else 64)+'}'
+                status='MALFORMED' if type(v) is not str or not re.fullmatch(pattern,v) else ('MATCH' if v==expected[k] else 'MISMATCH')
+            out['release_fields'][k]=status
+        out['release_binding_keys']='MATCH' if type(observed) is dict and set(observed)==set(RELEASE) else ('MISSING' if 'execution_binding' not in r else 'MALFORMED' if type(observed) is not dict else 'MISMATCH')
+        if type(observed) is dict and set(observed)==set(RELEASE) and all(out['release_fields'][k] in ('MATCH','MISMATCH') for k in RELEASE):out['binding_hashes']['configured_successor_execution']=sha(observed)
+        op.require(all(v=='MATCH' for v in out['release_fields'].values()) and out['release_binding_keys']=='MATCH','P07_RELEASE_BINDING')
         out['binding_hashes']['successor_execution']=sha(RELEASE)
     try:check('release',release)
     except Refusal:pass

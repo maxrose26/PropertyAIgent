@@ -165,7 +165,7 @@ def inventory(c):
     require(rows == [(n, hashlib.sha256(body.encode()).hexdigest(), 'ingestion_storage_owner',
                       ['search_path=pg_catalog'], n != 'ingestion_bolton_allowed')
                      for n, body in sorted(expected.items())], 'INTAKE_OWNER_FUNCTION_INVENTORY')
-    acl = c.execute("""SELECT
+    acl = c.execute("""SELECT 
      has_function_privilege('ingestion_worker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
      has_function_privilege('ingestion_effect_broker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
      has_function_privilege('ingestion_worker','public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)','EXECUTE'),

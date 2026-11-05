@@ -136,3 +136,60 @@ def test_postgres_enforces_read_only_transaction(monkeypatch):
  assert r['transaction']=='ROLLED_BACK' and r['sqlstates']['identity_inventory']=='25006'
  assert connections[0].closed
  with psycopg.connect(url,autocommit=True) as c:assert c.execute('SELECT count(*) FROM p07_probe').fetchone()==(0,)
+
+@pytest.mark.parametrize('failure',[None,'metadata','capability_acl','registrar_acl'])
+def test_actual_inventory_through_unchanged_guard(failure):
+ import hashlib
+ class InventoryConnection:
+  def __init__(self):self.calls=[]
+  def execute(self,sql,params=None):
+   self.calls.append(sql)
+   if len(self.calls)==1:
+    rows=[(n,hashlib.sha256(body.encode()).hexdigest(),'ingestion_storage_owner',['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,body in sorted(p.op.Owner.daily_intake_inventory().items())]
+    return Cursor([] if failure=='metadata' else rows)
+   if len(self.calls)==2:return Cursor([(False,False,True,True) if failure=='capability_acl' else (True,False,True,True)])
+   return Cursor([(True,) if failure=='registrar_acl' else (False,)])
+ c=InventoryConnection()
+ codes={'metadata':'INTAKE_OWNER_FUNCTION_INVENTORY','capability_acl':'INTAKE_OWNER_CAPABILITY_ACL','registrar_acl':'REGISTRAR_NARROW_ACL'}
+ if failure:
+  with pytest.raises(p.op.Denied,match=codes[failure]):p.op.inventory(p.ReadOnly(c))
+  assert codes[failure] in p.SAFE_CODES
+ else:
+  p.op.inventory(p.ReadOnly(c));assert len(c.calls)==3
+  assert c.calls[1].startswith('SELECT \n')
+
+@pytest.mark.parametrize('field',['revision','workflow_sha256','manifest_sha256','tree','branch'])
+@pytest.mark.parametrize('kind',['MISMATCH','MISSING','MALFORMED'])
+def test_individual_release_fields(world,field,kind):
+ c,ctl,old,DB,API,env,calls=world
+ r=json.loads(env['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']);parent=r['execution_binding'] if field in p.RELEASE else r
+ if kind=='MISSING':del parent[field]
+ elif kind=='MALFORMED':parent[field]={'secret':'DO_NOT_EXPORT'}
+ else:parent[field]='other-branch' if field=='branch' else 'a'*len(parent[field])
+ env['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']=json.dumps(r)
+ result=p.run(db_factory=DB,render_factory=API,environ=env)
+ assert result['release_fields'][field]==kind
+ assert all(v=='MATCH' for k,v in result['release_fields'].items() if k!=field)
+ assert result['refusals']['release']=='P07_RELEASE_BINDING' and result['transaction']=='ROLLED_BACK'
+ assert 'DO_NOT_EXPORT' not in json.dumps(result)
+
+@pytest.mark.parametrize('raw,status',[(None,'MISSING'),('bad json','MALFORMED'),('[]','MALFORMED')])
+def test_release_document_shape(world,raw,status):
+ c,ctl,old,DB,API,env,calls=world
+ if raw is None:env.pop('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE')
+ else:env['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']=raw
+ r=p.run(db_factory=DB,render_factory=API,environ=env)
+ assert r['release_document']==status and set(r['release_fields'].values())=={status}
+
+@pytest.mark.parametrize('code',['OWNER_IDENTITY','OWNER_SESSION_VISIBILITY','INTAKE_OWNER_FUNCTION_INVENTORY','INTAKE_OWNER_CAPABILITY_ACL','REGISTRAR_NARROW_ACL','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','DATABASE_EVIDENCE_TABLE_PRIVILEGES','P07_SELECT_ONLY'])
+def test_fixed_inventory_refusal_output(world,monkeypatch,code):
+ c,ctl,old,DB,API,env,calls=world
+ def refuse(*args):raise p.op.Denied(code)
+ monkeypatch.setattr(p.op,'inventory',refuse)
+ r=p.run(db_factory=DB,render_factory=API,environ=env)
+ assert r['refusals']['identity_inventory']==code and r['transaction']=='ROLLED_BACK'
+
+def test_exact_native_owner_authentication(monkeypatch):
+ monkeypatch.setattr(access,'require_operator',lambda *_:SimpleNamespace(issuer='i',subject='owner',machine=False))
+ monkeypatch.setattr(access,'load_policy',lambda:{'issuer':'i','owner_subject':'owner'})
+ ui.require_owner()
