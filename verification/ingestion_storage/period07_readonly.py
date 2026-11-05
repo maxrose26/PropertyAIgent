@@ -77,7 +77,7 @@ def permissions(c):
         op.require(c.execute("SELECT pg_has_role(current_user,%s,'USAGE'),pg_has_role(current_user,%s,'SET')",(role,role)).fetchone()==(False,False),'P07_TEMPORARY_PERMISSION_PRESENT')
     op.require(c.execute("SELECT has_function_privilege('ingestion_recovery_operator','public.ingestion_recover_abandoned(text,integer,boolean)','EXECUTE')").fetchone()==(True,),'P07_RECOVERY_EXECUTE')
     op.require(c.execute("SELECT has_function_privilege(current_user,'public.ingestion_intake_owner_state(text,text,text,bytea)','EXECUTE'),has_function_privilege(current_user,'public.ingestion_intake_evidence_read(text,text,text)','EXECUTE')").fetchone()==(True,True),'P07_OWNER_READERS')
-    op.require(c.execute("SELECT count(*) FROM pg_namespace n CROSS JOIN LATERAL aclexplode(n.nspacl) a WHERE n.nspname='public' AND a.grantee=current_user::regrole AND a.privilege_type='CREATE' AND a.is_grantable").fetchone()[0]>0,'P07_SCHEMA_GRANTABILITY')
+    op.require(c.execute("SELECT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')").fetchone()==(True,),'P07_SCHEMA_GRANTABILITY')
 
 def attempt(c,ctl):
     marker_valid(ctl.get('intake_run'))

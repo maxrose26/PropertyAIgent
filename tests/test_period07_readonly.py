@@ -21,7 +21,7 @@ class C:
   if 'pg_has_role(current_user' in s:return Cursor([(False,False)])
   if 'has_function_privilege(current_user' in s:return Cursor([(True,True)])
   if 'has_function_privilege(' in s:return Cursor([(True,)])
-  if 'aclexplode(n.nspacl)' in s:return Cursor([(1,)])
+  if "has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')" in s:return Cursor([(True,)])
   if 'pg_stat_activity' in s:return Cursor([])
   if 'FROM pg_roles' in s:return Cursor([(0,)])
   if 'SELECT authority,revision' in s:return Cursor([(p.AUTHORITY,p.PERIOD+'-2026-11-02-tameside','CLAIMED','SOURCE_INTENT',2 if self.bad=='fence' else 1,1,None,True,'DISCOVERY','tameside-screening-metadata-five-v1',p.SCOPE)])
@@ -193,3 +193,47 @@ def test_exact_native_owner_authentication(monkeypatch):
  monkeypatch.setattr(access,'require_operator',lambda *_:SimpleNamespace(issuer='i',subject='owner',machine=False))
  monkeypatch.setattr(access,'load_policy',lambda:{'issuer':'i','owner_subject':'owner'})
  ui.require_owner()
+
+@pytest.mark.parametrize('effective',[True,False,None])
+def test_schema_gate_requires_effective_grant_option(effective):
+ class SchemaConnection(C):
+  def execute(self,sql,params=None):
+   if 'has_schema_privilege' in sql:
+    self.calls.append(sql)
+    assert sql=="SELECT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')"
+    return Cursor([(effective,)])
+   return super().execute(sql,params)
+ c=SchemaConnection()
+ # Real permission validator; only unrelated existing role predicates isolated.
+ from unittest.mock import patch
+ with patch.object(p.op,'owner_absent'),patch.object(p.op,'admin_capabilities'):
+  if effective is True:p.permissions(p.ReadOnly(c))
+  else:
+   with pytest.raises(p.op.Denied,match='P07_SCHEMA_GRANTABILITY'):p.permissions(p.ReadOnly(c))
+ assert any('has_schema_privilege' in sql for sql in c.calls)
+ assert not any('aclexplode(n.nspacl)' in sql for sql in c.calls)
+
+@pytest.mark.skipif(not __import__('os').environ.get('P07_DISPOSABLE_PG'),reason='CI disposable PostgreSQL only')
+def test_postgres_schema_authority_ownership_inheritance_and_set_only():
+ import os,psycopg
+ url=os.environ['P07_DISPOSABLE_PG']
+ assert url=='postgresql://fixture:fixture@127.0.0.1:5432/p07_readonly'
+ with psycopg.connect(url,autocommit=True) as c:
+  c.execute('BEGIN')
+  try:
+   for role in ('p07_schema_owner','p07_schema_member','p07_schema_set_only','p07_schema_direct','p07_schema_basic'):
+    c.execute('CREATE ROLE '+role+' NOLOGIN')
+   c.execute('ALTER SCHEMA public OWNER TO p07_schema_owner')
+   c.execute('REVOKE ALL ON SCHEMA public FROM PUBLIC')
+   c.execute('GRANT p07_schema_owner TO p07_schema_member WITH INHERIT TRUE, SET TRUE')
+   c.execute('GRANT p07_schema_owner TO p07_schema_set_only WITH INHERIT FALSE, SET TRUE')
+   c.execute('GRANT CREATE ON SCHEMA public TO p07_schema_direct WITH GRANT OPTION')
+   c.execute('GRANT CREATE ON SCHEMA public TO p07_schema_basic')
+   for role,want in [('p07_schema_owner',True),('p07_schema_member',True),('p07_schema_direct',True),('p07_schema_basic',False),('p07_schema_set_only',False)]:
+    c.execute('SET LOCAL ROLE '+role)
+    got=p.ReadOnly(c).execute("SELECT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')").fetchone()
+    assert got==(want,)
+    if role in ('p07_schema_owner','p07_schema_member'):
+     assert c.execute("SELECT count(*) FROM pg_namespace n CROSS JOIN LATERAL aclexplode(n.nspacl) a WHERE n.nspname='public' AND a.grantee=current_user::regrole AND a.privilege_type='CREATE' AND a.is_grantable").fetchone()==(0,)
+    c.execute('RESET ROLE')
+  finally:c.execute('ROLLBACK')
