@@ -6,8 +6,8 @@ from . import attempt06_recovery as a06, period08_settlement as settlement, inta
 
 SUCCESSOR='b-dbpilot-20261027-1102-09'
 RECEIPT_SHA='838d00b6b6a87dba856027bf5a4e60852d0f3ae3688db3e5baae4f35d0b1f24f'
-BINDING=dict(revision='3adb65d06d0492d3b8f9b798e49e3be20699b082',workflow_sha256='a111c858189389df02d3fa2360c5d5d31520c472e85402ed2eab12993d90f2c2',manifest_sha256='4cc667f3727fc1f27fc0b305a4186174fcc2590185d1b7bd9384932dd96ee5ad')
-TREE='62b685ac7a2e826ad1f14bc4bb8ba98e42fe15eb'
+BINDING=dict(revision='c7e8b51eac69686f8d54ac2c295f5cb2f0002dd7',workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9',manifest_sha256='f78c0abf53ea7b414c6a093fc7d3bd4f4c257223701a015deadf7aa3b641bfe1')
+TREE='897c97b47dfe2bbe6282affa34f806ace19b1124'
 BRANCH='prep/b-timing-pg17-current-20261103'
 ACCEPTED=dict(settlement.STOP11,global_stop=None,manual_stop=None)
 
@@ -45,9 +45,9 @@ def namespace(c,*,migrated=None):
     new=hashlib.sha256(ATTEMPT09_OWNER_SQL.split('$owner_state$',2)[1].encode()).hexdigest()
     actual=c.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()[0]
     require(actual in ({new} if migrated is True else {old} if migrated is False else {old,new}),'JOURNAL_NAMESPACE')
-    if migrated is True:
-        row=c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
-        require(row==(registration_sql().split('$register$',2)[1],),'REGISTRAR_BINDING')
+    row=c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
+    expected=registration_sql().split('$register$',2)[1] if actual==new else op.Owner.daily_intake_inventory()['ingestion_register_bolton_exception']
+    require(row==(expected,),'REGISTRAR_BINDING')
     return actual
 
 def successor_guard(c,b,ctl,*,require_namespace=False):
