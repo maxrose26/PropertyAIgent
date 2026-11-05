@@ -177,6 +177,11 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
         run: timeout --kill-after=2s 120s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_b_targeted_readback.py -q --junitxml="$RUNNER_TEMP/b-targeted.xml"
+      - name: Attempt06 actual owner recovery and successor, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_attempt06_owner_path_pg.py tests/test_intake_owner_operations.py tests/test_attempt07_owner_units.py -q --junitxml="$RUNNER_TEMP/attempt06-owner.xml"
       - name: Connected intake through production restricted ledger, synthetic sources only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -195,6 +200,7 @@ jobs:
             ${{ runner.temp }}/daily-intake.xml
             ${{ runner.temp }}/b-readonly.xml
             ${{ runner.temp }}/b-targeted.xml
+            ${{ runner.temp }}/attempt06-owner.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8

@@ -45,6 +45,19 @@ def stop_snapshot(ctl):
     return {k:ctl.get(k,0 if k=='hard_stop_generation' else None) for k in ('global_stop','manual_stop','last_hard_stop','hard_stop_generation')}
 
 
+def poll_diagnostic(error):
+    """Fixed codes only: never export an exception message, SQL or parameters."""
+    from .connection_diagnostics import safe_failure
+    safe=safe_failure(error,'EXECUTION')
+    codes={'INTAKE_SHARED_STOP_CHANGED','INTAKE_PERIOD_EXPIRED','INTAKE_PERIOD_BINDING_CHANGED',
+           'INTAKE_FUNCTION_INVENTORY_CHANGED','STATEMENT_HARD_DEADLINE','DRIVER_STATEMENT_BOUND',
+           'DATABASE_RETURNED_VALUE_BOUND','MANUAL_STOP_OR_CONTROLLER_DEADLINE','EXECUTION_RESERVE_REACHED'}
+    code=error.args[0] if isinstance(error,Denied) and len(error.args)==1 and isinstance(error.args[0],str) and error.args[0] in codes else None
+    if type(error) is RuntimeError and error.args==('HARD_DEADLINE_MAIN_THREAD_ONLY',):code='HARD_DEADLINE_MAIN_THREAD_ONLY'
+    return dict(category='SHARED_STOP_CHANGED' if code=='INTAKE_SHARED_STOP_CHANGED' else 'POLL_ERROR',
+                code=code or 'UNCLASSIFIED',exception_kind=safe['exception_kind'],sqlstate=safe['sqlstate'],message_exported=False)
+
+
 def require_source_context(councils,*,disposable,profile=None,binding=None):
     if not disposable and 'manchester' in councils:
         from .render_intake import validate_profile,MemoryMonitor,SERVICE
@@ -127,9 +140,10 @@ class Runtime:
             expected=[(n,h,'ingestion_storage_owner',['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,h in sorted(self.expected_functions.items())]
             if [tuple(r) for r in actual]!=expected:raise Denied('INTAKE_FUNCTION_INVENTORY_CHANGED')
         row=c.execute(text("SELECT outcome::jsonb->'intake_periods'->:period AS policy, outcome::jsonb->'intake_run' AS intake_run, jsonb_build_object('global_stop',outcome::jsonb->'global_stop','manual_stop',outcome::jsonb->'manual_stop','last_hard_stop',outcome::jsonb->'last_hard_stop','hard_stop_generation',coalesce(outcome::jsonb->'hard_stop_generation','0'::jsonb)) AS stop FROM public.ingestion_work_items WHERE key=repeat('0',64)"),dict(period=self.args.period)).one()
-        if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('route')!=self.route_name or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
-            (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
-            raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
+        if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('route')!=self.route_name or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and row.policy['execution_binding']!=self.binding):
+            raise Denied('INTAKE_PERIOD_BINDING_CHANGED')
+        if not read_only and row.policy['expected_stop']!=row.stop:raise Denied('INTAKE_SHARED_STOP_CHANGED')
+        if not read_only and row.policy['expires_at']<=time.time():raise Denied('INTAKE_PERIOD_EXPIRED')
         self.durable_run=row.intake_run
         return row.policy
 
@@ -203,33 +217,44 @@ class Runtime:
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
         plan_path=self.root/(row['council']+'-plan.json');plan_path.write_bytes(canonical(plan))
         output=self.root/(row['council']+'-source.json')
-        # One persistent, metered restricted connection polls the DB stop while
-        # the existing credential-free owned-process supervisor runs the reader.
+        # SQL and its signal-based hard deadline stay on the main thread.
+        # Supervision runs independently so a slow DB poll cannot delay process,
+        # memory or source-time limits. Still one persistent restricted connection.
         with self.connection(seconds=90) as (c,budget):
             import threading
-            done=threading.Event();errors=[]
+            done=threading.Event();stop=threading.Event();errors=[];results=[]
             self.policy_read(c)
-            def poll():
-                while not done.wait(2):
-                    try:self.policy_read(c)
-                    except BaseException as error:errors.append(error);return
             def check():
                 self.run.check();budget.check()
                 if self.memory:self.memory.check()
-                if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
-            watcher=threading.Thread(target=poll,daemon=True);watcher.start()
-            try:
+                if stop.is_set():raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+            def supervise_source():
+              try:
                 profile=self.policy.get('render_profile') if row['council']=='manchester' and not self.test else None
                 environment={'INGESTION_SOURCE_PRIVATE':'ONCE'}
                 if profile:environment.update(PLAYWRIGHT_BROWSERS_PATH=profile['browser_path'],INGESTION_RENDER_PROFILE=json.dumps(profile))
-                outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
+                results.append(supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
                                 environment=environment,root=self.root/(row['council']+'-owned'),
                                 source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
-                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile)
+                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile))
+              except BaseException:errors.append('SOURCE_SUPERVISION_FAILED')
+              finally:done.set()
+            self.run.begin_source()
+            watcher=threading.Thread(target=supervise_source,name='intake-source-supervisor',daemon=True);watcher.start()
+            failure=None
+            try:
+                while not done.wait(2):
+                    try:self.policy_read(c)
+                    except BaseException as error:
+                        failure=poll_diagnostic(error)
+                        self.emit('source_poll_failed',dict(council=row['council'],**failure))
+                        break
             finally:
-                done.set();watcher.join(timeout=14)
-            if watcher.is_alive():raise Denied('STOP_POLL_CLOSURE_UNCERTAIN')
-            if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+                stop.set();watcher.join(timeout=14)
+            if watcher.is_alive():raise Denied('SOURCE_SUPERVISOR_CLOSURE_UNCERTAIN')
+            if failure:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+            if errors or len(results)!=1:raise Denied('SOURCE_SUPERVISION_FAILED')
+            outer=results[0]
             self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')

@@ -54,7 +54,7 @@ def diagnostic02_closed(state, *, snapshot, stable_credentials):
         state.get('stable_credentials')==stable_credentials,'OWNER_CONTINUATION_PREDECESSOR')
     return dict(period=state['period'],snapshot=snapshot,closure_sha256=hashlib.sha256(canonical(state['closure_receipt'])).hexdigest())
 
-def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False,diagnostic_cap=False,attempt06=False):
+def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False,diagnostic_cap=False,attempt06=False,attempt07=False):
     """Exact04→05 namespace addition; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
     old=new.replace(",'b-dbpilot-20261027-1102-05_owner'",'')
@@ -70,10 +70,20 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
     if attempt06:
         from .database_evidence import DIAGNOSTIC02_CAP_OWNER_SQL,ATTEMPT06_OWNER_SQL
         old=DIAGNOSTIC02_CAP_OWNER_SQL.split('$owner_state$',2)[1];new=ATTEMPT06_OWNER_SQL.split('$owner_state$',2)[1]
+    if attempt07:
+        from .database_evidence import ATTEMPT06_OWNER_SQL,ATTEMPT07_OWNER_SQL
+        old=ATTEMPT06_OWNER_SQL.split('$owner_state$',2)[1];new=ATTEMPT07_OWNER_SQL.split('$owner_state$',2)[1]
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c,stable_verifiers=stable_verifiers);op.owner_absent(c)
         c.execute("SET LOCAL statement_timeout='10s';SET LOCAL lock_timeout='3s';SET LOCAL idle_in_transaction_session_timeout='20s'")
+        if attempt07:
+            from .attempt06_recovery import successor_guard,SUCCESSOR,ACCEPTED
+            import os,json
+            h=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']).get('attempt06_receipt_sha256')
+            ctl=op.control(c);op.no_hazards(c,ctl);op.retained_cleanup(c,ctl)
+            op.require(SUCCESSOR not in ctl.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
+            successor_guard(c,dict(period=SUCCESSOR,evidence_backend='POSTGRES_PILOT_V1',accepted_stop=ACCEPTED,attempt06_receipt_sha256=h),op.control(c))
         before=c.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(c)
         schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
         definition=c.execute("SELECT prosrc,proacl::text,proowner::regrole::text,prosecdef,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
@@ -85,7 +95,7 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
         c.execute('SET LOCAL ROLE ingestion_storage_owner')
         c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
         snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
-        source=ATTEMPT06_OWNER_SQL if attempt06 else DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
+        source=ATTEMPT07_OWNER_SQL if attempt07 else ATTEMPT06_OWNER_SQL if attempt06 else DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
         c.execute(source.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
         c.execute('RESET ROLE')

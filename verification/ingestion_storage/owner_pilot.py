@@ -253,6 +253,10 @@ def fixed_binding(release,profile,address,guard,now=None):
     policy=dict(expires_at=b['runtime_deadline'],max_runs=1,overlap_days=7,councils=COUNCILS,expected_stop=op.ACCEPTED_STOP,
         execution_binding=b['execution_binding'],test_evidence=False,screening_config=SCREENING,hostaddr=address,route='POOLER',render_profile=profile,
         evidence_backend=BACKEND,fixed_window=WINDOW,access_deadline=b['valid_until'])
+    from .attempt06_recovery import SUCCESSOR,ACCEPTED
+    if PERIOD==SUCCESSOR:
+        b.update(accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256'))
+        policy['expected_stop']=ACCEPTED
     b['period_policy_sha256']=hashlib.sha256(canonical(policy)).hexdigest()
     op.validate_binding(b,opening=True,now=now)
     return b,policy
@@ -493,7 +497,7 @@ class Pilot:
     a failed attempt or automatically replace an uncertain write/job/build.
     """
     def __init__(self,db=None,*,token=None,render_factory=None,sleep=time.sleep):
-        self.db=db or Database();self.journal=Journal(self.db)
+        self.db=db or Database();self.journal=Journal(self.db,PERIOD)
         self.token=token or os.environ.get('PROPERTYAIGENT_INTAKE_RENDER_API_KEY')
         op.require(type(self.token) is str and bool(self.token),'CONFIGURED_RENDER_KEY_REQUIRED')
         self.render_factory=render_factory or (lambda:Render(self.token));self.sleep=sleep
@@ -573,7 +577,12 @@ class Pilot:
     def preflight(self):
         with envelope(),self.db.connection() as c:
             op.identity(c);op.inventory(c);verify_inventory(c);op.dormant(c,stable_verifiers=(self.state or {}).get('stable_credentials',{}).get('verifier_sha256'));op.owner_absent(c)
-            ctl=op.control(c);op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
+            ctl=op.control(c)
+            from .attempt06_recovery import SUCCESSOR,ACCEPTED,successor_guard
+            if PERIOD==SUCCESSOR:
+                release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+                successor_guard(c,dict(period=PERIOD,evidence_backend=BACKEND,accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256')),ctl)
+            else:op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
         with self.api() as api:
@@ -708,10 +717,14 @@ class Pilot:
 
     def prepare_continuation(self):
         from .owner_pilot_continuation import migrate_owner_namespace,predecessor
-        prior=Journal(self.db,PREDECESSOR);old=prior.load();link=predecessor(old,snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous})
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'])
+        prior=Journal(self.db,PREDECESSOR);old=prior.load()
+        from .attempt06_recovery import SUCCESSOR,predecessor06
+        next07=PERIOD==SUCCESSOR
+        snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous}
+        link=predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'attempt07':True} if next07 else {}))
         preserved=prior.load()
-        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==46 and prior.ciphertext_bytes==29084 and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if next07 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if next07 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()

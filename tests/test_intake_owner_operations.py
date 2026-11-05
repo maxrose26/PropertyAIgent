@@ -52,7 +52,7 @@ def mocked_sql(monkeypatch):
  c=SQL();monkeypatch.setattr(extra.Owner,'verify_installed',lambda self,c:op.require(c.inventory,'INTAKE_OWNER_FUNCTION_INVENTORY'))
  for n in ('identity','owner_absent','retained_cleanup','no_hazards'):monkeypatch.setattr(op,n,lambda *a,**kw:None)
  monkeypatch.setattr(op,'inventory',lambda c:op.require(c.inventory,'INTAKE_OWNER_FUNCTION_INVENTORY'))
- monkeypatch.setattr(op,'dormant',lambda c:list(c.members));monkeypatch.setattr(op,'control',lambda c:copy.deepcopy(c.ctl))
+ monkeypatch.setattr(op,'dormant',lambda c,**kw:list(c.members));monkeypatch.setattr(op,'control',lambda c:copy.deepcopy(c.ctl))
  monkeypatch.setattr(op,'ledger_sha',lambda c,replacement=None:hashlib.sha256(canonical(dict(control=c.ctl if replacement is None else replacement,other='unchanged'))).hexdigest());return c
 
 def issue(c,b,p):

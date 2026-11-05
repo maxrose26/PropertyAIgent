@@ -372,3 +372,100 @@ def test_stop_during_owned_source_closes_worker_and_preserves_original_stop(worl
     assert restricted_sessions(world['boot'])==0 and not (output/'manchester-source.json').exists()
     control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
     assert control['manual_stop']=='DISPOSABLE_ATTENDED_STOP'
+    assert result['usage']['requests'] is None and result['usage']['requests_status']=='UNKNOWN'
+    events=json.loads((output/'events.json').read_text())
+    assert any(e['event']=='source_poll_failed' and e['data']['category']=='SHARED_STOP_CHANGED' for e in events)
+
+
+def test_delayed_sources_cross_poll_boundary_with_real_restricted_postgres(world,tmp_path):
+    """Fast fixtures previously completed before the first defective poll."""
+    reset(world);authorise(world,'delayed-poll');env,sources=env_and_sources(world,tmp_path)
+    for file in sources.glob('*.json'):
+        audit=json.loads(file.read_text());audit['_test_delay_seconds']=3;file.write_text(json.dumps(audit))
+    output=tmp_path/'result'
+    process=subprocess.run([sys.executable,'-m','scripts.run_daily_councils','--period','delayed-poll','--output',str(output),
+        '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')],env=env,capture_output=True,text=True,timeout=60)
+    result=json.loads((output/'final-result.json').read_text())
+    assert process.returncode==0 and result['status']=='RETAINED_AND_SCREENED',result
+    assert len(result['scopes'])==2 and len(result['backlog']['records'])==2
+    assert result['usage']['requests_status']=='COMPLETE' and result['usage']['all_connections_closed']
+    assert restricted_sessions(world['boot'])==0
+
+
+def test_original_background_database_deadline_failure_is_reproducible():
+    import threading
+    from verification.ingestion_storage.operational_controller import DatabaseBudget
+    budget=DatabaseBudget();failures=[]
+    def original_poll():
+        try:budget.guarded(None,lambda:None)
+        except Exception as error:failures.append(error.args)
+    thread=threading.Thread(target=original_poll);thread.start();thread.join(timeout=2)
+    assert failures==[('HARD_DEADLINE_MAIN_THREAD_ONLY',)]
+
+
+@pytest.mark.parametrize('failure',[None,'INTAKE_SHARED_STOP_CHANGED','INTAKE_PERIOD_EXPIRED','database'])
+def test_source_poll_uses_main_thread_and_preserves_unknown_on_interruption(tmp_path,monkeypatch,failure):
+    """Real deadline guard with a synthetic supervisor; no network or SQL."""
+    import threading
+    from contextlib import contextmanager
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from verification.ingestion_storage.operational_controller import DatabaseBudget
+    runtime=object.__new__(Runtime);runtime.root=tmp_path/'output';runtime.root.mkdir()
+    sources=tmp_path/'sources';sources.mkdir()
+    (sources/'tameside.json').write_text(json.dumps(dict(_test_delay_seconds=3,
+        resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
+    runtime.args=SimpleNamespace(disposable_sources=str(sources));runtime.test=True;runtime.policy={}
+    runtime.run=IntakeRun();runtime.memory=None;runtime.events=[]
+    def synthetic_supervisor(command,*,check,root,**kw):
+        root.mkdir();end=time.monotonic()+3
+        try:
+            while time.monotonic()<end:check();time.sleep(.025)
+            (runtime.root/'tameside-source.json').write_text(json.dumps(dict(resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
+        except Denied:pass
+        outer=dict(cleanup='CLOSED',exit_code=0,limit_hit=None,live_owned_survivors=0,elapsed_seconds=3)
+        (root/'supervisor.json').write_text(json.dumps(outer));return outer
+    monkeypatch.setattr('verification.ingestion_storage.daily_intake_runtime.supervise',synthetic_supervisor)
+    budget=DatabaseBudget();calls=[]
+    @contextmanager
+    def connection(**kw):yield None,budget
+    runtime.connection=connection
+    def read(c):
+        calls.append(threading.current_thread())
+        budget.guarded(None,lambda:None)
+        if failure and len(calls)==2:
+            if failure=='database':raise RuntimeError('postgresql://secret-user:secret-password@private-host')
+            raise Denied(failure)
+    runtime.policy_read=read
+    if failure:
+        with pytest.raises(Denied,match='SOURCE_STOP_OR_ACCESS_CHANGED'):runtime.collect(dict(council='tameside'))
+        totals=runtime.run.totals()
+        assert totals['requests'] is None and totals['requests_accounted']==0 and totals['requests_status']=='UNKNOWN'
+        with pytest.raises(Denied,match='UNKNOWN_NO_CONTINUATION'):runtime.run.before_scope('arcus')
+        diagnostic=runtime.events[0]['data']
+        assert diagnostic['category']==('SHARED_STOP_CHANGED' if failure=='INTAKE_SHARED_STOP_CHANGED' else 'POLL_ERROR')
+        assert 'secret' not in json.dumps(runtime.events) and 'private-host' not in json.dumps(runtime.events)
+        outer=json.loads((runtime.root/'tameside-owned'/'supervisor.json').read_text())
+        assert outer['live_owned_survivors']==0
+    else:
+        _,outer=runtime.collect(dict(council='tameside'))
+        assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0
+        assert runtime.run.totals()['requests']==4 and runtime.run.totals()['requests_status']=='COMPLETE'
+    assert len(calls)>=2 and all(t is threading.main_thread() for t in calls)
+
+
+def test_poll_diagnostic_does_not_export_unrecognised_code_or_driver_parameters():
+    from verification.ingestion_storage.daily_intake_runtime import poll_diagnostic
+    from sqlalchemy.exc import OperationalError
+    from psycopg import OperationalError as NativeError
+    for error in (Denied('PRIVATE_CREDENTIAL'),OperationalError('SECRET_SQL',{'password':'SECRET'},NativeError('SECRET_URL'))):
+        result=poll_diagnostic(error)
+        assert result['category']=='POLL_ERROR' and result['code']=='UNCLASSIFIED'
+        assert 'PRIVATE' not in json.dumps(result) and 'SECRET' not in json.dumps(result)
+
+
+def test_interrupted_accounting_keeps_previous_count_only_as_partial():
+    run=IntakeRun();run.source(dict(requests=7,source_bytes=20,source_seconds=1,supervised_seconds=1))
+    run.begin_source()
+    assert run.totals()['requests'] is None and run.totals()['requests_accounted']==7
+    with pytest.raises(Denied):run.source(dict(requests=-1,source_bytes=0,source_seconds=0,supervised_seconds=0))
+    assert run.totals()['requests'] is None
