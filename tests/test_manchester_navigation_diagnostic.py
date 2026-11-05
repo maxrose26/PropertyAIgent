@@ -115,7 +115,7 @@ def test_supervisor_actual_child_environment_and_cleanup(tmp_path):
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['live_owned_survivors']==0 and result['retry'] is False, result
 
 @pytest.mark.skipif(__import__('os').environ.get('MANCHESTER_REAL_BROWSER')!='1',reason='explicit isolated browser runtime required')
-@pytest.mark.parametrize('file_ceiling',[512*1024,20*1024*1024])
+@pytest.mark.parametrize('file_ceiling',[512*1024,None])
 def test_actual_supervised_worker_45_second_envelope(tmp_path,file_ceiling):
  import sys,threading,tempfile
  owned_root=__import__('pathlib').Path(tempfile.mkdtemp(prefix='mnav-test-'))/'owned'
@@ -130,7 +130,8 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path,file_ceiling):
  thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
  plan=tmp_path/'plan';out=tmp_path/'out'
  plan.write_text(json.dumps(dict(row=d.ROW,fixture=None,diagnostic_mode=d.MODE)))
- code=f"import resource;original_setrlimit=resource.setrlimit;resource.setrlimit=lambda kind,bounds:original_setrlimit(kind,({file_ceiling},{file_ceiling}) if kind==resource.RLIMIT_FSIZE else bounds);from verification.discovery import manchester_navigation_diagnostic as d;d.DESTINATION='http://127.0.0.1:{server.server_port}/initial';from verification.ingestion_storage.daily_intake_runtime import source_worker;from types import SimpleNamespace;source_worker(SimpleNamespace(plan={str(plan)!r},output={str(out)!r}))"
+ override="" if file_ceiling is None else f"import resource;original_setrlimit=resource.setrlimit;resource.setrlimit=lambda kind,bounds:original_setrlimit(kind,({file_ceiling},{file_ceiling}) if kind==resource.RLIMIT_FSIZE else bounds);"
+ code=override+f"from verification.discovery import manchester_navigation_diagnostic as d;d.DESTINATION='http://127.0.0.1:{server.server_port}/initial';from verification.ingestion_storage.daily_intake_runtime import source_worker;from types import SimpleNamespace;source_worker(SimpleNamespace(plan={str(plan)!r},output={str(out)!r}))"
  try:
   result=supervise([sys.executable,'-B','-c',code],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root=owned_root,source=True,seconds=45,diagnostic_mode=d.MODE)
  finally:server.shutdown();server.server_close();thread.join()
@@ -148,3 +149,17 @@ def test_long_browser_temp_path_refused_before_launch(tmp_path,monkeypatch):
  monkeypatch.setattr('subprocess.Popen',lambda *a,**k:pytest.fail('LAUNCH_REACHED'))
  with pytest.raises(ValueError,match='DIAGNOSTIC_TEMP_PATH_BOUND'):
   supervise(['never'],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root='/tmp/'+'x'*60,source=True,seconds=45,diagnostic_mode=d.MODE)
+
+@pytest.mark.parametrize('mode,expected',[(d.MODE,20*1024*1024),(None,512*1024),('TAMESIDE_FIRST_SORT_V1',512*1024)])
+def test_exact_file_limit_selection(tmp_path,monkeypatch,mode,expected):
+ import os,resource
+ for k in list(os.environ):
+  if 'DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD')):monkeypatch.delenv(k)
+ monkeypatch.setenv('INGESTION_SOURCE_PRIVATE','ONCE')
+ class Observed(Exception):pass
+ def check(kind,bounds):
+  assert kind==resource.RLIMIT_FSIZE and bounds==(expected,expected)
+  raise Observed()
+ monkeypatch.setattr(resource,'setrlimit',check)
+ p=tmp_path/'plan';p.write_text(json.dumps(dict(row=d.ROW,fixture=None,**({'diagnostic_mode':mode} if mode else {}))))
+ with pytest.raises(Observed):source_worker(SimpleNamespace(plan=p,output=tmp_path/'out'))
