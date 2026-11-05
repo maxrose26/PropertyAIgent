@@ -50,6 +50,7 @@ def predecessor06(state,*,snapshot):
 
 
 RELEASE=dict(revision='54700366bab5434a5cda30abc853e0dc6dcc5d33',workflow_sha256='e5289d43dbd05f2ffa051529c4feeb6aa32fb719c621de00df3638e077bf78e4',manifest_sha256='482e137a9a62fdd1007ee351845a4fc2c0825693dfc3472217c2ac8d4c3b74fc')
+SAFE_CODES={'P07_ADMIN_ONLY_REQUIRED','P07_TEMPORARY_PERMISSION_PRESENT','P07_RECOVERY_EXECUTE','P07_OWNER_READERS','P07_SCHEMA_GRANTABILITY','P07_PIPELINE_SESSION','P07_OTHER_LOGIN_ENABLED','P07_AUTHORITY_NOT_CLOSED','P07_PERIOD_USED','P07_SUCCESSOR_WORK_EXISTS','P07_RELEASE_BINDING','P07_SCRAPER_STATE','P07_SECRET_FILES','P07_SCRAPER_ENVIRONMENT','A06_RUN_IDENTITY','A06_STOP_DRIFT','A06_PERIOD_BINDING','A06_GRANT_BINDING','A06_ITEM_BINDING','A06_ATTEMPT_BINDING','A06_OTHER_WORK','A06_EVIDENCE','A06_PREDECESSOR_CLOSURE','OWNER_IDENTITY','OWNER_SESSION_VISIBILITY','INTAKE_OWNER_FUNCTION_INVENTORY','DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING','RUNTIME_NOT_DORMANT','STABLE_VERIFIER_BINDING','EXISTING_RUNTIME_ADMIN_CAPABILITIES_REQUIRED','OWNER_CURRENT_WORK_OR_UNKNOWN_STATUS','OWNER_JOURNAL_HASH'}
 CHECKS=('identity_inventory','journal','dormant','permissions','attempt06','evidence','successor_unused','release','provider')
 
 class ReadOnly:
@@ -116,11 +117,15 @@ class Refusal(Exception):pass
 def run(*,db_factory=pilot.Database,render_factory=None,environ=None):
     env=os.environ if environ is None else environ
     out=dict(version='PERIOD07_READONLY_PREFLIGHT_V1',period=SUCCESSOR,status='REFUSED',checks={k:'UNVERIFIED' for k in CHECKS},database_writes=0,journal_writes=0,provider_mutations=0,job_submissions=0,transaction='NOT_STARTED',
-      capabilities={'actual_grant_execution':'UNVERIFIED','deployment_permission':'UNVERIFIED','inherited_dashboard_isolation':'UNVERIFIED','successor_artifact_readback':'UNVERIFIED','exact_archive_inventory':'UNVERIFIED'},binding_hashes={})
+      capabilities={'actual_grant_execution':'UNVERIFIED','deployment_permission':'UNVERIFIED','inherited_dashboard_isolation':'UNVERIFIED','successor_artifact_readback':'UNVERIFIED','exact_archive_inventory':'UNVERIFIED','source_branch_head':'UNVERIFIED'},binding_hashes={})
+    revision=env.get('RENDER_GIT_COMMIT','')
+    if re.fullmatch('[a-f0-9]{40}',revision):out['web_revision']=revision
     def check(name,fn):
         try:value=fn();out['checks'][name]='PASS';return value
         except Exception as exc:
             out['checks'][name]='REFUSED'
+            code=exc.args[0] if isinstance(exc,op.Denied) and len(exc.args)==1 and type(exc.args[0]) is str else None
+            out.setdefault('refusals',{})[name]=code if code in SAFE_CODES else 'CHECK_REFUSED'
             # Phase labels are fixed, not exception messages or private values.
             state=getattr(exc,'sqlstate',None)
             if state in ('42501','28P01','28000','57014','25006'):out.setdefault('sqlstates',{})[name]=state
@@ -157,6 +162,8 @@ def run(*,db_factory=pilot.Database,render_factory=None,environ=None):
         if all(v=='UNVERIFIED' for v in out['checks'].values()):out['checks']['identity_inventory']='REFUSED'
     def release():
         r=json.loads(env['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
+        observed=r.get('execution_binding',{})
+        if type(observed) is dict and set(observed)==set(RELEASE) and all(type(observed[k]) is str and re.fullmatch('[a-f0-9]{'+str(40 if k=='revision' else 64)+'}',observed[k]) for k in RELEASE):out['binding_hashes']['configured_successor_execution']=sha(observed)
         op.require(r.get('execution_binding')==RELEASE and r.get('tree')=='95bfb2677cddfe539b8b69945d870f6c8b5eb62e' and r.get('branch')=='prep/b-timing-pg17-current-20261103','P07_RELEASE_BINDING')
         out['binding_hashes']['successor_execution']=sha(RELEASE)
     try:check('release',release)
