@@ -469,4 +469,3 @@ def test_interrupted_accounting_keeps_previous_count_only_as_partial():
     assert run.totals()['requests'] is None and run.totals()['requests_accounted']==7
     with pytest.raises(Denied):run.source(dict(requests=-1,source_bytes=0,source_seconds=0,supervised_seconds=0))
     assert run.totals()['requests'] is None
-

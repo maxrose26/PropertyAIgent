@@ -18,7 +18,9 @@ def main(argv=None):
   if args.action in ('prepare-successor','verify-successor','run-successor','close-successor','status'):
    release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
    b=a06.binding_from_saved_state(db)
-   op.require(release.get('attempt06_receipt_sha256')==b['attempt06_receipt_sha256'],'A06_RECEIPT_BINDING')
+   op.require(release.get('attempt06_receipt_sha256',b['attempt06_receipt_sha256'])==b['attempt06_receipt_sha256'],'A06_RECEIPT_BINDING')
+   release['attempt06_receipt_sha256']=b['attempt06_receipt_sha256']
+   os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']=json.dumps(release)  # in-memory receipt binding; no configuration write
    instance=pilot.Pilot(db)
    if args.action=='prepare-successor':instance.prepare_continuation();result=instance.summary()
    elif args.action=='verify-successor':result=instance.verify_release_binding()

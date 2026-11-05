@@ -182,6 +182,9 @@ def test_actual_owner_sequence_and_bounded_successor(world,tmp_path,monkeypatch,
  assert ctl['intake_periods'][a06.PERIOD]['failed_runs']==saved['failed_runs'] and op.stop_snapshot(ctl)==a06.ACCEPTED
  assert len(ctl['intake_periods'][a06.SUCCESSOR]['days']['2026-11-02'])==2
  assert c.execute("SELECT count(*) FROM ingestion_run_evidence WHERE period=%s AND sha256=encode(sha256(body),'hex')",(a06.SUCCESSOR,)).fetchone()==(4,)
+ with w['actor']() as actor:verified=op.finalisation(actor,b,{'run_id':ctl['intake_run']['id'],'publication':ctl['intake_run']['publication']})
+ assert verified['status']=='INDEPENDENT_DATABASE_VERIFIED_SUCCESS' and len(verified['captures'])==2
+ assert all(x['screening_complete']==x['record_count'] for x in verified['captures'])
  with w['actor']() as actor:closed=op.close(actor,states[-1],lambda _:None)
  assert closed['runtime_access']=='DISABLED' and closed['sessions']=='ABSENT'
  assert c.execute(op.MEMBERS).fetchall()==w['members']
@@ -198,7 +201,22 @@ def test_successor_namespace_preserves_encrypted_history(world,monkeypatch):
  boot.execute('RESET ROLE');boot.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
  boot.execute('GRANT CREATE ON SCHEMA public TO postgres WITH GRANT OPTION')
  old=a06.PERIOD+'_owner';rid=hashlib.sha256(old.encode()).hexdigest()[:32]
- with w['actor']() as c:prior=c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)',(old,rid,'',b'synthetic-encrypted-history')).fetchone()
+ monkeypatch.setattr(owner_pilot,'PERIOD',a06.SUCCESSOR);monkeypatch.setattr(owner_pilot,'PREDECESSOR',a06.PERIOD)
+ class DB:
+  key='b'*64;address='192.0.2.1'
+  @contextmanager
+  def connection(self):
+   with w['actor']() as c:yield c
+ db=DB();journal=owner_pilot.Journal(db,a06.PERIOD)
+ passwords={r:__import__('sqlalchemy').engine.make_url(w['urls'][r]).password for r in op.ROLES}
+ old_state=dict(period=a06.PERIOD,status='CLOSED',job={'id':a06.JOB},binding=dict(period=a06.PERIOD,execution_binding=a06.BINDING),
+  access=dict(state='DATABASE_CLOSURE_ACKNOWLEDGED',render={'state':'RESTORATION_ACKNOWLEDGED'}),
+  closure_verification=dict(status='VERIFIED',authorities_closed=True,sessions=0),final_service=dict(suspended=True,configuration_equal=True,environment_equal=True),
+  stable_credentials=dict(version='STABLE_RESTRICTED_V1',passwords=passwords,verifier_sha256=w['binding']['credential_verifier_sha256']))
+ journal.save(old_state)
+ assert a06.binding_from_saved_state(db)['attempt06_receipt_sha256']==w['binding']['attempt06_receipt_sha256']
+ with w['actor']() as c:prior=c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(old,rid,'')).fetchone()
+
  release=json.loads(__import__('os').environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']);release['attempt06_receipt_sha256']=w['binding']['attempt06_receipt_sha256'];monkeypatch.setenv('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE',json.dumps(release))
  members=boot.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(boot)
  with w['actor']() as c:result=migrate_owner_namespace(c,attempt07=True,stable_verifiers=w['binding']['credential_verifier_sha256'])
@@ -207,6 +225,7 @@ def test_successor_namespace_preserves_encrypted_history(world,monkeypatch):
   assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(old,rid,'')).fetchone()==prior
   new=a06.SUCCESSOR+'_owner';newid=hashlib.sha256(new.encode()).hexdigest()[:32]
   assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)',(new,newid,'',b'synthetic-successor')).fetchone()[0]==0
+ assert journal.load()==old_state
 
 
 def test_successor_issuer_rejects_changed_receipt(world):

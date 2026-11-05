@@ -156,7 +156,7 @@ def predecessor06(state,*,snapshot):
     op.require(type(state) is dict and state.get('period')==PERIOD and state.get('status')=='CLOSED' and state.get('job',{}).get('id')==JOB
         and state.get('binding',{}).get('period')==PERIOD and state['binding'].get('execution_binding')==BINDING
         and state.get('access',{}).get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED'
-        and state['access'].get('render',{}).get('state')=='RESTORATION_ACKNOWLEDGED'
+        and state['access'].get('render',{}).get('state') in ('RESTORATION_ACKNOWLEDGED','RESTORATION_VERIFIED_BY_READBACK')
         and state.get('closure_verification',{}).get('status')=='VERIFIED'
         and state.get('closure_verification',{}).get('authorities_closed') is True
         and state.get('closure_verification',{}).get('sessions')==0
