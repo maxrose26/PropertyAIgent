@@ -295,6 +295,25 @@ def budget_selection(execution_budget, case):
     return select(execution_budget)
 
 
+# Only fixed network tokens are retained; never exception messages, URLs or IDs.
+NETWORK_ERRORS = frozenset(('ERR_NAME_NOT_RESOLVED','ERR_CONNECTION_REFUSED',
+    'ERR_CONNECTION_RESET','ERR_CONNECTION_CLOSED','ERR_CONNECTION_TIMED_OUT',
+    'ERR_TIMED_OUT','ERR_CERT_AUTHORITY_INVALID','ERR_CERT_DATE_INVALID',
+    'ERR_CERT_COMMON_NAME_INVALID','ERR_SSL_PROTOCOL_ERROR','ERR_ABORTED',
+    'ERR_BLOCKED_BY_CLIENT','ERR_BLOCKED_BY_ADMINISTRATOR','ERR_HTTP2_PROTOCOL_ERROR',
+    'ERR_TUNNEL_CONNECTION_FAILED','ERR_PROXY_CONNECTION_FAILED','ERR_EMPTY_RESPONSE'))
+
+def network_error_code(value):
+    if not isinstance(value,str):return 'UNKNOWN'
+    found=set(re.findall(r'(?<![A-Za-z0-9_])net::(ERR_[A-Z0-9_]+)(?![A-Za-z0-9_])',value))
+    return next(iter(found)) if len(found)==1 and found<=NETWORK_ERRORS else 'UNKNOWN'
+
+def browser_diagnostic(exc,stage):
+    return dict(version='BROWSER_BOUNDARY_V1',stage=stage,
+        exception_class=type(exc).__name__ if type(exc).__name__ in ('Error','TimeoutError') else 'OTHER',
+        network_error=network_error_code(str(exc)))
+
+
 async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None, execution_budget=None, deadline_origin=None):
     from playwright.async_api import async_playwright
     budget = budget_selection(execution_budget, case)
@@ -518,6 +537,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
         if audit['navigations'] > 2:
             fail('NAVIGATION_LIMIT')
 
+    boundary_stage='BROWSER_SETUP'
     try:
         async with async_playwright() as playwright:
             try:
@@ -538,6 +558,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                 client.on('Network.dataReceived', charge)
                 client.on('Fetch.requestPaused', route_handler)
                 await client.send('Fetch.enable', {'patterns':[{'urlPattern':'*','requestStage':'Request'}]})
+                boundary_stage='INITIAL_NAVIGATION'
                 async def navigate():
                     if case == 'trafford':
                         await page.goto('https://pa.trafford.gov.uk/online-applications/', wait_until='domcontentloaded', timeout=12000)
@@ -557,6 +578,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
+                    boundary_stage='ENUMERATION'
                     if case in UI_CASES:
                         await enumerate_ui(page,audit,stopped,ui_config,**({"retain_proof":True} if retain_proof else {}),**({'budget':budget,'deadline':deadline} if deadline is not None else {}))
                         classify_ui_enumeration(audit, fail)
@@ -600,6 +622,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                             fail('IDENTITY_NOT_ESTABLISHED')
                         elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':
                             fail('STATUS_NOT_ESTABLISHED')
+                boundary_stage='CLEANUP'
                 stop.cancel()
                 await asyncio.gather(stop, return_exceptions=True)
             finally:
@@ -609,6 +632,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                     await browser.close()
                 audit['cleanup'] = 'CONTEXT_BROWSER_CLOSED' if browser is not None else 'NOT_STARTED'
     except Exception as exc:
+        audit['browser_diagnostic']=browser_diagnostic(exc,boundary_stage)
         code = getattr(exc, 'code', None)  # fixed prepared-cache refusal code, prepared mode only
         fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
              else 'BROWSER_' + type(exc).__name__)
