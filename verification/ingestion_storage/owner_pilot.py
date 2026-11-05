@@ -6,6 +6,8 @@ only the two finite restricted credentials. Recovery journals use the existing
 Vault format, encrypted in the approved private evidence table.
 """
 import copy
+import base64
+import zlib
 import hashlib
 import json
 import os
@@ -48,6 +50,31 @@ CLEANUP_SNAPSHOTS=16     # 8 cleanup + first failure + verification + 4 reconcil
 def ciphertext_size(n):
     # Existing Vault: 16-byte salt + base64(Fernet 57-byte overhead + PKCS7 AES).
     return 16+4*((57+16*(n//16+1)+2)//3)
+
+# Reader compatibility copied from deployed owner revision 2fa0f07.
+# Preserve the existing write format and all recovery/closure guards.
+JOURNAL_METADATA_FIELDS=frozenset(('binding','access','artifact','profile','policy','startup_preflight','observations','job','job_terminal','runtime_qualification','source_result','independent_result','original_environment','stable_credentials','stable_configuration'))
+
+def hydrated_state(stored):
+    if isinstance(stored,dict):
+        packed=stored.get('journal_metadata')
+        if packed is not None:
+            try:
+                op.require(stored.get('cleanup_reserve',{}).get('version') in ('CLEANUP_RESERVE_V1','CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1') and isinstance(packed,dict) and set(packed)=={'version','bytes','sha256','data'} and packed['version']=='JOURNAL_METADATA_DEFLATE_V1' and type(packed['bytes']) is int and 0<=packed['bytes']<=65536,'OWNER_CODE_BINDING')
+                compressed=base64.b64decode(packed['data'],validate=True)
+                op.require(len(compressed)<=32768,'OWNER_CODE_BINDING')
+                decoder=zlib.decompressobj();raw=decoder.decompress(compressed,packed['bytes']+1)
+                op.require(decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail and len(raw)==packed['bytes'] and hashlib.sha256(raw).hexdigest()==packed['sha256'],'OWNER_CODE_BINDING')
+                decoded=json.loads(raw)
+                op.require(isinstance(decoded,dict) and set(decoded)<=JOURNAL_METADATA_FIELDS and not set(decoded).intersection(stored) and canonical(decoded)==raw,'OWNER_CODE_BINDING')
+                del stored['journal_metadata'];stored.update(decoded)
+            except (ValueError,TypeError,KeyError,zlib.error):raise op.Denied('OWNER_CODE_BINDING') from None
+        binding=stored.get('access',{}).get('binding',{})
+        if isinstance(binding,dict) and binding.get('version')=='ROOT_BINDING_REFERENCE_V1':
+            op.require(set(binding)=={'version','sha256'} and stored.get('cleanup_reserve',{}).get('version') in ('CLEANUP_RESERVE_V1','CLEANUP_RESERVE_DIAGNOSTIC02_36K_V1') and
+                binding['sha256']==hashlib.sha256(canonical(stored.get('binding'))).hexdigest(),'OWNER_CODE_BINDING')
+            stored['access']['binding']=copy.deepcopy(stored['binding'])
+    return stored
 
 def cleanup_reserve_policy():
     growth=sum(len(canonical(k))+1+n+1 for k,n in CLEANUP_RECORD_LIMITS.items())+CLEANUP_STATE_GROWTH
@@ -107,7 +134,7 @@ class Journal:
                 v=Vault(p,self.db.key,create=True);v.save(value);return p.read_bytes()
             fd=os.open(p,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             with os.fdopen(fd,'wb') as f:f.write(raw)
-            return Vault(p,self.db.key).load()
+            return hydrated_state(Vault(p,self.db.key).load())
     def load(self):
         with self.db.connection() as c:
             row=c.execute('SELECT * FROM public.ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(self.owner_period,self.owner_run,'')).fetchone()
