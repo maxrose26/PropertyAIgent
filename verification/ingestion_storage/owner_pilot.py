@@ -639,7 +639,7 @@ class Pilot:
                 successor_guard(c,dict(period=PERIOD,evidence_backend=BACKEND,accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256')),ctl)
             elif PERIOD=='b-dbpilot-20261027-1102-08':
                 from . import period08_successor as p08
-                p08.successor_guard(c,p08.binding_from_saved_state(self.db),ctl)
+                p08.successor_guard(c,p08.binding_from_saved_state(self.db),ctl,require_namespace=True)
             else:op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')

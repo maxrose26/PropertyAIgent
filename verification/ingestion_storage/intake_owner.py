@@ -362,7 +362,7 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         from .attempt06_recovery import successor_guard
         successor_guard(c,b,ctl)
         from .period08_successor import successor_guard as guard08
-        guard08(c,b,ctl)
+        guard08(c,b,ctl,require_namespace=True)
         retained_cleanup(c, ctl); no_hazards(c, ctl)
         leave_owner(c)
         prior = settings(c); original_ledger = ledger_sha(c)

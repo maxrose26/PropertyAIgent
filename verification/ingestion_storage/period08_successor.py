@@ -42,9 +42,18 @@ def unused(c,ctl,*,journal):
     periods=[SUCCESSOR,SUCCESSOR+'_owner'] if journal else [SUCCESSOR]
     require(c.execute('SELECT count(*) FROM public.ingestion_run_evidence WHERE period=ANY(%s)',(periods,)).fetchone()==(0,),'SUCCESSOR_USED')
 
-def successor_guard(c,b,ctl):
+def namespace(c,*,migrated=None):
+    from .database_evidence import ATTEMPT07_OWNER_SQL,ATTEMPT08_OWNER_SQL
+    old=hashlib.sha256(ATTEMPT07_OWNER_SQL.split('$owner_state$',2)[1].encode()).hexdigest()
+    new=hashlib.sha256(ATTEMPT08_OWNER_SQL.split('$owner_state$',2)[1].encode()).hexdigest()
+    actual=c.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()[0]
+    require(actual in ({new} if migrated is True else {old} if migrated is False else {old,new}),'JOURNAL_NAMESPACE')
+    return actual
+
+def successor_guard(c,b,ctl,*,require_namespace=False):
     if b.get('period')!=SUCCESSOR:return
     validate_binding(b);history(c,ctl)
+    if require_namespace:namespace(c,migrated=True)
     require(ctl['intake_periods'][p07.PERIOD].get('failure_disposition')==disposition(),'DISPOSITION')
     require(op.json_equal(c,op.stop_snapshot(ctl),ACCEPTED),'STOP_DRIFT')
 
@@ -55,16 +64,16 @@ def inspect(c,b):
         d=ctl['intake_periods'][p07.PERIOD].get('failure_disposition')
         if d is None:
             require(op.json_equal(c,op.stop_snapshot(ctl),p07.STOP9),'STOP_DRIFT');unused(c,ctl,journal=True)
-            status='PRE_DISPOSITION_VERIFIED'
+            namespace(c,migrated=False);status='PRE_DISPOSITION_VERIFIED'
         else:
-            successor_guard(c,b,ctl);unused(c,ctl,journal=False);status='DISPOSITION_COMMITTED_VERIFIED'
+            successor_guard(c,b,ctl);namespace(c);unused(c,ctl,journal=False);status='DISPOSITION_COMMITTED_VERIFIED'
         return dict(status=status,period=SUCCESSOR,receipt_sha256=RECEIPT_SHA,stop=op.stop_snapshot(ctl),transaction='ROLLED_BACK',retry=False)
     finally:c.execute('ROLLBACK')
 
 def dispose(c,b):
     validate_binding(b);op.validate_binding(b);op.begin(c)
     try:
-        ctl=op.control(c);members=p07.common(c,b,ctl)
+        ctl=op.control(c);members=p07.common(c,b,ctl);namespace(c,migrated=False)
         ctl=a06.lock(c);history(c,ctl);unused(c,ctl,journal=True);op.no_hazards(c,ctl)
         require(op.json_equal(c,op.stop_snapshot(ctl),p07.STOP9),'STOP_DRIFT')
         require('failure_disposition' not in ctl['intake_periods'][p07.PERIOD],'ALREADY_DISPOSED')

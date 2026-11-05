@@ -85,7 +85,7 @@ class PeriodIssuer(Owner):
             from .attempt06_recovery import successor_guard
             successor_guard(c,self.journal['binding'],before)
             from .period08_successor import successor_guard as guard08
-            guard08(c,self.journal['binding'],before)
+            guard08(c,self.journal['binding'],before,require_namespace=True)
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')

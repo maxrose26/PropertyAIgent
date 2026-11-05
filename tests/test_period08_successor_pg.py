@@ -23,6 +23,10 @@ def settled08(failed07,monkeypatch):
  monkeypatch.setenv('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE',json.dumps(release))
  # Read-only inventory capability observed on the configured live owner; no write ACL.
  c.execute('GRANT pg_read_all_data TO postgres')
+ c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner');c.execute('SET ROLE ingestion_storage_owner')
+ c.execute(de.ATTEMPT07_OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+ c.execute('RESET ROLE');c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
+ c.execute('GRANT CREATE ON SCHEMA public TO postgres WITH GRANT OPTION')
  w['members']=c.execute(op.MEMBERS).fetchall();w['history07']=copy.deepcopy(ctl['intake_periods'][p07.PERIOD])
  return w
 
@@ -53,7 +57,7 @@ def test_disposition_atomicity_and_ack_reconciliation(settled08,mode):
   assert op.ledger_sha(c)==snapshot
  else:assert op.ledger_sha(c)==before
 
-@pytest.mark.parametrize('drift',['receipt','global','manual','generation','last','release','history','used','journal','marker','permission'])
+@pytest.mark.parametrize('drift',['receipt','global','manual','generation','last','release','history','used','journal','marker','permission','namespace'])
 def test_disposition_refuses_changed_state(settled08,drift):
  w=settled08;c=w['boot'];ctl=op.control(c);b=copy.deepcopy(w['binding'])
  if drift=='receipt':b['period07_receipt_sha256']='0'*64
@@ -62,6 +66,10 @@ def test_disposition_refuses_changed_state(settled08,drift):
  elif drift=='history':ctl['intake_periods'][p07.PERIOD]['failed_runs'][p07.RUN]['actual_requests']=0
  elif drift=='used':ctl['intake_periods'][p08.SUCCESSOR]={}
  elif drift=='marker':ctl['intake_run']={'id':'0'*32}
+ elif drift=='namespace':
+  c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner');c.execute('SET ROLE ingestion_storage_owner')
+  c.execute(de.ATTEMPT06_OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+  c.execute('RESET ROLE');c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
  elif drift=='permission':c.execute('GRANT ingestion_storage_owner TO postgres WITH ADMIN FALSE,INHERIT FALSE,SET TRUE')
  elif drift=='journal':c.execute("INSERT INTO ingestion_run_evidence(period,run_id,name,body,sha256) VALUES(%s,%s,'owner/state-000',%s,%s)",(p08.SUCCESSOR+'_owner','0'*32,b'used',hashlib.sha256(b'used').hexdigest()))
  c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
@@ -75,6 +83,9 @@ def test_actual_period08_owner_sequence_and_bounded_successor(settled08,tmp_path
  saved=copy.deepcopy(op.control(c)['intake_periods'][p07.PERIOD])
  act(w,p08.dispose)
  with w['actor']() as actor:assert p08.inspect(actor,b)['stop']==p08.ACCEPTED
+ from verification.ingestion_storage.owner_pilot_continuation import migrate_owner_namespace
+ with w['actor']() as actor:migrate_owner_namespace(actor,attempt08=True,binding08=b,stable_verifiers=b['credential_verifier_sha256'])
+ with w['actor']() as actor:p08.namespace(actor,migrated=True)
  state=dict(version='FINITE_INTAKE_PERIOD_V1',state='ARMED_NO_RETRY',binding=b,policy=p)
  with w['actor']() as actor:extra.issue_period(actor,b,p,state,lambda _:None)
  assert c.execute(op.MEMBERS).fetchall()==w['members']
