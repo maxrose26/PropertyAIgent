@@ -72,3 +72,28 @@ def startup_prepare():
         print('PROPERTYAIGENT_OWNER_PILOT_READBACK '+str(start('status',server_prepare=True)['status']),flush=True)
     elif os.environ.get('PROPERTYAIGENT_INTAKE_PREPARE_ONCE')=='RECONCILE:'+PERIOD:
         print('PROPERTYAIGENT_OWNER_PILOT_RECEIPT_RECONCILIATION '+str(start('reconcile-artifact',server_prepare=True)['status']),flush=True)
+
+
+def period07_preflight():
+    """Explicit owner click only; same exclusion as legacy owner commands."""
+    import json
+    require_owner()  # before imports, credential access or child creation
+    global _process
+    with _lock:
+        if _process is not None and _process.poll() is None:
+            raise ValueError('OWNER_PILOT_PROCESS_ALREADY_RUNNING')
+        keep={'PATH','HOME','LANG','TZ','DATABASE_URL','PROPERTYAIGENT_INTAKE_RENDER_API_KEY','PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'}
+        env={k:v for k,v in os.environ.items() if k in keep}
+        env['PYTHONDONTWRITEBYTECODE']='1'
+        command=['/usr/bin/timeout','--signal=TERM','--kill-after=5s','60s',sys.executable,'-B','-u','-m','scripts.owner_period07_preflight']
+        _process=subprocess.Popen(command,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,start_new_session=True)
+        try:
+            raw,_=_process.communicate(timeout=67)
+            if _process.returncode!=0 or len(raw)>8192:raise ValueError('P07_CHILD_REFUSED')
+            result=json.loads(raw)
+            if result.get('version')!='PERIOD07_READONLY_PREFLIGHT_V1':raise ValueError('P07_RESULT_BINDING')
+            return result
+        except Exception:
+            if _process.poll() is None:
+                os.killpg(_process.pid,signal.SIGKILL);_process.wait(timeout=2)
+            return {'version':'PERIOD07_READONLY_PREFLIGHT_V1','status':'REFUSED','reason':'CHILD_TIMEOUT_OR_RESULT_BOUND','database_writes':0,'journal_writes':0,'provider_mutations':0,'job_submissions':0}

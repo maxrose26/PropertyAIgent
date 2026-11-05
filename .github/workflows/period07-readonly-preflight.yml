@@ -1,0 +1,42 @@
+name: Period07 hosted read-only preflight
+on:
+  push:
+    branches: [review/hosted-period07-preflight, release/stage1-access-boundary]
+    paths:
+      - app/owner_intake_control.py
+      - app/ui/server.py
+      - app/ui/pages/8_Bounded_Intake.py
+      - scripts/owner_period07_preflight.py
+      - verification/ingestion_storage/period07_readonly.py
+      - tests/test_period07_readonly.py
+      - .github/workflows/period07-readonly-preflight.yml
+permissions:
+  contents: read
+jobs:
+  readonly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: fixture
+          POSTGRES_PASSWORD: fixture
+          POSTGRES_DB: p07_readonly
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Owner boundary and enforced read-only PostgreSQL
+        env:
+          P07_DISPOSABLE_PG: postgresql://fixture:fixture@127.0.0.1:5432/p07_readonly
+        run: timeout 90s python -m pytest -q tests/test_period07_readonly.py tests/test_owner_intake_control.py --junitxml=period07-readonly.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: period07-readonly-${{ github.sha }}
+          path: period07-readonly.xml
