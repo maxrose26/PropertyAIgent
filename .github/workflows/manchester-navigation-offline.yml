@@ -23,7 +23,7 @@ jobs:
       - name: Install isolated browser for loopback-only proof
         env:
           PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
-        run: timeout --kill-after=2s 120s "$RUNNER_TEMP/mnav-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+        run: timeout --kill-after=2s 120s "$RUNNER_TEMP/mnav-venv/bin/python" -m playwright install chromium --only-shell
       - name: Worker, transport and supervisor regressions without council access
         env:
           PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
