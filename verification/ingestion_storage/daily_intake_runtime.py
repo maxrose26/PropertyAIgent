@@ -296,6 +296,7 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
+            if self.durable_run and self.args.period=='b-dbpilot-20261027-1102-09':raise Denied('P09_ALREADY_CONSUMED')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':

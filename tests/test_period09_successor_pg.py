@@ -119,8 +119,51 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready09,tmp_path,monkeyp
   assert len(new)==1 and new[0]['council']=='manchester' and new[0]['archive']['run_id']==run['id']
   # Actual admission path must refuse a second run without transport.
   duplicate=Runtime(SimpleNamespace(**{**vars(args),'output':str(tmp_path/'duplicate')}));duplicate.route_name=b['route'];duplicate.collect=lambda row:pytest.fail('RECOLLECTION')
-  assert duplicate.execute()['status']!='RETAINED_AND_SCREENED'
+  before_duplicate=op.ledger_sha(c)
+  repeated=duplicate.execute()
+  assert repeated['status']=='STOP_RECONCILE_NO_RETRY' and repeated['reason']=='P09_ALREADY_CONSUMED'
+  assert op.ledger_sha(c)==before_duplicate
  else:assert run['state']!='VERIFIED'
  with w['actor']() as actor:closed=op.close(actor,states[-1],lambda _:None)
  assert closed['runtime_access']=='DISABLED' and closed['sessions']=='ABSENT'
  assert c.execute(op.MEMBERS).fetchall()==w['members'] and s.protected_sha(c)==w['protected']
+
+@pytest.mark.parametrize('mode',['normal','before','lost','after_registrar'])
+def test_namespace_and_registrar_atomicity(ready09,mode):
+ from verification.ingestion_storage.owner_pilot_continuation import migrate_owner_namespace
+ w=ready09;c=w['boot'];act(w,p09.dispose)
+ before=op.ledger_sha(c);members=c.execute(op.MEMBERS).fetchall()
+ query="SELECT proname,prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid=ANY(ARRAY['public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure,'public.ingestion_register_bolton_exception(jsonb)'::regprocedure]) ORDER BY proname"
+ definitions=c.execute(query).fetchall();evidence=c.execute('SELECT * FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()
+ schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
+ class Break(Fault):
+  def execute(self,q,p=None):
+   r=super().execute(q,p)
+   if mode=='after_registrar' and q.startswith('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception'):raise RuntimeError('AFTER_REGISTRAR')
+   return r
+ with w['actor']() as actor:
+  if mode=='normal':migrate_owner_namespace(actor,attempt09=True,binding09=w['binding'],stable_verifiers=w['binding']['credential_verifier_sha256'])
+  else:
+   with pytest.raises(RuntimeError):migrate_owner_namespace(Break(actor,mode),attempt09=True,binding09=w['binding'],stable_verifiers=w['binding']['credential_verifier_sha256'])
+ assert op.ledger_sha(c)==before and c.execute(op.MEMBERS).fetchall()==members
+ assert c.execute('SELECT * FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==evidence
+ assert c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()==schema
+ if mode in ('normal','lost'):
+  with w['actor']() as actor:p09.namespace(actor,migrated=True)
+  for old,new in zip(definitions,c.execute(query).fetchall()):assert old[0]==new[0] and old[2:]==new[2:]
+ else:assert c.execute(query).fetchall()==definitions
+
+@pytest.mark.parametrize('mode',['before','lost'])
+def test_registration_ack_reconciled_without_repetition(ready09,mode):
+ from verification.ingestion_storage.owner_pilot_continuation import migrate_owner_namespace
+ w=ready09;c=w['boot'];act(w,p09.dispose);b=w['binding'];p=w['policy']
+ with w['actor']() as actor:migrate_owner_namespace(actor,attempt09=True,binding09=b,stable_verifiers=b['credential_verifier_sha256'])
+ before=op.ledger_sha(c)
+ with w['actor']() as actor:
+  with pytest.raises(Exception):extra.issue_period(Fault(actor,mode),b,p,dict(version='FINITE_INTAKE_PERIOD_V1',state='ARMED_NO_RETRY',binding=b,policy=p),lambda _:None)
+ with w['actor']() as fresh:
+  fresh.execute('BEGIN READ ONLY')
+  ctl=op.control(fresh);fresh.execute('ROLLBACK')
+ if mode=='lost':assert {k:ctl['intake_periods'][p09.SUCCESSOR][k] for k in p}==p
+ else:assert p09.SUCCESSOR not in ctl['intake_periods'] and op.ledger_sha(c)==before
+ assert c.execute(op.MEMBERS).fetchall()==w['members'] and backlog(w)==w['protected_backlog']
