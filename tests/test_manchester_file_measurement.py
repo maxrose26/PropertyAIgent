@@ -11,7 +11,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
   for limit in (524288,1048576,2097152,4194304,8388608,16777216,20971520):
    result=subprocess.run([sys.executable,'-m','pytest',__file__,'-q','-s','--tb=short'],env=dict(os.environ,MEASURE_FILE_LIMIT=str(limit)),capture_output=True,text=True,timeout=45)
    lines=[x.split('MANCHESTER_FILE_MEASUREMENT ',1)[1] for x in result.stdout.splitlines() if 'MANCHESTER_FILE_MEASUREMENT ' in x]
-   assert len(lines)==1,(result.returncode,result.stdout[-4000:])
+   assert result.returncode==0 and len(lines)==1,(result.returncode,result.stdout[-4000:])
    report=json.loads(lines[0]);reports.append(report)
   actual=subprocess.run([sys.executable,'-m','pytest',__file__,'-q','-s','--tb=short'],env=dict(os.environ,MEASURE_FILE_LIMIT='2097152',MEASURE_ACTUAL_WORKER='1'),capture_output=True,text=True,timeout=45)
   lines=[x.split('MANCHESTER_FILE_MEASUREMENT ',1)[1] for x in actual.stdout.splitlines() if 'MANCHESTER_FILE_MEASUREMENT ' in x]

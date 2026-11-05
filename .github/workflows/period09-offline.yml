@@ -56,6 +56,7 @@ jobs:
         env:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+      - run: timeout 30s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_daily_intake_runtime.py -q -k 'source_poll_uses_main_thread or poll_diagnostic or interrupted_accounting' --tb=short
       - uses: actions/upload-artifact@v4
         if: always()
         with:
