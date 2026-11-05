@@ -28,7 +28,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  from verification.discovery.arcus_ui_config import dated_config,MANCHESTER
  # A loopback TLS server exercises Chromium's real network service. Only the
  # fixture DNS resolution differs; collector parsing, CDP guards and cleanup are real.
- root=Path(tempfile.mkdtemp(prefix='mfiles-'))
+ root=Path(os.environ['TMPDIR']) if os.environ.get('MEASURE_INHERITED_TEMP')=='1' else Path(tempfile.mkdtemp(prefix='mfiles-'))
  key=root/'key.pem';cert=root/'cert.pem'
  subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(cert),'-days','1','-subj','/CN=localhost'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  class Handler(http.server.BaseHTTPRequestHandler):
