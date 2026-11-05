@@ -124,7 +124,7 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path):
  class Handler(BaseHTTPRequestHandler):
   def log_message(self,*a):pass
   def do_GET(self):
-   calls.append(self.path);self.send_response(200);self.end_headers()
+   calls.append(self.path);self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Length','15');self.end_headers();self.wfile.write(b'<html>ok</html>')
  server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
  thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
  plan=tmp_path/'plan';out=tmp_path/'out'
@@ -135,7 +135,7 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path):
  finally:server.shutdown();server.server_close();thread.join()
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['accounting_complete'] and result['live_owned_survivors']==0,result
  obs=json.loads(out.read_text())
- assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED',obs
+ assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED',json.dumps(obs,sort_keys=True)
  assert result['elapsed_seconds']<45
 
 
