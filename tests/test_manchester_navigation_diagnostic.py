@@ -115,7 +115,8 @@ def test_supervisor_actual_child_environment_and_cleanup(tmp_path):
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['live_owned_survivors']==0 and result['retry'] is False, result
 
 @pytest.mark.skipif(__import__('os').environ.get('MANCHESTER_REAL_BROWSER')!='1',reason='explicit isolated browser runtime required')
-def test_actual_supervised_worker_45_second_envelope(tmp_path):
+@pytest.mark.parametrize('file_ceiling',[512*1024,20*1024*1024])
+def test_actual_supervised_worker_45_second_envelope(tmp_path,file_ceiling):
  import sys,threading,tempfile
  owned_root=__import__('pathlib').Path(tempfile.mkdtemp(prefix='mnav-test-'))/'owned'
  from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
@@ -129,13 +130,16 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path):
  thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
  plan=tmp_path/'plan';out=tmp_path/'out'
  plan.write_text(json.dumps(dict(row=d.ROW,fixture=None,diagnostic_mode=d.MODE)))
- code=f"from verification.discovery import manchester_navigation_diagnostic as d;d.DESTINATION='http://127.0.0.1:{server.server_port}/initial';from verification.ingestion_storage.daily_intake_runtime import source_worker;from types import SimpleNamespace;source_worker(SimpleNamespace(plan={str(plan)!r},output={str(out)!r}))"
+ code=f"import resource;original_setrlimit=resource.setrlimit;resource.setrlimit=lambda kind,bounds:original_setrlimit(kind,({file_ceiling},{file_ceiling}) if kind==resource.RLIMIT_FSIZE else bounds);from verification.discovery import manchester_navigation_diagnostic as d;d.DESTINATION='http://127.0.0.1:{server.server_port}/initial';from verification.ingestion_storage.daily_intake_runtime import source_worker;from types import SimpleNamespace;source_worker(SimpleNamespace(plan={str(plan)!r},output={str(out)!r}))"
  try:
   result=supervise([sys.executable,'-B','-c',code],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root=owned_root,source=True,seconds=45,diagnostic_mode=d.MODE)
  finally:server.shutdown();server.server_close();thread.join()
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['accounting_complete'] and result['live_owned_survivors']==0,result
  obs=json.loads(out.read_text())
- assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED',json.dumps(obs,sort_keys=True)
+ assert calls==['/initial'] and obs['physical_requests']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED',json.dumps(obs,sort_keys=True)
+ if file_ceiling==512*1024:
+  assert obs['responses']==0 and obs['network_error']=='ERR_ABORTED',json.dumps(obs,sort_keys=True)
+ else:assert obs['responses']==1 and obs['http_status']==200,json.dumps(obs,sort_keys=True)
  assert result['elapsed_seconds']<45
 
 
