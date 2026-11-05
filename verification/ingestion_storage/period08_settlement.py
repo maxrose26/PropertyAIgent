@@ -90,7 +90,7 @@ def common(c,b,ctl):
 
 def pending(c,ctl):
     require(op.stop_snapshot(ctl)==STOP10,'STOP_DRIFT')
-    expected=receipt(ctl.get('intake_run'))
+    expected=receipt(ctl.get('intake_run'));expected['protected_work_sha256']=protected_sha(c)
     require(not ctl['intake_periods'][PERIOD].get('failed_runs') and not ctl['intake_periods'][PERIOD].get('failure_disposition'),'PRIOR_SETTLEMENT')
     row=c.execute('SELECT authority,revision,state,phase,fence,attempt_count,checkpoint,lease_until<extract(epoch FROM clock_timestamp()),task,contract,subject::jsonb FROM public.ingestion_work_items WHERE key=%s',(KEY,)).fetchone()
     require(row==(AUTHORITY,PERIOD+'-2026-11-02-manchester','CLAIMED','SOURCE_INTENT',1,1,None,True,'DISCOVERY','manchester-screening-metadata-v1',SCOPE),'ITEM')
@@ -126,7 +126,7 @@ def recover(c,b):
     op.begin(c)
     try:
         ctl=op.control(c);members=common(c,b,ctl)
-        ctl=a06.lock(c);expected=pending(c,ctl);expected['protected_work_sha256']=protected_sha(c)
+        ctl=a06.lock(c);expected=pending(c,ctl)
         # Locks exclude a competing controller mutation; recheck evidence/history.
         evidence(c);predecessor.history(c,ctl);tameside(c)
         require(c.execute('SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name',(PERIOD,RUN)).fetchall()==[(n,) for n in sorted(EVIDENCE)],'ARCHIVE_INVENTORY')

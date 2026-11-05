@@ -625,14 +625,18 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                 boundary_stage='CLEANUP'
                 stop.cancel()
                 await asyncio.gather(stop, return_exceptions=True)
+            except Exception as exc:
+                audit['browser_diagnostic']=browser_diagnostic(exc,boundary_stage)
+                raise
             finally:
+                boundary_stage='CLEANUP'
                 if context is not None:
                     await context.close()
                 if browser is not None:
                     await browser.close()
                 audit['cleanup'] = 'CONTEXT_BROWSER_CLOSED' if browser is not None else 'NOT_STARTED'
     except Exception as exc:
-        audit['browser_diagnostic']=browser_diagnostic(exc,boundary_stage)
+        audit.setdefault('browser_diagnostic',browser_diagnostic(exc,boundary_stage))
         code = getattr(exc, 'code', None)  # fixed prepared-cache refusal code, prepared mode only
         fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
              else 'BROWSER_' + type(exc).__name__)

@@ -31,12 +31,13 @@ def failed08(settled08,tmp_path,monkeypatch):
    from tests.test_tameside_pagination_calibration import FORM,SEARCH,ECHO,body,Response
    from verification.discovery.pagination_calibration import run_counted_window,COUNTED_MODE
    from verification.discovery.four_council_proof import manifest_scope
-   from verification.discovery.source_profiles import profile
+   from verification.discovery.source_profiles import profile,bind_audit
    from verification.discovery.idox_window import WindowConfig
    bodies=[FORM,SEARCH,*[body(n,count=5 if n<5 else 4,nxt=n<5,previous=n>1,total=24) for n in range(1,6)],ECHO]
    bodies=iter(v.replace(b'24/10/2026',b'27/10/2026').replace(b'30/10/2026',b'02/11/2026') for v in bodies)
    with manifest_scope(row,profile(row,'SCREENING_METADATA',idox_pagination=COUNTED_MODE)):
     audit=run_counted_window(lambda *a,**k:Response(next(bodies)),WindowConfig('tameside','RECEIVED',start,end,0,60))
+   audit=bind_audit(profile(row,'SCREENING_METADATA',idox_pagination=COUNTED_MODE),audit)
    assert audit['failure'] is None and len(audit['records'])==24
    audit,outer=idox_supervised(folder,audit);r=audit['resource'];metrics=dict(requests=r['requests_attempted'],source_bytes=r['received_bytes'],source_seconds=r['elapsed_seconds'])
   else:
