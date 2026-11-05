@@ -18,6 +18,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   if not Path(root).is_absolute() or len(str(Path(root)))>40:raise ValueError('DIAGNOSTIC_TEMP_PATH_BOUND')
  if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
  single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
+ if diagnostic_mode is not None:group_rss=single_rss  # Preserve period08's 1 GiB source-process-group ceiling.
  if execution_budget is not None:
   from app.ingestion.source_budget import select
   selected=select(execution_budget);ceiling=selected['worker_seconds']
