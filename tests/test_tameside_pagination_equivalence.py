@@ -66,14 +66,14 @@ def test_unsupported_destination_refuses(target):
     s=soup(layout());s.select('a.next')[0]['href']=target
     with pytest.raises(CalibrationError):directions(s,C,1)
 
-@pytest.mark.parametrize('mode',['numbered-alone','explicit-conflict','numbered-disagree','numeric-skip','disabled-conflict','post-vs-get','form-override'])
+@pytest.mark.parametrize('mode',['numbered-alone','explicit-conflict','numbered-disagree','numeric-label-target-conflict','disabled-conflict','post-vs-get','form-override'])
 def test_no_new_numbered_only_or_conflicting_authority(mode):
     s=soup(layout())
     if mode=='numbered-alone':
         for n in s.select('a.next'):n.decompose()
     elif mode=='explicit-conflict':s.select('a.next')[1]['href']='pagedSearchResults.do?action=page&searchCriteria.page=3'
     elif mode=='numbered-disagree':s.select('a')[0]['href']='pagedSearchResults.do?action=page&searchCriteria.page=3'
-    elif mode=='numeric-skip':s.select('a')[0].string='3';s.select('a')[0]['href']='pagedSearchResults.do?action=page&searchCriteria.page=3'
+    elif mode=='numeric-label-target-conflict':s.select('a')[0].string='3';s.select('a')[0]['href']='pagedSearchResults.do?action=page&searchCriteria.page=4'
     elif mode=='disabled-conflict':s.select('a.next')[1]['aria-disabled']='true'
     elif mode=='post-vs-get':
         for a in s.select('a.next'):a.decompose()

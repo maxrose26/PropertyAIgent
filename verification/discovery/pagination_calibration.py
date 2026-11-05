@@ -73,7 +73,7 @@ def paging_get(href,config,expected):
 
 
 def directions(soup,config,current):
-    found={'NEXT':[],'PREVIOUS':[],'NUMBERED_NEXT':[]}
+    found={'NEXT':[],'PREVIOUS':[],'NUMBERED_NEXT':[]};later=[]
     for node in soup.select('a,button,input[type="submit"],input[type="button"],[role="button"],[onclick]'):
         label=' '.join((node.get('value','') if node.name=='input' else node.get_text(' ',strip=True)).split()).casefold()
         aria=node.get('aria-label','').strip().casefold();rel=node.get('rel',[]);classes=node.get('class',[])
@@ -85,7 +85,15 @@ def directions(soup,config,current):
                 values=q.get('searchCriteria.page',[])
                 paging='searchCriteria.page' in q or urlsplit(node.get('href','')).path.endswith('/pagedSearchResults.do') or urlsplit(node.get('href','')).path=='pagedSearchResults.do'
                 if paging and label.isdigit() and len(label)<=3 and int(label)>current:
-                    require(int(label)==current+1,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_LINK_SKIPS_ADJACENT_PAGE')
+                    if int(label)!=current+1:
+                        # Observed Idox pagers advertise pages 3–5 beside page 2.
+                        # Validate those destinations, but only explicit Next can
+                        # authorise navigation to the immediately adjacent page.
+                        pager=node.find_parent(lambda n: bool(set(n.get('class',[])) & {'pager','pagination','paging'}))
+                        require(pager is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_LINK_SKIPS_ADJACENT_PAGE')
+                        require(label==str(int(label)) and current+1<int(label)<=6 and not node.has_attr('onclick'),'CALIBRATION_NAVIGATION_UNSUPPORTED')
+                        paging_get(node.get('href'),config,int(label));later.append(int(label))
+                        continue
                     kind='NUMBERED_NEXT'
                 elif any(v.isdigit() and (len(v)>3 or int(v)>current) for v in values):
                     raise CalibrationError('CALIBRATION_NAVIGATION_AMBIGUOUS','UNCLASSIFIED_FORWARD_PAGE_LINK')
@@ -135,8 +143,9 @@ def directions(soup,config,current):
     # A numbered link can corroborate an explicit Next; it never authorises
     # navigation on its own. Reconcile after scanning both top/bottom pagers.
     numbered=[request for evidence,request in found['NUMBERED_NEXT'] if not evidence['disabled']]
-    require(not numbered or next_request is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_WITHOUT_EXPLICIT_NEXT')
+    require(not (numbered or later) or next_request is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_WITHOUT_EXPLICIT_NEXT')
     require(all(request==next_request for request in numbered),'CALIBRATION_NAVIGATION_CONFLICT')
+    if later:summary['validated_later_pages']=sorted(set(later))
     return summary,next_request
 
 def observe(body,config,ordinal):
@@ -171,6 +180,7 @@ def observe(body,config,ordinal):
         first,last,total=counts[0]
         require(first==(ordinal-1)*5+1 and last-first+1==len(rows) and last<=total,'CALIBRATION_CONTRADICTORY_COUNTS')
         require((next_request is not None)==(last<total),'CALIBRATION_CONTRADICTORY_COUNTS')
+        require(all((p-1)*5<total for p in nav.get('validated_later_pages',[])),'CALIBRATION_CONTRADICTORY_COUNTS')
         count=dict(first=first,last=last,total=total)
     current_labels=[]
     for n in soup.select('.pager .current,.pagination .current,.paging .current,[aria-current="page"],p.pager > strong'):
@@ -255,6 +265,15 @@ def _run_five_page(dispatch,config,*,response_evidence,observation_only):
                 require(total is None or total==page['range']['total'],'CALIBRATION_CONTRADICTORY_COUNTS');total=page['range']['total']
             require(total is None or len(keys)<=total,'CALIBRATION_CONTRADICTORY_COUNTS')
             if next_request is None:require(total is None or len(keys)==total,'CALIBRATION_CONTRADICTORY_COUNTS')
+            # Preserve duplicate-control counts without repeating identical maps
+            # in the bounded trace (top/bottom Idox pagers are equivalent).
+            compact_nav={};occurrences={}
+            for kind,items in page['navigation'].items():
+                if isinstance(items,list) and items and isinstance(items[0],dict):
+                    unique={encoded(item):item for item in items}
+                    compact_nav[kind]=list(unique.values());occurrences[kind]=len(items)
+                else:compact_nav[kind]=items
+            page=dict(page,navigation=compact_nav,navigation_occurrences=occurrences)
             progress['pages'].append(page);out['records'].extend(asdict(x) for x in rows)
             out['pages'].append(dict(ordinal=ordinal,first=page['range']['first'] if page['range'] else None,last=page['range']['last'] if page['range'] else None,total=page['range']['total'] if page['range'] else None,rows=len(rows),page_size=5,body_sha256=page['body_sha256'],terminal=None));save()
             if next_request is None:break

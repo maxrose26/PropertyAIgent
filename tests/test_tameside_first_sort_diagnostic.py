@@ -58,3 +58,16 @@ def test_fourth_dispatch_impossible():
  '<a class="next" onclick="SECRET()" href="pagedSearchResults.do?action=page&searchCriteria.page=2">Next</a>'])
 def test_token_redaction_preserves_decision(fragment):
  raw=fragment.encode();clean=d.sanitise(raw);assert b'SECRET' not in clean and d.decision(raw)==d.decision(clean)
+
+def test_sort_redirect_is_third_and_last_physical_request(tmp_path,monkeypatch):
+ result,calls=worker(tmp_path,monkeypatch,[FORM,SEARCH,(b'',302,{'Location':d.CONFIG.base+'/pagedSearchResults.do?action=page&searchCriteria.page=2'})])
+ assert len(calls)==result['physical_requests']==3 and result['retries']==0 and result['sanitised_html'] is None
+
+def test_worker_refuses_database_environment_before_transport(tmp_path,monkeypatch):
+ monkeypatch.setenv('INGESTION_SOURCE_PRIVATE','ONCE');monkeypatch.setenv('DATABASE_URL','DO_NOT_USE')
+ with pytest.raises(Exception,match='PRIVATE_CREDENTIAL_FREE_SOURCE'):source_worker(SimpleNamespace(plan='not-read',output='not-written'))
+
+def test_unrecognised_field_and_query_values_redacted_even_if_numeric():
+ raw=b'<input name="session" value="123"><a href="pagedSearchResults.do?action=page&searchCriteria.page=2&session=456">Next</a>'
+ clean=d.sanitise(raw)
+ assert b'123' not in clean and b'456' not in clean and d.decision(raw)==d.decision(clean)
