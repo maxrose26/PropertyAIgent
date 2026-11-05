@@ -7,7 +7,7 @@ from datetime import date,datetime,timezone
 import pytest,psycopg
 from psycopg import sql
 from tests.e2e_pg_world import disposable_world
-from tests.e2e_connection_support import idox_audit,arcus_audit,entry,SCHEME
+from tests.e2e_connection_support import idox_audit,arcus_audit,entry,SCHEME,idox_supervised,arcus_slot_supervised
 from verification.ingestion_storage import intake_owner as op,intake_owner_operations as extra,attempt06_recovery as a06
 from verification.ingestion_storage import database_evidence as de,intake_policy,owner_pilot
 from verification.ingestion_storage.daily_intake_runtime import Runtime,execution_binding
@@ -53,7 +53,7 @@ def world(monkeypatch):
    ctl['intake_periods']={a06.PERIOD:dict(execution_binding=a06.BINDING,days={'2026-11-02':{'tameside':a06.KEY}})}
    ctl['grants'][a06.AUTHORITY]=dict(intake_run=a06.RUN,intake_period=a06.PERIOD,capture_key=a06.KEY,execution_binding=a06.BINDING,expires_at=0)
    boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
-   patch=dict(key=a06.KEY,authority=a06.AUTHORITY,revision=a06.PERIOD+'-2026-11-02-tameside',state='CLAIMED',phase='SOURCE_INTENT',fence=1,attempt_count=1,checkpoint=None,lease_until=time.time()-20,owner='synthetic')
+   patch=dict(key=a06.KEY,authority=a06.AUTHORITY,revision=a06.PERIOD+'-2026-11-02-tameside',state='CLAIMED',phase='SOURCE_INTENT',fence=1,attempt_count=1,checkpoint=None,lease_until=time.time()-20,owner='synthetic',task='DISCOVERY',contract='tameside-screening-metadata-five-v1',subject=a06.SCOPE)
    boot.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(w)||%s::jsonb)).* FROM ingestion_work_items w WHERE key=%s",(json.dumps(patch),op.CONTROL))
    boot.execute("INSERT INTO ingestion_work_attempts(work_key,fence,owner,started_at,authority,phase) VALUES(%s,1,'synthetic',0,%s,'SOURCE_INTENT')",(a06.KEY,a06.AUTHORITY))
    # Only expected hashes are substituted for private production bodies, never a validator.
@@ -161,8 +161,15 @@ def test_actual_owner_sequence_and_bounded_successor(world,tmp_path,monkeypatch,
   runtime.run.begin_source();start,end=date.fromisoformat(row['start']),date.fromisoformat(row['end'])
   records=[entry('SYNTHETIC/26',SCHEME)]
   audit=idox_audit('tameside',records,start,end) if row['council']=='tameside' else arcus_audit('manchester',records,start,end,budget='BROWSER_SOURCE_V2')
-  runtime.run.source(dict(requests=1,source_bytes=len(de.canonical(audit)),source_seconds=0.1,supervised_seconds=0.1))
-  return audit,dict(cleanup='CLOSED',exit_code=0,limit_hit=None,live_owned_survivors=0,elapsed_seconds=.1,observed_at=datetime.now(timezone.utc).isoformat())
+  folder=tmp_path/row['council'];folder.mkdir()
+  if row['council']=='tameside':
+   audit,outer=idox_supervised(folder,audit);r=audit['resource']
+   metrics=dict(requests=r['requests_attempted'],source_bytes=r['received_bytes'],source_seconds=r['elapsed_seconds'])
+  else:
+   audit,outer,_=arcus_slot_supervised(folder,audit,runtime.contract(row).scope())
+   metrics=dict(requests=audit['requests'],source_bytes=audit['decoded_bytes']+audit['encoded_bytes']+audit['outbound_payload_bytes'],source_seconds=audit['supervisor_seconds'])
+  runtime.run.source(dict(metrics,supervised_seconds=outer['elapsed_seconds']))
+  return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
  runtime.collect=source
  result=runtime.execute()
  assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result,sort_keys=True)

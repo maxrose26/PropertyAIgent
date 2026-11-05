@@ -8,6 +8,7 @@ from .database_evidence import canonical, verify_inventory
 
 PERIOD='b-dbpilot-20261027-1102-06'
 SUCCESSOR='b-dbpilot-20261027-1102-07'
+SCOPE=dict(kind='DISCOVERY_SCOPE',council='tameside',start='2026-10-27',end='2026-11-02',semantics='RECEIVED')
 RUN='f0afadd31d56467580ce61b51bbf19a3'
 JOB='job-dblr422jnfac73d8eaeg'
 KEY='dc8ae276a9c3f697b9905adf0ec8835398009769b69e788e4fd70e13216ee6fc'
@@ -86,10 +87,10 @@ def recover(c,b):
         op.require(g.get('intake_run')==RUN and g.get('intake_period')==PERIOD and g.get('capture_key')==KEY and g.get('execution_binding')==BINDING and type(g.get('expires_at')) is int and g['expires_at']==0,'A06_GRANT_BINDING')
         op.require(not c.execute("SELECT pid FROM pg_stat_activity WHERE usename=ANY(%s)",(list(op.ROLES)+['ingestion_application_login','ingestion_recovery_login'],)).fetchall(),'EXISTING_PIPELINE_SESSION')
         op.require(not any(type(v.get('expires_at')) not in (int,float) or v['expires_at']>__import__('time').time() for v in ctl.get('grants',{}).values()),'UNEXPIRED_OR_UNREADABLE_AUTHORITY')
-        row=c.execute('SELECT authority,revision,state,phase,fence,attempt_count,checkpoint,lease_until<extract(epoch FROM clock_timestamp()) FROM public.ingestion_work_items WHERE key=%s',(KEY,)).fetchone()
-        op.require(row==(AUTHORITY,PERIOD+'-2026-11-02-tameside','CLAIMED','SOURCE_INTENT',1,1,None,True),'A06_ITEM_BINDING')
+        row=c.execute('SELECT authority,revision,state,phase,fence,attempt_count,checkpoint,lease_until<extract(epoch FROM clock_timestamp()),task,contract,subject::jsonb FROM public.ingestion_work_items WHERE key=%s',(KEY,)).fetchone()
+        op.require(row==(AUTHORITY,PERIOD+'-2026-11-02-tameside','CLAIMED','SOURCE_INTENT',1,1,None,True,'DISCOVERY','tameside-screening-metadata-five-v1',SCOPE),'A06_ITEM_BINDING')
         op.require(c.execute('SELECT fence,phase,finished_at,checkpoint,authority FROM public.ingestion_work_attempts WHERE work_key=%s',(KEY,)).fetchall()==[(1,'SOURCE_INTENT',None,None,AUTHORITY)],'A06_ATTEMPT_BINDING')
-        op.require(c.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>%s AND (phase IN ('SOURCE_INTENT','WRITE_INTENT') OR state='PERSISTENCE_UNCERTAIN' OR revision=%s)",(KEY,PERIOD+'-2026-11-02-manchester')).fetchone()==(0,),'A06_OTHER_WORK')
+        op.require(c.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>%s AND (phase IN ('SOURCE_INTENT','WRITE_INTENT') OR state='PERSISTENCE_UNCERTAIN' OR revision=%s OR authority=%s)",(KEY,PERIOD+'-2026-11-02-manchester',AUTHORITY)).fetchone()==(0,),'A06_OTHER_WORK')
         op.require(c.execute("SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name",(PERIOD,RUN)).fetchall()==[(n,) for n in sorted(EVIDENCE)],'A06_EVIDENCE')
         check_evidence(c)
         expected=receipt(marker);op.require(sha(expected)==b['attempt06_receipt_sha256'],'A06_RECEIPT_BINDING')
@@ -181,7 +182,7 @@ def binding_from_saved_state(db):
         try:
             ctl=op.control(c)
             marker=ctl.get('intake_run')
-            if marker is None:marker=ctl.get('intake_periods',{}).get(PERIOD,{}).get('failed_runs',{}).get(RUN,{}).get('original_marker')
+            if not marker or marker.get('id')!=RUN:marker=ctl.get('intake_periods',{}).get(PERIOD,{}).get('failed_runs',{}).get(RUN,{}).get('original_marker')
             h=sha(receipt(marker))
         finally:c.execute('ROLLBACK')
     return dict(version='FINITE_INTAKE_OWNER_V1',period=SUCCESSOR,route='POOLER',hostaddr=db.address,owner_hostaddr=db.address,

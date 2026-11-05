@@ -25,6 +25,7 @@ def main(argv=None):
    elif args.action=='run-successor':instance.run(args.owner_checked_at);result=instance.summary()
    elif args.action=='close-successor':instance.recover();result=instance.inspect()
    else:result=instance.inspect()
+   if args.action=='run-successor':op.require(result.get('status')=='CLOSED' and result.get('pipeline_status')=='VERIFIED_RETAINED_AND_SCREENED','A06_SUCCESSOR_NOT_VERIFIED')
   else:
    b=a06.binding_from_saved_state(db)
    if args.action=='inspect-binding':result={'status':'READ_ONLY_BINDING','period':a06.SUCCESSOR,'receipt_sha256':b['attempt06_receipt_sha256']}
@@ -36,8 +37,10 @@ def main(argv=None):
     # A new connection, and no retry after any mutation exception.
     with pilot.envelope(),db.connection() as c:result=a06.readback(c,b,phase)
   print(json.dumps(result,sort_keys=True));return 0
- except BaseException:
+ except BaseException as exc:
   # No exception values, driver messages, environment or private state exported.
-  print(json.dumps({'status':'STOP_RECONCILE_NO_RETRY','action':args.action,'effects':'UNKNOWN_UNTIL_READBACK'}));return 2
+  allowed={'A06_EXACT_AUTHORITY','A06_RECEIPT_BINDING','A06_PREDECESSOR_CLOSURE','A06_RUN_IDENTITY','A06_STOP_DRIFT','A06_EVIDENCE','A06_ITEM_BINDING','A06_ATTEMPT_BINDING','A06_OTHER_WORK','A06_PERIOD_BINDING','A06_GRANT_BINDING','A06_RECOVERY_ADMIN_ONLY','A06_PERMISSION_CLEANUP','A06_RECOVERY_EFFECTS','A06_RECEIPT','A06_SUCCESSOR_BINDING','A06_DISPOSITION','A06_SUCCESSOR_NOT_VERIFIED','A06_RECOVERED_ITEM','A06_RECOVERED_ATTEMPT','A06_ALREADY_DISPOSED'}
+  code=exc.args[0] if isinstance(exc,op.Denied) and len(exc.args)==1 and type(exc.args[0]) is str and exc.args[0] in allowed else 'UNCLASSIFIED'
+  print(json.dumps({'status':'STOP_RECONCILE_NO_RETRY','reason':code,'action':args.action,'effects':'UNKNOWN_UNTIL_READBACK'}));return 2
 
 if __name__=='__main__':raise SystemExit(main())
