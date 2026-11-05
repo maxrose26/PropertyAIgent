@@ -105,7 +105,8 @@ def test_supervisor_refuses_changed_envelope_before_launch(tmp_path,monkeypatch,
   supervise(['never'],environment=env,root=tmp_path/'owned',source=True,seconds=seconds,diagnostic_mode=d.MODE)
 
 def test_supervisor_actual_child_environment_and_cleanup(tmp_path):
- import sys
+ import sys,tempfile
+ tmp_path=__import__('pathlib').Path(tempfile.mkdtemp(prefix='mnav-test-'))
  from verification.ingestion_storage.operational_supervisor import supervise
  result=supervise([sys.executable,'-c',"import os;assert set(os.environ)<={'PATH','HOME','TMPDIR','LANG','PYTHONNOUSERSITE','PYTHONDONTWRITEBYTECODE','OPENBLAS_NUM_THREADS','INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH','LC_CTYPE'}"],
   environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root=tmp_path/'owned',source=True,seconds=45,diagnostic_mode=d.MODE)
@@ -113,7 +114,8 @@ def test_supervisor_actual_child_environment_and_cleanup(tmp_path):
 
 @pytest.mark.skipif(__import__('os').environ.get('MANCHESTER_REAL_BROWSER')!='1',reason='explicit isolated browser runtime required')
 def test_actual_supervised_worker_45_second_envelope(tmp_path):
- import sys,threading
+ import sys,threading,tempfile
+ owned_root=__import__('pathlib').Path(tempfile.mkdtemp(prefix='mnav-test-'))/'owned'
  from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
  from verification.ingestion_storage.operational_supervisor import supervise
  calls=[]
@@ -127,9 +129,16 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path):
  plan.write_text(json.dumps(dict(row=d.ROW,fixture=None,diagnostic_mode=d.MODE)))
  code=f"from verification.discovery import manchester_navigation_diagnostic as d;d.DESTINATION='http://127.0.0.1:{server.server_port}/initial';from verification.ingestion_storage.daily_intake_runtime import source_worker;from types import SimpleNamespace;source_worker(SimpleNamespace(plan={str(plan)!r},output={str(out)!r}))"
  try:
-  result=supervise([sys.executable,'-B','-c',code],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root=tmp_path/'owned',source=True,seconds=45,diagnostic_mode=d.MODE)
+  result=supervise([sys.executable,'-B','-c',code],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root=owned_root,source=True,seconds=45,diagnostic_mode=d.MODE)
  finally:server.shutdown();server.server_close();thread.join()
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['accounting_complete'] and result['live_owned_survivors']==0,result
  obs=json.loads(out.read_text())
  assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED'
  assert result['elapsed_seconds']<45
+
+
+def test_long_browser_temp_path_refused_before_launch(tmp_path,monkeypatch):
+ from verification.ingestion_storage.operational_supervisor import supervise
+ monkeypatch.setattr('subprocess.Popen',lambda *a,**k:pytest.fail('LAUNCH_REACHED'))
+ with pytest.raises(ValueError,match='DIAGNOSTIC_TEMP_PATH_BOUND'):
+  supervise(['never'],environment={'INGESTION_SOURCE_PRIVATE':'ONCE','PLAYWRIGHT_BROWSERS_PATH':'/tmp/propertyaigent-manchester-diagnostic-browser'},root='/tmp/'+'x'*60,source=True,seconds=45,diagnostic_mode=d.MODE)

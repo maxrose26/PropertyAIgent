@@ -4,7 +4,7 @@ from pathlib import Path
 from verification.discovery.manchester_navigation_diagnostic import MODE,ROW
 from verification.ingestion_storage.operational_supervisor import supervise
 
-ROOT=Path('/tmp/propertyaigent-manchester-navigation-once-20261105')
+ROOT=Path('/tmp/pai-mnav-20261105')
 def main():
  # Exclusive directory is the local submission receipt. Never reuse on uncertainty.
  ROOT.mkdir(mode=0o700,exist_ok=False)

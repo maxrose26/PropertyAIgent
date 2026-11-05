@@ -14,6 +14,8 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   if diagnostic_mode!='MANCHESTER_INITIAL_NAVIGATION_V1' or not source or seconds!=45 or execution_budget is not None or render_profile is not None:raise ValueError('FIXED_DIAGNOSTIC_ENVELOPE')
   if set(environment)!={'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH'} or environment['INGESTION_SOURCE_PRIVATE']!='ONCE':raise ValueError('DIAGNOSTIC_ENVIRONMENT')
   if environment['PLAYWRIGHT_BROWSERS_PATH']!='/tmp/propertyaigent-manchester-diagnostic-browser':raise ValueError('DIAGNOSTIC_BROWSER_PATH')
+  # Fixed short temporary root for the validated isolated browser envelope.
+  if not Path(root).is_absolute() or len(str(Path(root)))>40:raise ValueError('DIAGNOSTIC_TEMP_PATH_BOUND')
  if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
  single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
  if execution_budget is not None:
