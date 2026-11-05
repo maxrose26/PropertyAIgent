@@ -58,6 +58,23 @@ def poll_diagnostic(error):
                 code=code or 'UNCLASSIFIED',exception_kind=safe['exception_kind'],sqlstate=safe['sqlstate'],message_exported=False)
 
 
+def source_boundary_diagnostic(outer,output):
+    """Bounded decisions only; no child stderr, paths, contents or exception text."""
+    limits={'PROCESS_RSS','AGGREGATE_RSS','DEADLINE','OWNER_STOP','OUTPUT_BOUND',
+            'ACCOUNTING_UNCERTAIN','LAUNCH_OR_ACCOUNTING_UNCERTAIN',
+            'ADOPTED_CLEANUP_UNCERTAIN','CLEANUP_DEADLINE','OUTPUT_ACCOUNTING'}
+    code=outer.get('exit_code');limit=outer.get('limit_hit')
+    try:
+        state=('WITHIN_BOUND' if output.stat().st_size<=512*1024 else 'TOO_LARGE') if output.is_file() else 'MISSING_OR_NOT_FILE'
+    except OSError:state='STAT_UNVERIFIED'
+    return dict(version='SOURCE_BOUNDARY_V1',
+        worker_exit=code if type(code) is int and -255<=code<=255 else None,
+        worker_exit_state='ZERO' if type(code) is int and code==0 else 'NONZERO' if type(code) is int else 'UNVERIFIED',
+        process_cleanup='CLOSED' if outer.get('cleanup')=='CLOSED' else 'UNVERIFIED',
+        limit='NONE' if limit is None else limit if type(limit) is str and limit in limits else 'UNCLASSIFIED',
+        output=state,request_count_status='UNKNOWN',message_exported=False)
+
+
 def require_source_context(councils,*,disposable,profile=None,binding=None):
     if not disposable and 'manchester' in councils:
         from .render_intake import validate_profile,MemoryMonitor,SERVICE
@@ -260,6 +277,7 @@ class Runtime:
             outer=results[0]
             self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
+            self.emit('source_boundary_failed',source_boundary_diagnostic(outer,output))
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
         source=json.loads(output.read_bytes());outer['observed_at']=datetime.now(timezone.utc).isoformat()
         if row['council']=='manchester':
