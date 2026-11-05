@@ -76,10 +76,10 @@ def validate_binding(b, *, opening=False, now=None):
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06'),'OWNER_DATABASE_PILOT_SCOPE')
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06','b-dbpilot-20261027-1102-07'),'OWNER_DATABASE_PILOT_SCOPE')
     if 'credential_policy' in b:
         require(database and b['credential_policy']=='STABLE_RESTRICTED_V1' and type(b.get('credential_verifier_sha256')) is dict and set(b['credential_verifier_sha256'])==set(ROLES) and all(re.fullmatch('[a-f0-9]{64}',v) for v in b['credential_verifier_sha256'].values()),'STABLE_VERIFIER_BINDING')
-    require(b.get('accepted_stop') == ACCEPTED_STOP, 'OWNER_STOP_BINDING')
+    require(b.get('accepted_stop') == accepted_stop(b), 'OWNER_STOP_BINDING')
     if 'publication_mint' in b:
         m=b['publication_mint']
         require(type(m) is dict and set(m)=={'authority_sha256','receipt_sha256','expires_at'} and
@@ -106,6 +106,15 @@ def validate_binding(b, *, opening=False, now=None):
         elif 'publication_mint' in b:
             require(b['valid_until']-now > MINT_START_MIN_SECONDS,'MINT_B_AND_CLOSURE_WINDOW')
     return b
+
+
+def accepted_stop(b):
+    from . import attempt06_recovery as a06
+    if b.get('period')==a06.SUCCESSOR:
+        require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and re.fullmatch('[a-f0-9]{64}',b.get('attempt06_receipt_sha256','')),'A06_SUCCESSOR_BINDING')
+        return a06.ACCEPTED
+    require('attempt06_receipt_sha256' not in b,'A06_SUCCESSOR_BINDING')
+    return ACCEPTED_STOP
 
 
 def reviewed_application_binding():
@@ -345,6 +354,8 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         c.execute('LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE')
         ctl=control(c,locked=True)
         require(stop_snapshot(ctl) == b['accepted_stop'], 'ACTIVATION_STOP_CHANGED')
+        from .attempt06_recovery import successor_guard
+        successor_guard(c,b,ctl)
         retained_cleanup(c, ctl); no_hazards(c, ctl)
         leave_owner(c)
         prior = settings(c); original_ledger = ledger_sha(c)

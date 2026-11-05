@@ -39,7 +39,7 @@ def validate_policy(b, policy, *, now=None):
     op.require(hashlib.sha256(canonical(policy)).hexdigest() == b.get('period_policy_sha256'), 'PERIOD_POLICY_HASH')
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
     application=op.reviewed_application_binding() if database else op.APPLICATION_BINDING
-    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.ACCEPTED_STOP, 'PERIOD_REVIEWED_BINDINGS')
+    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
     op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and (database or policy['expires_at'] <= b.get('publication_valid_until',0)), 'PERIOD_ROUTE_EXPIRY')
     if database:op.require(policy['evidence_backend']==b['evidence_backend'] and policy['fixed_window']==b['fixed_window'] and policy['access_deadline']==b['valid_until'] and policy['expires_at']==b['valid_until']-185,'PERIOD_DATABASE_FIXED_DEADLINES')
     if 'timing_policy' in b:
@@ -80,8 +80,10 @@ class PeriodIssuer(Owner):
             rows=c.execute(ISSUER_MEMBERS).fetchall()
             op.require(len(rows)==1 and rows[0][0]!='postgres' and rows[0][1:]==(True,False,False) and c.execute(FLAGS).fetchone()==(False,False), 'PERIOD_EXISTING_ISSUER_ADMIN_ONLY')
             before=op.control(c)
-            op.require(op.stop_snapshot(before)==op.ACCEPTED_STOP, 'PERIOD_STOP_CHANGED')
+            op.require(op.stop_snapshot(before)==op.accepted_stop(self.journal['binding']), 'PERIOD_STOP_CHANGED')
             op.retained_cleanup(c,before);op.no_hazards(c,before)
+            from .attempt06_recovery import successor_guard
+            successor_guard(c,self.journal['binding'],before)
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')
