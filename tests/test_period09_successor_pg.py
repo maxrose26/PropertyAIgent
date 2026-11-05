@@ -167,3 +167,25 @@ def test_registration_ack_reconciled_without_repetition(ready09,mode):
  if mode=='lost':assert {k:ctl['intake_periods'][p09.SUCCESSOR][k] for k in p}==p
  else:assert p09.SUCCESSOR not in ctl['intake_periods'] and op.ledger_sha(c)==before
  assert c.execute(op.MEMBERS).fetchall()==w['members'] and backlog(w)==w['protected_backlog']
+
+@pytest.mark.parametrize('change',['both','tameside','other_period','generation','receipt','binding'])
+def test_sql_registration_scope_not_just_python_guard(ready09,change):
+ from verification.ingestion_storage.owner_pilot_continuation import migrate_owner_namespace
+ w=ready09;c=w['boot'];act(w,p09.dispose);b=w['binding'];policy=copy.deepcopy(w['policy']);period=p09.SUCCESSOR
+ with w['actor']() as actor:migrate_owner_namespace(actor,attempt09=True,binding09=b,stable_verifiers=b['credential_verifier_sha256'])
+ before=op.ledger_sha(c);members=c.execute(op.MEMBERS).fetchall()
+ if change=='both':policy['councils']=copy.deepcopy(extra.COUNCILS)
+ if change=='tameside':policy['councils']={'tameside':extra.COUNCILS['tameside']}
+ if change=='other_period':period='b-dbpilot-20261027-1102-10'
+ if change=='binding':policy['execution_binding']['revision']='0'*40
+ c.execute('BEGIN')
+ try:
+  if change in ('generation','receipt'):
+   ctl=op.control(c)
+   if change=='generation':ctl['hard_stop_generation']=12;policy['expected_stop']['hard_stop_generation']=12
+   else:ctl['intake_periods'][s.PERIOD]['failure_disposition']['receipt_sha256']='0'*64
+   c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
+  with pytest.raises(__import__('psycopg').errors.RaiseException):
+   c.execute('SELECT ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(operation='intake_period',period=period,policy=policy)),))
+ finally:c.execute('ROLLBACK')
+ assert op.ledger_sha(c)==before and c.execute(op.MEMBERS).fetchall()==members

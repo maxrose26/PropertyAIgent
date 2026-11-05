@@ -217,6 +217,7 @@ class Runtime:
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
+        if self.args.period=='b-dbpilot-20261027-1102-09' and not self.test:plan['file_profile']='MANCHESTER_PERIOD09_V1'
         plan_path=self.root/(row['council']+'-plan.json');plan_path.write_bytes(canonical(plan))
         output=self.root/(row['council']+'-source.json')
         # SQL and its signal-based hard deadline stay on the main thread.
@@ -472,6 +473,10 @@ def source_worker(args):
     import resource
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
     file_ceiling=512*1024
+    if plan.get('file_profile') is not None:
+        fixed=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
+        if plan!=dict(row=fixed,fixture=None,file_profile='MANCHESTER_PERIOD09_V1'):raise Denied('MANCHESTER_FILE_PROFILE_SCOPE')
+        file_ceiling=2*1024*1024
     if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
         from verification.discovery.manchester_navigation_diagnostic import MODE,ROW
         if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
