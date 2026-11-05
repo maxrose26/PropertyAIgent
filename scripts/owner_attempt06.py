@@ -9,13 +9,13 @@ from verification.ingestion_storage import owner_pilot as pilot
 
 def main(argv=None):
  p=argparse.ArgumentParser()
- p.add_argument('--action',required=True,choices=('inspect-binding','settle','read-recovery','dispose','read-disposition','prepare-successor','verify-successor','run-successor','close-successor','status'))
+ p.add_argument('--action',required=True,choices=('inspect-binding','settle','read-recovery','dispose','read-disposition','prepare-successor','reconcile-startup','verify-successor','run-successor','close-successor','status'))
  p.add_argument('--owner-checked-at',type=float)
  args=p.parse_args(argv)
  try:
   op.require(os.environ.get('PROPERTYAIGENT_OWNER_PILOT_AUTHORITY')==a06.SUCCESSOR,'A06_EXACT_AUTHORITY')
   a06.configure_successor();db=pilot.Database()
-  if args.action in ('prepare-successor','verify-successor','run-successor','close-successor','status'):
+  if args.action in ('prepare-successor','reconcile-startup','verify-successor','run-successor','close-successor','status'):
    release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
    b=a06.binding_from_saved_state(db)
    op.require(release.get('attempt06_receipt_sha256',b['attempt06_receipt_sha256'])==b['attempt06_receipt_sha256'],'A06_RECEIPT_BINDING')
@@ -23,6 +23,9 @@ def main(argv=None):
    os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']=json.dumps(release)  # in-memory receipt binding; no configuration write
    instance=pilot.Pilot(db)
    if args.action=='prepare-successor':instance.prepare_continuation();result=instance.summary()
+   elif args.action=='reconcile-startup':
+    from verification.ingestion_storage.owner_startup07_reconciliation import reconcile,RECEIPT
+    result=reconcile(instance,{'version':'ATTEMPT07_STARTUP_RECEIPT_V1','receipt':RECEIPT})
    elif args.action=='verify-successor':result=instance.verify_release_binding()
    elif args.action=='run-successor':instance.run(args.owner_checked_at);result=instance.summary()
    elif args.action=='close-successor':instance.recover();result=instance.inspect()
