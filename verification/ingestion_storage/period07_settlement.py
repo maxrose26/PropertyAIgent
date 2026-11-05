@@ -16,6 +16,7 @@ KEY='ef5afe887f3e5162212fc33f2cf4429d5cbb19cf11bede34e2d1156b09741bc5'
 AUTHORITY='INGESTION_CHAIN_TAMESIDE_CAPTURE_C4DCC4619ADA'
 BINDING=dict(revision='54700366bab5434a5cda30abc853e0dc6dcc5d33',workflow_sha256='e5289d43dbd05f2ffa051529c4feeb6aa32fb719c621de00df3638e077bf78e4',manifest_sha256='482e137a9a62fdd1007ee351845a4fc2c0825693dfc3472217c2ac8d4c3b74fc')
 EVIDENCE={'capture-1/source.json':'08171942f8a8ddc5f125d3468f7df800eef7189d0a80cc92ebf0094bd8b3bdf8','final/events-before-publication.json':'4abd400c87f26ea09743ee355ec40c98ae3d157fb652012c796dcc94d8ae9e21','final/result-before-publication.json':'f1c1d65333ffee46af4c8c48c964ffcf5d3429cd10a5be653f63deac1565ac8b'}
+MARKER_SHA='ba74765f7d35eb420a12f59e3ac8207d17778892108d3529ca8808324d6167fc'
 JOURNAL_SHA='31e7d340047e37df0d0e4382374dce5ccc939b1eb819d1213f11e238fa69fdf2'
 A06_RECEIPT_SHA='25470c04237b8cc167b4ceb6a10dc612601683108f27aebffab9ad61dd778b6e'
 STOP8=dict(a06.STOP6,hard_stop_generation=8)
@@ -46,6 +47,7 @@ def evidence(c):
     require(isinstance(events,list) and [e['data']['metrics']['requests'] for e in events if e.get('event')=='source_closed' and e.get('data',{}).get('council')=='tameside']==[3],'ACCOUNTING_EVIDENCE')
 
 def receipt(marker):
+    require(a06.sha(marker)==MARKER_SHA,'MARKER_HASH')
     require(type(marker) is dict and marker.get('id')==RUN and marker.get('period')==PERIOD and marker.get('state')=='OPEN' and marker.get('day')=='2026-11-02' and marker.get('publication_path')==f'docs/design/ingestion-operational-execution-daily-intake/{PERIOD}/{RUN}/final/result-before-publication.json','MARKER')
     return dict(version='PERIOD07_FAILED_RECOVERY_V1',original_marker=copy.deepcopy(marker),period=PERIOD,run_id=RUN,job_id=JOB,execution_binding=BINDING,evidence=EVIDENCE,status='FAILED_RECONCILED',coverage='NOT_ESTABLISHED',actual_requests=3,request_count_status='COMPLETE',source_failure='CALIBRATION_NAVIGATION_AMBIGUOUS',validation_failure='IDOX_PAGINATION_PROFILE_BINDING',exact_navigation_cause='UNPROVEN',manchester='NOT_ATTEMPTED',recovered_key=KEY,recovered_fence=2,source_or_write_replay_authorised=False,stop_before=STOP8,stop_after=STOP9)
 

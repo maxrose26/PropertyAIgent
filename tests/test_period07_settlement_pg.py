@@ -11,6 +11,7 @@ def failed07(world,monkeypatch):
  ctl=op.control(c);monkeypatch.setattr(s,'A06_RECEIPT_SHA',a.sha(ctl['intake_periods'][a.PERIOD]['failed_runs'][a.RUN]))
  w['history06']=copy.deepcopy(ctl['intake_periods'][a.PERIOD]);ctl.update(s.STOP8)
  ctl['intake_run']=dict(id=s.RUN,period=s.PERIOD,state='OPEN',day='2026-11-02',publication_path=path(s.PERIOD,s.RUN,'final/result-before-publication.json'))
+ monkeypatch.setattr(s,'MARKER_SHA',a.sha(ctl['intake_run']))
  ctl['intake_periods'][s.PERIOD]=dict(execution_binding=s.BINDING,evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},max_runs=1,councils={'tameside':{},'manchester':{}},days={'2026-11-02':{'tameside':s.KEY}})
  ctl['grants'][s.AUTHORITY]=dict(intake_run=s.RUN,intake_period=s.PERIOD,capture_key=s.KEY,execution_binding=s.BINDING,expires_at=0)
  ctl['unrelated_preserved']={'stop':'DO_NOT_CHANGE'}
