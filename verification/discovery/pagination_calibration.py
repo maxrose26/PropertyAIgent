@@ -17,12 +17,13 @@ TRACE_LIMIT=8192
 CODES=frozenset('CALIBRATION_SCOPE CALIBRATION_RETENTION_INCOMPLETE CALIBRATION_PAGE_SIZE_IGNORED CALIBRATION_SORT_CHANGED CALIBRATION_PAGE_IDENTITY CALIBRATION_NAVIGATION_AMBIGUOUS CALIBRATION_NAVIGATION_UNSUPPORTED CALIBRATION_NAVIGATION_CONFLICT CALIBRATION_REPEATED_PAGE CALIBRATION_DUPLICATE_IDENTITY CALIBRATION_CONTRADICTORY_COUNTS CALIBRATION_ERROR_RESPONSE CALIBRATION_SESSION_EXPIRED CALIBRATION_UNEXPECTED_MESSAGE CALIBRATION_ROW_LAYOUT_REFUSED CALIBRATION_SEARCH_BINDING CALIBRATION_PAGE_CAP CALIBRATION_ROW_CAP CALIBRATION_REQUEST_CAP CALIBRATION_BYTE_CAP CALIBRATION_DEADLINE CALIBRATION_TRACE_BOUND CALIBRATION_TRACE_IO CALIBRATION_UNKNOWN'.split())
 
 class CalibrationError(ValueError):
-    def __init__(self,code):
+    def __init__(self,code,detail=None):
         self.code=code if type(code) is str and code in CODES else 'CALIBRATION_UNKNOWN'
+        self.detail=detail
         super().__init__(self.code)
 
-def require(ok,code):
-    if not ok:raise CalibrationError(code)
+def require(ok,code,detail=None):
+    if not ok:raise CalibrationError(code,detail)
 
 def checkpoint(path,value):
     raw=encoded(value);require(len(raw)<=TRACE_LIMIT,'CALIBRATION_TRACE_BOUND')
@@ -84,10 +85,10 @@ def directions(soup,config,current):
                 values=q.get('searchCriteria.page',[])
                 paging='searchCriteria.page' in q or urlsplit(node.get('href','')).path.endswith('/pagedSearchResults.do') or urlsplit(node.get('href','')).path=='pagedSearchResults.do'
                 if paging and label.isdigit() and len(label)<=3 and int(label)>current:
-                    require(int(label)==current+1,'CALIBRATION_NAVIGATION_AMBIGUOUS')
+                    require(int(label)==current+1,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_LINK_SKIPS_ADJACENT_PAGE')
                     kind='NUMBERED_NEXT'
                 elif any(v.isdigit() and (len(v)>3 or int(v)>current) for v in values):
-                    raise CalibrationError('CALIBRATION_NAVIGATION_AMBIGUOUS')
+                    raise CalibrationError('CALIBRATION_NAVIGATION_AMBIGUOUS','UNCLASSIFIED_FORWARD_PAGE_LINK')
             if kind is None:continue
         e=dict(kind=kind,element=node.name,disabled=disabled(node),method=None,action_path=None,fields={},page=None)
         if not e['disabled']:
@@ -113,7 +114,7 @@ def directions(soup,config,current):
                         value=field.get('value','')
                     elif field.name=='input' and typ=='hidden':value=field.get('value','')
                     elif field.name=='select':
-                        options=field.select('option[selected]');require(len(options)==1,'CALIBRATION_NAVIGATION_AMBIGUOUS');value=options[0].get('value','')
+                        options=field.select('option[selected]');require(len(options)==1,'CALIBRATION_NAVIGATION_AMBIGUOUS','POST_SELECT_NOT_SINGLE');value=options[0].get('value','')
                     else:raise CalibrationError('CALIBRATION_NAVIGATION_UNSUPPORTED')
                     require(name in {'_csrf','searchCriteria.page','action','orderBy','orderByDirection','searchCriteria.resultsPerPage'} and name not in fields and type(value) is str and len(value)<=1024,'CALIBRATION_NAVIGATION_UNSUPPORTED')
                     fields[name]=value
@@ -128,13 +129,13 @@ def directions(soup,config,current):
     for kind,items in found.items():
         active=[x for x in items if not x[0]['disabled']]
         require(not active or len(active)==len(items),'CALIBRATION_NAVIGATION_CONFLICT')
-        unique={x[1] for x in active};require(len(unique)<=1,'CALIBRATION_NAVIGATION_AMBIGUOUS')
+        unique={x[1] for x in active};require(len(unique)<=1,'CALIBRATION_NAVIGATION_AMBIGUOUS','MULTIPLE_DISTINCT_DIRECTION_REQUESTS')
         summary[kind.lower()]=[x[0] for x in items]
         if kind=='NEXT' and active:next_request=active[0][1]
     # A numbered link can corroborate an explicit Next; it never authorises
     # navigation on its own. Reconcile after scanning both top/bottom pagers.
     numbered=[request for evidence,request in found['NUMBERED_NEXT'] if not evidence['disabled']]
-    require(not numbered or next_request is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS')
+    require(not numbered or next_request is not None,'CALIBRATION_NAVIGATION_AMBIGUOUS','NUMBERED_WITHOUT_EXPLICIT_NEXT')
     require(all(request==next_request for request in numbered),'CALIBRATION_NAVIGATION_CONFLICT')
     return summary,next_request
 
@@ -281,6 +282,9 @@ def _run_five_page(dispatch,config,*,response_evidence,observation_only):
         else:code='CALIBRATION_UNKNOWN'
         from .source_diagnostics import shape,transport_facts
         out['failure_diagnostic']=shape(b'',stage,'UNCLASSIFIED_FAILURE',transport_facts(b.last_response,exc,failure=b.transport_failure))
+        if type(exc) is CalibrationError and exc.detail is not None:
+            # Fixed codes only: no DOM text, URLs, form values, cookies or tokens.
+            out['navigation_refusal']=dict(version='PAGINATION_REFUSAL_V1',check=exc.detail,stage=stage,ordinal=ordinal if stage=='PAGE_PARSE' else None,body_sha256=sha(body) if stage=='PAGE_PARSE' else None)
         progress.update(state='STOPPED_REQUIRES_REVIEW',failure=code);out['failure']=code;out['capped']=code.endswith('_CAP');out['completeness']='FAILED'
         try:save()
         except Exception:pass
