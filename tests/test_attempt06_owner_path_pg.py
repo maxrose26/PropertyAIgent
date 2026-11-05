@@ -48,7 +48,7 @@ def world(monkeypatch):
     patch=dict(key=key,state='SAFETY_BLOCKED',phase='RECOVERED',fence=2,owner=None,lease_until=None)
     boot.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(w)||%s::jsonb)).* FROM ingestion_work_items w WHERE key=%s",(json.dumps(patch),op.CONTROL))
     boot.execute("INSERT INTO ingestion_work_attempts(work_key,fence,owner,started_at,finished_at,authority,phase) VALUES(%s,1,'synthetic',0,1,'synthetic','RECOVERED')",(key,))
-   marker=dict(id=a06.RUN,period=a06.PERIOD,state='OPEN',day='2026-11-02')
+   marker=dict(id=a06.RUN,period=a06.PERIOD,state='OPEN',day='2026-11-02',publication_path=de.path(a06.PERIOD,a06.RUN,'final/result-before-publication.json'))
    ctl['intake_run']=marker
    ctl['intake_periods']={a06.PERIOD:dict(execution_binding=a06.BINDING,days={'2026-11-02':{'tameside':a06.KEY}})}
    ctl['grants'][a06.AUTHORITY]=dict(intake_run=a06.RUN,intake_period=a06.PERIOD,capture_key=a06.KEY,execution_binding=a06.BINDING,expires_at=0)
@@ -165,7 +165,7 @@ def test_actual_owner_sequence_and_bounded_successor(world,tmp_path,monkeypatch,
   return audit,dict(cleanup='CLOSED',exit_code=0,limit_hit=None,live_owned_survivors=0,elapsed_seconds=.1,observed_at=datetime.now(timezone.utc).isoformat())
  runtime.collect=source
  result=runtime.execute()
- assert result['status']=='RETAINED_AND_SCREENED',result
+ assert result['status']=='RETAINED_AND_SCREENED',json.dumps(result,sort_keys=True)
  assert result['authority_closure']=='INVALIDATED' and result['cleanup']=='CLOSED'
  ctl=op.control(c);assert ctl['intake_run']['state']=='VERIFIED' and ctl['intake_run']['id']!=a06.RUN
  assert ctl['intake_periods'][a06.PERIOD]['failed_runs']==saved['failed_runs'] and op.stop_snapshot(ctl)==a06.ACCEPTED
@@ -176,3 +176,23 @@ def test_actual_owner_sequence_and_bounded_successor(world,tmp_path,monkeypatch,
  assert c.execute(op.MEMBERS).fetchall()==w['members']
  record_property('postgres_version',w['server_version']);record_property('actor_superuser',False)
  record_property('sequence','recover/readback/dispose/readback/issue/activate/runtime/close')
+
+
+def test_successor_namespace_preserves_encrypted_history(world,monkeypatch):
+ from verification.ingestion_storage.owner_pilot_continuation import migrate_owner_namespace
+ w=world;boot=w['boot'];act(w,a06.recover);read(w,'recovery');act(w,a06.dispose);read(w,'disposition')
+ # Synthetic installed Attempt06 namespace, using its exact original SQL body.
+ boot.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner');boot.execute('SET ROLE ingestion_storage_owner')
+ boot.execute(de.ATTEMPT06_OWNER_SQL.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+ boot.execute('RESET ROLE');boot.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')
+ boot.execute('GRANT CREATE ON SCHEMA public TO postgres WITH GRANT OPTION')
+ old=a06.PERIOD+'_owner';rid=hashlib.sha256(old.encode()).hexdigest()[:32]
+ with w['actor']() as c:prior=c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)',(old,rid,'',b'synthetic-encrypted-history')).fetchone()
+ release=json.loads(__import__('os').environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE']);release['attempt06_receipt_sha256']=w['binding']['attempt06_receipt_sha256'];monkeypatch.setenv('PROPERTYAIGENT_INTAKE_SOURCE_RELEASE',json.dumps(release))
+ members=boot.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(boot)
+ with w['actor']() as c:result=migrate_owner_namespace(c,attempt07=True,stable_verifiers=w['binding']['credential_verifier_sha256'])
+ assert result['permissions_restored'] and op.ledger_sha(boot)==ledger and boot.execute(op.MEMBERS).fetchall()==members
+ with w['actor']() as c:
+  assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,NULL::bytea)',(old,rid,'')).fetchone()==prior
+  new=a06.SUCCESSOR+'_owner';newid=hashlib.sha256(new.encode()).hexdigest()[:32]
+  assert c.execute('SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)',(new,newid,'',b'synthetic-successor')).fetchone()[0]==0

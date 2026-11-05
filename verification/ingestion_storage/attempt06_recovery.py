@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import re
 from . import intake_owner as op
 from .database_evidence import canonical, verify_inventory
 
@@ -21,7 +22,7 @@ ROLE='ingestion_recovery_operator'
 def sha(value):return hashlib.sha256(canonical(value)).hexdigest()
 
 def marker_valid(marker):
-    op.require(type(marker) is dict and marker.get('id')==RUN and marker.get('period')==PERIOD and marker.get('state')=='OPEN' and marker.get('day')=='2026-11-02','A06_RUN_IDENTITY')
+    op.require(type(marker) is dict and marker.get('id')==RUN and marker.get('period')==PERIOD and marker.get('state')=='OPEN' and marker.get('day')=='2026-11-02' and marker.get('publication_path')=='docs/design/ingestion-operational-execution-daily-intake/'+PERIOD+'/'+RUN+'/final/result-before-publication.json','A06_RUN_IDENTITY')
 
 def receipt(marker):
     marker_valid(marker)
@@ -52,6 +53,7 @@ def disposition(receipt_sha):return dict(version='ATTEMPT06_DISPOSITION_V1',rece
 
 def successor_guard(c,b,ctl):
     if b.get('period')!=SUCCESSOR:return
+    op.require(type(b.get('attempt06_receipt_sha256')) is str and re.fullmatch('[a-f0-9]{64}',b['attempt06_receipt_sha256']),'A06_RECEIPT_BINDING')
     op.require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and b.get('accepted_stop')==ACCEPTED,'A06_SUCCESSOR_BINDING')
     history(c,ctl,disposed=True,expected_sha=b.get('attempt06_receipt_sha256'))
     op.require(op.stop_snapshot(ctl)==ACCEPTED,'A06_STOP_DRIFT')
@@ -149,3 +151,39 @@ def readback(c,b,phase):
         op.require(c.execute("SELECT pg_has_role(current_user,'ingestion_recovery_operator','USAGE'),pg_has_role(current_user,'ingestion_recovery_operator','SET')").fetchone()==(False,False),'A06_PERMISSION_CLEANUP')
         return dict(status='COMMITTED_STATE_VERIFIED_READ_ONLY',phase=phase,receipt_sha256=sha(r),stop=op.stop_snapshot(ctl),retry=False)
     finally:c.execute('ROLLBACK')
+
+def predecessor06(state,*,snapshot):
+    """Reuse existing encrypted credentials only from the exact closed Attempt06 job."""
+    op.require(type(state) is dict and state.get('period')==PERIOD and state.get('status')=='CLOSED' and state.get('job',{}).get('id')==JOB
+        and state.get('access',{}).get('state')=='DATABASE_CLOSURE_ACKNOWLEDGED'
+        and state['access'].get('render',{}).get('state')=='RESTORATION_ACKNOWLEDGED'
+        and state.get('closure_verification',{}).get('status')=='VERIFIED'
+        and state.get('closure_verification',{}).get('authorities_closed') is True
+        and state.get('closure_verification',{}).get('sessions')==0
+        and state.get('final_service')==dict(suspended=True,configuration_equal=True,environment_equal=True)
+        and state.get('stable_credentials',{}).get('version')=='STABLE_RESTRICTED_V1'
+        and set(state['stable_credentials'].get('passwords',{}))==set(op.ROLES)
+        and set(state['stable_credentials'].get('verifier_sha256',{}))==set(op.ROLES),'A06_PREDECESSOR_CLOSURE')
+    return dict(period=PERIOD,job_id=JOB,snapshot=snapshot,state_sha256=sha(state),source_requests='UNKNOWN',manchester='NOT_ATTEMPTED',execution_identity=SUCCESSOR)
+
+def configure_successor():
+    from . import owner_pilot as pilot
+    pilot.PERIOD=SUCCESSOR;pilot.PREDECESSOR=PERIOD
+    pilot.OWNER_PERIOD=SUCCESSOR+'_owner';pilot.OWNER_RUN=hashlib.sha256(pilot.OWNER_PERIOD.encode()).hexdigest()[:32]
+
+def binding_from_saved_state(db):
+    """No fresh secret, copied credential, policy write or expiry extension."""
+    from .owner_pilot import Journal,envelope
+    prior=Journal(db,PERIOD);old=prior.load()
+    predecessor06(old,snapshot=dict(ordinal=prior.ordinal,bytes=prior.ciphertext_bytes,sha256=prior.previous))
+    with envelope(),db.connection() as c:
+        c.execute('BEGIN READ ONLY')
+        try:
+            ctl=op.control(c)
+            marker=ctl.get('intake_run')
+            if marker is None:marker=ctl.get('intake_periods',{}).get(PERIOD,{}).get('failed_runs',{}).get(RUN,{}).get('original_marker')
+            h=sha(receipt(marker))
+        finally:c.execute('ROLLBACK')
+    return dict(version='FINITE_INTAKE_OWNER_V1',period=SUCCESSOR,route='POOLER',hostaddr=db.address,owner_hostaddr=db.address,
+        execution_binding=op.reviewed_application_binding(),evidence_backend='POSTGRES_PILOT_V1',fixed_window={'start':'2026-10-27','end':'2026-11-02'},accepted_stop=ACCEPTED,
+        attempt06_receipt_sha256=h,credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=old['stable_credentials']['verifier_sha256'])
