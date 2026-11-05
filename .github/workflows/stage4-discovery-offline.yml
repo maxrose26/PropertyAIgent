@@ -172,6 +172,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/daily-intake-venv"
+      - name: Period08 receipt-bound continuation, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_period08_successor_pg.py tests/test_period08_owner_units.py -q --tb=short --junitxml="$RUNNER_TEMP/period08-successor.xml"
       - name: Period07 settlement and navigation, disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -207,6 +212,7 @@ jobs:
             ${{ runner.temp }}/b-targeted.xml
             ${{ runner.temp }}/attempt06-owner.xml
             ${{ runner.temp }}/period07-followup.xml
+            ${{ runner.temp }}/period08-successor.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8

@@ -80,13 +80,17 @@ def pending(c,ctl):
     require(len(role)==1 and role[0][0]!='postgres' and role[0][1:]==(True,False,False),'RECOVERY_ADMIN_ONLY')
     return expected
 
-def settled(c,ctl):
-    require(op.stop_snapshot(ctl)==STOP9 and 'intake_run' not in ctl,'SETTLED_CONTROL')
+def history(c,ctl):
+    # Historical receipt/item checks also remain valid after a reviewed disposition.
     r=ctl['intake_periods'][PERIOD].get('failed_runs',{}).get(RUN)
     require(type(r) is dict and op.json_equal(c,r,receipt(r.get('original_marker'))),'RECEIPT')
     require(c.execute('SELECT state,phase,fence,owner,lease_until,checkpoint,reason,next_action,outcome::jsonb FROM public.ingestion_work_items WHERE key=%s',(KEY,)).fetchone()==('SAFETY_BLOCKED','RECOVERED',2,None,None,None,'ABANDONED_SOURCE_INTENT','RECONCILE',{'outcome':'ABANDONED_SOURCE_INTENT','source_or_write_replay_authorised':False}),'RECOVERED_ITEM')
     require(c.execute('SELECT fence,phase,finished_at IS NOT NULL,checkpoint FROM public.ingestion_work_attempts WHERE work_key=%s',(KEY,)).fetchall()==[(1,'RECOVERED',True,None)],'RECOVERED_ATTEMPT')
     return r
+
+def settled(c,ctl):
+    require(op.stop_snapshot(ctl)==STOP9 and 'intake_run' not in ctl,'SETTLED_CONTROL')
+    return history(c,ctl)
 
 def inspect(c,b):
     c.execute('BEGIN READ ONLY')

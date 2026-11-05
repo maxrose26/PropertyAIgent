@@ -307,6 +307,11 @@ def fixed_binding(release,profile,address,guard,now=None):
     if PERIOD==SUCCESSOR:
         b.update(accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256'))
         policy['expected_stop']=ACCEPTED
+    from . import period08_successor as p08
+    if PERIOD==p08.SUCCESSOR:
+        p08.release(release)
+        b.update(accepted_stop=p08.ACCEPTED,period07_receipt_sha256=p08.RECEIPT_SHA)
+        policy['expected_stop']=p08.ACCEPTED
     b['period_policy_sha256']=hashlib.sha256(canonical(policy)).hexdigest()
     op.validate_binding(b,opening=True,now=now)
     return b,policy
@@ -632,6 +637,9 @@ class Pilot:
             if PERIOD==SUCCESSOR:
                 release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
                 successor_guard(c,dict(period=PERIOD,evidence_backend=BACKEND,accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256')),ctl)
+            elif PERIOD=='b-dbpilot-20261027-1102-08':
+                from . import period08_successor as p08
+                p08.successor_guard(c,p08.binding_from_saved_state(self.db),ctl)
             else:op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
@@ -769,12 +777,13 @@ class Pilot:
         from .owner_pilot_continuation import migrate_owner_namespace,predecessor
         prior=Journal(self.db,PREDECESSOR);old=prior.load()
         from .attempt06_recovery import SUCCESSOR,predecessor06
-        next07=PERIOD==SUCCESSOR
+        from . import period08_successor as p08
+        next07=PERIOD==SUCCESSOR;next08=PERIOD==p08.SUCCESSOR
         snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous}
-        link=predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'attempt07':True} if next07 else {}))
+        link=p08.predecessor(old,snapshot=snapshot) if next08 else predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'attempt08':True,'binding08':p08.binding_from_saved_state(self.db)} if next08 else {'attempt07':True} if next07 else {}))
         preserved=prior.load()
-        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if next07 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if next07 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if next07 or next08 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if next07 or next08 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()

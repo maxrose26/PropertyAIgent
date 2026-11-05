@@ -76,7 +76,7 @@ def validate_binding(b, *, opening=False, now=None):
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
     if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06','b-dbpilot-20261027-1102-07'),'OWNER_DATABASE_PILOT_SCOPE')
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06','b-dbpilot-20261027-1102-07','b-dbpilot-20261027-1102-08'),'OWNER_DATABASE_PILOT_SCOPE')
     if 'credential_policy' in b:
         require(database and b['credential_policy']=='STABLE_RESTRICTED_V1' and type(b.get('credential_verifier_sha256')) is dict and set(b['credential_verifier_sha256'])==set(ROLES) and all(re.fullmatch('[a-f0-9]{64}',v) for v in b['credential_verifier_sha256'].values()),'STABLE_VERIFIER_BINDING')
     require(b.get('accepted_stop') == accepted_stop(b), 'OWNER_STOP_BINDING')
@@ -109,6 +109,11 @@ def validate_binding(b, *, opening=False, now=None):
 
 
 def accepted_stop(b):
+    from . import period08_successor as p08
+    if b.get('period')==p08.SUCCESSOR:
+        p08.validate_binding(b)
+        return p08.ACCEPTED
+    require('period07_receipt_sha256' not in b,'P08_SUCCESSOR_BINDING')
     from . import attempt06_recovery as a06
     if b.get('period')==a06.SUCCESSOR:
         require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and type(b.get('attempt06_receipt_sha256')) is str and re.fullmatch('[a-f0-9]{64}',b['attempt06_receipt_sha256']),'A06_SUCCESSOR_BINDING')
@@ -356,6 +361,8 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         require(stop_snapshot(ctl) == b['accepted_stop'], 'ACTIVATION_STOP_CHANGED')
         from .attempt06_recovery import successor_guard
         successor_guard(c,b,ctl)
+        from .period08_successor import successor_guard as guard08
+        guard08(c,b,ctl)
         retained_cleanup(c, ctl); no_hazards(c, ctl)
         leave_owner(c)
         prior = settings(c); original_ledger = ledger_sha(c)
