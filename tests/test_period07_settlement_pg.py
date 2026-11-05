@@ -36,6 +36,7 @@ def read(w):
 def test_atomic_settlement_and_uncertain_ack(failed07,mode):
  w=failed07;c=w['boot'];before=op.ledger_sha(c);members=c.execute(op.MEMBERS).fetchall()
  assert read(w)['status']=='READY_FOR_REVIEW_NOT_AUTHORISED'
+ assert op.ledger_sha(c)==before and c.execute(op.MEMBERS).fetchall()==members
  class Break(Fault):
   def execute(self,q,p=None):
    r=super().execute(q,p)
@@ -74,7 +75,7 @@ def test_changed_binding_refuses_atomically(failed07,drift,monkeypatch):
  elif drift=='checkpoint':c.execute("UPDATE ingestion_work_items SET checkpoint='{}' WHERE key=%s",(s.KEY,))
  elif drift=='manchester':c.execute('UPDATE ingestion_work_items SET revision=%s WHERE key=%s',(s.PERIOD+'-2026-11-02-manchester',op.RECOVERED[0]))
  elif drift=='permission':c.execute('GRANT ingestion_recovery_operator TO postgres WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
- elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body=convert_to('changed','UTF8') WHERE period=%s AND name='capture-1/source.json'",(s.PERIOD,))
+ elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body=convert_to('changed','UTF8'),sha256=encode(sha256(convert_to('changed','UTF8')),'hex') WHERE period=%s AND name='capture-1/source.json'",(s.PERIOD,))
  elif drift=='count':
   raw=canonical(dict(council='tameside',requested_interval=['2026-10-27','2026-11-02'],date_semantics='RECEIVED',failure='CALIBRATION_NAVIGATION_AMBIGUOUS',resource={'requests_attempted':0}));h=hashlib.sha256(raw).hexdigest()
   c.execute("UPDATE ingestion_run_evidence SET body=%s,sha256=%s WHERE period=%s AND name='capture-1/source.json'",(raw,h,s.PERIOD));monkeypatch.setitem(s.EVIDENCE,'capture-1/source.json',h)

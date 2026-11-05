@@ -206,6 +206,7 @@ jobs:
             ${{ runner.temp }}/b-readonly.xml
             ${{ runner.temp }}/b-targeted.xml
             ${{ runner.temp }}/attempt06-owner.xml
+            ${{ runner.temp }}/period07-followup.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8

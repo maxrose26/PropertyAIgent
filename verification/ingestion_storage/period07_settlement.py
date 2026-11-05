@@ -71,7 +71,7 @@ def pending(c,ctl):
     require(row==(AUTHORITY,PERIOD+'-2026-11-02-tameside','CLAIMED','SOURCE_INTENT',1,1,None,True,'DISCOVERY','tameside-screening-metadata-five-v1',a06.SCOPE),'ITEM')
     require(c.execute('SELECT fence,phase,finished_at,checkpoint,authority FROM public.ingestion_work_attempts WHERE work_key=%s',(KEY,)).fetchall()==[(1,'SOURCE_INTENT',None,None,AUTHORITY)],'ATTEMPT')
     require(c.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key<>%s AND (phase IN ('SOURCE_INTENT','WRITE_INTENT') OR state='PERSISTENCE_UNCERTAIN' OR revision=%s OR authority=%s)",(KEY,PERIOD+'-2026-11-02-manchester',AUTHORITY)).fetchone()==(0,),'OTHER_WORK')
-    role=c.execute("SELECT grantor::regrole::text,admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_recovery_operator'::regrole AND member=current_user::regrole").fetchall()
+    role=c.execute("SELECT grantor::regrole::text,admin_option,inherit_option,set_option FROM pg_auth_members WHERE roleid='ingestion_recovery_operator'::regrole AND member=session_user::regrole").fetchall()
     require(len(role)==1 and role[0][0]!='postgres' and role[0][1:]==(True,False,False),'RECOVERY_ADMIN_ONLY')
     return expected
 
