@@ -471,7 +471,7 @@ def test_interrupted_accounting_keeps_previous_count_only_as_partial():
     assert run.totals()['requests'] is None
 
 @pytest.mark.parametrize('fault',['none','before_commit','lost_ack'])
-def test_failed_run_retirement_prototype_pg(world,fault):
+def test_failed_run_retirement_prototype_pg(world,tmp_path,fault):
     from verification.ingestion_storage.failed_run_prototype import retire
     from verification.ingestion_storage import intake_owner as op
     import hashlib
@@ -528,3 +528,12 @@ def test_failed_run_retirement_prototype_pg(world,fault):
         boot.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(after),op.CONTROL))
         authorise(world,'prototype-successor')
         assert op.control(boot)['intake_periods'][period]['failed_runs'][run_id]==receipt
+        run,result,_=invoke(world,tmp_path,'prototype-successor')
+        assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED',result
+        assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED'
+        successor=op.control(boot)
+        assert successor['intake_run']['state']=='VERIFIED'
+        assert successor['intake_run']['id']!=run_id
+        assert successor['hard_stop_generation']==7
+        assert successor['intake_periods'][period]['failed_runs'][run_id]==receipt
+        assert boot.execute(op.MEMBERS).fetchall()==members
