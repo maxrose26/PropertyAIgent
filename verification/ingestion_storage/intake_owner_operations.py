@@ -39,7 +39,9 @@ def validate_policy(b, policy, *, now=None):
     op.require(hashlib.sha256(canonical(policy)).hexdigest() == b.get('period_policy_sha256'), 'PERIOD_POLICY_HASH')
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
     application=op.reviewed_application_binding() if database else op.APPLICATION_BINDING
-    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
+    from . import period09_successor as p09
+    expected_councils=p09.councils() if b['period']==p09.SUCCESSOR else COUNCILS
+    op.require(policy['councils'] == expected_councils and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
     op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and (database or policy['expires_at'] <= b.get('publication_valid_until',0)), 'PERIOD_ROUTE_EXPIRY')
     if database:op.require(policy['evidence_backend']==b['evidence_backend'] and policy['fixed_window']==b['fixed_window'] and policy['access_deadline']==b['valid_until'] and policy['expires_at']==b['valid_until']-185,'PERIOD_DATABASE_FIXED_DEADLINES')
     if 'timing_policy' in b:

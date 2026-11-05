@@ -310,7 +310,8 @@ class Runtime:
                 self.run.check=monitored_check
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
-                if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!={'tameside','manchester'}:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
+                expected_councils={'manchester'} if self.args.period=='b-dbpilot-20261027-1102-09' else {'tameside','manchester'}
+                if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!=expected_councils:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
                 for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:
                 self.active_council=row['council']

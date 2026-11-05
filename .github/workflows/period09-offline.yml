@@ -1,0 +1,34 @@
+name: Period09 Manchester-only OFFLINE
+on:
+  pull_request:
+    paths:
+      - 'verification/ingestion_storage/**'
+      - 'scripts/owner_period09.py'
+      - 'scripts/owner_pilot_job.py'
+      - 'tests/test_period09*'
+      - 'tests/test_manchester_file_measurement.py'
+      - '.github/workflows/period09-offline.yml'
+permissions:
+  contents: read
+jobs:
+  browser-files:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: timeout 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/p09-venv"
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m playwright install chromium --only-shell
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_manchester_file_measurement.py -q -s --tb=short --junitxml="$RUNNER_TEMP/files.xml"
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+          MANCHESTER_REAL_BROWSER: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: period09-browser-files
+          path: ${{ runner.temp }}/files.xml

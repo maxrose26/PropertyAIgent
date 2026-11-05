@@ -109,6 +109,11 @@ def validate_binding(b, *, opening=False, now=None):
 
 
 def accepted_stop(b):
+    from . import period09_successor as p09
+    if b.get('period')==p09.SUCCESSOR:
+        p09.validate_binding(b)
+        return p09.ACCEPTED
+    require('period08_receipt_sha256' not in b,'P09_SUCCESSOR_BINDING')
     from . import period08_successor as p08
     if b.get('period')==p08.SUCCESSOR:
         p08.validate_binding(b)
@@ -363,6 +368,8 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         successor_guard(c,b,ctl)
         from .period08_successor import successor_guard as guard08
         guard08(c,b,ctl,require_namespace=True)
+        from .period09_successor import successor_guard as guard09
+        guard09(c,b,ctl,require_namespace=True)
         retained_cleanup(c, ctl); no_hazards(c, ctl)
         leave_owner(c)
         prior = settings(c); original_ledger = ledger_sha(c)
@@ -516,7 +523,12 @@ def finalisation(c, b, expected):
         require(0 < len(grants) <= 4 and all(type(g.get('expires_at')) in (int,float) and g['expires_at'] == 0 and g.get('intake_period') == b['period'] and
                 g.get('execution_binding') == b['execution_binding'] for g in grants.values()), 'INDEPENDENT_AUTHORITY_CLOSURE')
         roots = (ctl.get('intake_periods', {}).get(b['period'], {}).get('days') or {}).get(run.get('day')) or {}
-        require(set(roots) == {'tameside', 'manchester'} and len(set(roots.values())) == 2, 'INDEPENDENT_COUNCILS')
+        from . import period09_successor as p09
+        expected_councils={'tameside','manchester'}
+        if b['period']==p09.SUCCESSOR:
+            p09.successor_guard(c,b,ctl);expected_councils={'manchester'}
+            require(ctl['intake_periods'][b['period']]['councils']==p09.councils(),'INDEPENDENT_COUNCIL_POLICY')
+        require(set(roots)==expected_councils and len(set(roots.values()))==len(expected_councils),'INDEPENDENT_COUNCILS')
         require(all(any(g.get('capture_key')==key for g in grants.values()) for key in roots.values()),
                 'INDEPENDENT_BOTH_CAPTURE_AUTHORITIES')
         result = []
