@@ -18,6 +18,7 @@ AUTHORITY='INGESTION_CHAIN_MANCHESTER_CAPTURE_28383FD729DE'
 BINDING=predecessor.BINDING
 EVIDENCE={'capture-1/source.json':'4691339a26f8bd4e86ea6df92e6730bcd964304753fe2ce4760e69685a993fd3','capture-2/source.json':'d21c771f96138af731d05445b45e1a155c26d1306a7419a488c21feb559d3698','final/events-before-publication.json':'8fa7b51bbeb9a7f113b8b641908397e0c3e5509c699125e95826ffe4b271f2d3','final/result-before-publication.json':'03db3bcdfc8c3a4e2fdbc901bb1525c55d7932f9d878da3501af45826e6c7051'}
 MARKER_SHA='0e3885f35230d37750cab20685b75962a614714bdec89717f0718fe8ce869347'
+TAMESIDE_WORK_SHA='959cc7c96a9fcd90446472da56e2209cacedbbef4fa3ea441d82d215fcf62f09'
 JOURNAL_SHA='6cd68c0f6fc43bfda8b884eb08ae9dc873e24e95ca10d4626d53da22af8d6d4f'
 STOP10=dict(a06.STOP6,hard_stop_generation=10)
 STOP11=dict(STOP10,hard_stop_generation=11,manual_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP')
@@ -68,6 +69,7 @@ def protected_sha(c):
       )::text,'UTF8')),'hex')""",(TAMESIDE,TAMESIDE,TAMESIDE)).fetchone()[0]
 
 def tameside(c):
+    require(protected_sha(c)==TAMESIDE_WORK_SHA,'TAMESIDE_WORK_BINDING')
     row=c.execute('SELECT state,phase,checkpoint::jsonb FROM ingestion_work_items WHERE key=%s',(TAMESIDE,)).fetchone()
     require(row is not None and row[:2]==('COMPLETE','FINISHED'),'TAMESIDE_CAPTURE')
     cp=row[2];archive=cp.get('durable_archive',{})

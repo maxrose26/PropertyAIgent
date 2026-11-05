@@ -58,6 +58,7 @@ def failed08(settled08,tmp_path,monkeypatch):
  monkeypatch.setattr(s,'EVIDENCE',dict(c.execute('SELECT name,sha256 FROM ingestion_run_evidence WHERE period=%s AND run_id=%s',(s.PERIOD,s.RUN)).fetchall()))
  w['history_before']=copy.deepcopy(ctl['intake_periods']);w['protected']=s.protected_sha(c);w['all_other']=s.all_other_work_sha(c);w['members']=c.execute(op.MEMBERS).fetchall()
  w['evidence_before']=c.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()
+ monkeypatch.setattr(s,'TAMESIDE_WORK_SHA',s.protected_sha(c))
  s.tameside(c);assert op.stop_snapshot(ctl)==s.STOP10
  with w['actor']() as actor:assert s.inspect(actor,b)['status']=='READY_FOR_REVIEW_NOT_AUTHORISED'
  return w
@@ -113,7 +114,7 @@ def test_settlement_preserves_completed_tameside(failed08,mode):
    assert s.history(c,op.control(c))['tameside']['records']==24
  else:assert op.ledger_sha(c)==before
 
-@pytest.mark.parametrize('drift',['marker','stop','fence','checkpoint','lease','tameside','screen','batch','evidence','prior'])
+@pytest.mark.parametrize('drift',['marker','stop','fence','checkpoint','lease','tameside','screen','screen_content','batch','evidence','prior'])
 def test_changed_state_refuses_atomically(failed08,drift):
  w=failed08;c=w['boot'];ctl=op.control(c)
  if drift=='marker':ctl['intake_run']['id']='0'*32
@@ -124,6 +125,7 @@ def test_changed_state_refuses_atomically(failed08,drift):
   from psycopg import sql
   c.execute(sql.SQL('UPDATE ingestion_work_items SET {}=%s WHERE key=%s').format(sql.Identifier(field)),(value,s.KEY))
  elif drift=='tameside':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=%s",(s.TAMESIDE,))
+ elif drift=='screen_content':c.execute("UPDATE ingestion_work_items SET checkpoint=(checkpoint::jsonb||'{\"changed\":true}'::jsonb)::json WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND dependencies::jsonb=jsonb_build_array(%s::text) LIMIT 1)",(s.TAMESIDE,))
  elif drift in ('screen','batch'):c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task=%s AND state='COMPLETE' LIMIT 1)",('SCREENING' if drift=='screen' else 'LISTING_METADATA',))
  elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body='bad'::bytea,sha256=encode(sha256('bad'::bytea),'hex') WHERE period=%s AND name='capture-2/source.json'",(s.PERIOD,))
  c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL));before=op.ledger_sha(c)
