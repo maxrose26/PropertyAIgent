@@ -6,7 +6,7 @@ from playwright.async_api import Error, TimeoutError
 from verification.discovery import manchester_navigation_diagnostic as d
 from verification.ingestion_storage.daily_intake_runtime import source_worker
 
-@pytest.mark.parametrize('scenario', ['ok','redirect','subresources','repeat','dns','timeout','cleanup'])
+@pytest.mark.parametrize('scenario', ['ok','redirect','subresources','repeat','dns','timeout','cleanup','response_before_cdp'])
 def test_worker_transport_gate(tmp_path,monkeypatch,scenario):
  handlers={};calls=[];closed=[];options=[]
  class Client:
@@ -24,6 +24,7 @@ def test_worker_transport_gate(tmp_path,monkeypatch,scenario):
     if scenario=='redirect':event.update(redirectedRequestId='TOKEN_PRIVATE')
     if scenario=='subresources':event.update(resourceType='Script')
     await handlers['Fetch.requestPaused'](event)
+   if scenario=='response_before_cdp':return SimpleNamespace(status=200)
    handlers['Network.responseReceived'](dict(type='Document',response=dict(status=302 if scenario=='redirect' else 200)))
  class Context:
   async def route_web_socket(self,*a):pass
@@ -56,6 +57,7 @@ def test_worker_transport_gate(tmp_path,monkeypatch,scenario):
  assert not any(x in json.dumps(result) for x in ['SECRET','TOKEN','https://'])
  if scenario in ('redirect','subresources','repeat'):
   assert result['blocked_requests']==1 and sum(k=='Fetch.failRequest' for k,a in calls)==1
+ if scenario=='response_before_cdp':assert result['responses']==1 and result['http_status']==200
  if scenario=='dns':assert result['network_error']=='ERR_NAME_NOT_RESOLVED' and result['responses']==0
  if scenario=='timeout':assert result['exception_class']=='TimeoutError' and result['responses']==0
  assert result['cleanup']==('UNVERIFIED' if scenario=='cleanup' else 'CONTEXT_BROWSER_CLOSED')
@@ -133,7 +135,7 @@ def test_actual_supervised_worker_45_second_envelope(tmp_path):
  finally:server.shutdown();server.server_close();thread.join()
  assert result['exit_code']==0 and result['cleanup']=='CLOSED' and result['accounting_complete'] and result['live_owned_survivors']==0,result
  obs=json.loads(out.read_text())
- assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED'
+ assert calls==['/initial'] and obs['physical_requests']==1 and obs['responses']==1 and obs['cleanup']=='CONTEXT_BROWSER_CLOSED',obs
  assert result['elapsed_seconds']<45
 
 

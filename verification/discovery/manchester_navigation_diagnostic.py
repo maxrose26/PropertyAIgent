@@ -82,7 +82,11 @@ async def observe():
                 stop = asyncio.create_task(stopped.wait()); tasks.update((nav, stop))
                 done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 if nav in done:
-                    await nav
+                    response = await nav
+                    # Playwright's commit acknowledgement can precede this CDP
+                    # session's response event. Preserve the returned response.
+                    if response is not None and not result['responses']:
+                        received(dict(type='Document',response=dict(status=response.status)))
                 # Never enumerate, submit criteria, follow redirect or read DOM.
             except Exception as exc:
                 diagnostic = browser_diagnostic(exc, result['stage'])
