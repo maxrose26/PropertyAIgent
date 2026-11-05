@@ -1,5 +1,5 @@
 """Offline production probe path: first-request browser failure, no HTTP transport."""
-import asyncio,json
+import asyncio,json,time,socket
 import pytest
 from types import SimpleNamespace
 from playwright.async_api import Error,TimeoutError
@@ -43,7 +43,8 @@ def test_actual_probe_first_request_refuses_and_closes(monkeypatch,error):
   async def __aenter__(self):return SimpleNamespace(chromium=Chromium())
   async def __aexit__(self,*args):pass
  monkeypatch.setattr('playwright.async_api.async_playwright',Playwright)
- result=asyncio.run(p.probe('discovery_manchester_ui_window',('2026-10-27','2026-11-02')))
+ monkeypatch.setattr(socket.socket,'connect',lambda *a,**k:pytest.fail('NETWORK_FORBIDDEN'))
+ result=asyncio.run(p.probe('discovery_manchester_ui_window',('2026-10-27','2026-11-02'),execution_budget='BROWSER_SOURCE_V2',deadline_origin=time.monotonic()))
  assert result['failure']=='BROWSER_'+type(error).__name__ and result['safety_failure'] is True
  assert result['requests']==1 and result['responses']==0 and result['pages']==1
  assert result['browser_diagnostic']['stage']=='INITIAL_NAVIGATION'
@@ -51,3 +52,9 @@ def test_actual_probe_first_request_refuses_and_closes(monkeypatch,error):
  assert calls.count('Fetch.continueRequest')==1 and closed==['context','browser']
  assert 'SECRET' not in json.dumps(result) and 'PRIVATE_ID' not in json.dumps(result)
  assert result['cleanup']=='CONTEXT_BROWSER_CLOSED'
+
+ from app.ingestion.coordinator import validate_source_resources
+ from app.ingestion.ledger import DEFAULT_LIMITS,Denied
+ from tests.test_tameside_b_connection import outer
+ result.update(peak_owned_rss=0,supervisor_seconds=0.1,process_cleanup='CLOSED',live_owned_survivors=0,supervisor_limit_hit=False)
+ with pytest.raises(Denied,match='SOURCE_SAFETY'):validate_source_resources(result,outer(),DEFAULT_LIMITS)

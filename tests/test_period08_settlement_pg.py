@@ -8,7 +8,7 @@ import pytest
 from tests.test_attempt06_owner_path_pg import world,act,Fault
 from tests.test_period07_settlement_pg import failed07
 from tests.test_period08_successor_pg import settled08
-from tests.e2e_connection_support import idox_supervised,arcus_audit,arcus_slot_supervised
+from tests.e2e_connection_support import idox_supervised,arcus_audit,arcus_slot_supervised,entry,SCHEME
 from verification.ingestion_storage import period08_settlement as s,period08_successor as p08,intake_owner as op,intake_owner_operations as extra,attempt06_recovery as a06
 from verification.ingestion_storage.daily_intake_runtime import Runtime
 
@@ -41,11 +41,11 @@ def failed08(settled08,tmp_path,monkeypatch):
    assert audit['failure'] is None and len(audit['records'])==24
    audit,outer=idox_supervised(folder,audit);r=audit['resource'];metrics=dict(requests=r['requests_attempted'],source_bytes=r['received_bytes'],source_seconds=r['elapsed_seconds'])
   else:
-   audit=arcus_audit('manchester',[],start,end,budget='BROWSER_SOURCE_V2');audit.update(requests=1,responses=0,failure='BROWSER_Error',safety_failure=True,safety_events=['BROWSER_Error'])
+   audit=arcus_audit('manchester',[entry('SYNTHETIC/26',SCHEME)],start,end,budget='BROWSER_SOURCE_V2');audit.update(date_semantics='VALIDATED',listing_records=[],listing_segments=[],applied_interval=None,enumeration_evidence='UNKNOWN',navigations=0,public_ui_posts=0,measured_public_ui_posts=0,requests=1,responses=0,failure='BROWSER_Error',safety_failure=True,safety_events=['BROWSER_Error'])
    audit,outer,_=arcus_slot_supervised(folder,audit,runtime.contract(row).scope());metrics=dict(requests=1,source_bytes=audit['decoded_bytes']+audit['encoded_bytes']+audit['outbound_payload_bytes'],source_seconds=audit['supervisor_seconds'])
   runtime.run.source(dict(metrics,supervised_seconds=outer['elapsed_seconds']));return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
  runtime.collect=source;result=runtime.execute()
- assert result['status']=='STOP_RECONCILE_NO_RETRY' and result['reason']=='SOURCE_SAFETY',result
+ assert result['status']=='STOP_RECONCILE_NO_RETRY' and result.get('reason')=='SOURCE_SAFETY',result
  with w['actor']() as actor:op.close(actor,states[-1],lambda _:None)
  ctl=op.control(c);period=ctl['intake_periods'][s.PERIOD];keys=period['days']['2026-11-02']
  for name,value in [('RUN',ctl['intake_run']['id']),('KEY',keys['manchester']),('TAMESIDE',keys['tameside']),('BINDING',b['execution_binding']),('MARKER_SHA',a06.sha(ctl['intake_run']))]:monkeypatch.setattr(s,name,value)
