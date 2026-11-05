@@ -1,0 +1,17 @@
+--- a/verification/ingestion_storage/daily_intake_runtime.py
++++ b/verification/ingestion_storage/daily_intake_runtime.py
+@@ -466,8 +466,13 @@
+ def source_worker(args):
+     if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD')) for k in os.environ):raise Denied('PRIVATE_CREDENTIAL_FREE_SOURCE')
+     import resource
+-    resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
+     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
++    file_ceiling=512*1024
++    if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
++        from verification.discovery.manchester_navigation_diagnostic import MODE,ROW
++        if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
++        file_ceiling=20*1024*1024
++    resource.setrlimit(resource.RLIMIT_FSIZE,(file_ceiling,file_ceiling))
+     seconds=75 if row['council']=='manchester' else 45;resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
+     if plan.get('diagnostic_mode') is not None:
+         if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
