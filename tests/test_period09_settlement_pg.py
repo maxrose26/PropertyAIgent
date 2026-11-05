@@ -27,6 +27,7 @@ def failed09(ready09,tmp_path,monkeypatch):
   runtime.run.begin_source()
   raise op.Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
  runtime.collect=source
+ runtime.emit('runtime_authentication',dict(fixture=True))
  result=runtime.execute();assert result['reason']=='SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY' and result['usage']['requests'] is None
  with w['actor']() as actor:op.close(actor,states[-1],lambda _:None)
  ctl=op.control(c);key=ctl['intake_periods'][s.PERIOD]['days']['2026-11-02']['manchester']
@@ -89,3 +90,22 @@ def test_changed_state_refuses_atomically(failed09,drift):
  with w['actor']() as actor:
   with pytest.raises(op.Denied):s.recover(actor,w['binding'])
  assert op.ledger_sha(c)==before and c.execute(op.MEMBERS).fetchall()==w['members']
+
+def test_actual_owner_entrypoint_and_readback(failed09,monkeypatch):
+ from contextlib import contextmanager
+ from scripts import owner_period09_settlement as cli
+ w=failed09
+ class DB:
+  @contextmanager
+  def connection(self):
+   with w['actor']() as c:yield c
+ monkeypatch.setattr(cli.pilot,'Database',DB);monkeypatch.setattr(s,'binding',lambda db:w['binding'])
+ monkeypatch.delenv('PROPERTYAIGENT_OWNER_SETTLEMENT_AUTHORITY',raising=False)
+ before=op.ledger_sha(w['boot']);assert cli.main(['--action','settle'])==2
+ assert op.ledger_sha(w['boot'])==before
+ assert cli.main(['--action','inspect'])==0
+ monkeypatch.setenv('PROPERTYAIGENT_OWNER_SETTLEMENT_AUTHORITY',s.PERIOD)
+ assert cli.main(['--action','settle'])==0
+ assert cli.main(['--action','inspect'])==0
+ assert backlog(w)==w['protected_backlog']
+ assert w['boot'].execute(op.MEMBERS).fetchall()==w['members']
