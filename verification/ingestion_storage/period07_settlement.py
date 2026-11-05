@@ -53,6 +53,9 @@ def receipt(marker):
 
 def common(c,b,ctl):
     members=a06.baseline(c,b)
+    owner=c.execute(op.OWNER_MEMBERS).fetchall()
+    require(len(owner)==1 and owner[0][0]!='postgres' and owner[0][1:]==(True,False,False),'OWNER_ADMIN_ONLY')
+    require(c.execute("SELECT NOT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()==(True,),'OWNER_SCHEMA_BASELINE')
     op.retained_cleanup(c,ctl)
     a06.history(c,ctl,disposed=True,expected_sha=A06_RECEIPT_SHA)
     evidence(c)

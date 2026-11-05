@@ -63,10 +63,12 @@ def test_atomic_settlement_and_uncertain_ack(failed07,mode):
   assert op.ledger_sha(c)==digest
  else:assert op.ledger_sha(c)==before
 
-@pytest.mark.parametrize('drift',['id','stop','generation','lease','fence','attempt','checkpoint','evidence','count','manchester','history06','permission'])
+@pytest.mark.parametrize('drift',['id','stop','generation','lease','fence','attempt','checkpoint','evidence','count','manchester','history06','permission','owner_permission','extra_marker'])
 def test_changed_binding_refuses_atomically(failed07,drift,monkeypatch):
  w=failed07;c=w['boot'];ctl=op.control(c)
- if drift=='id':ctl['intake_run']['id']='0'*32
+ if drift=='extra_marker':ctl['intake_run']['unexpected']='changed'
+ elif drift=='owner_permission':c.execute('GRANT ingestion_storage_owner TO postgres WITH ADMIN FALSE, INHERIT FALSE, SET TRUE')
+ elif drift=='id':ctl['intake_run']['id']='0'*32
  elif drift=='stop':ctl['manual_stop']='UNRELATED'
  elif drift=='generation':ctl['hard_stop_generation']=9
  elif drift=='history06':ctl['intake_periods'][a.PERIOD]['failed_runs'][a.RUN]['actual_requests']=0
