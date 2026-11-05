@@ -102,7 +102,14 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
         schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
         definition=c.execute("SELECT prosrc,proacl::text,proowner::regrole::text,prosecdef,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
         op.require(definition[0] in (old,new) and definition[2:]==('ingestion_storage_owner',True,['search_path=pg_catalog']),'OWNER_CONTINUATION_MIGRATION')
+        registrar=None
+        if attempt09:
+            registrar=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
+            old_reg=op.Owner.daily_intake_inventory()['ingestion_register_bolton_exception']
+            new_reg=p09.registration_sql().split('$register$',2)[1]
+            op.require(registrar[0] in (old_reg,new_reg),'P09_REGISTRAR_BASELINE')
         if definition[0]==new:
+            if attempt09:p09.namespace(c,migrated=True)
             verify_inventory(c);op.owner_absent(c);c.execute('COMMIT');return dict(status='ALREADY_EXACT_READBACK',function_sha256=hashlib.sha256(new.encode()).hexdigest(),mutation=False)
         c.execute('GRANT ingestion_storage_owner TO postgres WITH INHERIT FALSE,SET TRUE GRANTED BY postgres')
         c.execute('GRANT CREATE ON SCHEMA public TO ingestion_storage_owner')
@@ -111,6 +118,11 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
         snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
         source=ATTEMPT09_OWNER_SQL if attempt09 else ATTEMPT08_OWNER_SQL if attempt08 else ATTEMPT07_OWNER_SQL if attempt07 else ATTEMPT06_OWNER_SQL if attempt06 else DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
         c.execute(source.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+        if attempt09:
+            c.execute('LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE')
+            c.execute(p09.registration_sql())
+            readback=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
+            op.require(readback==(new_reg,*registrar[1:]),'P09_REGISTRAR_READBACK')
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
         c.execute('RESET ROLE')
         c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')

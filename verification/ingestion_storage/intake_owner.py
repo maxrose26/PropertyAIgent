@@ -181,9 +181,10 @@ def inventory(c):
      r.rolname,p.proconfig,p.prosecdef FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
      JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY 1""",
                      (list(expected),)).fetchall()
-    require(rows == [(n, hashlib.sha256(body.encode()).hexdigest(), 'ingestion_storage_owner',
-                      ['search_path=pg_catalog'], n != 'ingestion_bolton_allowed')
-                     for n, body in sorted(expected.items())], 'INTAKE_OWNER_FUNCTION_INVENTORY')
+    from .period09_successor import function_inventory
+    variants=[expected,function_inventory()]
+    require(any(rows == [(n,hashlib.sha256(body.encode()).hexdigest(),'ingestion_storage_owner',
+        ['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,body in sorted(v.items())] for v in variants),'INTAKE_OWNER_FUNCTION_INVENTORY')
     acl = c.execute("""SELECT
      has_function_privilege('ingestion_worker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
      has_function_privilege('ingestion_effect_broker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),

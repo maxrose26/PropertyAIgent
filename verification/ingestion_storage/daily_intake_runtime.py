@@ -109,7 +109,9 @@ class Runtime:
             ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr,'route':self.route_name}
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0;self.database_prearchives={};self.active_council=None
         self.policy=None;self.memory=None
-        self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in Owner.daily_intake_inventory().items()}
+        from .period09_successor import SUCCESSOR,function_inventory
+        inventory=function_inventory() if args.period==SUCCESSOR else Owner.daily_intake_inventory()
+        self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in inventory.items()}
 
     def emit(self,event,data):
         value=dict(event=event,data=data)

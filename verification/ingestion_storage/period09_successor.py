@@ -45,6 +45,9 @@ def namespace(c,*,migrated=None):
     new=hashlib.sha256(ATTEMPT09_OWNER_SQL.split('$owner_state$',2)[1].encode()).hexdigest()
     actual=c.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()[0]
     require(actual in ({new} if migrated is True else {old} if migrated is False else {old,new}),'JOURNAL_NAMESPACE')
+    if migrated is True:
+        row=c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
+        require(row==(registration_sql().split('$register$',2)[1],),'REGISTRAR_BINDING')
     return actual
 
 def successor_guard(c,b,ctl,*,require_namespace=False):
@@ -118,3 +121,32 @@ def binding_from_saved_state(db):
 def councils():
     from .intake_owner_operations import COUNCILS
     return {'manchester':COUNCILS['manchester']}
+
+
+def registration_sql():
+    """Only exact period09 admission changes; intake_finish and worker stay byte-identical."""
+    from .intake_policy import policy_sql
+    source=policy_sql();start=source.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(')
+    source=source[start:source.index('$register$;',start)+len('$register$;')]
+    old="OR e->'max_runs' IS DISTINCT FROM '1'::jsonb OR (SELECT count(*) FROM jsonb_each(e->'councils'))<>2"
+    new="OR e->'max_runs' IS DISTINCT FROM '1'::jsonb OR (CASE WHEN a='b-dbpilot-20261027-1102-09' THEN e->'councils' IS DISTINCT FROM "+"'"+json.dumps(councils(),sort_keys=True)+"'::jsonb ELSE (SELECT count(*) FROM jsonb_each(e->'councils'))<>2 END)"
+    require(source.count(old)==1,'REGISTRATION_ANCHOR')
+    source=source.replace(old,new)
+    anchor="   e:=e||jsonb_build_object('registered_at',t,'days','{}'::jsonb);"
+    guard="""   IF a='b-dbpilot-20261027-1102-09' AND (
+      ctl->>'hard_stop_generation' IS DISTINCT FROM '11'
+      OR ctl->>'last_hard_stop' IS DISTINCT FROM 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+      OR ctl->'intake_periods'->'b-dbpilot-20261027-1102-08'->'failure_disposition'->>'successor' IS DISTINCT FROM a
+      OR ctl->'intake_periods'->'b-dbpilot-20261027-1102-08'->'failure_disposition'->>'receipt_sha256' IS DISTINCT FROM '__RECEIPT__'
+      OR ctl->'intake_periods'->'b-dbpilot-20261027-1102-08'->'failure_disposition'->'execution_binding' IS DISTINCT FROM e->'execution_binding'
+      OR ctl->'intake_periods'->'b-dbpilot-20261027-1102-08'->'failure_disposition'->'councils' IS DISTINCT FROM '["manchester"]'::jsonb
+     ) THEN RAISE EXCEPTION 'PERIOD09_RECEIPT_BOUND_DISPOSITION'; END IF;
+""".replace('__RECEIPT__',RECEIPT_SHA)
+    require(source.count(anchor)==1,'REGISTRATION_ANCHOR')
+    return source.replace(anchor,guard+anchor)
+
+
+def function_inventory():
+    expected=op.Owner.daily_intake_inventory()
+    body=registration_sql().split('$register$',2)[1]
+    return dict(expected,ingestion_register_bolton_exception=body)

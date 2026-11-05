@@ -60,6 +60,10 @@ class PeriodIssuer(Owner):
     No new connection: wrapper supplies this exact terminal-owned connection.
     Checks surround BEGIN, the fixed registration call and COMMIT in the existing issuer.
     """
+    def daily_intake_inventory(self):
+        from . import period09_successor as p09
+        return p09.function_inventory() if getattr(self,'period',None)==p09.SUCCESSOR else super().daily_intake_inventory()
+
     def q(self,c,statement,params=None,*,effect=False):
         if statement == 'COMMIT':
             op.require(c.execute(op.MEMBERS).fetchall()==self.prior_members and c.execute(FLAGS).fetchone()==(False,False), 'PERIOD_PRIVILEGE_RESTORATION')
@@ -88,6 +92,8 @@ class PeriodIssuer(Owner):
             successor_guard(c,self.journal['binding'],before)
             from .period08_successor import successor_guard as guard08
             guard08(c,self.journal['binding'],before,require_namespace=True)
+            from .period09_successor import successor_guard as guard09
+            guard09(c,self.journal['binding'],before,require_namespace=True)
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')
