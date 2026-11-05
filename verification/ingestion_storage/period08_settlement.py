@@ -49,12 +49,23 @@ def evidence(c):
     for council,count in [('tameside',8),('manchester',1)]:
         require([e['data']['metrics']['requests'] for e in events if e.get('event')=='source_closed' and e.get('data',{}).get('council')==council]==[count],'ACCOUNTING_EVIDENCE')
 
-def protected_sha(c):
+def all_other_work_sha(c):
     # Covers every other work item/attempt, including all accepted Tameside results.
     return c.execute("""SELECT encode(sha256(convert_to(jsonb_build_object(
       'items',(SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY key),'[]') FROM ingestion_work_items w WHERE key<>ALL(%s)),
       'attempts',(SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY work_key,fence),'[]') FROM ingestion_work_attempts a WHERE work_key<>%s)
       )::text,'UTF8')),'hex')""",([op.CONTROL,KEY],KEY)).fetchone()[0]
+
+def protected_sha(c):
+    # Receipt binds completed Tameside rows, not future unrelated registrations.
+    return c.execute("""WITH protected AS (
+      SELECT * FROM ingestion_work_items WHERE key=%s
+       OR (task='SCREENING' AND dependencies::jsonb=jsonb_build_array(%s::text))
+       OR (task='LISTING_METADATA' AND checkpoint::jsonb->'plan'->>'capture_key'=%s))
+      SELECT encode(sha256(convert_to(jsonb_build_object(
+       'items',(SELECT jsonb_agg(to_jsonb(w) ORDER BY key) FROM protected w),
+       'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY work_key,fence) FROM ingestion_work_attempts a WHERE work_key IN (SELECT key FROM protected))
+      )::text,'UTF8')),'hex')""",(TAMESIDE,TAMESIDE,TAMESIDE)).fetchone()[0]
 
 def tameside(c):
     row=c.execute('SELECT state,phase,checkpoint::jsonb FROM ingestion_work_items WHERE key=%s',(TAMESIDE,)).fetchone()
@@ -126,7 +137,7 @@ def recover(c,b):
     op.begin(c)
     try:
         ctl=op.control(c);members=common(c,b,ctl)
-        ctl=a06.lock(c);expected=pending(c,ctl)
+        ctl=a06.lock(c);expected=pending(c,ctl);untouched=all_other_work_sha(c)
         # Locks exclude a competing controller mutation; recheck evidence/history.
         evidence(c);predecessor.history(c,ctl);tameside(c)
         require(c.execute('SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name',(PERIOD,RUN)).fetchall()==[(n,) for n in sorted(EVIDENCE)],'ARCHIVE_INVENTORY')
@@ -139,6 +150,7 @@ def recover(c,b):
         want['intake_periods'][PERIOD]['failed_runs']={RUN:expected};del want['intake_run']
         c.execute('UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(want),op.CONTROL))
         settled(c,want);predecessor.history(c,want);tameside(c)
+        require(all_other_work_sha(c)==untouched,'UNRELATED_WORK_CHANGED')
         a06.cleanup(c,members);c.execute('COMMIT')
     except BaseException:
         try:c.execute('ROLLBACK')

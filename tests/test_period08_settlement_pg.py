@@ -43,7 +43,11 @@ def failed08(settled08,tmp_path,monkeypatch):
   else:
    audit=arcus_audit('manchester',[entry('SYNTHETIC/26',SCHEME)],start,end,budget='BROWSER_SOURCE_V2');audit.update(date_semantics='VALIDATED',listing_records=[],listing_segments=[],applied_interval=None,enumeration_evidence='UNKNOWN',navigations=0,public_ui_posts=0,measured_public_ui_posts=0,requests=1,responses=0,failure='BROWSER_Error',safety_failure=True,safety_events=['BROWSER_Error'])
    audit,outer,_=arcus_slot_supervised(folder,audit,runtime.contract(row).scope());metrics=dict(requests=1,source_bytes=audit['decoded_bytes']+audit['encoded_bytes']+audit['outbound_payload_bytes'],source_seconds=audit['supervisor_seconds'])
-  runtime.run.source(dict(metrics,supervised_seconds=outer['elapsed_seconds']));return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
+  metrics=dict(metrics,supervised_seconds=outer['elapsed_seconds']);runtime.run.source(metrics)
+  runtime.emit('source_closed',dict(council=row['council'],metrics=metrics,outer=outer))
+  from verification.ingestion_storage.database_evidence import canonical
+  runtime.archive(canonical(audit))
+  return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
  runtime.collect=source;result=runtime.execute()
  assert result['status']=='STOP_RECONCILE_NO_RETRY' and result.get('reason')=='SOURCE_SAFETY',result
  with w['actor']() as actor:op.close(actor,states[-1],lambda _:None)
@@ -52,9 +56,10 @@ def failed08(settled08,tmp_path,monkeypatch):
  monkeypatch.setattr(s,'AUTHORITY',c.execute('SELECT authority FROM ingestion_work_items WHERE key=%s',(s.KEY,)).fetchone()[0])
  c.execute('UPDATE ingestion_work_items SET lease_until=%s WHERE key=%s',(time.time()-60,s.KEY))
  monkeypatch.setattr(s,'EVIDENCE',dict(c.execute('SELECT name,sha256 FROM ingestion_run_evidence WHERE period=%s AND run_id=%s',(s.PERIOD,s.RUN)).fetchall()))
- w['history_before']=copy.deepcopy(ctl['intake_periods']);w['protected']=s.protected_sha(c);w['members']=c.execute(op.MEMBERS).fetchall()
+ w['history_before']=copy.deepcopy(ctl['intake_periods']);w['protected']=s.protected_sha(c);w['all_other']=s.all_other_work_sha(c);w['members']=c.execute(op.MEMBERS).fetchall()
  w['evidence_before']=c.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()
  s.tameside(c);assert op.stop_snapshot(ctl)==s.STOP10
+ with w['actor']() as actor:assert s.inspect(actor,b)['status']=='READY_FOR_REVIEW_NOT_AUTHORISED'
  return w
 
 def backlog(w):
@@ -90,7 +95,7 @@ def test_settlement_preserves_completed_tameside(failed08,mode):
   if mode=='normal':s.recover(actor,w['binding'])
   else:
    with pytest.raises(RuntimeError):s.recover(Break(actor,mode),w['binding'])
- assert s.protected_sha(c)==w['protected'];s.tameside(c);assert backlog(w)==retained
+ assert s.protected_sha(c)==w['protected'] and s.all_other_work_sha(c)==w['all_other'];s.tameside(c);assert backlog(w)==retained
  assert c.execute(op.MEMBERS).fetchall()==w['members']
  assert c.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence_before']
  ctl=op.control(c)
