@@ -58,3 +58,32 @@ def test_corruption_or_changed_identity_refused(bad):
         raw['access']['binding']['sha256']='0'*64
         b=p.canonical(raw);meta.update(bytes=len(b),sha256=hashlib.sha256(b).hexdigest(),data=base64.b64encode(zlib.compress(b)).decode())
     with pytest.raises(p.op.Denied):a.predecessor06(p.hydrated_state(stored),snapshot={})
+
+
+def test_deployed_writer_preserves_values_and_reserve(monkeypatch):
+    monkeypatch.setattr(p,'PERIOD',a.SUCCESSOR)
+    monkeypatch.setattr(p,'PREDECESSOR',a.PERIOD)
+    class DB:
+        key='fixture-only-journal-key'
+        def connection(self):raise AssertionError('No database write allowed')
+    j=p.Journal(DB(),a.PERIOD)
+    s=state();s['cleanup_reserve']=dict(p.cleanup_reserve_policy(),cleanup_writes=0)
+    s['source_result']={'requests':None,'historical_cause':'UNKNOWN','manchester':'NOT_ATTEMPTED','padding':'fixture'*5000}
+    assert len(p.canonical(s))>32768
+    assert j.save(copy.deepcopy(s),validate_only=True)<22152
+    assert j._vault(raw=j._vault(value=s))==s
+    assert j.ordinal==-1 and j.state is None
+    # High-entropy metadata must still refuse; no limit is increased.
+    s['source_result']['padding']=''.join(hashlib.sha256(str(i).encode()).hexdigest() for i in range(900))
+    with pytest.raises(p.op.Denied,match='OWNER_CLEANUP_RESERVE_BYTE_BOUND'):
+        j.save(s,validate_only=True)
+    assert p.cleanup_reserve_policy()['normal_plaintext_ceiling']==16534
+    assert p.CLEANUP_SNAPSHOTS==16
+
+
+def test_period_checkpoint_binds_exact_root_values():
+    value={'state':'COMMIT_ACKNOWLEDGED','binding':{'fixed':'binding'},'policy':{'max_runs':1}}
+    checkpoint=p.period_checkpoint(value)
+    assert checkpoint['binding_sha256']==hashlib.sha256(p.canonical(value['binding'])).hexdigest()
+    assert checkpoint['policy_sha256']==hashlib.sha256(p.canonical(value['policy'])).hexdigest()
+    assert 'binding' not in checkpoint and 'policy' not in checkpoint
