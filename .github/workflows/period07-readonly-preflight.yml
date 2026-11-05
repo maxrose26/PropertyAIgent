@@ -1,5 +1,7 @@
 name: Period07 hosted read-only preflight
 on:
+  pull_request:
+    branches: [release/stage1-access-boundary]
   push:
     branches: [review/hosted-period07-preflight, release/stage1-access-boundary]
     paths:
