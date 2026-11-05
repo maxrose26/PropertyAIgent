@@ -28,6 +28,10 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
           MANCHESTER_REAL_BROWSER: '1'
+      - run: timeout 100s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period09_browser_boundary.py -q -s --tb=short
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+          MANCHESTER_REAL_BROWSER: '1'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

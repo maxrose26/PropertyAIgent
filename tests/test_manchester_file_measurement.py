@@ -122,6 +122,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  from verification.direct_reference.prepared_font_cache import headless_shell_executable
  browser_sha=hashlib.sha256(Path(headless_shell_executable(os.environ['PLAYWRIGHT_BROWSERS_PATH'])).read_bytes()).hexdigest()
  report=dict(browser_sha256=browser_sha,peak_owned_rss=peak_rss[0],live_owned_survivors=len(survivors),actual_worker=os.environ.get('MEASURE_ACTUAL_WORKER')=='1',file_limit=limit,max_file_bytes=max(peak.values(),default=0),files=sorted(peak.items(),key=lambda x:x[1],reverse=True)[:12],failure=a['failure'],enumeration=a.get('enumeration_evidence'),cleanup=a['cleanup'],requests=a['requests'],records=len(a.get('listing_records',[])),physical_requests=len(calls))
+ if os.environ.get('P09_BOUNDARY_RECEIPT'):Path(os.environ['P09_BOUNDARY_RECEIPT']).write_text(json.dumps(report,sort_keys=True))
  print('MANCHESTER_FILE_MEASUREMENT '+json.dumps(report,sort_keys=True));record_property('file_measurement',json.dumps(report,sort_keys=True))
  assert a['cleanup']=='CONTEXT_BROWSER_CLOSED' and not survivors
  assert peak_rss[0]<=1024*1024*1024
