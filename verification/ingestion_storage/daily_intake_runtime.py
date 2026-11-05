@@ -469,6 +469,13 @@ def source_worker(args):
     resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
     seconds=75 if row['council']=='manchester' else 45;resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
+    if plan.get('diagnostic_mode') is not None:
+        from verification.discovery.tameside_diagnostic import MODE,ROW,live
+        if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
+        raw=canonical(live())
+        if len(raw)>524288:raise Denied('DIAGNOSTIC_OUTPUT_BOUND')
+        with Path(args.output).open('xb') as f:f.write(raw)
+        return
     if plan['fixture'] is not None:
         raw=Path(plan['fixture']).read_bytes()
         fixture=json.loads(raw);delay=fixture.pop('_test_delay_seconds',0)

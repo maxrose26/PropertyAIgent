@@ -176,7 +176,7 @@ jobs:
         env:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
-        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_period07_settlement_pg.py tests/test_period07_navigation.py tests/test_tameside_pagination_equivalence.py -q --tb=short --junitxml="$RUNNER_TEMP/period07-followup.xml"
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_tameside_first_sort_diagnostic.py tests/test_period07_settlement_pg.py tests/test_period07_navigation.py tests/test_tameside_pagination_equivalence.py -q --tb=short --junitxml="$RUNNER_TEMP/period07-followup.xml"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
