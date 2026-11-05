@@ -6,8 +6,8 @@ from . import attempt06_recovery as a06, period07_settlement as p07, intake_owne
 
 SUCCESSOR='b-dbpilot-20261027-1102-08'
 RECEIPT_SHA='b461d84c45aadbea3bab1960273cedcf55f75a19b967b5d71a205d587ba8fb44'
-BINDING=dict(revision='56a8a420ae21f60633dc2b8eea4c2f61ef5659a1',workflow_sha256='1fa3e58f6ccfe47a4ff5b6b6d8d4aa08b458e08cfa3a3b66741b3b1a75d07aa4',manifest_sha256='b82b6c4c3a8390422d8f5a1a98a2e489ce2ef5104e2386560af945c7a3d998d9')
-TREE='a27d1f7970fe719a7d542f35da83d2f78455ffdb'
+BINDING=dict(revision='3adb65d06d0492d3b8f9b798e49e3be20699b082',workflow_sha256='a111c858189389df02d3fa2360c5d5d31520c472e85402ed2eab12993d90f2c2',manifest_sha256='4cc667f3727fc1f27fc0b305a4186174fcc2590185d1b7bd9384932dd96ee5ad')
+TREE='62b685ac7a2e826ad1f14bc4bb8ba98e42fe15eb'
 BRANCH='prep/b-timing-pg17-current-20261103'
 ACCEPTED=dict(p07.STOP9,global_stop=None,manual_stop=None)
 
