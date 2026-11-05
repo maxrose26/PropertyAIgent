@@ -31,7 +31,9 @@ def packed(s):
 
 
 @pytest.mark.parametrize('compressed',[False,True])
-def test_actual_encrypted_journal_roundtrip(compressed):
+def test_actual_encrypted_journal_roundtrip(compressed,monkeypatch):
+    monkeypatch.setattr(p,'PERIOD',a.SUCCESSOR)
+    monkeypatch.setattr(p,'PREDECESSOR',a.PERIOD)
     class DB: key='fixture-only-journal-key'
     j=p.Journal(DB(),a.PERIOD)
     s=state(); stored=packed(s) if compressed else s
