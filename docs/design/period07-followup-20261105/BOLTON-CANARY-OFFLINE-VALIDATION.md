@@ -38,6 +38,8 @@ Scope-policy SHA-256: `d5b25334ef4c75cfbe801e2e3c797c70d2db427fc7e48e6849d962b19
 
 Hosted PostgreSQL 17 run [42193736282](https://github.com/maxrose26/PropertyAIgent/actions/runs/42193736282), job 127811715005: SUCCESS; 36 contract/PG checks passed in 150.96 seconds; two actual nested-worker tests passed in 8.18 seconds. Earlier full sequence run 42192561016 passed 31 + 2 tests; the 60-record extension at 6735c614 passed 32 + 2 (run 42193250348). Those are supporting iterations, not separate live runs.
 
+Final owner hosted run [42194338694](https://github.com/maxrose26/PropertyAIgent/actions/runs/42194338694), job 127813718231, at exact owner 426919cdf297d440f7b1433fc0bc15469e467911: SUCCESS; 36 contract/PG checks passed in 159.96 seconds and two nested-worker tests passed in 8.28 seconds.
+
 Final owner-pin focused checks: 76 passed in 1.22 seconds. Independent comparison proves every BOUND_FILES byte, workflow/manifest, and all three migration function bodies match the sealed scraper; only the owner pin differs. Final clean scraper startup through scripts.owner_pilot_job returned CLEAN_CHECKOUT_VERIFIED_BEFORE_QUALIFICATION, clean exact tree/binding, authentication_attempts=0 and source_requests=0. This was local isolated startup validation, not a Render artifact verification. No Render deployment/job ID exists for this canary.
 
 Function body SHA-256 values for independent migration readback:
