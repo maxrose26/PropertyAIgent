@@ -30,6 +30,8 @@ class ArcusListingContract:
     retain_explicit_zero:bool=False  # opt-in intake; historical empty-window refusal unchanged
     compact_retained:bool=False  # raw label captures remain in the bound source archive
 
+    compact_field_evidence:bool=False  # duplicated DOM strings stay in the hash-bound source archive
+
     def __post_init__(self):
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256):raise Denied('EXACT_ARCUS_QUALIFICATION_REQUIRED')
         if self.config.council not in ARCUS_COUNCILS:raise Denied('ARCUS_COUNCIL')
@@ -48,6 +50,7 @@ class ArcusListingContract:
         require_screening_mode(source,self.config.council)
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied('SOURCE_AUDIT_BOUND')
         c=self.config
+        if self.compact_field_evidence and (not self.compact_retained or c.council!='manchester' or (c.start,c.end)!=('2026-10-27','2026-11-02')):raise Denied('COMPACT_FIELD_SCOPE')
         validate_source_resources(source,outer,limits,audit_bytes_limit=source_bytes_limit)
         try:
             self._listing().validate(source,audit_bytes_limit=source_bytes_limit)
@@ -69,6 +72,8 @@ class ArcusListingContract:
                 # projected fields and the raw capture digest; the duplicated
                 # label array remains in source_sha256's durable source archive.
                 projected.pop('assessment_capture')
+            if self.compact_field_evidence:
+                projected['fields']={k:{n:v for n,v in f.items() if n not in ('dom_text_content','rendered_label')} for k,f in projected['fields'].items()}
             records.append(dict(projected,provenance=dict(parser='app.ingestion.arcus_adapter',segment_ordinal=seg['ordinal'],body_sha256=seg['evidence_sha256'],row_ordinal=n)))
         resources=dict(metric='ARCUS_UI_COMBINED_BYTES',requests=source['requests'],decoded_bytes=source['decoded_bytes'],encoded_bytes=source['encoded_bytes'],
             outbound_payload_bytes=source['outbound_payload_bytes'],combined_bytes=combined_bytes(source),supervisor_seconds=source['supervisor_seconds'],

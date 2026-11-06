@@ -41,3 +41,25 @@ def test_changed_file_profile_scope_refuses_before_limit_or_transport(tmp_path,m
  row=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02');row.update(change)
  plan=tmp_path/'plan';plan.write_text(json.dumps(dict(row=row,fixture=None,file_profile='MANCHESTER_PERIOD09_V1')))
  with pytest.raises(Exception,match='MANCHESTER_FILE_PROFILE_SCOPE'):source_worker(SimpleNamespace(plan=plan,output=tmp_path/'out'))
+
+
+def test_compact_fields_preserve_screening_and_original_source():
+ import copy
+ from dataclasses import replace
+ from datetime import date
+ from tests.e2e_connection_support import arcus_contract,outer
+ from tests.test_daily_intake_runtime import arcus_audit,entry,SCHEME,RULE
+ from app.ingestion.ledger import DEFAULT_LIMITS,digest
+ audit=arcus_audit('manchester',[entry('M/2026/1',SCHEME)],date(2026,10,27),date(2026,11,2))
+ before=copy.deepcopy(audit)
+ c=replace(arcus_contract('manchester',date(2026,10,27),date(2026,11,2)),compact_retained=True)
+ full=c.project(audit,outer(),DEFAULT_LIMITS)
+ compact=replace(c,compact_field_evidence=True).project(audit,outer(),DEFAULT_LIMITS)
+ assert audit==before and compact['source_sha256']==full['source_sha256']==digest(audit)
+ a,b=full['records'][0],compact['records'][0]
+ assert RULE.screen(a)==RULE.screen(b)
+ assert {k:v for k,v in a.items() if k!='fields'}=={k:v for k,v in b.items() if k!='fields'}
+ assert b['fields']=={k:{n:v for n,v in f.items() if n not in ('dom_text_content','rendered_label')} for k,f in a['fields'].items()}
+ assert compact['resources']==full['resources'] and compact['segments']==full['segments']
+ with pytest.raises(Exception,match='COMPACT_FIELD_SCOPE'):
+  replace(c,compact_retained=False,compact_field_evidence=True).project(audit,outer(),DEFAULT_LIMITS)

@@ -231,7 +231,7 @@ class Runtime:
         from verification.discovery.arcus_ui_audit import validate
         from verification.discovery.arcus_ui_window import qualify_segment
         case='discovery_'+row['council']+'_ui_window'
-        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True,compact_retained=True)
+        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True,compact_retained=True,compact_field_evidence=getattr(getattr(self,'args',None),'period',None)=='b-dbpilot-20261027-1102-10')
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
