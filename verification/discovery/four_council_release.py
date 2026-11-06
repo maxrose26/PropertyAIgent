@@ -64,6 +64,29 @@ SUCCESSOR_V2_LIMITS = dict(SUCCESSOR_LIMITS, worker_seconds=225, active_seconds=
 VERSION_LIMITS = {VERSION: LIMITS, SUCCESSOR_VERSION: SUCCESSOR_LIMITS, SUCCESSOR_V2_VERSION: SUCCESSOR_V2_LIMITS, CAMPAIGN_VERSION: SUCCESSOR_V2_LIMITS.copy()}
 LOCAL_OUTCOMES = ('ROCHDALE_RESULT_MARKER_TIMEOUT', 'IDOX_SEARCH_OR_SORT_TIMEOUT',
                   'OLDHAM_SORT_SELECTOR_ABSENT')
+
+
+def exact_timeout_transport(value):
+    """Accept only the existing no-response TIMEOUT signal, with optional bounded
+    transport-failure evidence for genuine request timeouts. Other failures stop.
+    """
+    from .source_diagnostics import validate_transport
+    try:validate_transport(value)
+    except ValueError:return False
+    expected={'http_status':None,'media_type':None,'redirect':None,
+        'rejection_outcome':'TIMEOUT','rejection_reason':'transport failed'}
+    if (set(value) not in (set(expected),set(expected)|{'failure'})
+        or any(value[k]!=v for k,v in expected.items())):return False
+    if 'failure' not in value:return True  # Historical bounded transport evidence.
+    failure=value['failure']
+    return (failure['version']==1
+        and failure['stage'] in {'REQUEST_DISPATCH','RESPONSE_READ'}
+        and (failure['exception_class'],failure['reason']) in {
+            ('REQUESTS_TIMEOUT','TIMEOUT_UNKNOWN_STAGE'),
+            ('REQUESTS_CONNECT_TIMEOUT','CONNECT_TIMEOUT'),
+            ('REQUESTS_READ_TIMEOUT','READ_TIMEOUT')}
+        and failure['error_code'] in {'UNKNOWN','ETIMEDOUT'}
+        and failure['chain_truncated'] is False)
 PACKAGES = ('requests','beautifulsoup4','lxml','playwright','psutil','cryptography')
 DEPENDENCIES = ('docs/design/four-council-release-20261022/manifest.json','verification/discovery/four_council_release.py',
     'docs/design/four-council-release-20261022/owner-launch.sh',
@@ -636,8 +659,7 @@ class Launcher:
             and p[-1]['original_response_sha256'] is None and p[-1]['body_bytes'] is None
             and p[-1]['sanitised_evidence']=={'availability':'UNAVAILABLE'}
             and p[-1]['transport']==diagnostic.get('transport')
-            and diagnostic.get('transport')=={'http_status':None,'media_type':None,'redirect':None,
-                'rejection_outcome':'TIMEOUT','rejection_reason':'transport failed'}):
+            and exact_timeout_transport(diagnostic.get('transport'))):
             if [e['operation'] for e in p] == (['FORM','SEARCH_REQUEST'] if operation=='SEARCH_REQUEST' else ['FORM','SEARCH','SORT_REQUEST']):
                 if not self.campaign or row['council'] in {'tameside','oldham'}:return LOCAL_OUTCOMES[1]
         if ((self.row(index)['council']=='oldham' if self.campaign else index==3) and a.get('failure')=='ListingError:sort selector' and operation=='SORT_FORM_PARSE'
