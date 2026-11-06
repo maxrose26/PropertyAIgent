@@ -272,6 +272,29 @@ def test_exact_existing_continuation_predicates_survive_profile_selection(counci
     assert state in {'UNKNOWN','FAILED'} and launch.local_outcome(0,value,state)==code
 
 
+@pytest.mark.parametrize('field,value',[
+    ('reason','DNS_FAILURE'),('exception_class','REQUESTS_CONNECTION_ERROR'),
+    ('stage','UNKNOWN'),('error_code','ECONNRESET'),('chain_truncated',True)])
+def test_idox_timeout_continuation_rejects_inconsistent_transport_failure(field,value):
+    """Fail closed if the new transport-failure envelope contradicts a timeout."""
+    from tests.campaign_release_support import audit as old_audit
+    row=next(x for x in ROWS if x['council']=='tameside')
+    original=old_audit(row,local='timeout')
+    transport=deepcopy(original['failure_diagnostic']['transport'])
+    assert 'failure' in transport and r.exact_timeout_transport(transport)
+    transport['failure'][field]=value
+    assert not r.exact_timeout_transport(transport)
+
+
+def test_idox_timeout_continuation_rejects_unrecognised_transport_fields():
+    from tests.campaign_release_support import audit as old_audit
+    row=next(x for x in ROWS if x['council']=='tameside')
+    transport=deepcopy(old_audit(row,local='timeout')['failure_diagnostic']['transport'])
+    assert r.exact_timeout_transport(transport)
+    transport['private_unqualified_field']='DO_NOT_EXPORT'
+    assert not r.exact_timeout_transport(transport)
+
+
 @pytest.mark.parametrize('row',ROWS,ids=lambda x:x['council'])
 def test_wrong_destination_in_records_refuses(row):
     value=audit(row);key='listing_records' if row['council'] in f.ARCUS else 'records'
