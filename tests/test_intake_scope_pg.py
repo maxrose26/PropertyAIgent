@@ -114,16 +114,7 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
  if incomplete=='startup-boundary':
   import time as real_time
   monkeypatch.setattr(module,'time',SimpleNamespace(time=lambda:b['valid_until']-1500,monotonic=real_time.monotonic))
- import sys
- from collections import deque
- boundaries=deque(maxlen=8)
- def trace(frame,event,arg):
-  if event=='exception' and '/PropertyAIgent/' in frame.f_code.co_filename and arg[0] not in (StopIteration,GeneratorExit):
-   boundaries.append((frame.f_code.co_filename.split('/PropertyAIgent/')[-1],frame.f_lineno,arg[0].__name__))
-  return trace
- sys.settrace(trace)
- try:result_code=main(argv,prepared_runtime=runtime)
- finally:sys.settrace(None)
+ result_code=main(argv,prepared_runtime=runtime)
  result=json.loads((runtime.root/'final-result.json').read_text())
  if incomplete=='startup-boundary':
   assert result_code==1 and result['reason']=='DATABASE_PILOT_STARTUP_RESERVE'
@@ -131,7 +122,7 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
   with w['actor']() as actor:closed=op.close(actor,states[-1],lambda _:None)
   assert closed['runtime_access']=='DISABLED' and closed['sessions']=='ABSENT'
   return
- assert result_code==(1 if incomplete is True else 0),({k:result.get(k) for k in ('status','reason','failure','cleanup','scopes')},list(boundaries))
+ assert result_code==(1 if incomplete is True else 0),json.dumps({k:result.get(k) for k in ('status','reason','failure','cleanup','scopes','finalisation_failure')})
  assert calls==[sc.SCOPE.row()]
  assert result['usage']['requests']==audit['resource']['requests_attempted']<=10
  assert result['usage']['all_connections_closed'] is True

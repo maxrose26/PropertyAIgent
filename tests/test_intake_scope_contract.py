@@ -28,10 +28,13 @@ def test_actual_scope_owner_clock(bound,monkeypatch,elapsed,allowed):
   with pytest.raises(op.Denied):validate_policy(b,p,now=t+elapsed)
 
 
-def test_finish_guard_unchanged_and_release_pin_not_in_sql():
+def test_finish_guards_preserved_with_exact_bolton_identity_and_no_release_pin():
  a=sc.prior.registration_sql();b=sc.registration_sql()
  start="  IF p->>'operation'='intake_finish' THEN";end="  IF ctl ? 'intake_run'"
- assert a[a.index(start):a.index(end)]==b[b.index(start):b.index(end)]
+ old="AND w.subject::jsonb->>'council'='tameside') OR (w.subject::jsonb->>'council'='manchester'"
+ new="AND (w.subject::jsonb->>'council'='tameside' OR (a='"+BOLTON.period+"' AND w.subject::jsonb->>'council'='bolton' AND w.subject::jsonb->>'semantics'='RECEIVED' AND (convert_from(d.body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED' AND e->'fixed_window'='"+json.dumps(BOLTON.window(),sort_keys=True)+"'::jsonb))) OR (w.subject::jsonb->>'council'='manchester'"
+ assert b.count(new)==1
+ assert a[a.index(start):a.index(end)]==b[b.index(start):b.index(end)].replace(new,old)
  # The worker's inventory must stay identical when the owner pins the sealed
  # scraper commit: exact release is checked by the existing owner issuer.
  before=b

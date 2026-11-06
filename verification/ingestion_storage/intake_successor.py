@@ -101,6 +101,13 @@ def registration_sql():
    END IF;
 """.replace('__EXACT__',exact).replace('__BINDING__',lit(BINDING)).replace('__STOP__',lit(ACCEPTED)).replace('__RUN__',RUN).replace('__PRIOR__',PREDECESSOR).replace('__FINAL__',FINAL_SHA)
     replace(anchor,checks+anchor)
+    # Preserve all finish checks; admit the same exact Bolton audit identity
+    # already required at the evidence write boundary.
+    replace("AND w.subject::jsonb->>'council'='tameside') OR (w.subject::jsonb->>'council'='manchester'",
+        "AND (w.subject::jsonb->>'council'='tameside' OR ("+exact+
+        " AND w.subject::jsonb->>'council'='bolton' AND w.subject::jsonb->>'semantics'='RECEIVED'"
+        " AND (convert_from(d.body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED'"
+        " AND e->'fixed_window'="+lit(SCOPE.window())+"))) OR (w.subject::jsonb->>'council'='manchester'")
     return source
 
 def evidence_write_sql():
