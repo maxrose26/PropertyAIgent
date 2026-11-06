@@ -169,6 +169,7 @@ def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
         text=path.read_text(encoding='utf-8',errors='ignore')
         if re.search(r'RULE_V3|screening-assessment-v3|routing_of|ingestion\.count_(?:assessment|evidence)|from\s+\.count_(?:assessment|evidence)|from\s+\.\s+import\s+[^\n]*count_(?:assessment|evidence)',text):offenders.add(path.relative_to(ROOT).as_posix())
     assert offenders<=allowed,offenders      # explicit opt-in only: the disposable coordinator and the read-only projections; no production path
+    import ast
     # An existing successor verification recomputes the 35 frozen Manchester
     # screens in memory for parity; it neither selects a new live rule nor
     # writes screening outcomes. Permit ONLY that audited call shape.
@@ -190,7 +191,6 @@ def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     assert len(sql)==4 and all(q.lstrip().upper().startswith('SELECT ') for q in sql)
     assert not re.search(r'screening-assessment-v3|routing_of|count_assessment',successor)
     # Owner issuance validates the frozen configuration; it must not directly screen rows.
-    import ast
     owner=ast.parse((ROOT/'verification/ingestion_storage/oldham_authority.py').read_text())
     assert not [n for n in ast.walk(owner) if isinstance(n,ast.Call) and ((isinstance(n.func,ast.Attribute) and n.func.attr in {'screen','screen_row','rescreen','re_screen'}) or (isinstance(n.func,ast.Name) and n.func.id in {'screen_row','assess_proposal'}))]
     assert not [n for n in dir(ls) if 'rescreen' in n.lower() or 're_screen' in n.lower()]
