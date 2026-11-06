@@ -39,3 +39,22 @@ def test_source_size_and_legacy_git_receipt_unchanged():
  assert c==[]
  source={'value':1};raw=canonical(source);legacy=dict(commit='b'*40,path='docs/design/old/source.json',sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),readback_verified=True)
  assert archive_capture(source,lambda _:legacy)==legacy
+
+
+@pytest.mark.parametrize('field,value,reason',[
+ ('path','docs/design/other/file','DATABASE_EVIDENCE_DESCRIPTOR'),
+ ('period','bad/slash','DATABASE_EVIDENCE_DESCRIPTOR'),
+ ('name','owner/state-001','DATABASE_EVIDENCE_DESCRIPTOR'),
+ ('readback_verified',False,'DATABASE_EVIDENCE_DESCRIPTOR'),
+ ('bytes',True,'DATABASE_EVIDENCE_DESCRIPTOR'),
+ ('bytes',999,'DATABASE_EVIDENCE_CONTENT_BINDING'),
+ ('sha256','b'*64,'DATABASE_EVIDENCE_CONTENT_BINDING'),
+])
+def test_runtime_database_receipt_still_refuses_invalid_descriptors(field,value,reason):
+ d,c,w,r=callbacks();source={'council':'tameside','opaque':'synthetic'};raw=canonical(source)
+ receipt=store(raw,'pilot','a'*32,'capture-1/source.json',w,r)
+ altered=dict(receipt,**{field:value})
+ with pytest.raises(Denied,match=reason):
+  archive_capture(source,lambda _:altered)
+ with pytest.raises(Denied,match=reason):
+  validate_descriptor(altered,sha=hashlib.sha256(raw).hexdigest(),size=len(raw))

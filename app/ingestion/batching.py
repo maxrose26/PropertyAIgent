@@ -3,13 +3,32 @@ from copy import deepcopy
 import json,re
 from .ledger import Denied,digest,bounded
 
+# Runtime validation cannot depend on the frozen verification package. Mirror the
+# already installed POSTGRES_PILOT_V1 receipt contract without touching its oracle.
+def _validate_postgres_receipt(v,*,sha,size):
+    names=('capture-1/source.json','capture-2/source.json','final/result-before-publication.json','final/events-before-publication.json')
+    if (not isinstance(v,dict) or v.get('backend')!='POSTGRES_PILOT_V1'
+        or set(v)!={'backend','period','run_id','name','path','sha256','bytes','readback_verified'}):
+        raise Denied('DATABASE_EVIDENCE_DESCRIPTOR')
+    if (not re.fullmatch(r'[A-Za-z0-9_-]{1,60}',v['period'])
+        or not re.fullmatch('[a-f0-9]{32}',v['run_id']) or v['name'] not in names
+        or v['path']!=f"docs/design/ingestion-operational-execution-daily-intake/{v['period']}/{v['run_id']}/{v['name']}"
+        or not re.fullmatch('[a-f0-9]{64}',v['sha256']) or type(v['bytes']) is not int
+        or not 0<v['bytes']<=2*1024*1024 or v['readback_verified'] is not True):
+        raise Denied('DATABASE_EVIDENCE_DESCRIPTOR')
+    if v['sha256']!=sha or v['bytes']!=size:
+        raise Denied('DATABASE_EVIDENCE_CONTENT_BINDING')
+    if v['name'].startswith('capture-') and v['bytes']>512*1024:
+        raise Denied('SOURCE_AUDIT_BOUND')
+    return v
+
+
 def archive_capture(source,archive):
     raw=json.dumps(source,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
     if len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
     receipt=bounded(archive(raw),4096)
     if receipt.get('backend')=='POSTGRES_PILOT_V1':
-        from verification.ingestion_storage.database_evidence import validate_descriptor
-        return validate_descriptor(receipt,sha=digest(source),size=len(raw))
+        return _validate_postgres_receipt(receipt,sha=digest(source),size=len(raw))
     if (receipt.get('sha256')!=digest(source) or receipt.get('bytes')!=len(raw)
         or receipt.get('readback_verified') is not True or not re.fullmatch('[a-f0-9]{40}',receipt.get('commit',''))
         or not receipt.get('path','').startswith('docs/design/') or '..' in receipt['path'].split('/')):raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
