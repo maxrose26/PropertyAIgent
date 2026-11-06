@@ -188,8 +188,10 @@ def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     assert all({kw.arg:ast.literal_eval(kw.value) for kw in rule.keywords}==dict(unit_threshold=10,link_related=False) for rule in rules)
     plans=[n for n in calls if isinstance(n.func,ast.Name) and n.func.id=='_screen_items']
     assert len(plans)==1 and any(kw.arg=='capture_bound' and isinstance(kw.value,ast.Constant) and kw.value.value is True for kw in plans[0].keywords)
-    sql=[n.args[0].value for n in calls if isinstance(n.func,ast.Attribute) and n.func.attr=='execute' and n.args and isinstance(n.args[0],ast.Constant)]
-    assert len(sql)==4 and all(q.lstrip().upper().startswith('SELECT ') for q in sql)
+    sql_calls=[n for n in calls if isinstance(n.func,ast.Attribute) and n.func.attr in {'execute','executemany','copy','commit','rollback'}]
+    assert len(sql_calls)==4 and all(n.func.attr=='execute' and isinstance(n.func.value,ast.Name) and n.func.value.id=='c'
+        and n.args and isinstance(n.args[0],ast.Constant) and isinstance(n.args[0].value,str)
+        and n.args[0].value.lstrip().upper().startswith('SELECT ') for n in sql_calls)
     assert not re.search(r'screening-assessment-v3|routing_of|count_assessment',successor)
     # Owner issuance validates the frozen configuration; it must not directly screen rows.
     owner=ast.parse((ROOT/'verification/ingestion_storage/oldham_authority.py').read_text())
