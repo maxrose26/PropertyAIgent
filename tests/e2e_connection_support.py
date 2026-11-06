@@ -189,7 +189,7 @@ def arcus_audit(council, entries, start, end, *, budget=None):
     audit = dict(case=arcus_case(council), destination=cfg.destination, persistence=False, failure=None, safety_failure=False, safety_events=[], cleanup='CONTEXT_BROWSER_CLOSED',
                  process_cleanup='CLOSED', live_owned_survivors=0, supervisor_limit_hit=False, enumeration_evidence='COUNT_RECONCILED', completeness='UNKNOWN',
                  applied_interval=[cfg.start, cfg.end], requested_interval=[cfg.start, cfg.end], requests=20, decoded_bytes=1000, encoded_bytes=800, outbound_payload_bytes=100,
-                 public_ui_posts=1, measured_public_ui_posts=1, supervisor_seconds=5, peak_owned_rss=100000, pages=len(segments), navigations=1, redirects=0, listing_records=rows,
+                 public_ui_posts=1, measured_public_ui_posts=1, supervisor_seconds=5, peak_owned_rss=100000, pages=1, navigations=1, redirects=0, listing_records=rows,
                  listing_segments=segments)
     if budget is not None:
         audit.update(execution_budget=budget, stage_timings={'NAVIGATION': 1200, 'READY': 600, 'CRITERIA': 300, 'SEGMENT': [300]*len(segments)})
