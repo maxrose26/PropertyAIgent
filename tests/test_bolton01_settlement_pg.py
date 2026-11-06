@@ -77,8 +77,8 @@ def test_changed_state_refuses_atomically(failed_bolton,drift):
   c.execute(sql.SQL('UPDATE ingestion_work_items SET {}=%s WHERE key=%s').format(sql.Identifier(field)),(value,s.KEY))
  elif drift=='tameside':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=%s",(prior.TAMESIDE,))
  elif drift=='screen_content':c.execute("UPDATE ingestion_work_items SET checkpoint=(checkpoint::jsonb||'{\"changed\":true}'::jsonb)::json WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND dependencies::jsonb=jsonb_build_array(%s::text) LIMIT 1)",(prior.TAMESIDE,))
- elif drift=='screen':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE' AND dependencies::jsonb=jsonb_build_array(%s::text) ORDER BY key LIMIT 1)",(prior.TAMESIDE,))
- elif drift=='batch':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='LISTING_METADATA' AND state='COMPLETE' AND checkpoint::jsonb->'plan'->>'capture_key'=%s ORDER BY key LIMIT 1)",(prior.TAMESIDE,))
+ elif drift=='screen':assert c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE' AND dependencies::jsonb=jsonb_build_array(%s::text) ORDER BY key LIMIT 1)",(prior.TAMESIDE,)).rowcount==1
+ elif drift=='batch':assert c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='LISTING_METADATA' AND state='COMPLETE' AND checkpoint::jsonb->'plan'->>'capture_key'=%s ORDER BY key LIMIT 1)",(prior.TAMESIDE,)).rowcount==1
  elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body='bad'::bytea,sha256=encode(sha256('bad'::bytea),'hex') WHERE period=%s AND name='final/result-before-publication.json'",(s.PERIOD,))
  c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL));before=op.ledger_sha(c)
  with w['actor']() as actor:
