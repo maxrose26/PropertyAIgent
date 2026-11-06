@@ -63,7 +63,7 @@ def test_success_archive_atomic_and_readback(succeeded10,mode):
  assert c.execute(op.MEMBERS).fetchall()==w['members']
  assert c.execute('SELECT period,run_id,name,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence']
 
-@pytest.mark.parametrize('incomplete',[False,True,'retained-recovery','startup-boundary'])
+@pytest.mark.parametrize('incomplete',[False,True,'retained-recovery','startup-boundary','maximum'])
 def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,monkeypatch,incomplete):
  w=succeeded10;c=w['boot'];b=w['binding'];p=w['policy']
  from scripts import owner_intake_scope
@@ -82,8 +82,9 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
  monkeypatch.delenv('DATABASE_URL',raising=False)
  # The real reader produces the synthetic transport audit; the actual runtime
  # collect -> supervisor -> credential-free worker path is retained below.
- audit=idox_audit('bolton',[entry(f'B/{i}/26',SCHEME) for i in range(24)],date(2026,11,3),date(2026,11,5))
- if os.environ.get('BOLTON_WORKER_AUDIT'):
+ count=60 if incomplete=='maximum' else 24
+ audit=idox_audit('bolton',[entry(f'B/{i}/26',SCHEME) for i in range(count)],date(2026,11,3),date(2026,11,5))
+ if os.environ.get('BOLTON_WORKER_AUDIT') and count==24:
   audit=json.loads(__import__('pathlib').Path(os.environ['BOLTON_WORKER_AUDIT']).read_text())
   assert len(audit['records'])==24 and audit['resource']['requests_attempted']==6
  if incomplete is True:audit['enumeration_evidence']='TOTAL_UNKNOWN'
@@ -132,7 +133,7 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
  if incomplete is not True:
   assert ctl['intake_run']['state']=='VERIFIED'
   with w['actor']() as actor:verified=op.finalisation(actor,b,dict(run_id=ctl['intake_run']['id'],publication=ctl['intake_run']['publication']))
-  assert verified['captures'][0]['screening_complete']==24
+  assert verified['captures'][0]['screening_complete']==count
   key=ctl['intake_periods'][sc.SCOPE.period]['days'][sc.SCOPE.end]['bolton']
   receipt=c.execute('SELECT checkpoint::jsonb FROM ingestion_work_items WHERE key=%s',(key,)).fetchone()[0]
   a=receipt['durable_archive'];raw=bytes(c.execute('SELECT body FROM ingestion_run_evidence WHERE period=%s AND run_id=%s AND name=%s',(a['period'],a['run_id'],a['name'])).fetchone()[0])
@@ -141,7 +142,7 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
   from app.ingestion.sql_ledger import SQLLedger
   from app.ingestion.listing_screening import ScreeningRule,RULE_V3
   page=backlog_page(SQLLedger(w['app'],owner='test',authority='',bindings={}),['bolton'],[sc.SCOPE.contract],ScreeningRule(RULE_V3,unit_threshold=10,link_related=False))
-  assert len(page['records'])==24 and all(r['archive']['period']==sc.SCOPE.period for r in page['records'])
+  assert len(page['records'])==count and all(r['archive']['period']==sc.SCOPE.period for r in page['records'])
   if incomplete=='retained-recovery':assert recovery==[receipt['source_sha256']]
   # Preserve two historical assessment sets. Scope by explicit contract; never
   # choose a version by ordering or silently erase ambiguous history.
@@ -153,7 +154,7 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
    c.execute("INSERT INTO ingestion_work_items SELECT (jsonb_populate_record(NULL::ingestion_work_items,to_jsonb(w)||%s::jsonb)).* FROM ingestion_work_items w WHERE dependencies::jsonb=%s::jsonb AND task='SCREENING' ORDER BY key LIMIT 1",(json.dumps(patch),json.dumps([key])))
   ledger=SQLLedger(w['app'],owner='test',authority='',bindings={});rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
   with pytest.raises(op.Denied,match='BACKLOG_MULTIPLE_ASSESSMENTS'):backlog_page(ledger,['bolton'],[legacy_contract],rule)
-  assert len(backlog_page(ledger,['bolton'],[sc.SCOPE.contract],rule)['records'])==24
+  assert len(backlog_page(ledger,['bolton'],[sc.SCOPE.contract],rule)['records'])==count
   assert c.execute("SELECT count(*) FROM ingestion_work_items WHERE dependencies::jsonb=%s::jsonb",(json.dumps([legacy]),)).fetchone()==(2,)
 
   duplicate=Runtime(SimpleNamespace(**{**vars(args),'output':str(tmp_path/'duplicate')}));duplicate.route_name=b['route'];duplicate.collect=lambda _:pytest.fail('RECOLLECTION')

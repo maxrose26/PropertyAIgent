@@ -18,9 +18,9 @@ CAPTURE_SHA = 'bf62b953e98360ab327044e73aef54769f5dc5dccd6e5610068afc707f701af4'
 SOURCE_SHA = '9aae860861680ef0bdf3317277b005d87dbfccf8c90dd7e0474c681391bcc09f'
 ACCEPTED = prior.ACCEPTED
 BRANCH = prior.BRANCH
-# Replaced only after the scraper commit is sealed. Inactive until then.
-BINDING = dict(revision='0'*40, workflow_sha256='0'*64, manifest_sha256='0'*64)
-TREE = '0'*40
+# Owner pin; the sealed scraper keeps identical scope SQL and runtime files.
+BINDING = dict(revision='d497758212a6e73ed5f77632167ddd4033133607', workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9', manifest_sha256='cb1aa1b01cbd5ff17d1b4a17f369046c1116b3d14edb80cc530745624196dd9f')
+TREE = '2c14b68b2ba6d98ffb9cf170db2277bd9fada2e9'
 
 def require(ok, code): op.require(ok, 'SCOPE_'+code)
 def sha(value): return hashlib.sha256(canonical(value)).hexdigest()
