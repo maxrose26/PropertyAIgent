@@ -110,7 +110,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
     original_popen=subprocess.Popen
     def start(command,*args,**kwargs):
      if len(command)>3 and command[1:3]==['-m','verification.direct_reference.instrumented_probe']:
-      bootstrap='from tests.manchester_loopback_transport import run;raise SystemExit(run('+repr(url.hostname)+','+str(server.server_port)+','+repr(os.environ['P09_BOUNDARY_RECEIPT']+'.inner')+'))'
+      bootstrap='from tests.manchester_loopback_transport import run;raise SystemExit(run('+repr(url.hostname)+','+str(server.server_port)+','+repr(os.environ['P09_BOUNDARY_RECEIPT']+'.inner')+','+repr(os.environ.get('MEASURE_LEGACY_AUDIT')=='1')+'))'
       command=[command[0],'-c',bootstrap,*command[3:]]
      return original_popen(command,*args,**kwargs)
     monkeypatch.setattr(subprocess,'Popen',start)
@@ -128,6 +128,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
     if os.environ.get('P09_BOUNDARY_RECEIPT'):Path(os.environ['P09_BOUNDARY_RECEIPT']).write_text(json.dumps(dict(worker_exception=type(error).__name__,code=str(error) if str(error) in known else 'UNCLASSIFIED')))
     raise
    a=json.loads(out.read_text())
+   if full_path and os.environ.get('P09_BOUNDARY_RECEIPT'):Path(os.environ['P09_BOUNDARY_RECEIPT']+'.audit').write_text(json.dumps(a))
    assert out.stat().st_size<=524288
   else:a=read_probe()
  finally:done.set();t.join();server.shutdown();server.server_close();server_thread.join()

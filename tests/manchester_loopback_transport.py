@@ -18,13 +18,24 @@ def install(host,port):
   async def __aexit__(self,*a):return await self.manager.__aexit__(*a)
  playwright.async_api.async_playwright=Wrapped
 
-def run(host,port,receipt):
+def run(host,port,receipt,legacy=False):
  import json
  from pathlib import Path
  install(host,port)
- from verification.direct_reference.instrumented_probe import main
- try:return main()
+ from verification.direct_reference import instrumented_probe as probe
+ if legacy:
+  import inspect
+  body=inspect.getsource(probe._main)
+  old="))),separators=(',',':'))+'\\n'"
+  assert body.count(old)==1
+  exec(body.replace(old,"))),indent=2)+'\\n'"),probe.__dict__)
+ try:return probe.main()
  except Exception as error:
   allowed={'WORKER_AUDIT_BOUND','PROOF_OUTPUT_BOUND','PROOF_OBSERVATION_OUTPUT_BOUND','PROFILE_AUDIT_BINDING','PROOF_MISSING','EXISTING_OUTPUT'}
-  Path(receipt).write_text(json.dumps(dict(exception_class=type(error).__name__,code=str(error) if str(error) in allowed else 'UNCLASSIFIED')))
+  sizes={};tb=error.__traceback__
+  while tb:
+   if tb.tb_frame.f_code.co_name=='_main' and isinstance(tb.tb_frame.f_locals.get('raw'),str):
+    raw=tb.tb_frame.f_locals['raw'];sizes=dict(indented_bytes=len(raw.encode()),compact_bytes=len(json.dumps(json.loads(raw),separators=(',',':')).encode())+1)
+   tb=tb.tb_next
+  Path(receipt).write_text(json.dumps(dict(exception_class=type(error).__name__,code=str(error) if str(error) in allowed else 'UNCLASSIFIED',**sizes)))
   raise
