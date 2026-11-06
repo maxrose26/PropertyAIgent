@@ -100,15 +100,34 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
     if 'DATABASE' in name or name.endswith(('_KEY','_TOKEN','_PASSWORD')):monkeypatch.delenv(name)
    monkeypatch.setenv('INGESTION_SOURCE_PRIVATE','ONCE')
    from verification.ingestion_storage.daily_intake_runtime import source_worker
+   from verification.discovery.finite_acceptance import read as actual_read
+   full_path=os.environ.get('MEASURE_FULL_PATH')=='1'
+   if full_path:
+    from verification.ingestion_storage import render_intake
+    # The sole hosted-context substitution: CI lacks Render's 2 GiB cgroup.
+    # Full finite reader, inner worker, proof and output validators remain real.
+    monkeypatch.setattr(render_intake,'source_context',lambda profile:render_intake.validate_profile(profile))
+    original_popen=subprocess.Popen
+    def start(command,*args,**kwargs):
+     if len(command)>3 and command[1:3]==['-m','verification.direct_reference.instrumented_probe']:
+      bootstrap='from tests.manchester_loopback_transport import install;install('+repr(url.hostname)+','+str(server.server_port)+');from verification.direct_reference.instrumented_probe import main;raise SystemExit(main())'
+      command=[command[0],'-c',bootstrap,*command[3:]]
+     return original_popen(command,*args,**kwargs)
+    monkeypatch.setattr(subprocess,'Popen',start)
    row=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
    def reader(actual_row,**opts):
     assert actual_row==row and opts['no_transport_retry'] is True and opts['execution_budget']=='BROWSER_SOURCE_V2'
     assert resource.getrlimit(resource.RLIMIT_FSIZE)==(2097152,2097152)
-    return read_probe()
+    return actual_read(actual_row,**opts) if full_path else read_probe()
    monkeypatch.setattr('verification.discovery.finite_acceptance.read',reader)
    plan=root/'plan';out=root/'source.json';plan.write_text(json.dumps(dict(row=row,fixture=None,file_profile='MANCHESTER_PERIOD09_V1')))
    from types import SimpleNamespace
-   source_worker(SimpleNamespace(plan=plan,output=out));a=json.loads(out.read_text())
+   try:source_worker(SimpleNamespace(plan=plan,output=out))
+   except Exception as error:
+    known={'PROFILE_AUDIT_BINDING','WORKER_AUDIT_BOUND','bounded audit','RENDER_AGGREGATE_MISMATCH','RENDER_SOURCE_ENVIRONMENT','PROCESS_NAMESPACE_MISMATCH'}
+    if os.environ.get('P09_BOUNDARY_RECEIPT'):Path(os.environ['P09_BOUNDARY_RECEIPT']).write_text(json.dumps(dict(worker_exception=type(error).__name__,code=str(error) if str(error) in known else 'UNCLASSIFIED')))
+    raise
+   a=json.loads(out.read_text())
    assert out.stat().st_size<=524288
   else:a=read_probe()
  finally:done.set();t.join();server.shutdown();server.server_close();server_thread.join()
