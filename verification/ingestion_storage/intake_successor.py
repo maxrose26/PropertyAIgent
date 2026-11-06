@@ -19,8 +19,8 @@ SOURCE_SHA = '9aae860861680ef0bdf3317277b005d87dbfccf8c90dd7e0474c681391bcc09f'
 ACCEPTED = prior.ACCEPTED
 BRANCH = prior.BRANCH
 # Owner pin; the sealed scraper keeps identical scope SQL and runtime files.
-BINDING = dict(revision='d497758212a6e73ed5f77632167ddd4033133607', workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9', manifest_sha256='cb1aa1b01cbd5ff17d1b4a17f369046c1116b3d14edb80cc530745624196dd9f')
-TREE = '2c14b68b2ba6d98ffb9cf170db2277bd9fada2e9'
+BINDING = dict(revision='ee9dbb7b9dccca161aad46526248f14a9661ce9c', workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9', manifest_sha256='570b020ca03ad47a2d00c265f1a752cd39c0eb70d91c1071f70ffed17de07eba')
+TREE = '9eaf248641ae2d09defc9f1703c5814cb4278a7a'
 
 def require(ok, code): op.require(ok, 'SCOPE_'+code)
 def sha(value): return hashlib.sha256(canonical(value)).hexdigest()
