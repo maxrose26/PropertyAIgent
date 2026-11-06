@@ -109,9 +109,10 @@ def test_actual_owner_entrypoint_and_readback(failed_bolton,monkeypatch,lost):
 def test_control_drift_between_preflight_and_lock_refuses(failed_bolton,monkeypatch,drift):
  """Commit a second owner's change in the exact preflight/lock interval."""
  import psycopg
+ from tests.e2e_pg_world import settings
  w=failed_bolton;c=w['boot'];original_lock=a06.lock;observed={}
  def interleaved_lock(actor):
-  with psycopg.connect(c.info.dsn,autocommit=True) as writer:
+  with psycopg.connect(settings()[0],autocommit=True) as writer:
    ctl=op.control(writer)
    if drift=='period':ctl['intake_periods'][s.PERIOD]['max_runs']=2
    elif drift=='grant':ctl['grants'][s.AUTHORITY]['expires_at']=time.time()+60
