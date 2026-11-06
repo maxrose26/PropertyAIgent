@@ -47,8 +47,15 @@ def success(c, ctl):
     row=c.execute("SELECT state,checkpoint::jsonb FROM public.ingestion_work_items WHERE key=%s",(CAPTURE,)).fetchone()
     require(row and row[0]=='COMPLETE' and sha(row[1])==CAPTURE_SHA and row[1].get('source_sha256')==SOURCE_SHA
         and len(row[1].get('records',[]))==35, 'PREDECESSOR_CAPTURE')
-    rows=c.execute("SELECT task,state,count(*) FROM public.ingestion_work_items WHERE dependencies::jsonb=%s::jsonb GROUP BY task,state ORDER BY task,state",(json.dumps([CAPTURE]),)).fetchall()
-    require(rows==[('LISTING_METADATA','COMPLETE',7),('SCREENING','COMPLETE',35)],'PREDECESSOR_SCREENING')
+    from .chain_registration import _screen_items, completed_screening, Registration
+    from .scope_binding import binding_for
+    from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+    root=c.execute('SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s',(CAPTURE,)).fetchone()[0]
+    batches,screens=_screen_items(binding_for('manchester'),root,row[1],ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),root['limits'],capture_bound=True)
+    keys=[x['key'] for x in [*batches,*screens.values()]]
+    rows=[r[0] for r in c.execute('SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=ANY(%s)',(keys,)).fetchall()]
+    require(len(batches)==7 and len(screens)==35,'PREDECESSOR_SCREENING')
+    completed_screening(Registration('SCREENING','',[],[],{}, {},CAPTURE,batches=batches,screens=screens),row[1],ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),rows)
     return marker
 
 def guard(c,b,ctl,*,require_namespace=False):

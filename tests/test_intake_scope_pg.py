@@ -83,6 +83,9 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
  # The real reader produces the synthetic transport audit; the actual runtime
  # collect -> supervisor -> credential-free worker path is retained below.
  audit=idox_audit('bolton',[entry(f'B/{i}/26',SCHEME) for i in range(24)],date(2026,11,3),date(2026,11,5))
+ if os.environ.get('BOLTON_WORKER_AUDIT'):
+  audit=json.loads(__import__('pathlib').Path(os.environ['BOLTON_WORKER_AUDIT']).read_text())
+  assert len(audit['records'])==24 and audit['resource']['requests_attempted']==6
  if incomplete is True:audit['enumeration_evidence']='TOTAL_UNKNOWN'
  fixture=tmp_path/'bolton-response.json';fixture.write_text(json.dumps(audit))
  import verification.ingestion_storage.daily_intake_runtime as module

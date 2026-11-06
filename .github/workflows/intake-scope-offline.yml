@@ -32,8 +32,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - run: timeout 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/scope-venv"
+      - run: timeout 100s "$RUNNER_TEMP/scope-venv/bin/python" -m pytest tests/test_intake_scope_worker.py -q -x --tb=short
+        env:
+          BOLTON_WORKER_AUDIT: ${{ runner.temp }}/bolton-worker.json
       - run: timeout 540s "$RUNNER_TEMP/scope-venv/bin/python" -m pytest tests/test_bolton_canary_preparation.py tests/test_intake_scope_contract.py tests/test_intake_scope_pg.py -q -x --tb=short --junitxml="$RUNNER_TEMP/scope.xml"
         env:
+          BOLTON_WORKER_AUDIT: ${{ runner.temp }}/bolton-worker.json
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
       - uses: actions/upload-artifact@v4
