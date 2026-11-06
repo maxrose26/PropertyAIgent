@@ -120,7 +120,10 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
     assert resource.getrlimit(resource.RLIMIT_FSIZE)==(2097152,2097152)
     return actual_read(actual_row,**opts) if full_path else read_probe()
    monkeypatch.setattr('verification.discovery.finite_acceptance.read',reader)
-   plan=root/'plan';out=root/'source.json';plan.write_text(json.dumps(dict(row=row,fixture=None,file_profile='MANCHESTER_PERIOD09_V1')))
+   # Production plan/export are siblings of the supervised owned directory.
+   # Browser TMPDIR stays inside owned; only these control/output files live outside.
+   outputs=Path(os.environ['P09_BOUNDARY_RECEIPT']).parent if full_path else root
+   plan=outputs/'plan';out=outputs/'source.json';plan.write_text(json.dumps(dict(row=row,fixture=None,file_profile='MANCHESTER_PERIOD09_V1')))
    from types import SimpleNamespace
    try:source_worker(SimpleNamespace(plan=plan,output=out))
    except Exception as error:

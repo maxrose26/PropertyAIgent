@@ -63,6 +63,6 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
   row=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
   audit=json.loads(Path(str(receipt)+'.audit').read_text())
   from verification.ingestion_storage.limit_reconciliation import BROWSER_SOURCE_V2_ITEM_LIMITS
-  projected=r.contract(row).project(audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat()),BROWSER_SOURCE_V2_ITEM_LIMITS)
+  projected=r.contract(row).project(audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat()),BROWSER_SOURCE_V2_ITEM_LIMITS,source_bytes_limit=512*1024)
   assert len(projected['records'])==60 and r.contract(row).admission_window(projected,'manchester').outcome.value=='COMPLETE'
   print('P10_REAL_CAPTURE_VALIDATOR '+json.dumps(dict(records=60,coverage='COMPLETE',physical_requests=report['physical_requests'],cleanup=outer['cleanup'])))
