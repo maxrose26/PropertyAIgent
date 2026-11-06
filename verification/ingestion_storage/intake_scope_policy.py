@@ -18,6 +18,7 @@ class IntakeScope:
     pages: int = 6
     records: int = 60
     source_seconds: int = 45
+    source_group_bytes: int = 1024**3
 
     def window(self): return dict(start=self.start, end=self.end)
     def councils(self):

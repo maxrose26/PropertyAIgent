@@ -43,3 +43,11 @@ def test_finish_guards_preserved_with_exact_bolton_identity_and_no_release_pin()
   sc.BINDING=dict(revision='a'*40,workflow_sha256='b'*64,manifest_sha256='c'*64)
   assert sc.registration_sql()==before
  finally:sc.BINDING=original
+
+
+@pytest.mark.parametrize('value,source',[(1024**3+1,True),(0,True),(1024**3,False),(True,True)])
+def test_scope_memory_cannot_expand_or_apply_to_controller(tmp_path,value,source):
+ from verification.ingestion_storage.operational_supervisor import supervise
+ with pytest.raises(ValueError,match='FIXED_SOURCE_GROUP_BOUND'):
+  supervise([],environment={},root=tmp_path/'unused',source=source,source_group_bytes=value)
+ assert not (tmp_path/'unused').exists()

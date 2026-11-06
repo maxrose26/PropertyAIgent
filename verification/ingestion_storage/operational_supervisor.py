@@ -9,7 +9,7 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None,render_profile=None,diagnostic_mode=None):
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None,check=lambda:None,execution_budget=None,render_profile=None,diagnostic_mode=None,source_group_bytes=None):
  if diagnostic_mode is not None:
   if diagnostic_mode!='MANCHESTER_INITIAL_NAVIGATION_V1' or not source or seconds!=45 or execution_budget is not None or render_profile is not None:raise ValueError('FIXED_DIAGNOSTIC_ENVELOPE')
   if set(environment)!={'INGESTION_SOURCE_PRIVATE','PLAYWRIGHT_BROWSERS_PATH'} or environment['INGESTION_SOURCE_PRIVATE']!='ONCE':raise ValueError('DIAGNOSTIC_ENVIRONMENT')
@@ -18,6 +18,9 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   if not Path(root).is_absolute() or len(str(Path(root)))>40:raise ValueError('DIAGNOSTIC_TEMP_PATH_BOUND')
  if execution_budget is not None and (not source or execution_budget!='BROWSER_SOURCE_V2'):raise ValueError('FIXED_SOURCE_BUDGET')
  single_rss=1024**3;group_rss=1536*1024**2;ceiling=45 if source else 165
+ if source_group_bytes is not None:
+  if type(source_group_bytes) is not int or source_group_bytes!=1024**3 or not source or execution_budget is not None or render_profile is not None or diagnostic_mode is not None:raise ValueError('FIXED_SOURCE_GROUP_BOUND')
+  group_rss=source_group_bytes
  if diagnostic_mode is not None:group_rss=single_rss  # Preserve period08's 1 GiB source-process-group ceiling.
  if execution_budget is not None:
   from app.ingestion.source_budget import select

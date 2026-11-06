@@ -262,7 +262,8 @@ class Runtime:
                 results.append(supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
                                 environment=environment,root=self.root/(row['council']+'-owned'),
                                 source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
-                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile))
+                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile,
+                                **({'source_group_bytes':self.scope_policy.source_group_bytes} if self.scope_policy else {})))
               except BaseException:errors.append('SOURCE_SUPERVISION_FAILED')
               finally:done.set()
             self.run.begin_source()
