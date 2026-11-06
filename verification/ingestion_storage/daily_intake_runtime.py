@@ -127,7 +127,8 @@ class Runtime:
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0;self.database_prearchives={};self.active_council=None
         self.policy=None;self.memory=None
         from .period09_successor import SUCCESSOR,function_inventory
-        inventory=function_inventory() if args.period==SUCCESSOR else Owner.daily_intake_inventory()
+        from . import period10_successor as p10
+        inventory=p10.function_inventory() if args.period==p10.SUCCESSOR else function_inventory() if args.period==SUCCESSOR else Owner.daily_intake_inventory()
         self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in inventory.items()}
 
     def emit(self,event,data):
@@ -234,7 +235,7 @@ class Runtime:
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
-        if self.args.period=='b-dbpilot-20261027-1102-09' and not self.test:plan['file_profile']='MANCHESTER_PERIOD09_V1'
+        if self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') and not self.test:plan['file_profile']='MANCHESTER_PERIOD09_V1'
         plan_path=self.root/(row['council']+'-plan.json');plan_path.write_bytes(canonical(plan))
         output=self.root/(row['council']+'-source.json')
         # SQL and its signal-based hard deadline stay on the main thread.
@@ -315,7 +316,7 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
-            if self.durable_run and self.args.period=='b-dbpilot-20261027-1102-09':raise Denied('P09_ALREADY_CONSUMED')
+            if self.durable_run and self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10'):raise Denied('P10_ALREADY_CONSUMED' if self.args.period.endswith('-10') else 'P09_ALREADY_CONSUMED')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
@@ -332,7 +333,7 @@ class Runtime:
                 self.run.check=monitored_check
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
-                expected_councils={'manchester'} if self.args.period=='b-dbpilot-20261027-1102-09' else {'tameside','manchester'}
+                expected_councils={'manchester'} if self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') else {'tameside','manchester'}
                 if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!=expected_councils:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
                 for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:

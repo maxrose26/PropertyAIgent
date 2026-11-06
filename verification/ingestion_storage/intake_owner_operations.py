@@ -40,7 +40,8 @@ def validate_policy(b, policy, *, now=None):
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
     application=op.reviewed_application_binding() if database else op.APPLICATION_BINDING
     from . import period09_successor as p09
-    expected_councils=p09.councils() if b['period']==p09.SUCCESSOR else COUNCILS
+    from . import period10_successor as p10
+    expected_councils=p10.councils() if b['period']==p10.SUCCESSOR else p09.councils() if b['period']==p09.SUCCESSOR else COUNCILS
     op.require(policy['councils'] == expected_councils and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
     op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and (database or policy['expires_at'] <= b.get('publication_valid_until',0)), 'PERIOD_ROUTE_EXPIRY')
     if database:op.require(policy['evidence_backend']==b['evidence_backend'] and policy['fixed_window']==b['fixed_window'] and policy['access_deadline']==b['valid_until'] and policy['expires_at']==b['valid_until']-185,'PERIOD_DATABASE_FIXED_DEADLINES')
@@ -62,6 +63,8 @@ class PeriodIssuer(Owner):
     """
     def daily_intake_inventory(self):
         from . import period09_successor as p09
+        from . import period10_successor as p10
+        if getattr(self,'period',None)==p10.SUCCESSOR:return p10.function_inventory()
         return p09.function_inventory() if getattr(self,'period',None)==p09.SUCCESSOR else super().daily_intake_inventory()
 
     def q(self,c,statement,params=None,*,effect=False):
@@ -94,6 +97,8 @@ class PeriodIssuer(Owner):
             guard08(c,self.journal['binding'],before,require_namespace=True)
             from .period09_successor import successor_guard as guard09
             guard09(c,self.journal['binding'],before,require_namespace=True)
+            from .period10_successor import successor_guard as guard10
+            guard10(c,self.journal['binding'],before,require_namespace=True)
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')
