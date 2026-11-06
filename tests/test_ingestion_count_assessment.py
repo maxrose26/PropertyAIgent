@@ -179,12 +179,13 @@ def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     all_rule_uses=[n for n in ast.walk(module) if isinstance(n,ast.Name) and n.id=='RULE_V3']
     success_rule_uses=[n for n in ast.walk(success) if isinstance(n,ast.Name) and n.id=='RULE_V3']
     imports=[n for n in ast.walk(module) if isinstance(n,ast.ImportFrom) and any(a.name=='RULE_V3' for a in n.names)]
-    assert len(all_rule_uses)==len(success_rule_uses)==1
+    assert len(all_rule_uses)==len(success_rule_uses)==2
     assert len(imports)==1 and imports[0] in ast.walk(success)
     calls=[n for n in ast.walk(success) if isinstance(n,ast.Call)]
     rules=[n for n in calls if isinstance(n.func,ast.Name) and n.func.id=='ScreeningRule']
-    assert len(rules)==1 and len(rules[0].args)==1 and isinstance(rules[0].args[0],ast.Name) and rules[0].args[0].id=='RULE_V3'
-    assert {kw.arg:ast.literal_eval(kw.value) for kw in rules[0].keywords}==dict(unit_threshold=10,link_related=False)
+    assert len(rules)==2
+    assert all(len(rule.args)==1 and isinstance(rule.args[0],ast.Name) and rule.args[0].id=='RULE_V3' for rule in rules)
+    assert all({kw.arg:ast.literal_eval(kw.value) for kw in rule.keywords}==dict(unit_threshold=10,link_related=False) for rule in rules)
     plans=[n for n in calls if isinstance(n.func,ast.Name) and n.func.id=='_screen_items']
     assert len(plans)==1 and any(kw.arg=='capture_bound' and isinstance(kw.value,ast.Constant) and kw.value.value is True for kw in plans[0].keywords)
     sql=[n.args[0].value for n in calls if isinstance(n.func,ast.Attribute) and n.func.attr=='execute' and n.args and isinstance(n.args[0],ast.Constant)]
