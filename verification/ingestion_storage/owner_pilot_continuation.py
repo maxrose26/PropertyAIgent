@@ -54,7 +54,7 @@ def diagnostic02_closed(state, *, snapshot, stable_credentials):
         state.get('stable_credentials')==stable_credentials,'OWNER_CONTINUATION_PREDECESSOR')
     return dict(period=state['period'],snapshot=snapshot,closure_sha256=hashlib.sha256(canonical(state['closure_receipt'])).hexdigest())
 
-def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False,diagnostic_cap=False,attempt06=False,attempt07=False,attempt08=False,binding08=None,attempt09=False,binding09=None,attempt10=False,binding10=None):
+def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,deadline=False,diagnostic_cap=False,attempt06=False,attempt07=False,attempt08=False,binding08=None,attempt09=False,binding09=None,attempt10=False,binding10=None,scope_binding=None):
     """Exact04→05 namespace addition; unchanged ACL, ledger and evidence."""
     new=OWNER_SQL.split('$owner_state$',2)[1]
     old=new.replace(",'b-dbpilot-20261027-1102-05_owner'",'')
@@ -82,6 +82,10 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
     if attempt10:
         from .database_evidence import ATTEMPT09_OWNER_SQL,ATTEMPT10_OWNER_SQL
         old=ATTEMPT09_OWNER_SQL.split('$owner_state$',2)[1];new=ATTEMPT10_OWNER_SQL.split('$owner_state$',2)[1]
+    if scope_binding is not None:
+        from . import intake_successor as successor
+        from .database_evidence import ATTEMPT10_OWNER_SQL
+        old=ATTEMPT10_OWNER_SQL.split('$owner_state$',2)[1];new=successor.owner_sql().split('$owner_state$',2)[1]
     c.execute('BEGIN')
     try:
         op.identity(c);op.inventory(c);op.dormant(c,stable_verifiers=stable_verifiers);op.owner_absent(c)
@@ -105,6 +109,9 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             from . import period10_successor as p10
             ctl=op.control(c);p10.successor_guard(c,binding10,ctl);p10.unused(c,ctl,journal=True)
             op.no_hazards(c,ctl);op.retained_cleanup(c,ctl)
+        if scope_binding is not None:
+            ctl=op.control(c);successor.guard(c,scope_binding,ctl);successor.unused(c,ctl,journal=True)
+            op.no_hazards(c,ctl);op.retained_cleanup(c,ctl)
         before=c.execute(op.MEMBERS).fetchall();ledger=op.ledger_sha(c)
         schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
         definition=c.execute("SELECT prosrc,proacl::text,proowner::regrole::text,prosecdef,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
@@ -120,7 +127,12 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             old_reg=p10.settlement.predecessor.registration_sql().split('$register$',2)[1]
             new_reg=p10.registration_sql().split('$register$',2)[1]
             op.require(registrar[0] in (old_reg,new_reg),'P10_REGISTRAR_BASELINE')
+        if scope_binding is not None:
+            registrar=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
+            old_reg=successor.prior.registration_sql().split('$register$',2)[1];new_reg=successor.registration_sql().split('$register$',2)[1]
+            op.require(registrar[0] in (old_reg,new_reg),'SCOPE_REGISTRAR_BASELINE')
         if definition[0]==new:
+            if scope_binding is not None:successor.namespace(c,migrated=True)
             if attempt09:p09.namespace(c,migrated=True)
             if attempt10:p10.namespace(c,migrated=True)
             verify_inventory(c);op.owner_absent(c);c.execute('COMMIT');return dict(status='ALREADY_EXACT_READBACK',function_sha256=hashlib.sha256(new.encode()).hexdigest(),mutation=False)
@@ -129,11 +141,11 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
         c.execute('SET LOCAL ROLE ingestion_storage_owner')
         c.execute('LOCK TABLE public.ingestion_run_evidence IN SHARE ROW EXCLUSIVE MODE')
         snapshot=c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()
-        source=ATTEMPT10_OWNER_SQL if attempt10 else ATTEMPT09_OWNER_SQL if attempt09 else ATTEMPT08_OWNER_SQL if attempt08 else ATTEMPT07_OWNER_SQL if attempt07 else ATTEMPT06_OWNER_SQL if attempt06 else DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
+        source=successor.owner_sql() if scope_binding is not None else ATTEMPT10_OWNER_SQL if attempt10 else ATTEMPT09_OWNER_SQL if attempt09 else ATTEMPT08_OWNER_SQL if attempt08 else ATTEMPT07_OWNER_SQL if attempt07 else ATTEMPT06_OWNER_SQL if attempt06 else DIAGNOSTIC02_CAP_OWNER_SQL if diagnostic_cap else DEADLINE_OWNER_SQL if deadline else QUALIFICATION_OWNER_SQL if qualification else OWNER_SQL
         c.execute(source.split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
-        if attempt09 or attempt10:
+        if attempt09 or attempt10 or scope_binding is not None:
             c.execute('LOCK TABLE public.ingestion_work_items,public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE')
-            c.execute(p10.registration_sql() if attempt10 else p09.registration_sql())
+            c.execute(successor.registration_sql() if scope_binding is not None else p10.registration_sql() if attempt10 else p09.registration_sql())
             readback=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
             op.require(readback==(new_reg,*registrar[1:]),'P09_REGISTRAR_READBACK')
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')

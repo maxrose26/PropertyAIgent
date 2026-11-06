@@ -70,7 +70,7 @@ def test_existing_owner_refuses_proposed_bolton_identity_before_effects(bound):
     binding, _, _ = bound
     binding = copy.deepcopy(binding)
     binding.update(period='b-bolton-20261103-1105-01', fixed_window={'start': str(START), 'end': str(END)})
-    with pytest.raises(Denied, match='OWNER_DATABASE_PILOT_SCOPE'):
+    with pytest.raises(Denied, match='SCOPE_BINDING'):
         owner.validate_binding(binding)
 
 

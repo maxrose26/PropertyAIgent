@@ -216,6 +216,9 @@ def verify_inventory(c):
          FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=%s""",(contract['name'],)).fetchall()
         hashes={contract['sha256']}
         if contract['name']=='ingestion_intake_owner_state':hashes.update(hashlib.sha256(x.split('$owner_state$',2)[1].encode()).hexdigest() for x in (QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL,DIAGNOSTIC02_CAP_OWNER_SQL,ATTEMPT06_OWNER_SQL,ATTEMPT07_OWNER_SQL,ATTEMPT08_OWNER_SQL,ATTEMPT09_OWNER_SQL,ATTEMPT10_OWNER_SQL))
+        if contract['name']=='ingestion_intake_owner_state':
+            from .intake_successor import owner_sql
+            hashes.add(hashlib.sha256(owner_sql().split('$owner_state$',2)[1].encode()).hexdigest())
         require(len(rows)==1 and rows[0][0] in hashes and rows[0][1:]==('ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False),'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
     row=c.execute("""SELECT c.relowner::regrole::text,c.relrowsecurity,c.relforcerowsecurity,
      (SELECT count(*) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)

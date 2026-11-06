@@ -62,6 +62,9 @@ def test_changed_state_refuses(ready10,drift):
 
 @pytest.mark.parametrize('incomplete',[False,True])
 def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeypatch,incomplete):
+ exercise_owner_runtime(ready10,tmp_path,monkeypatch,incomplete)
+
+def exercise_owner_runtime(ready10,tmp_path,monkeypatch,incomplete,record_count=1):
  w=ready10;c=w['boot'];b=w['binding'];p=w['policy']
  # Execute actual owner CLI for disposition/readback; only configured connection and
  # immutable fixture identity binding replace production integrations.
@@ -92,7 +95,7 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
  def source(row):
   assert row==dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02');called.append(row)
   runtime.run.begin_source();folder=tmp_path/'source10';folder.mkdir()
-  audit=arcus_audit('manchester',[entry('M10/26',SCHEME)],date(2026,10,27),date(2026,11,2),budget='BROWSER_SOURCE_V2')
+  audit=arcus_audit('manchester',[entry(f'M10/{i}/26',SCHEME) for i in range(record_count)],date(2026,10,27),date(2026,11,2),budget='BROWSER_SOURCE_V2')
   if incomplete:audit.update(failure='PAGE_CAP',safety_failure=True)
   audit,outer,_=arcus_slot_supervised(folder,audit,runtime.contract(row).scope())
   if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE'):
@@ -102,7 +105,7 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
   runtime.run.source(dict(requests=audit['requests'],source_bytes=audit['decoded_bytes']+audit['encoded_bytes']+audit['outbound_payload_bytes'],source_seconds=audit['supervisor_seconds'],supervised_seconds=outer['elapsed_seconds']))
   runtime.archive(__import__('verification.ingestion_storage.database_evidence',fromlist=['canonical']).canonical(audit))
   return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
- expected_records=60 if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE') else 1
+ expected_records=60 if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE') else record_count
  runtime.collect=source
  # Synthetic fixture only: identify the exact guarded boundary without payloads.
  import sys,traceback

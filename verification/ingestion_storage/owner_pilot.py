@@ -322,6 +322,13 @@ def fixed_binding(release,profile,address,guard,now=None):
         p10.release(release)
         b.update(accepted_stop=p10.ACCEPTED,period09_receipt_sha256=p10.RECEIPT_SHA)
         policy.update(expected_stop=p10.ACCEPTED,councils=p10.councils())
+    from .intake_scope_policy import reviewed
+    scope=reviewed(PERIOD)
+    if scope:
+        from . import intake_successor as successor
+        successor.release(release)
+        b.update(accepted_stop=successor.ACCEPTED,scope_policy_sha256=scope.fingerprint(),fixed_window=scope.window())
+        policy.update(expected_stop=successor.ACCEPTED,councils=scope.councils(),fixed_window=scope.window())
     b['period_policy_sha256']=hashlib.sha256(canonical(policy)).hexdigest()
     op.validate_binding(b,opening=True,now=now)
     return b,policy
@@ -656,6 +663,9 @@ class Pilot:
             elif PERIOD=='b-dbpilot-20261027-1102-10':
                 from . import period10_successor as p10
                 p10.successor_guard(c,p10.binding_from_saved_state(self.db),ctl,require_namespace=True)
+            elif __import__('verification.ingestion_storage.intake_scope_policy',fromlist=['reviewed']).reviewed(PERIOD):
+                from . import intake_successor as successor
+                successor.guard(c,successor.binding_from_saved_state(self.db),ctl,require_namespace=True)
             else:op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
@@ -796,13 +806,16 @@ class Pilot:
         from . import period08_successor as p08
         from . import period09_successor as p09
         from . import period10_successor as p10
+        from . import intake_successor as successor
+        from .intake_scope_policy import reviewed
+        scoped=reviewed(PERIOD) is not None
         next10=PERIOD==p10.SUCCESSOR
         next07=PERIOD==SUCCESSOR;next08=PERIOD==p08.SUCCESSOR;next09=PERIOD==p09.SUCCESSOR
         snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous}
-        link=p10.predecessor(old,snapshot=snapshot) if next10 else p09.predecessor(old,snapshot=snapshot) if next09 else p08.predecessor(old,snapshot=snapshot) if next08 else predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'attempt10':True,'binding10':p10.binding_from_saved_state(self.db)} if next10 else {'attempt09':True,'binding09':p09.binding_from_saved_state(self.db)} if next09 else {'attempt08':True,'binding08':p08.binding_from_saved_state(self.db)} if next08 else {'attempt07':True} if next07 else {}))
+        link=successor.predecessor(old,snapshot=snapshot) if scoped else p10.predecessor(old,snapshot=snapshot) if next10 else p09.predecessor(old,snapshot=snapshot) if next09 else p08.predecessor(old,snapshot=snapshot) if next08 else predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'scope_binding':successor.binding_from_saved_state(self.db)} if scoped else {'attempt10':True,'binding10':p10.binding_from_saved_state(self.db)} if next10 else {'attempt09':True,'binding09':p09.binding_from_saved_state(self.db)} if next09 else {'attempt08':True,'binding08':p08.binding_from_saved_state(self.db)} if next08 else {'attempt07':True} if next07 else {}))
         preserved=prior.load()
-        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if next07 or next08 or next09 or next10 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if next07 or next08 or next09 or next10 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if scoped or next07 or next08 or next09 or next10 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if scoped or next07 or next08 or next09 or next10 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()

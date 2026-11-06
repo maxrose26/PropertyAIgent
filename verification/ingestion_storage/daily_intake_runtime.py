@@ -17,7 +17,7 @@ from .operational_controller import DatabaseBudget,ControllerLedger
 from .operational_owner import Owner
 from .operational_publication import GitHub,canonical,BRANCH,REPO
 from .operational_supervisor import supervise
-from .scope_binding import binding_for
+from .scope_binding import intake_binding_for as binding_for
 from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
@@ -28,7 +28,7 @@ BOUND_FILES=('verification/ingestion_storage/deadline_evidence.py','verification
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/render_intake.py','verification/direct_reference/instrumented_probe.py','verification/ingestion_storage/chain_caller.py',
              'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
-             'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
+             'verification/ingestion_storage/chain_registration.py','verification/ingestion_storage/intake_scope_policy.py','verification/ingestion_storage/scope_binding.py','scripts/run_daily_councils.py')
 
 def execution_binding():
     import re
@@ -129,6 +129,11 @@ class Runtime:
         from .period09_successor import SUCCESSOR,function_inventory
         from . import period10_successor as p10
         inventory=p10.function_inventory() if args.period==p10.SUCCESSOR else function_inventory() if args.period==SUCCESSOR else Owner.daily_intake_inventory()
+        from .intake_scope_policy import reviewed
+        self.scope_policy=reviewed(args.period)
+        if self.scope_policy:
+            from .intake_successor import function_inventory as scoped_inventory
+            inventory=scoped_inventory()
         self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in inventory.items()}
 
     def emit(self,event,data):
@@ -316,6 +321,7 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
+            if self.durable_run and self.scope_policy and self.durable_run.get('period')==self.args.period:raise Denied('SCOPE_ALREADY_CONSUMED')
             if self.durable_run and self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10'):raise Denied('P10_ALREADY_CONSUMED' if self.args.period.endswith('-10') else 'P09_ALREADY_CONSUMED')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
@@ -334,7 +340,10 @@ class Runtime:
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
                 expected_councils={'manchester'} if self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') else {'tameside','manchester'}
-                if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!=expected_councils:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
+                if self.scope_policy:
+                    from .intake_scope_policy import require_scope
+                    require_scope(self.args.period,self.policy)
+                elif self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!=expected_councils:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
                 for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:
                 self.active_council=row['council']
