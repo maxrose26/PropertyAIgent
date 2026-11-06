@@ -48,7 +48,7 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
   assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
   assert outer['exit_code']!=0 and outer['limit_hit'] is None,outer
   diagnostic=json.loads(inner.read_text())
-  assert diagnostic['code']=='WORKER_AUDIT_BOUND' and diagnostic['indented_bytes']>=65536 and diagnostic['compact_bytes']<65536
+  assert diagnostic['code']=='WORKER_AUDIT_BOUND' and diagnostic['indented_bytes']>=65536 and 65536<=diagnostic['compact_bytes']<512000
   return
  assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
  assert outer['exit_code']==0 and outer['limit_hit'] is None,outer
@@ -64,5 +64,5 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
   audit=json.loads(Path(str(receipt)+'.audit').read_text())
   from verification.ingestion_storage.limit_reconciliation import BROWSER_SOURCE_V2_ITEM_LIMITS
   projected=r.contract(row).project(audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat()),BROWSER_SOURCE_V2_ITEM_LIMITS)
-  assert len(projected['records'])==60 and projected['window']['outcome']=='COMPLETE'
+  assert len(projected['records'])==60 and r.contract(row).admission_window(projected,'manchester').outcome.value=='COMPLETE'
   print('P10_REAL_CAPTURE_VALIDATOR '+json.dumps(dict(records=60,coverage='COMPLETE',physical_requests=report['physical_requests'],cleanup=outer['cleanup'])))

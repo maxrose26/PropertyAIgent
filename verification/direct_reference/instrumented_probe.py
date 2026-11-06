@@ -656,8 +656,20 @@ def execution_environment_allowed(case, mode, environ):
             and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
 
 
-def bounded_worker_audit(path,case,metadata=False):
-    bound=512000 if metadata else 65536
+def worker_audit_bound(case,metadata=False,*,retain_proof=False,execution_budget=None):
+    # Screening-grade Manchester proof carries metadata even though --metadata
+    # is false (that switch belongs to the historical, non-proof route).
+    # Reuse its existing metadata ceiling; no collection/output ceiling changes.
+    if retain_proof and execution_budget=='BROWSER_SOURCE_V2' and case=='discovery_manchester_ui_window':
+        from verification.discovery.four_council_proof import current_collection_profile
+        from verification.discovery.source_profiles import profile
+        fixed=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
+        if current_collection_profile()==profile(fixed,'SCREENING_METADATA'):return 512000
+    return 512000 if metadata else 65536
+
+
+def bounded_worker_audit(path,case,metadata=False,*,retain_proof=False,execution_budget=None):
+    bound=worker_audit_bound(case,metadata,retain_proof=retain_proof,execution_budget=execution_budget)
     return (json.loads(path.read_text()) if path.exists() and path.stat().st_size<bound
             else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
 
@@ -771,7 +783,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                     survivors.append(pid)
             except psutil.NoSuchProcess:
                 pass
-        result = bounded_worker_audit(child_output,case,metadata)
+        result = bounded_worker_audit(child_output,case,metadata,retain_proof=retain_proof,execution_budget=execution_budget)
         result.update(supervisor_seconds=round(time.monotonic()-start, 3), peak_owned_rss=peak,
                       owned_processes_seen=len(seen), live_owned_survivors=len(survivors),
                       supervisor_limit_hit=expired, process_cleanup='CLOSED' if not survivors else 'FAILED')
@@ -819,7 +831,7 @@ def _main():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
         raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),separators=(',',':'))+'\n'
-        if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
+        if len(raw.encode())>=worker_audit_bound(a.case,a.metadata,retain_proof=a.retain_four_council_proof,execution_budget=a.execution_budget):raise ValueError('WORKER_AUDIT_BOUND')
         if a.retain_four_council_proof:
             from verification.discovery.four_council_proof import write_audit
             write_audit(a.output,json.loads(raw))

@@ -29,6 +29,7 @@ def run(host,port,receipt,legacy=False):
   old="))),separators=(',',':'))+'\\n'"
   assert body.count(old)==1
   exec(body.replace(old,"))),indent=2)+'\\n'"),probe.__dict__)
+  probe.worker_audit_bound=lambda case,metadata=False,**kw:512000 if metadata else 65536
  try:return probe.main()
  except Exception as error:
   allowed={'WORKER_AUDIT_BOUND','PROOF_OUTPUT_BOUND','PROOF_OBSERVATION_OUTPUT_BOUND','PROFILE_AUDIT_BINDING','PROOF_MISSING','EXISTING_OUTPUT'}
