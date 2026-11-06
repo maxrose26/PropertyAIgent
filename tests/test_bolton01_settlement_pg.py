@@ -103,3 +103,27 @@ def test_actual_owner_entrypoint_and_readback(failed_bolton,monkeypatch,lost):
  assert cli.main(['--action','inspect'])==0
  assert backlog(w)==w['protected_backlog']
  assert w['boot'].execute(op.MEMBERS).fetchall()==w['members']
+
+
+@pytest.mark.parametrize('drift',['period','grant','other_authority'])
+def test_control_drift_between_preflight_and_lock_refuses(failed_bolton,monkeypatch,drift):
+ """Commit a second owner's change in the exact preflight/lock interval."""
+ import psycopg
+ w=failed_bolton;c=w['boot'];original_lock=a06.lock;observed={}
+ def interleaved_lock(actor):
+  with psycopg.connect(c.info.dsn,autocommit=True) as writer:
+   ctl=op.control(writer)
+   if drift=='period':ctl['intake_periods'][s.PERIOD]['max_runs']=2
+   elif drift=='grant':ctl['grants'][s.AUTHORITY]['expires_at']=time.time()+60
+   else:ctl['grants']['CONCURRENT_OWNER']={'expires_at':time.time()+60}
+   writer.execute('UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
+   observed['ledger']=op.ledger_sha(writer)
+  return original_lock(actor)
+ monkeypatch.setattr(a06,'lock',interleaved_lock)
+ with w['actor']() as actor:
+  with pytest.raises(op.Denied,match='BOLTON_SETTLEMENT_'+{'period':'PERIOD','grant':'AUTHORITY','other_authority':'OTHER_AUTHORITY'}[drift]):
+   s.recover(actor,w['binding'])
+ assert op.ledger_sha(c)==observed['ledger']
+ assert c.execute(op.MEMBERS).fetchall()==w['members']
+ assert s.all_other_work_sha(c)==w['all_other']
+ assert c.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence_before']
