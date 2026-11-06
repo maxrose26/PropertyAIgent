@@ -35,6 +35,11 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
   def do_GET(self):
    calls.append(self.path)
    self.send_response(200);self.send_header('Content-Type','text/html');self.end_headers();self.wfile.write(html.encode())
+  def do_POST(self):
+   assert self.path=='/pr/s/sfsites/aura'
+   assert self.rfile.read(int(self.headers['Content-Length']))==b'fixture=public-ui'
+   calls.append(self.path)
+   self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(b'{}')
   def log_message(self,*args):pass
  server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
  tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(cert,key);server.socket=tls.wrap_socket(server.socket,server_side=True)
@@ -49,6 +54,8 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  for label in config.blank_combos:html+=f'<div role="combobox" aria-label="{label}">Select an option</div>'
  html+='<div role="combobox" aria-label="Category">Planning Applications</div><p class="pr-pagination__results"></p><section id="rows"></section><a class="pr-pagination__link" href="#" onclick="event.preventDefault();page++;render()">Next</a>'
  html+='''<script>let page=0;function render(){let first=page*10+1,last=first+9;document.querySelector('p').textContent=`Showing ${first} to ${last} of 60 results`;let out='';for(let n=first;n<=last;n++){out+=`<div role="list" class="slds-box"><a href="/pr/s/detail/${String(n).padStart(18,'0')}?c__r=Arcus_BE_Public_Register">M/${n}</a><div role="listitem">Reference<br>M/${n}</div><div role="listitem">Valid Date<br>28/10/2026</div><div role="listitem">Proposal<br>Erection of 12 dwellings</div><div role="listitem">Site Address<br>Fixture site ${n}</div><div role="listitem">Application type<br>Full</div></div>`}document.querySelector('#rows').innerHTML=out;if(page===5)document.querySelector('a.pr-pagination__link').remove()}render()</script>'''
+ if os.environ.get('MEASURE_FULL_PATH')=='1':
+  html=html.replace('}render()</script>',"}fetch('/pr/s/sfsites/aura',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'fixture=public-ui'}).then(render)</script>")
  monkeypatch.setenv('TMPDIR',str(root));monkeypatch.setenv('HOME',str(root));peak={};done=threading.Event();calls=[];seen={};peak_rss=[0]
  def scan():
   while not done.is_set():
@@ -150,5 +157,5 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
  assert a['cleanup']=='CONTEXT_BROWSER_CLOSED' and not survivors
  assert peak_rss[0]<=1024*1024*1024
  assert a.get('enumeration_evidence')=='COUNT_RECONCILED' or a.get('safety_failure') is True,a
- assert len(calls)<=1
+ assert len(calls)<=(2 if os.environ.get('MEASURE_FULL_PATH')=='1' else 1)
  if a.get('enumeration_evidence')=='COUNT_RECONCILED':assert len(a['listing_records'])==60

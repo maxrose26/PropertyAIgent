@@ -53,9 +53,10 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
  assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
  assert outer['exit_code']==0 and outer['limit_hit'] is None,outer
  report=json.loads(receipt.read_text());assert report['actual_worker'] and report['records']==60 and report['enumeration']=='COUNT_RECONCILED'
- assert report['physical_requests']==1 and report['cleanup']=='CONTEXT_BROWSER_CLOSED'
+ assert report['physical_requests']==(2 if inherited_temp=='full' else 1) and report['cleanup']=='CONTEXT_BROWSER_CLOSED'
 
  if inherited_temp=='full':
+  assert observations['max_regular_bytes']<=512*1024-16384
   from verification.ingestion_storage.daily_intake_runtime import Runtime
   from verification.ingestion_storage.intake_owner_operations import COUNCILS
   from datetime import datetime,timezone

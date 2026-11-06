@@ -800,12 +800,15 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
             result['failure'] = result.get('failure') or 'EXECUTION_BUDGET_MISMATCH'
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
-        if retain_proof:
-            from verification.discovery.four_council_proof import write_audit
-            write_audit(output,result)
-        else:output.write_text(json.dumps(result, indent=2) + '\n')
-        print(json.dumps(result, sort_keys=True))
-        return 0 if result.get('failure') is None else 1
+    # The private child audit has been validated into memory. Remove its
+    # temporary directory before exporting the parent receipt, so the unchanged
+    # aggregate output guard never counts two copies of the same audit.
+    if retain_proof:
+        from verification.discovery.four_council_proof import write_audit
+        write_audit(output,result)
+    else:output.write_text(json.dumps(result, indent=2) + '\n')
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result.get('failure') is None else 1
 
 
 def _main():
