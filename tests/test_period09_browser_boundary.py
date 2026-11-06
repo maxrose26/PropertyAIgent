@@ -66,4 +66,6 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
   from verification.ingestion_storage.limit_reconciliation import BROWSER_SOURCE_V2_ITEM_LIMITS
   projected=r.contract(row).project(audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat()),BROWSER_SOURCE_V2_ITEM_LIMITS,source_bytes_limit=512*1024)
   assert len(projected['records'])==60 and r.contract(row).admission_window(projected,'manchester').outcome.value=='COMPLETE'
+  if os.environ.get('P10_LOOPBACK_CAPTURE'):
+   Path(os.environ['P10_LOOPBACK_CAPTURE']).write_text(json.dumps(dict(audit=audit,outer=outer),sort_keys=True))
   print('P10_REAL_CAPTURE_VALIDATOR '+json.dumps(dict(records=60,coverage='COMPLETE',physical_requests=report['physical_requests'],cleanup=outer['cleanup'])))

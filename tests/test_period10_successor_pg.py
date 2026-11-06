@@ -1,5 +1,6 @@
 """Actual fixed owner operations and runtime against disposable PG; no council transport."""
-import copy,json,subprocess,hashlib
+import copy,json,subprocess,hashlib,os
+from pathlib import Path
 from contextlib import contextmanager
 from datetime import date,datetime,timezone
 from types import SimpleNamespace
@@ -94,9 +95,14 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
   audit=arcus_audit('manchester',[entry('M10/26',SCHEME)],date(2026,10,27),date(2026,11,2),budget='BROWSER_SOURCE_V2')
   if incomplete:audit.update(failure='PAGE_CAP',safety_failure=True)
   audit,outer,_=arcus_slot_supervised(folder,audit,runtime.contract(row).scope())
+  if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE'):
+   observed=json.loads(Path(os.environ['P10_LOOPBACK_CAPTURE']).read_text())
+   audit,outer=observed['audit'],observed['outer']
+   assert len(audit['listing_records'])==60 and audit['requests']==2
   runtime.run.source(dict(requests=audit['requests'],source_bytes=audit['decoded_bytes']+audit['encoded_bytes']+audit['outbound_payload_bytes'],source_seconds=audit['supervisor_seconds'],supervised_seconds=outer['elapsed_seconds']))
   runtime.archive(__import__('verification.ingestion_storage.database_evidence',fromlist=['canonical']).canonical(audit))
   return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
+ expected_records=60 if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE') else 1
  runtime.collect=source
  assert main(argv,prepared_runtime=runtime)==(1 if incomplete else 0)
  assert len(called)==1 and backlog(w)==w['protected_backlog']
@@ -106,7 +112,7 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
  if not incomplete:
   assert run['state']=='VERIFIED'
   with w['actor']() as actor:verified=op.finalisation(actor,b,dict(run_id=run['id'],publication=run['publication']))
-  assert len(verified['captures'])==1 and verified['captures'][0]['council']=='manchester' and verified['captures'][0]['screening_complete']==1
+  assert len(verified['captures'])==1 and verified['captures'][0]['council']=='manchester' and verified['captures'][0]['screening_complete']==expected_records
   from app.ingestion.daily_intake import backlog_page
   from app.ingestion.sql_ledger import SQLLedger
   from app.ingestion.listing_screening import ScreeningRule,RULE_V3
@@ -118,7 +124,7 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
    cursor=page['next_cursor']
   assert len([r for r in records if r['capture_key']==prior.TAMESIDE])==24
   new=[r for r in records if r['archive']['period']==p10.SUCCESSOR]
-  assert len(new)==1 and new[0]['council']=='manchester' and new[0]['archive']['run_id']==run['id']
+  assert len(new)==expected_records and all(x['council']=='manchester' and x['archive']['run_id']==run['id'] for x in new)
   # Actual admission path must refuse a second run without transport.
   duplicate=Runtime(SimpleNamespace(**{**vars(args),'output':str(tmp_path/'duplicate')}));duplicate.route_name=b['route'];duplicate.collect=lambda row:pytest.fail('RECOLLECTION')
   before_duplicate=op.ledger_sha(c)
