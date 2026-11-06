@@ -219,6 +219,9 @@ def verify_inventory(c):
         if contract['name']=='ingestion_intake_owner_state':
             from .intake_successor import owner_sql
             hashes.add(hashlib.sha256(owner_sql().split('$owner_state$',2)[1].encode()).hexdigest())
+        if contract['name']=='ingestion_intake_evidence_write':
+            from .intake_successor import evidence_write_sql
+            hashes.add(hashlib.sha256(evidence_write_sql().split('$evidence_write$',2)[1].encode()).hexdigest())
         require(len(rows)==1 and rows[0][0] in hashes and rows[0][1:]==('ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False),'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
     row=c.execute("""SELECT c.relowner::regrole::text,c.relrowsecurity,c.relforcerowsecurity,
      (SELECT count(*) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)

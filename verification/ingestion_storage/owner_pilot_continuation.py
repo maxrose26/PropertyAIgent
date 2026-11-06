@@ -131,6 +131,11 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             registrar=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
             old_reg=successor.prior.registration_sql().split('$register$',2)[1];new_reg=successor.registration_sql().split('$register$',2)[1]
             op.require(registrar[0] in (old_reg,new_reg),'SCOPE_REGISTRAR_BASELINE')
+            from .database_evidence import WRITE_SQL
+            writer=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure").fetchone()
+            old_writer=WRITE_SQL.split('$evidence_write$',2)[1]
+            new_writer=successor.evidence_write_sql().split('$evidence_write$',2)[1]
+            op.require(writer[0]==(new_writer if definition[0]==new else old_writer),'SCOPE_EVIDENCE_BASELINE')
         if definition[0]==new:
             if scope_binding is not None:successor.namespace(c,migrated=True)
             if attempt09:p09.namespace(c,migrated=True)
@@ -148,6 +153,10 @@ def migrate_owner_namespace(c, *, stable_verifiers=None, qualification=False,dea
             c.execute(successor.registration_sql() if scope_binding is not None else p10.registration_sql() if attempt10 else p09.registration_sql())
             readback=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()
             op.require(readback==(new_reg,*registrar[1:]),'P09_REGISTRAR_READBACK')
+        if scope_binding is not None:
+            c.execute(successor.evidence_write_sql().split('REVOKE ALL ON FUNCTION',1)[0].replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION',1))
+            readback=c.execute("SELECT prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure").fetchone()
+            op.require(readback==(new_writer,*writer[1:]),'SCOPE_EVIDENCE_READBACK')
         op.require(c.execute("SELECT count(*),md5(coalesce(string_agg(period||run_id||name||sha256,',' ORDER BY period,run_id,name),'')) FROM ingestion_run_evidence").fetchone()==snapshot,'OWNER_CONTINUATION_PRESERVATION')
         c.execute('RESET ROLE')
         c.execute('REVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner')

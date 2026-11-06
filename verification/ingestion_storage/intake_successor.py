@@ -103,6 +103,19 @@ def registration_sql():
     replace(anchor,checks+anchor)
     return source
 
+def evidence_write_sql():
+    from .database_evidence import WRITE_SQL
+    anchor="OR (w.subject::jsonb->>'council'='manchester'"
+    require(WRITE_SQL.count(anchor)==1,'EVIDENCE_ANCHOR')
+    clause=("OR (p_period='"+SCOPE.period+"' AND policy->'fixed_window'="
+        "'"+json.dumps(SCOPE.window(),sort_keys=True)+"'::jsonb"
+        " AND w.subject::jsonb->>'council'='bolton'"
+        " AND w.subject::jsonb->>'semantics'='RECEIVED'"
+        " AND (convert_from(p_body,'UTF8')::jsonb)->>'council'='bolton'"
+        " AND (convert_from(p_body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED')\n ")
+    return WRITE_SQL.replace(anchor,clause+anchor)
+
+
 def function_inventory():
     return dict(op.Owner.daily_intake_inventory(), ingestion_register_bolton_exception=registration_sql().split('$register$',2)[1])
 
@@ -111,6 +124,9 @@ def namespace(c,*,migrated=None):
     current=c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()[0]
     old,new=ATTEMPT10_OWNER_SQL.split('$owner_state$',2)[1],owner_sql().split('$owner_state$',2)[1]
     require(current in ([new] if migrated is True else [old] if migrated is False else [old,new]),'NAMESPACE')
+    from .database_evidence import WRITE_SQL
+    writer=evidence_write_sql() if current==new else WRITE_SQL
+    require(c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure").fetchone()==(writer.split('$evidence_write$',2)[1],),'EVIDENCE_WRITER')
     expected=registration_sql() if current==new else prior.registration_sql()
     require(c.execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()==(expected.split('$register$',2)[1],),'REGISTRAR')
 
