@@ -104,7 +104,10 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
   return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
  expected_records=60 if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE') else 1
  runtime.collect=source
- assert main(argv,prepared_runtime=runtime)==(1 if incomplete else 0)
+ code=main(argv,prepared_runtime=runtime)
+ retained=json.loads((runtime.root/'final-result.json').read_text())
+ diagnostic={k:retained.get(k) for k in ('status','reason','failure','finalisation','evidence','cleanup','authority_closure','usage')}
+ assert code==(1 if incomplete else 0),diagnostic
  assert len(called)==1 and backlog(w)==w['protected_backlog']
  ctl=op.control(c);assert ctl['intake_periods'][s.PERIOD]['failed_runs']==w['histories'][s.PERIOD]['failed_runs']
  assert set(ctl['intake_periods'][p10.SUCCESSOR]['days']['2026-11-02'])=={'manchester'}

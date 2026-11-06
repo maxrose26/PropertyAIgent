@@ -73,6 +73,11 @@ jobs:
         with:
           name: period10-synthetic-loopback
           path: ${{ runner.temp }}/p10-loopback
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period10_successor_pg.py -q -k actual_owner_entry_runtime_backlog_and_closure --tb=short
+        env:
+          P10_LOOPBACK_CAPTURE: ${{ runner.temp }}/p10-loopback/capture.json
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
       - run: timeout 540s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period09_successor_pg.py tests/test_period09_contract.py tests/test_period09_settlement_pg.py tests/test_period09_source_boundary.py tests/test_period10_successor_pg.py tests/test_period10_contract.py tests/test_manchester_audit_serialization.py -q --tb=short --junitxml="$RUNNER_TEMP/p09.xml"
         env:
           P10_LOOPBACK_CAPTURE: ${{ runner.temp }}/p10-loopback/capture.json
