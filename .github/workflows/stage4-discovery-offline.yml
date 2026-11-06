@@ -6,6 +6,8 @@ on:
       - 'app/ingestion/**'
       - 'scripts/run_daily_councils*.py'
       - 'tests/test_daily_intake*.py'
+      - 'tests/test_b_current_offline_review.py'
+      - 'docs/design/daily-intake-20261029/b-readonly-stage4-6bc3ae0-review.sql'
       - 'verification/ingestion_storage/**'
       - '.github/workflows/stage4-ingestion-storage-catalogue-once.yml'
       - 'app/pipeline/discovery_*.py'
@@ -202,6 +204,11 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
         run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake.py tests/test_daily_intake_limits.py tests/test_daily_intake_pg.py tests/test_daily_intake_runtime.py tests/test_daily_intake_interruptions.py tests/test_render_intake.py -q --junitxml="$RUNNER_TEMP/daily-intake.xml"
+      - name: Stage4 candidate B read-only inspection, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 120s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_b_current_offline_review.py -q --junitxml="$RUNNER_TEMP/b-current-review.xml"
       - name: Fixed B read-only inspection, disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -213,6 +220,7 @@ jobs:
           name: daily-intake-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/daily-intake.xml
+            ${{ runner.temp }}/b-current-review.xml
             ${{ runner.temp }}/b-readonly.xml
             ${{ runner.temp }}/b-targeted.xml
             ${{ runner.temp }}/attempt06-owner.xml
