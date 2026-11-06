@@ -104,7 +104,17 @@ def test_actual_owner_entry_runtime_backlog_and_closure(ready10,tmp_path,monkeyp
   return audit,dict(outer,observed_at=datetime.now(timezone.utc).isoformat())
  expected_records=60 if not incomplete and os.environ.get('P10_LOOPBACK_CAPTURE') else 1
  runtime.collect=source
- code=main(argv,prepared_runtime=runtime)
+ # Synthetic fixture only: identify the exact guarded boundary without payloads.
+ import sys,traceback
+ payload_boundaries=[]
+ def trace_boundary(frame,event,arg):
+  if event=='exception' and frame.f_code.co_name=='bounded' and str(arg[1])=='PAYLOAD_BOUND':
+   payload_boundaries.append(dict(bytes=len(frame.f_locals['raw']),limit=frame.f_locals['limit'],stack=[f'{x.filename.split("/src/")[-1]}:{x.lineno}:{x.name}' for x in traceback.extract_stack(frame)[-8:]]))
+  return trace_boundary
+ sys.settrace(trace_boundary)
+ try:code=main(argv,prepared_runtime=runtime)
+ finally:sys.settrace(None)
+ if payload_boundaries:print('SYNTHETIC_PAYLOAD_BOUNDARIES',json.dumps(payload_boundaries))
  retained=json.loads((runtime.root/'final-result.json').read_text())
  diagnostic={k:retained.get(k) for k in ('status','reason','failure','finalisation','evidence','cleanup','authority_closure','usage')}
  assert code==(1 if incomplete else 0),diagnostic
