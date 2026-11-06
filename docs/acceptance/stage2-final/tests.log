@@ -1,0 +1,210 @@
+........................................................................ [ 13%]
+........................................................................ [ 27%]
+........................................................................ [ 41%]
+........................................................................ [ 55%]
+........................................................................ [ 69%]
+........................................................................ [ 83%]
+..............................F............FFF........F................. [ 97%]
+.............                                                            [100%]
+=================================== FAILURES ===================================
+__ test_classify_page_forces_review_required_true_for_a_useful_classification __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-19/test_classify_page_forces_revi0')
+
+    def test_classify_page_forces_review_required_true_for_a_useful_classification(tmp_path):
+        image_path = tmp_path / "img.png"
+        image_path.write_bytes(b"\x89PNG\r\nfake bytes for a fake image")
+        # The fake model itself under-reports review_required=False - the
+        # pipeline never trusts that for a useful classification (Part 9/10).
+        client = _FakeVisionClient(_classification_result(review_required=False))
+>       result = classify_page(client, str(image_path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_visual_evidence.py:288: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/security/commands.py:110: in invoke
+    actor=access.require_operator(action,paid=paid)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+action = 'visual.classify', paid = True
+
+    def require_operator(action='shared.write', *, paid=False):
+        actor = current_actor()
+        if actor.role != 'operator':
+            raise AccessDenied('Operator permission required.')
+        if actor.machine and action not in actor.actions:
+            raise AccessDenied('Command scope denied.')
+        if paid and load_policy().get('paid_actions', {}).get(action) is not True:
+>           raise AccessDenied('This paid action is disabled.')
+E           app.security.access.AccessDenied: This paid action is disabled.
+
+app/security/access.py:319: AccessDenied
+___________ test_rejected_image_is_never_reprocessed_even_with_force ___________
+
+session = <sqlalchemy.orm.session.Session object at 0x7f19854d9190>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-19/test_rejected_image_is_never_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f1984b70f20>
+
+    def test_rejected_image_is_never_reprocessed_even_with_force(session, tmp_path, monkeypatch):
+        monkeypatch.setattr(rendering_module, "VISUALS_DIR", tmp_path / "visuals")
+        site = _make_site(session)
+        application = _make_application(session, site_id=site.id)
+        pdf_path = tmp_path / "doc.pdf"
+        _make_pdf(pdf_path, ["a page showing the site boundary clearly marked"])
+        document = _make_document(session, application.id, pdf_path)
+    
+        client = _FakeVisionClient(_classification_result())
+        limits = PipelineLimits()
+>       process_document(session, client, document, limits, PipelineStats())
+
+tests/test_visual_evidence.py:411: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/security/commands.py:121: in invoke
+    result=function(*bound.args,**bound.kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/visuals/pipeline.py:324: in process_document
+    require_operator("visual.classify", paid=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+action = 'visual.classify', paid = True
+
+    def require_operator(action='shared.write', *, paid=False):
+        actor = current_actor()
+        if actor.role != 'operator':
+            raise AccessDenied('Operator permission required.')
+        if actor.machine and action not in actor.actions:
+            raise AccessDenied('Command scope denied.')
+        if paid and load_policy().get('paid_actions', {}).get(action) is not True:
+>           raise AccessDenied('This paid action is disabled.')
+E           app.security.access.AccessDenied: This paid action is disabled.
+
+app/security/access.py:319: AccessDenied
+_____ test_unchanged_document_rerun_makes_no_new_ai_call_or_duplicate_row ______
+
+session = <sqlalchemy.orm.session.Session object at 0x7f19850293a0>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-19/test_unchanged_document_rerun_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f198a0ece30>
+
+    def test_unchanged_document_rerun_makes_no_new_ai_call_or_duplicate_row(session, tmp_path, monkeypatch):
+        monkeypatch.setattr(rendering_module, "VISUALS_DIR", tmp_path / "visuals")
+        site = _make_site(session)
+        application = _make_application(session, site_id=site.id)
+        pdf_path = tmp_path / "doc.pdf"
+        _make_pdf(pdf_path, ["a page showing the site boundary clearly marked"])
+        document = _make_document(session, application.id, pdf_path)
+    
+        client = _FakeVisionClient(_classification_result())
+        limits = PipelineLimits()
+>       process_document(session, client, document, limits, PipelineStats())
+
+tests/test_visual_evidence.py:437: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/security/commands.py:121: in invoke
+    result=function(*bound.args,**bound.kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/visuals/pipeline.py:324: in process_document
+    require_operator("visual.classify", paid=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+action = 'visual.classify', paid = True
+
+    def require_operator(action='shared.write', *, paid=False):
+        actor = current_actor()
+        if actor.role != 'operator':
+            raise AccessDenied('Operator permission required.')
+        if actor.machine and action not in actor.actions:
+            raise AccessDenied('Command scope denied.')
+        if paid and load_policy().get('paid_actions', {}).get(action) is not True:
+>           raise AccessDenied('This paid action is disabled.')
+E           app.security.access.AccessDenied: This paid action is disabled.
+
+app/security/access.py:319: AccessDenied
+___ test_changed_source_creates_a_new_current_row_and_supersedes_the_old_one ___
+
+session = <sqlalchemy.orm.session.Session object at 0x7f1984b72cf0>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-19/test_changed_source_creates_a_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f198a4fc0b0>
+
+    def test_changed_source_creates_a_new_current_row_and_supersedes_the_old_one(session, tmp_path, monkeypatch):
+        monkeypatch.setattr(rendering_module, "VISUALS_DIR", tmp_path / "visuals")
+        site = _make_site(session)
+        application = _make_application(session, site_id=site.id)
+        pdf_path = tmp_path / "doc.pdf"
+        _make_pdf(pdf_path, ["version one showing the site boundary clearly marked"])
+        document = _make_document(session, application.id, pdf_path)
+    
+        client = _FakeVisionClient(_classification_result())
+        limits = PipelineLimits()
+>       process_document(session, client, document, limits, PipelineStats())
+
+tests/test_visual_evidence.py:459: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/security/commands.py:121: in invoke
+    result=function(*bound.args,**bound.kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/visuals/pipeline.py:324: in process_document
+    require_operator("visual.classify", paid=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+action = 'visual.classify', paid = True
+
+    def require_operator(action='shared.write', *, paid=False):
+        actor = current_actor()
+        if actor.role != 'operator':
+            raise AccessDenied('Operator permission required.')
+        if actor.machine and action not in actor.actions:
+            raise AccessDenied('Command scope denied.')
+        if paid and load_policy().get('paid_actions', {}).get(action) is not True:
+>           raise AccessDenied('This paid action is disabled.')
+E           app.security.access.AccessDenied: This paid action is disabled.
+
+app/security/access.py:319: AccessDenied
+___________ test_visual_evidence_row_retains_full_source_provenance ____________
+
+session = <sqlalchemy.orm.session.Session object at 0x7f1985cfc800>
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-19/test_visual_evidence_row_retai0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f1988660fe0>
+
+    def test_visual_evidence_row_retains_full_source_provenance(session, tmp_path, monkeypatch):
+        monkeypatch.setattr(rendering_module, "VISUALS_DIR", tmp_path / "visuals")
+        site = _make_site(session)
+        application = _make_application(session, site_id=site.id)
+        pdf_path = tmp_path / "doc.pdf"
+        _make_pdf(pdf_path, ["a page showing the site boundary clearly marked"])
+        document = _make_document(session, application.id, pdf_path, document_name="Site Location Plan.pdf")
+        document.source_url = "https://portal.example.invalid/documents/doc123.pdf"
+        session.commit()
+    
+        client = _FakeVisionClient(_classification_result())
+>       process_document(session, client, document, PipelineLimits(), PipelineStats())
+
+tests/test_visual_evidence.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/security/commands.py:121: in invoke
+    result=function(*bound.args,**bound.kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/visuals/pipeline.py:324: in process_document
+    require_operator("visual.classify", paid=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+action = 'visual.classify', paid = True
+
+    def require_operator(action='shared.write', *, paid=False):
+        actor = current_actor()
+        if actor.role != 'operator':
+            raise AccessDenied('Operator permission required.')
+        if actor.machine and action not in actor.actions:
+            raise AccessDenied('Command scope denied.')
+        if paid and load_policy().get('paid_actions', {}).get(action) is not True:
+>           raise AccessDenied('This paid action is disabled.')
+E           app.security.access.AccessDenied: This paid action is disabled.
+
+app/security/access.py:319: AccessDenied
+=========================== short test summary info ============================
+FAILED tests/test_visual_evidence.py::test_classify_page_forces_review_required_true_for_a_useful_classification
+FAILED tests/test_visual_evidence.py::test_rejected_image_is_never_reprocessed_even_with_force
+FAILED tests/test_visual_evidence.py::test_unchanged_document_rerun_makes_no_new_ai_call_or_duplicate_row
+FAILED tests/test_visual_evidence.py::test_changed_source_creates_a_new_current_row_and_supersedes_the_old_one
+FAILED tests/test_visual_evidence.py::test_visual_evidence_row_retains_full_source_provenance
+5 failed, 512 passed in 33.53s

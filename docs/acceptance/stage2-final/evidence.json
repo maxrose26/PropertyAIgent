@@ -1,0 +1,47 @@
+{
+  "base_commit": "d253773a09690f27b150adb701c95f9aa3ee210f",
+  "application_changes": false,
+  "new_tests": false,
+  "network": "syscall-denied by existing offline runners",
+  "results": [
+    {
+      "selection": "tests",
+      "tests": 517,
+      "passed": 512,
+      "failures": [
+        {
+          "test": "tests.test_visual_evidence::test_classify_page_forces_review_required_true_for_a_useful_classification",
+          "message": "app.security.access.AccessDenied: This paid action is disabled."
+        },
+        {
+          "test": "tests.test_visual_evidence::test_rejected_image_is_never_reprocessed_even_with_force",
+          "message": "app.security.access.AccessDenied: This paid action is disabled."
+        },
+        {
+          "test": "tests.test_visual_evidence::test_unchanged_document_rerun_makes_no_new_ai_call_or_duplicate_row",
+          "message": "app.security.access.AccessDenied: This paid action is disabled."
+        },
+        {
+          "test": "tests.test_visual_evidence::test_changed_source_creates_a_new_current_row_and_supersedes_the_old_one",
+          "message": "app.security.access.AccessDenied: This paid action is disabled."
+        },
+        {
+          "test": "tests.test_visual_evidence::test_visual_evidence_row_retains_full_source_provenance",
+          "message": "app.security.access.AccessDenied: This paid action is disabled."
+        }
+      ],
+      "errors": 0,
+      "skips": 0,
+      "xml_sha256": "41aea74ecdcfd157d6b4527194575fabf82446f1eccd77e305d723d853cc5e21"
+    },
+    {
+      "selection": "journey",
+      "tests": 10,
+      "passed": 10,
+      "failures": [],
+      "errors": 0,
+      "skips": 0,
+      "xml_sha256": "388ea497060c215ccdf7a46881fa991d464de5a71ea0d331fd678de0734cb031"
+    }
+  ]
+}
