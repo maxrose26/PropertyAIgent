@@ -7,8 +7,8 @@ from . import attempt06_recovery as a06, period09_settlement as settlement, inta
 SUCCESSOR='b-dbpilot-20261027-1102-10'
 RECEIPT_SHA='2549b1cde3f78f38b338a980003231ff8c9bc375de6720b40d05d4053afd0f1d'
 # Exact scraper release; owner pin does not change its bound source files.
-BINDING=dict(revision='3ac568376685f448a8fa353ac82e24862302786b',workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9',manifest_sha256='65c6f54b7339bd2abe5fc337c1e82bd919c6385ecac2a00e80b642d22a7775da')
-TREE='3c7d854691dca7f758ee222594c851f535d1fdad'
+BINDING=dict(revision='5af5f42ca8e299a83017851fc8c61a03880ced2e',workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9',manifest_sha256='044819280bfd7ac0850a79c9ddf8a409716175865a7494e19f0502be13e43a2c')
+TREE='87125a88c1e4b1879a1d06fcf68099340d983562'
 BRANCH='prep/b-timing-pg17-current-20261103'
 ACCEPTED=dict(settlement.STOP13,global_stop=None,manual_stop=None)
 
