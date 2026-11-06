@@ -64,7 +64,7 @@ def test_success_archive_atomic_and_readback(succeeded10,mode):
  assert c.execute('SELECT period,run_id,name,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence']
 
 @pytest.mark.parametrize('incomplete',[False,True,'retained-recovery','startup-boundary','maximum'])
-def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,monkeypatch,incomplete):
+def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,monkeypatch,incomplete,authenticate=False):
  w=succeeded10;c=w['boot'];b=w['binding'];p=w['policy']
  from scripts import owner_intake_scope
  class DB:
@@ -100,6 +100,9 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
  monkeypatch.setattr(module,'require_source_context',lambda *a,**kw:None)
  args=SimpleNamespace(period=sc.SCOPE.period,output=str(tmp_path/'canary'),hostaddr=b['hostaddr'],disposable_sources=None,disposable_archive=None,backlog=False,after=None,page_size=3)
  runtime=Runtime(args);runtime.route_name=b['route']
+ if authenticate:
+  from verification.ingestion_storage.runtime_authentication import qualify
+  assert qualify(runtime,b['valid_until'])['status']=='VERIFIED_BOTH_RESTRICTED_ROLES'
  argv=['--period',args.period,'--output',args.output,'--hostaddr',args.hostaddr]
  recovery=[]
  if incomplete=='retained-recovery':

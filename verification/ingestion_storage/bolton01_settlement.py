@@ -70,6 +70,14 @@ def receipt(marker):
     require(type(marker) is dict and marker.get('id')==RUN and marker.get('period')==PERIOD and marker.get('state')=='OPEN' and marker.get('day')=='2026-11-05' and marker.get('publication_path')==f'docs/design/ingestion-operational-execution-daily-intake/{PERIOD}/{RUN}/final/result-before-publication.json','MARKER')
     return dict(version='BOLTON01_FAILED_RECOVERY_V1',original_marker=copy.deepcopy(marker),period=PERIOD,run_id=RUN,job_id=JOB,execution_binding=BINDING,evidence=EVIDENCE,status='FAILED_RECONCILED',coverage='UNKNOWN',actual_requests=4,request_count_status='COMPLETE',requests_accounted=4,tameside=dict(status='NOT_RECOLLECTED_PRIOR_PERIOD08_PRESERVED',period=prior.PERIOD,capture_key=prior.TAMESIDE,records=24),bolton=dict(status='COVERAGE_UNKNOWN',requests=4,checkpoint=None,validation_failure='IDOX_WINDOW_BINDING_OR_COMPLETENESS',cause='TOTAL_AND_TERMINAL_UNPROVEN'),recovered_key=KEY,recovered_fence=2,source_or_write_replay_authorised=False,stop_before=STOP14,stop_after=STOP15)
 
+def control_binding(ctl):
+    """Validate mutable control fields both before and after acquiring the lock."""
+    p=ctl.get('intake_periods',{}).get(PERIOD,{})
+    require(p.get('execution_binding')==BINDING and p.get('evidence_backend')=='POSTGRES_PILOT_V1' and p.get('fixed_window')=={'start':'2026-11-03','end':'2026-11-05'} and p.get('max_runs')==1 and set(p.get('councils',{}))=={'bolton'} and p.get('days')=={'2026-11-05':{'bolton':KEY}},'PERIOD')
+    g=ctl.get('grants',{}).get(AUTHORITY,{})
+    require(g.get('intake_run')==RUN and g.get('intake_period')==PERIOD and g.get('capture_key')==KEY and g.get('execution_binding')==BINDING and g.get('expires_at')==0,'AUTHORITY')
+    require(not any(type(g.get('expires_at')) not in (int,float) or g['expires_at']>time.time() for g in ctl.get('grants',{}).values()),'OTHER_AUTHORITY')
+
 def common(c,b,ctl):
     members=a06.baseline(c,b)
     owner=c.execute(op.OWNER_MEMBERS).fetchall()
@@ -78,12 +86,8 @@ def common(c,b,ctl):
     op.retained_cleanup(c,ctl)
     predecessor.success(c,ctl)
     evidence(c);tameside(c)
-    p=ctl.get('intake_periods',{}).get(PERIOD,{})
-    require(p.get('execution_binding')==BINDING and p.get('evidence_backend')=='POSTGRES_PILOT_V1' and p.get('fixed_window')=={'start':'2026-11-03','end':'2026-11-05'} and p.get('max_runs')==1 and set(p.get('councils',{}))=={'bolton'} and p.get('days')=={'2026-11-05':{'bolton':KEY}},'PERIOD')
-    g=ctl.get('grants',{}).get(AUTHORITY,{})
-    require(g.get('intake_run')==RUN and g.get('intake_period')==PERIOD and g.get('capture_key')==KEY and g.get('execution_binding')==BINDING and g.get('expires_at')==0,'AUTHORITY')
+    control_binding(ctl)
     require(not c.execute('SELECT pid FROM pg_stat_activity WHERE usename=ANY(%s)',(list(op.ROLES)+['ingestion_application_login','ingestion_recovery_login'],)).fetchall(),'SESSIONS')
-    require(not any(type(g.get('expires_at')) not in (int,float) or g['expires_at']>time.time() for g in ctl.get('grants',{}).values()),'OTHER_AUTHORITY')
     require(c.execute("SELECT pg_has_role(current_user,'ingestion_recovery_operator','USAGE'),pg_has_role(current_user,'ingestion_recovery_operator','SET')").fetchone()==(False,False),'RECOVERY_PERMISSION')
     return members
 
@@ -125,7 +129,8 @@ def recover(c,b):
     op.begin(c)
     try:
         ctl=op.control(c);members=common(c,b,ctl)
-        ctl=a06.lock(c);expected=pending(c,ctl);untouched=all_other_work_sha(c)
+        ctl=a06.lock(c);control_binding(ctl)
+        expected=pending(c,ctl);untouched=all_other_work_sha(c)
         # Locks exclude a competing controller mutation; recheck evidence/history.
         evidence(c);predecessor.success(c,ctl);tameside(c)
         require(c.execute('SELECT name FROM public.ingestion_run_evidence WHERE period=%s AND run_id=%s ORDER BY name',(PERIOD,RUN)).fetchall()==[(n,) for n in sorted(EVIDENCE)],'ARCHIVE_INVENTORY')

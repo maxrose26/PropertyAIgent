@@ -12,7 +12,7 @@ def failed_bolton(succeeded10,tmp_path,monkeypatch):
  w=succeeded10;c=w['boot'];original=source.idox_audit
  monkeypatch.delenv('BOLTON_WORKER_AUDIT',raising=False)
  monkeypatch.setattr(source,'idox_audit',lambda council,entries,start,end:original(council,entries[:7],start,end,single_page_no_pager=True))
- source.test_actual_bolton_entry_capture_screen_backlog_close(w,tmp_path,monkeypatch,True)
+ source.test_actual_bolton_entry_capture_screen_backlog_close(w,tmp_path,monkeypatch,True,authenticate=True)
  ctl=op.control(c);key=ctl['intake_periods'][s.PERIOD]['days']['2026-11-05']['bolton']
  for name,value in dict(RUN=ctl['intake_run']['id'],KEY=key,BINDING=w['binding']['execution_binding'],MARKER_SHA=a06.sha(ctl['intake_run']),AUTHORITY=c.execute('SELECT authority FROM ingestion_work_items WHERE key=%s',(key,)).fetchone()[0]).items():monkeypatch.setattr(s,name,value)
  monkeypatch.setattr(s,'EVIDENCE',dict(c.execute('SELECT name,sha256 FROM ingestion_run_evidence WHERE period=%s AND run_id=%s',(s.PERIOD,s.RUN)).fetchall()))
@@ -37,8 +37,9 @@ def test_settlement_preserves_completed_tameside(failed_bolton,mode):
  with w['actor']() as actor:assert s.inspect(actor,w['binding'])['status']=='READY_FOR_REVIEW_NOT_AUTHORISED'
  class Break(Fault):
   def execute(self,q,p=None):
-   if mode=='before_cleanup' and q=='RESET ROLE':raise RuntimeError('BEFORE_CLEANUP')
+   if mode=='before_cleanup' and q=='RESET ROLE' and getattr(self,'recovered',False):raise RuntimeError('BEFORE_CLEANUP')
    r=super().execute(q,p)
+   if q.startswith('SELECT public.ingestion_recover_abandoned'):self.recovered=True
    if mode=='after_recover' and q.startswith('SELECT public.ingestion_recover_abandoned'):raise RuntimeError('AFTER_RECOVER')
    return r
  with w['actor']() as actor:
@@ -76,7 +77,8 @@ def test_changed_state_refuses_atomically(failed_bolton,drift):
   c.execute(sql.SQL('UPDATE ingestion_work_items SET {}=%s WHERE key=%s').format(sql.Identifier(field)),(value,s.KEY))
  elif drift=='tameside':c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=%s",(prior.TAMESIDE,))
  elif drift=='screen_content':c.execute("UPDATE ingestion_work_items SET checkpoint=(checkpoint::jsonb||'{\"changed\":true}'::jsonb)::json WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND dependencies::jsonb=jsonb_build_array(%s::text) LIMIT 1)",(prior.TAMESIDE,))
- elif drift in ('screen','batch'):c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task=%s AND state='COMPLETE' LIMIT 1)",('SCREENING' if drift=='screen' else 'LISTING_METADATA',))
+ elif drift=='screen':assert c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='SCREENING' AND state='COMPLETE' AND dependencies::jsonb=jsonb_build_array(%s::text) ORDER BY key LIMIT 1)",(prior.TAMESIDE,)).rowcount==1
+ elif drift=='batch':assert c.execute("UPDATE ingestion_work_items SET state='CLAIMED' WHERE key=(SELECT key FROM ingestion_work_items WHERE task='LISTING_METADATA' AND state='COMPLETE' AND checkpoint::jsonb->'plan'->>'capture_key'=%s ORDER BY key LIMIT 1)",(prior.TAMESIDE,)).rowcount==1
  elif drift=='evidence':c.execute("UPDATE ingestion_run_evidence SET body='bad'::bytea,sha256=encode(sha256('bad'::bytea),'hex') WHERE period=%s AND name='final/result-before-publication.json'",(s.PERIOD,))
  c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL));before=op.ledger_sha(c)
  with w['actor']() as actor:
@@ -102,3 +104,28 @@ def test_actual_owner_entrypoint_and_readback(failed_bolton,monkeypatch,lost):
  assert cli.main(['--action','inspect'])==0
  assert backlog(w)==w['protected_backlog']
  assert w['boot'].execute(op.MEMBERS).fetchall()==w['members']
+
+
+@pytest.mark.parametrize('drift',['period','grant','other_authority'])
+def test_control_drift_between_preflight_and_lock_refuses(failed_bolton,monkeypatch,drift):
+ """Commit a second owner's change in the exact preflight/lock interval."""
+ import psycopg
+ from tests.e2e_pg_world import settings
+ w=failed_bolton;c=w['boot'];original_lock=a06.lock;observed={}
+ def interleaved_lock(actor):
+  with psycopg.connect(settings()[0],autocommit=True) as writer:
+   ctl=op.control(writer)
+   if drift=='period':ctl['intake_periods'][s.PERIOD]['max_runs']=2
+   elif drift=='grant':ctl['grants'][s.AUTHORITY]['expires_at']=time.time()+60
+   else:ctl['grants']['CONCURRENT_OWNER']={'expires_at':time.time()+60}
+   writer.execute('UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=%s',(json.dumps(ctl),op.CONTROL))
+   observed['ledger']=op.ledger_sha(writer)
+  return original_lock(actor)
+ monkeypatch.setattr(a06,'lock',interleaved_lock)
+ with w['actor']() as actor:
+  with pytest.raises(op.Denied,match='BOLTON_SETTLEMENT_'+{'period':'PERIOD','grant':'AUTHORITY','other_authority':'OTHER_AUTHORITY'}[drift]):
+   s.recover(actor,w['binding'])
+ assert op.ledger_sha(c)==observed['ledger']
+ assert c.execute(op.MEMBERS).fetchall()==w['members']
+ assert s.all_other_work_sha(c)==w['all_other']
+ assert c.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence_before']
