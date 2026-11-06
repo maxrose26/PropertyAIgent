@@ -76,13 +76,29 @@ def test_each_rendered_registration_passes_the_runners_actual_validator_with_eve
 
 
 def test_the_mode_specific_fields_are_exactly_the_reviewed_ones(clone):
+    # The renderer runs in a *different checkout*. Two policy paths are
+    # deliberately absolute and must be anchored to THAT checkout, not the
+    # importing test module's original checkout. Keep every other field exact.
+    def clone_policy_path(path):
+        original=Path(path)
+        assert original.is_absolute() and original.is_relative_to(ROOT)
+        relative=original.relative_to(ROOT)
+        assert (ROOT/relative).is_file() and (clone/relative).is_file()
+        return str(clone/relative)
+    def clone_predecessor(reviewed):
+        expected=json.loads(json.dumps(reviewed))
+        expected['policy_window_allowance']['policy_file']=clone_policy_path(orr.GENERATION3_WINDOW_POLICY)
+        if 'policy_screening_v3' in expected:
+            expected['policy_screening_v3']['policy_file']=clone_policy_path(orr.GENERATION3_SCREENING_V3_POLICY)
+        return expected
     _, p, _ = render_ok(clone, 'policy')
-    assert p['authority'] == orr.SV3_POLICY_AUTHORITY and p['execution_authority'] == 'NONE' and p['state_directory'] == orr.SV3_POLICY_STATE and p['predecessor'] == json.loads(json.dumps(orr.SV3_POLICY_PREDECESSOR))
-    assert p['policy']['named_allowance'] == orr.SV3_NAME and p['policy']['rollback_function'] == str(orr.SV3_WORKER_ROLLBACK) and p['policy']['rollback_policy'] == str(orr.GENERATION3_WINDOW_POLICY)
+    assert p['authority'] == orr.SV3_POLICY_AUTHORITY and p['execution_authority'] == 'NONE' and p['state_directory'] == orr.SV3_POLICY_STATE and p['predecessor'] == clone_predecessor(orr.SV3_POLICY_PREDECESSOR)
+    assert p['policy']['named_allowance'] == orr.SV3_NAME and p['policy']['rollback_function'] == str(orr.SV3_WORKER_ROLLBACK) and p['policy']['rollback_policy'] == clone_policy_path(orr.GENERATION3_WINDOW_POLICY)
+    assert p['policy']['file'] == clone_policy_path(orr.GENERATION3_SCREENING_V3_POLICY)
     assert p['owner_limits'] == dict(connections=list(orr.SV3_POLICY_OWNER_LIMITS['connections']), commands=list(orr.SV3_POLICY_OWNER_LIMITS['commands'])) and not {'screening_v3', 'window', 'capture', 'pipeline'} & set(p)
     _, s, _ = render_ok(clone, 'screening')
     assert s['authority'] == orr.SV3_AUTHORITY and s['state_directory'] == orr.SV3_STATE and s['screening_v3'] == json.loads(json.dumps(orr.SV3_BINDING)) and s['control_sha256'] == AUDIT['control']
-    assert s['policy_ceremony_audit'] == dict(events_sha256=AUDIT['policy_events'], final_result_sha256=AUDIT['policy_final']) and s['predecessor'] == json.loads(json.dumps(orr.SV3_PREDECESSOR))
+    assert s['policy_ceremony_audit'] == dict(events_sha256=AUDIT['policy_events'], final_result_sha256=AUDIT['policy_final']) and s['predecessor'] == clone_predecessor(orr.SV3_PREDECESSOR)
     assert s['owner_limits'] == dict(connections=list(orr.SV3_OWNER_LIMITS['connections']), commands=list(orr.SV3_OWNER_LIMITS['commands'])) and not {'window', 'capture', 'pipeline', 'probe'} & set(s)
 
 
