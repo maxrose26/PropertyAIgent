@@ -12,7 +12,7 @@ def failed_bolton(succeeded10,tmp_path,monkeypatch):
  w=succeeded10;c=w['boot'];original=source.idox_audit
  monkeypatch.delenv('BOLTON_WORKER_AUDIT',raising=False)
  monkeypatch.setattr(source,'idox_audit',lambda council,entries,start,end:original(council,entries[:7],start,end,single_page_no_pager=True))
- source.test_actual_bolton_entry_capture_screen_backlog_close(w,tmp_path,monkeypatch,True)
+ source.test_actual_bolton_entry_capture_screen_backlog_close(w,tmp_path,monkeypatch,True,authenticate=True)
  ctl=op.control(c);key=ctl['intake_periods'][s.PERIOD]['days']['2026-11-05']['bolton']
  for name,value in dict(RUN=ctl['intake_run']['id'],KEY=key,BINDING=w['binding']['execution_binding'],MARKER_SHA=a06.sha(ctl['intake_run']),AUTHORITY=c.execute('SELECT authority FROM ingestion_work_items WHERE key=%s',(key,)).fetchone()[0]).items():monkeypatch.setattr(s,name,value)
  monkeypatch.setattr(s,'EVIDENCE',dict(c.execute('SELECT name,sha256 FROM ingestion_run_evidence WHERE period=%s AND run_id=%s',(s.PERIOD,s.RUN)).fetchall()))
@@ -37,8 +37,9 @@ def test_settlement_preserves_completed_tameside(failed_bolton,mode):
  with w['actor']() as actor:assert s.inspect(actor,w['binding'])['status']=='READY_FOR_REVIEW_NOT_AUTHORISED'
  class Break(Fault):
   def execute(self,q,p=None):
-   if mode=='before_cleanup' and q=='RESET ROLE':raise RuntimeError('BEFORE_CLEANUP')
+   if mode=='before_cleanup' and q=='RESET ROLE' and getattr(self,'recovered',False):raise RuntimeError('BEFORE_CLEANUP')
    r=super().execute(q,p)
+   if q.startswith('SELECT public.ingestion_recover_abandoned'):self.recovered=True
    if mode=='after_recover' and q.startswith('SELECT public.ingestion_recover_abandoned'):raise RuntimeError('AFTER_RECOVER')
    return r
  with w['actor']() as actor:
