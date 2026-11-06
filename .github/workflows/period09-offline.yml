@@ -1,0 +1,91 @@
+name: Period09 Manchester-only OFFLINE
+on:
+  pull_request:
+    paths:
+      - 'verification/ingestion_storage/**'
+      - 'scripts/owner_period09.py'
+      - 'scripts/owner_period10.py'
+      - 'scripts/owner_period09_settlement.py'
+      - 'scripts/owner_pilot_job.py'
+      - 'tests/test_period09*'
+      - 'tests/test_period10*'
+      - 'tests/manchester_loopback_transport.py'
+      - 'tests/test_manchester_audit_serialization.py'
+      - 'tests/test_manchester_file_measurement.py'
+      - '.github/workflows/period09-offline.yml'
+permissions:
+  contents: read
+jobs:
+  browser-files:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: timeout 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/p09-venv"
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m playwright install chromium --only-shell
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_manchester_file_measurement.py -q -s --tb=short --junitxml="$RUNNER_TEMP/files.xml"
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+          MANCHESTER_REAL_BROWSER: '1'
+      - run: mkdir -p "$RUNNER_TEMP/p10-loopback"
+      - run: timeout 100s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period09_browser_boundary.py -q -s --tb=short
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/propertyaigent-manchester-diagnostic-browser
+          MANCHESTER_REAL_BROWSER: '1'
+          P10_LOOPBACK_CAPTURE: ${{ runner.temp }}/p10-loopback/capture.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: period09-browser-files
+          path: ${{ runner.temp }}/files.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: period10-synthetic-loopback
+          path: ${{ runner.temp }}/p10-loopback/capture.json
+          if-no-files-found: error
+  successor-pg:
+    needs: browser-files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: provisioning_bootstrap
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: ingestion_provisioning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U provisioning_bootstrap -d ingestion_provisioning_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: timeout 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/p09-venv"
+      - uses: actions/download-artifact@v4
+        with:
+          name: period10-synthetic-loopback
+          path: ${{ runner.temp }}/p10-loopback
+      - run: timeout 120s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period10_successor_pg.py -q -k actual_owner_entry_runtime_backlog_and_closure --tb=short
+        env:
+          P10_LOOPBACK_CAPTURE: ${{ runner.temp }}/p10-loopback/capture.json
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+      - run: timeout 540s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_period09_successor_pg.py tests/test_period09_contract.py tests/test_period09_settlement_pg.py tests/test_period09_source_boundary.py tests/test_period10_successor_pg.py tests/test_period10_contract.py tests/test_manchester_audit_serialization.py -q --tb=short --junitxml="$RUNNER_TEMP/p09.xml"
+        env:
+          P10_LOOPBACK_CAPTURE: ${{ runner.temp }}/p10-loopback/capture.json
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+      - run: timeout 30s "$RUNNER_TEMP/p09-venv/bin/python" -m pytest tests/test_daily_intake_runtime.py -q -k 'source_poll_uses_main_thread or poll_diagnostic or interrupted_accounting' --tb=short
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: period09-pg
+          path: ${{ runner.temp }}/p09.xml

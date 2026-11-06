@@ -17,7 +17,7 @@ from .operational_controller import DatabaseBudget,ControllerLedger
 from .operational_owner import Owner
 from .operational_publication import GitHub,canonical,BRANCH,REPO
 from .operational_supervisor import supervise
-from .scope_binding import binding_for
+from .scope_binding import intake_binding_for as binding_for
 from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
@@ -28,7 +28,7 @@ BOUND_FILES=('verification/ingestion_storage/deadline_evidence.py','verification
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/render_intake.py','verification/direct_reference/instrumented_probe.py','verification/ingestion_storage/chain_caller.py',
              'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
-             'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
+             'verification/ingestion_storage/chain_registration.py','verification/ingestion_storage/intake_scope_policy.py','verification/ingestion_storage/scope_binding.py','scripts/run_daily_councils.py')
 
 def execution_binding():
     import re
@@ -56,6 +56,23 @@ def poll_diagnostic(error):
     if type(error) is RuntimeError and error.args==('HARD_DEADLINE_MAIN_THREAD_ONLY',):code='HARD_DEADLINE_MAIN_THREAD_ONLY'
     return dict(category='SHARED_STOP_CHANGED' if code=='INTAKE_SHARED_STOP_CHANGED' else 'POLL_ERROR',
                 code=code or 'UNCLASSIFIED',exception_kind=safe['exception_kind'],sqlstate=safe['sqlstate'],message_exported=False)
+
+
+def source_boundary_diagnostic(outer,output):
+    """Bounded decisions only; no child stderr, paths, contents or exception text."""
+    limits={'PROCESS_RSS','AGGREGATE_RSS','DEADLINE','OWNER_STOP','OUTPUT_BOUND',
+            'ACCOUNTING_UNCERTAIN','LAUNCH_OR_ACCOUNTING_UNCERTAIN',
+            'ADOPTED_CLEANUP_UNCERTAIN','CLEANUP_DEADLINE','OUTPUT_ACCOUNTING'}
+    code=outer.get('exit_code');limit=outer.get('limit_hit')
+    try:
+        state=('WITHIN_BOUND' if output.stat().st_size<=512*1024 else 'TOO_LARGE') if output.is_file() else 'MISSING_OR_NOT_FILE'
+    except OSError:state='STAT_UNVERIFIED'
+    return dict(version='SOURCE_BOUNDARY_V1',
+        worker_exit=code if type(code) is int and -255<=code<=255 else None,
+        worker_exit_state='ZERO' if type(code) is int and code==0 else 'NONZERO' if type(code) is int else 'UNVERIFIED',
+        process_cleanup='CLOSED' if outer.get('cleanup')=='CLOSED' else 'UNVERIFIED',
+        limit='NONE' if limit is None else limit if type(limit) is str and limit in limits else 'UNCLASSIFIED',
+        output=state,request_count_status='UNKNOWN',message_exported=False)
 
 
 def require_source_context(councils,*,disposable,profile=None,binding=None):
@@ -109,7 +126,15 @@ class Runtime:
             ca,_=verified_trust();self.options={'ssl':{'sslmode':'verify-full','sslrootcert':str(ca)},'hostaddr':args.hostaddr,'route':self.route_name}
         self.events=[];self.github=None;self.head=None;self.archive_ordinal=0;self.database_prearchives={};self.active_council=None
         self.policy=None;self.memory=None
-        self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in Owner.daily_intake_inventory().items()}
+        from .period09_successor import SUCCESSOR,function_inventory
+        from . import period10_successor as p10
+        inventory=p10.function_inventory() if args.period==p10.SUCCESSOR else function_inventory() if args.period==SUCCESSOR else Owner.daily_intake_inventory()
+        from .intake_scope_policy import reviewed
+        self.scope_policy=reviewed(args.period)
+        if self.scope_policy:
+            from .intake_successor import function_inventory as scoped_inventory
+            inventory=scoped_inventory()
+        self.expected_functions={n:hashlib.sha256(body.encode()).hexdigest() for n,body in inventory.items()}
 
     def emit(self,event,data):
         value=dict(event=event,data=data)
@@ -211,10 +236,11 @@ class Runtime:
         from verification.discovery.arcus_ui_audit import validate
         from verification.discovery.arcus_ui_window import qualify_segment
         case='discovery_'+row['council']+'_ui_window'
-        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True,compact_retained=True)
+        return ArcusListingContract(config['contract'],assessment_dated_config(UI_CASES[case],row['start'],row['end']),case,validate,qualify_segment,config['qualification_sha256'],'BROWSER_SOURCE_V2',retain_explicit_zero=True,compact_retained=True,compact_field_evidence=getattr(getattr(self,'args',None),'period',None)=='b-dbpilot-20261027-1102-10')
 
     def collect(self,row):
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
+        if self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') and not self.test:plan['file_profile']='MANCHESTER_PERIOD09_V1'
         plan_path=self.root/(row['council']+'-plan.json');plan_path.write_bytes(canonical(plan))
         output=self.root/(row['council']+'-source.json')
         # SQL and its signal-based hard deadline stay on the main thread.
@@ -236,7 +262,8 @@ class Runtime:
                 results.append(supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
                                 environment=environment,root=self.root/(row['council']+'-owned'),
                                 source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
-                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile))
+                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile,
+                                **({'source_group_bytes':self.scope_policy.source_group_bytes} if self.scope_policy else {})))
               except BaseException:errors.append('SOURCE_SUPERVISION_FAILED')
               finally:done.set()
             self.run.begin_source()
@@ -257,6 +284,7 @@ class Runtime:
             outer=results[0]
             self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
+            self.emit('source_boundary_failed',source_boundary_diagnostic(outer,output))
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
         source=json.loads(output.read_bytes());outer['observed_at']=datetime.now(timezone.utc).isoformat()
         if row['council']=='manchester':
@@ -294,6 +322,8 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
+            if self.durable_run and self.scope_policy and self.durable_run.get('period')==self.args.period:raise Denied('SCOPE_ALREADY_CONSUMED')
+            if self.durable_run and self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10'):raise Denied('P10_ALREADY_CONSUMED' if self.args.period.endswith('-10') else 'P09_ALREADY_CONSUMED')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
@@ -310,7 +340,11 @@ class Runtime:
                 self.run.check=monitored_check
             rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
             if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
-                if self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!={'tameside','manchester'}:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
+                expected_councils={'manchester'} if self.args.period in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') else {'tameside','manchester'}
+                if self.scope_policy:
+                    from .intake_scope_policy import require_scope
+                    require_scope(self.args.period,self.policy)
+                elif self.policy.get('fixed_window')!={'start':'2026-10-27','end':'2026-11-02'} or set(self.policy['councils'])!=expected_councils:raise Denied('DATABASE_PILOT_FIXED_WINDOW')
                 for row in rows:row.update(self.policy['fixed_window'])
             for row in rows:
                 self.active_council=row['council']
@@ -466,9 +500,28 @@ class Runtime:
 def source_worker(args):
     if os.environ.get('INGESTION_SOURCE_PRIVATE')!='ONCE' or any('DATABASE' in k or k.endswith(('_KEY','_TOKEN','_PASSWORD')) for k in os.environ):raise Denied('PRIVATE_CREDENTIAL_FREE_SOURCE')
     import resource
-    resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024,512*1024))
     plan=json.loads(Path(args.plan).read_bytes());row=plan['row']
+    file_ceiling=512*1024
+    if plan.get('file_profile') is not None:
+        fixed=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
+        if plan!=dict(row=fixed,fixture=None,file_profile='MANCHESTER_PERIOD09_V1'):raise Denied('MANCHESTER_FILE_PROFILE_SCOPE')
+        file_ceiling=2*1024*1024
+    if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
+        from verification.discovery.manchester_navigation_diagnostic import MODE,ROW
+        if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
+        file_ceiling=20*1024*1024
+    resource.setrlimit(resource.RLIMIT_FSIZE,(file_ceiling,file_ceiling))
     seconds=75 if row['council']=='manchester' else 45;resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
+    if plan.get('diagnostic_mode') is not None:
+        if plan.get('diagnostic_mode') == 'MANCHESTER_INITIAL_NAVIGATION_V1':
+            from verification.discovery.manchester_navigation_diagnostic import MODE,ROW,live
+        else:
+            from verification.discovery.tameside_diagnostic import MODE,ROW,live
+        if plan != dict(row=ROW,fixture=None,diagnostic_mode=MODE):raise Denied('DIAGNOSTIC_SCOPE')
+        raw=canonical(live())
+        if len(raw)>524288:raise Denied('DIAGNOSTIC_OUTPUT_BOUND')
+        with Path(args.output).open('xb') as f:f.write(raw)
+        return
     if plan['fixture'] is not None:
         raw=Path(plan['fixture']).read_bytes()
         fixture=json.loads(raw);delay=fixture.pop('_test_delay_seconds',0)

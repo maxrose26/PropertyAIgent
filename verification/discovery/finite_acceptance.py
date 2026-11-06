@@ -90,13 +90,13 @@ def _read(row, *, no_transport_retry=False, retain_proof=False, execution_mode=N
                 from .source_profiles import validate_audit
                 validate_audit(profile,value)
             return value if pagination_calibration else retain_screening(value)
-    from verification.direct_reference.instrumented_probe import supervised
+    from verification.direct_reference.instrumented_probe import supervised,worker_audit_bound
     case='discovery_'+row['council']+'_ui_window'
     with tempfile.TemporaryDirectory(prefix='discovery-finite-') as td:
         path=Path(td)/'source.json'
         with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
             supervised(case,path,**({'execution_mode':execution_mode} if execution_mode else {}),window=(row['start'],row['end']),**({'retain_proof':True} if retain_proof else {}),**({'execution_budget':execution_budget} if execution_budget is not None else {}))
-        if not path.is_file() or path.stat().st_size>=65536:raise ValueError('bounded audit')
+        if not path.is_file() or path.stat().st_size>=worker_audit_bound(case,retain_proof=retain_proof,execution_budget=execution_budget):raise ValueError('bounded audit')
         value=json.loads(path.read_bytes())
         if retain_proof and 'retained_proof' in value:
             from .four_council_proof import validate_audit

@@ -75,8 +75,13 @@ def validate_binding(b, *, opening=False, now=None):
                 [('revision', 40), ('workflow_sha256', 64), ('manifest_sha256', 64)]), 'OWNER_CODE_BINDING')
     database=b.get('evidence_backend')=='POSTGRES_PILOT_V1'
     require(e==reviewed_application_binding() if database else e==APPLICATION_BINDING,'EXACT_REVIEWED_APPLICATION_REQUIRED')
-    if database:
-        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06','b-dbpilot-20261027-1102-07'),'OWNER_DATABASE_PILOT_SCOPE')
+    from .intake_scope_policy import reviewed
+    scope=reviewed(b['period'])
+    if database and scope:
+        from .intake_successor import validate_binding as scope_binding
+        scope_binding(b)
+    elif database:
+        require(b.get('fixed_window')=={'start':'2026-10-27','end':'2026-11-02'} and b['period'] in ('b-dbpilot-20261027-1102-01','b-dbpilot-20261027-1102-02','b-dbpilot-20261027-1102-03','b-dbpilot-20261027-1102-04','b-dbpilot-20261027-1102-05','b-dbpilot-20261027-1102-06','b-dbpilot-20261027-1102-07','b-dbpilot-20261027-1102-08','b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10'),'OWNER_DATABASE_PILOT_SCOPE')
     if 'credential_policy' in b:
         require(database and b['credential_policy']=='STABLE_RESTRICTED_V1' and type(b.get('credential_verifier_sha256')) is dict and set(b['credential_verifier_sha256'])==set(ROLES) and all(re.fullmatch('[a-f0-9]{64}',v) for v in b['credential_verifier_sha256'].values()),'STABLE_VERIFIER_BINDING')
     require(b.get('accepted_stop') == accepted_stop(b), 'OWNER_STOP_BINDING')
@@ -109,6 +114,25 @@ def validate_binding(b, *, opening=False, now=None):
 
 
 def accepted_stop(b):
+    from .intake_scope_policy import reviewed
+    if reviewed(b.get('period')):
+        from . import intake_successor as successor
+        successor.validate_binding(b);return successor.ACCEPTED
+    from . import period10_successor as p10
+    if b.get("period")==p10.SUCCESSOR:
+        p10.validate_binding(b)
+        return p10.ACCEPTED
+    require("period09_receipt_sha256" not in b,"P10_SUCCESSOR_BINDING")
+    from . import period09_successor as p09
+    if b.get('period')==p09.SUCCESSOR:
+        p09.validate_binding(b)
+        return p09.ACCEPTED
+    require('period08_receipt_sha256' not in b,'P09_SUCCESSOR_BINDING')
+    from . import period08_successor as p08
+    if b.get('period')==p08.SUCCESSOR:
+        p08.validate_binding(b)
+        return p08.ACCEPTED
+    require('period07_receipt_sha256' not in b,'P08_SUCCESSOR_BINDING')
     from . import attempt06_recovery as a06
     if b.get('period')==a06.SUCCESSOR:
         require(b.get('evidence_backend')=='POSTGRES_PILOT_V1' and type(b.get('attempt06_receipt_sha256')) is str and re.fullmatch('[a-f0-9]{64}',b['attempt06_receipt_sha256']),'A06_SUCCESSOR_BINDING')
@@ -171,9 +195,12 @@ def inventory(c):
      r.rolname,p.proconfig,p.prosecdef FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
      JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.proname=ANY(%s) ORDER BY 1""",
                      (list(expected),)).fetchall()
-    require(rows == [(n, hashlib.sha256(body.encode()).hexdigest(), 'ingestion_storage_owner',
-                      ['search_path=pg_catalog'], n != 'ingestion_bolton_allowed')
-                     for n, body in sorted(expected.items())], 'INTAKE_OWNER_FUNCTION_INVENTORY')
+    from .period09_successor import function_inventory
+    from .period10_successor import function_inventory as inventory10
+    from .intake_successor import function_inventory as scope_inventory
+    variants=[expected,function_inventory(),inventory10(),scope_inventory()]
+    require(any(rows == [(n,hashlib.sha256(body.encode()).hexdigest(),'ingestion_storage_owner',
+        ['search_path=pg_catalog'],n!='ingestion_bolton_allowed') for n,body in sorted(v.items())] for v in variants),'INTAKE_OWNER_FUNCTION_INVENTORY')
     acl = c.execute("""SELECT
      has_function_privilege('ingestion_worker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
      has_function_privilege('ingestion_effect_broker','public.ingestion_register_bolton_exception(jsonb)','EXECUTE'),
@@ -356,6 +383,14 @@ def activate(c, b, save, *, password_factory=None,prepared=None):
         require(stop_snapshot(ctl) == b['accepted_stop'], 'ACTIVATION_STOP_CHANGED')
         from .attempt06_recovery import successor_guard
         successor_guard(c,b,ctl)
+        from .period08_successor import successor_guard as guard08
+        guard08(c,b,ctl,require_namespace=True)
+        from .period09_successor import successor_guard as guard09
+        guard09(c,b,ctl,require_namespace=True)
+        from .period10_successor import successor_guard as guard10
+        guard10(c,b,ctl,require_namespace=True)
+        from .intake_successor import guard as scope_guard
+        scope_guard(c,b,ctl,require_namespace=True)
         retained_cleanup(c, ctl); no_hazards(c, ctl)
         leave_owner(c)
         prior = settings(c); original_ledger = ledger_sha(c)
@@ -509,7 +544,20 @@ def finalisation(c, b, expected):
         require(0 < len(grants) <= 4 and all(type(g.get('expires_at')) in (int,float) and g['expires_at'] == 0 and g.get('intake_period') == b['period'] and
                 g.get('execution_binding') == b['execution_binding'] for g in grants.values()), 'INDEPENDENT_AUTHORITY_CLOSURE')
         roots = (ctl.get('intake_periods', {}).get(b['period'], {}).get('days') or {}).get(run.get('day')) or {}
-        require(set(roots) == {'tameside', 'manchester'} and len(set(roots.values())) == 2, 'INDEPENDENT_COUNCILS')
+        from . import period09_successor as p09
+        expected_councils={'tameside','manchester'}
+        if b['period']==p09.SUCCESSOR:
+            p09.successor_guard(c,b,ctl);expected_councils={'manchester'}
+            require(ctl['intake_periods'][b['period']]['councils']==p09.councils(),'INDEPENDENT_COUNCIL_POLICY')
+        from . import period10_successor as p10
+        if b['period']==p10.SUCCESSOR:
+            p10.successor_guard(c,b,ctl);expected_councils={'manchester'}
+            require(ctl['intake_periods'][b['period']]['councils']==p10.councils(),'INDEPENDENT_COUNCIL_POLICY')
+        from .intake_scope_policy import reviewed,require_scope
+        if reviewed(b['period']):
+            from .intake_successor import guard
+            guard(c,b,ctl);expected_councils={require_scope(b['period'],ctl['intake_periods'][b['period']]).council}
+        require(set(roots)==expected_councils and len(set(roots.values()))==len(expected_councils),'INDEPENDENT_COUNCILS')
         require(all(any(g.get('capture_key')==key for g in grants.values()) for key in roots.values()),
                 'INDEPENDENT_BOTH_CAPTURE_AUTHORITIES')
         result = []

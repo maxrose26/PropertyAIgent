@@ -307,6 +307,28 @@ def fixed_binding(release,profile,address,guard,now=None):
     if PERIOD==SUCCESSOR:
         b.update(accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256'))
         policy['expected_stop']=ACCEPTED
+    from . import period08_successor as p08
+    if PERIOD==p08.SUCCESSOR:
+        p08.release(release)
+        b.update(accepted_stop=p08.ACCEPTED,period07_receipt_sha256=p08.RECEIPT_SHA)
+        policy['expected_stop']=p08.ACCEPTED
+    from . import period09_successor as p09
+    if PERIOD==p09.SUCCESSOR:
+        p09.release(release)
+        b.update(accepted_stop=p09.ACCEPTED,period08_receipt_sha256=p09.RECEIPT_SHA)
+        policy.update(expected_stop=p09.ACCEPTED,councils=p09.councils())
+    from . import period10_successor as p10
+    if PERIOD==p10.SUCCESSOR:
+        p10.release(release)
+        b.update(accepted_stop=p10.ACCEPTED,period09_receipt_sha256=p10.RECEIPT_SHA)
+        policy.update(expected_stop=p10.ACCEPTED,councils=p10.councils())
+    from .intake_scope_policy import reviewed
+    scope=reviewed(PERIOD)
+    if scope:
+        from . import intake_successor as successor
+        successor.release(release)
+        b.update(accepted_stop=successor.ACCEPTED,scope_policy_sha256=scope.fingerprint(),fixed_window=scope.window())
+        policy.update(expected_stop=successor.ACCEPTED,councils=scope.councils(),fixed_window=scope.window())
     b['period_policy_sha256']=hashlib.sha256(canonical(policy)).hexdigest()
     op.validate_binding(b,opening=True,now=now)
     return b,policy
@@ -632,6 +654,18 @@ class Pilot:
             if PERIOD==SUCCESSOR:
                 release=json.loads(os.environ['PROPERTYAIGENT_INTAKE_SOURCE_RELEASE'])
                 successor_guard(c,dict(period=PERIOD,evidence_backend=BACKEND,accepted_stop=ACCEPTED,attempt06_receipt_sha256=release.get('attempt06_receipt_sha256')),ctl)
+            elif PERIOD=='b-dbpilot-20261027-1102-08':
+                from . import period08_successor as p08
+                p08.successor_guard(c,p08.binding_from_saved_state(self.db),ctl,require_namespace=True)
+            elif PERIOD=='b-dbpilot-20261027-1102-09':
+                from . import period09_successor as p09
+                p09.successor_guard(c,p09.binding_from_saved_state(self.db),ctl,require_namespace=True)
+            elif PERIOD=='b-dbpilot-20261027-1102-10':
+                from . import period10_successor as p10
+                p10.successor_guard(c,p10.binding_from_saved_state(self.db),ctl,require_namespace=True)
+            elif __import__('verification.ingestion_storage.intake_scope_policy',fromlist=['reviewed']).reviewed(PERIOD):
+                from . import intake_successor as successor
+                successor.guard(c,successor.binding_from_saved_state(self.db),ctl,require_namespace=True)
             else:op.require(op.stop_snapshot(ctl)==op.ACCEPTED_STOP,'OWNER_STOP_CHANGED')
             op.retained_cleanup(c,ctl);op.no_hazards(c,ctl)
             op.require(PERIOD not in ctl.get('intake_periods',{}),'OWNER_PERIOD_ALREADY_USED')
@@ -769,12 +803,19 @@ class Pilot:
         from .owner_pilot_continuation import migrate_owner_namespace,predecessor
         prior=Journal(self.db,PREDECESSOR);old=prior.load()
         from .attempt06_recovery import SUCCESSOR,predecessor06
-        next07=PERIOD==SUCCESSOR
+        from . import period08_successor as p08
+        from . import period09_successor as p09
+        from . import period10_successor as p10
+        from . import intake_successor as successor
+        from .intake_scope_policy import reviewed
+        scoped=reviewed(PERIOD) is not None
+        next10=PERIOD==p10.SUCCESSOR
+        next07=PERIOD==SUCCESSOR;next08=PERIOD==p08.SUCCESSOR;next09=PERIOD==p09.SUCCESSOR
         snapshot={'ordinal':prior.ordinal,'bytes':prior.ciphertext_bytes,'sha256':prior.previous}
-        link=predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
-        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'attempt07':True} if next07 else {}))
+        link=successor.predecessor(old,snapshot=snapshot) if scoped else p10.predecessor(old,snapshot=snapshot) if next10 else p09.predecessor(old,snapshot=snapshot) if next09 else p08.predecessor(old,snapshot=snapshot) if next08 else predecessor06(old,snapshot=snapshot) if next07 else predecessor(old,snapshot=snapshot)
+        with envelope(),self.db.connection() as c:migrate_owner_namespace(c,stable_verifiers=old['stable_credentials']['verifier_sha256'],**({'scope_binding':successor.binding_from_saved_state(self.db)} if scoped else {'attempt10':True,'binding10':p10.binding_from_saved_state(self.db)} if next10 else {'attempt09':True,'binding09':p09.binding_from_saved_state(self.db)} if next09 else {'attempt08':True,'binding08':p08.binding_from_saved_state(self.db)} if next08 else {'attempt07':True} if next07 else {}))
         preserved=prior.load()
-        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if next07 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if next07 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
+        op.require(prior.previous==link['snapshot']['sha256'] and prior.ordinal==(snapshot['ordinal'] if scoped or next07 or next08 or next09 or next10 else 46) and prior.ciphertext_bytes==(snapshot['bytes'] if scoped or next07 or next08 or next09 or next10 else 29084) and hashlib.sha256(canonical(preserved)).hexdigest()==link['state_sha256'],'OWNER_CONTINUATION_PRESERVATION')
         op.require(self.journal.load() is None,'OWNER_CONTINUATION_DUPLICATE')
         self.state={'period':PERIOD,'version':'OWNER_PLATFORM_PILOT_V1','intents':{},'status':'PREPARING','github_publication':'NOT_REQUESTED','predecessor':link}
         self.save()
@@ -950,7 +991,7 @@ class Pilot:
         self.journal.load()
         op.require((self.journal.previous,self.journal.ordinal)==before,'OWNER_PRIOR_ATTEMPT_RECONCILE')
         return dict(status='RELEASE_BINDING_VERIFIED_READ_ONLY',period=PERIOD,window=WINDOW,
-            date_fields={'tameside':'RECEIVED','manchester':'VALIDATED'},deployment=b['retained_deployment'],
+            date_fields=({'manchester':'VALIDATED'} if PERIOD in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') else {'tameside':'RECEIVED','manchester':'VALIDATED'}),deployment=b['retained_deployment'],
             execution_binding=b['execution_binding'],binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),
             policy_sha256=b['period_policy_sha256'],max_runs=p['max_runs'],render_profile=b['render_profile'],
             readback=self._release_readback,capacity=self._release_capacity,
@@ -1256,7 +1297,7 @@ class Pilot:
         return self.summary()
     def summary(self):
         s=self.state
-        return {'period':PERIOD,'window':WINDOW,'date_fields':{'tameside':'RECEIVED','manchester':'VALIDATED'},'status':s['status'],
+        return {'period':PERIOD,'window':WINDOW,'date_fields':({'manchester':'VALIDATED'} if PERIOD in ('b-dbpilot-20261027-1102-09','b-dbpilot-20261027-1102-10') else {'tameside':'RECEIVED','manchester':'VALIDATED'}),'status':s['status'],
                 'pipeline_status':s.get('pipeline_status','NOT_RUN'),'github_publication':'NOT_REQUESTED','deployment':s.get('deployment'),
                 'job_id':s.get('job',{}).get('id'),'job_status':s.get('job_terminal',{}).get('status'),'final_service':s.get('final_service'),
                 'failure':s.get('failure'),'first_failure':s.get('first_failure'),'cleanup_reserve':s.get('cleanup_reserve'),'closure_verification':s.get('closure_verification'),'closure_failure':s.get('closure_failure'),'restoration_failure':s.get('restoration_failure'),

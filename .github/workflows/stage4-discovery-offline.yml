@@ -172,6 +172,21 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/daily-intake-venv"
+      - name: Period08 partial settlement and Manchester boundary, disposable only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 240s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_period08_settlement_pg.py tests/test_manchester_browser_boundary.py -q --tb=short --junitxml="$RUNNER_TEMP/period08-settlement.xml"
+      - name: Period08 receipt-bound continuation, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_period08_successor_pg.py tests/test_period08_owner_units.py -q --tb=short --junitxml="$RUNNER_TEMP/period08-successor.xml"
+      - name: Period07 settlement and navigation, disposable PostgreSQL only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_tameside_observed_navigation.py tests/test_tameside_first_sort_diagnostic.py tests/test_period07_settlement_pg.py tests/test_period07_navigation.py tests/test_tameside_pagination_equivalence.py -q --tb=short --junitxml="$RUNNER_TEMP/period07-followup.xml"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -201,6 +216,9 @@ jobs:
             ${{ runner.temp }}/b-readonly.xml
             ${{ runner.temp }}/b-targeted.xml
             ${{ runner.temp }}/attempt06-owner.xml
+            ${{ runner.temp }}/period07-followup.xml
+            ${{ runner.temp }}/period08-successor.xml
+            ${{ runner.temp }}/period08-settlement.xml
   v3-admission-pg:
     runs-on: ubuntu-24.04
     timeout-minutes: 8

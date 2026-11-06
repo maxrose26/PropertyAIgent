@@ -1,0 +1,20 @@
+{
+  "id": "006507e3-0ca4-493a-b751-020a45fa692a",
+  "labels": [
+    {
+      "name": "resource",
+      "value": "job-dbmehqrbc2fs7381np50"
+    },
+    {
+      "name": "level",
+      "value": "info"
+    },
+    {
+      "name": "type",
+      "value": "app"
+    }
+  ],
+  "message": "MANCHESTER_NAVIGATION_DIAGNOSTIC_V1 {\"blocked_requests\": 3, \"browser_sha256\": \"ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e\", \"bytes\": 0, \"cleanup\": \"CONTEXT_BROWSER_CLOSED\", \"coverage\": \"NOT_ESTABLISHED\", \"diagnostic_revision\": \"32410a68d06412a2c74c0aff818b4a19471e8ab0\", \"elapsed_seconds\": 2.118, \"entry_exit_code\": 0, \"exception_class\": null, \"http_status\": 200, \"network_error\": \"UNKNOWN\", \"physical_requests\": 1, \"responses\": 1, \"retries\": 0, \"row\": {\"council\": \"manchester\", \"end\": \"2026-11-02\", \"semantics\": \"VALIDATED\", \"start\": \"2026-10-27\"}, \"scraper_artifact_revision\": \"3adb65d06d0492d3b8f9b798e49e3be20699b082\", \"stage\": \"INITIAL_NAVIGATION\", \"status\": \"FIRST_RESPONSE_OBSERVED\", \"supervisor\": {\"accounting_complete\": true, \"cleanup\": \"CLOSED\", \"elapsed_seconds\": 4.379216089844704, \"exit_code\": 0, \"expired\": false, \"limit_hit\": null, \"live_owned_survivors\": 0, \"peak_owned_rss\": 659283968, \"persistence\": \"READBACK_REQUIRED\", \"processes_seen\": 8, \"retry\": false}, \"transport\": \"CHROMIUM_FETCH_GATE\", \"version\": \"MANCHESTER_INITIAL_NAVIGATION_V1\"}",
+  "timestamp": "2026-11-05T20:37:45.38858976Z"
+}
+

@@ -181,14 +181,18 @@ def arcus_audit(council, entries, start, end, *, budget=None):
         cards.append(dict(fields=fields, links=[dict(text=e['reference'], href=f'{origin}/pr/s/detail/{e["record_id"]}?c__r=Arcus_BE_Public_Register')],
                           assessment_capture=immediate(cap.capture_fields(Fields(texts)))))
     n = len(entries)
-    rows = qualify_segment(f'Showing 1 to {n} of {n} results', cards, 1, config=cfg)[3]
+    rows=[];segments=[]
+    for offset in range(0,n,10):
+        last=min(offset+10,n);ordinal=offset//10+1
+        part=qualify_segment(f'Showing {offset+1} to {last} of {n} results',cards[offset:last],offset+1,config=cfg)[3]
+        rows.extend(part);segments.append(dict(ordinal=ordinal,first=offset+1,last=last,total=n,evidence_sha256=hashlib.sha256(json.dumps(part,sort_keys=True).encode()).hexdigest()))
     audit = dict(case=arcus_case(council), destination=cfg.destination, persistence=False, failure=None, safety_failure=False, safety_events=[], cleanup='CONTEXT_BROWSER_CLOSED',
                  process_cleanup='CLOSED', live_owned_survivors=0, supervisor_limit_hit=False, enumeration_evidence='COUNT_RECONCILED', completeness='UNKNOWN',
                  applied_interval=[cfg.start, cfg.end], requested_interval=[cfg.start, cfg.end], requests=20, decoded_bytes=1000, encoded_bytes=800, outbound_payload_bytes=100,
                  public_ui_posts=1, measured_public_ui_posts=1, supervisor_seconds=5, peak_owned_rss=100000, pages=1, navigations=1, redirects=0, listing_records=rows,
-                 listing_segments=[dict(ordinal=1, first=1, last=n, total=n, evidence_sha256=hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest())])
+                 listing_segments=segments)
     if budget is not None:
-        audit.update(execution_budget=budget, stage_timings={'NAVIGATION': 1200, 'READY': 600, 'CRITERIA': 300, 'SEGMENT': [300]})
+        audit.update(execution_budget=budget, stage_timings={'NAVIGATION': 1200, 'READY': 600, 'CRITERIA': 300, 'SEGMENT': [300]*len(segments)})
     return audit
 
 

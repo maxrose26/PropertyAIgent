@@ -295,6 +295,25 @@ def budget_selection(execution_budget, case):
     return select(execution_budget)
 
 
+# Only fixed network tokens are retained; never exception messages, URLs or IDs.
+NETWORK_ERRORS = frozenset(('ERR_NAME_NOT_RESOLVED','ERR_CONNECTION_REFUSED',
+    'ERR_CONNECTION_RESET','ERR_CONNECTION_CLOSED','ERR_CONNECTION_TIMED_OUT',
+    'ERR_TIMED_OUT','ERR_CERT_AUTHORITY_INVALID','ERR_CERT_DATE_INVALID',
+    'ERR_CERT_COMMON_NAME_INVALID','ERR_SSL_PROTOCOL_ERROR','ERR_ABORTED',
+    'ERR_BLOCKED_BY_CLIENT','ERR_BLOCKED_BY_ADMINISTRATOR','ERR_HTTP2_PROTOCOL_ERROR',
+    'ERR_TUNNEL_CONNECTION_FAILED','ERR_PROXY_CONNECTION_FAILED','ERR_EMPTY_RESPONSE'))
+
+def network_error_code(value):
+    if not isinstance(value,str):return 'UNKNOWN'
+    found=set(re.findall(r'(?<![A-Za-z0-9_])net::(ERR_[A-Z0-9_]+)(?![A-Za-z0-9_])',value))
+    return next(iter(found)) if len(found)==1 and found<=NETWORK_ERRORS else 'UNKNOWN'
+
+def browser_diagnostic(exc,stage):
+    return dict(version='BROWSER_BOUNDARY_V1',stage=stage,
+        exception_class=type(exc).__name__ if type(exc).__name__ in ('Error','TimeoutError') else 'OTHER',
+        network_error=network_error_code(str(exc)))
+
+
 async def probe(case, window=None, metadata=False, *, retain_proof=False, prepared_font_cache=None, execution_budget=None, deadline_origin=None):
     from playwright.async_api import async_playwright
     budget = budget_selection(execution_budget, case)
@@ -518,6 +537,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
         if audit['navigations'] > 2:
             fail('NAVIGATION_LIMIT')
 
+    boundary_stage='BROWSER_SETUP'
     try:
         async with async_playwright() as playwright:
             try:
@@ -538,6 +558,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                 client.on('Network.dataReceived', charge)
                 client.on('Fetch.requestPaused', route_handler)
                 await client.send('Fetch.enable', {'patterns':[{'urlPattern':'*','requestStage':'Request'}]})
+                boundary_stage='INITIAL_NAVIGATION'
                 async def navigate():
                     if case == 'trafford':
                         await page.goto('https://pa.trafford.gov.uk/online-applications/', wait_until='domcontentloaded', timeout=12000)
@@ -557,6 +578,7 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
+                    boundary_stage='ENUMERATION'
                     if case in UI_CASES:
                         await enumerate_ui(page,audit,stopped,ui_config,**({"retain_proof":True} if retain_proof else {}),**({'budget':budget,'deadline':deadline} if deadline is not None else {}))
                         classify_ui_enumeration(audit, fail)
@@ -600,15 +622,21 @@ async def probe(case, window=None, metadata=False, *, retain_proof=False, prepar
                             fail('IDENTITY_NOT_ESTABLISHED')
                         elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':
                             fail('STATUS_NOT_ESTABLISHED')
+                boundary_stage='CLEANUP'
                 stop.cancel()
                 await asyncio.gather(stop, return_exceptions=True)
+            except Exception as exc:
+                audit['browser_diagnostic']=browser_diagnostic(exc,boundary_stage)
+                raise
             finally:
+                boundary_stage='CLEANUP'
                 if context is not None:
                     await context.close()
                 if browser is not None:
                     await browser.close()
                 audit['cleanup'] = 'CONTEXT_BROWSER_CLOSED' if browser is not None else 'NOT_STARTED'
     except Exception as exc:
+        audit.setdefault('browser_diagnostic',browser_diagnostic(exc,boundary_stage))
         code = getattr(exc, 'code', None)  # fixed prepared-cache refusal code, prepared mode only
         fail(code if prepared_font_cache is not None and isinstance(code, str) and code.startswith('PREPARED_FONT_CACHE_')
              else 'BROWSER_' + type(exc).__name__)
@@ -628,8 +656,20 @@ def execution_environment_allowed(case, mode, environ):
             and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
 
 
-def bounded_worker_audit(path,case,metadata=False):
-    bound=512000 if metadata else 65536
+def worker_audit_bound(case,metadata=False,*,retain_proof=False,execution_budget=None):
+    # Screening-grade Manchester proof carries metadata even though --metadata
+    # is false (that switch belongs to the historical, non-proof route).
+    # Reuse its existing metadata ceiling; no collection/output ceiling changes.
+    if retain_proof and execution_budget=='BROWSER_SOURCE_V2' and case=='discovery_manchester_ui_window':
+        from verification.discovery.four_council_proof import current_collection_profile
+        from verification.discovery.source_profiles import profile
+        fixed=dict(council='manchester',semantics='VALIDATED',start='2026-10-27',end='2026-11-02')
+        if current_collection_profile()==profile(fixed,'SCREENING_METADATA'):return 512000
+    return 512000 if metadata else 65536
+
+
+def bounded_worker_audit(path,case,metadata=False,*,retain_proof=False,execution_budget=None):
+    bound=worker_audit_bound(case,metadata,retain_proof=retain_proof,execution_budget=execution_budget)
     return (json.loads(path.read_text()) if path.exists() and path.stat().st_size<bound
             else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
 
@@ -743,7 +783,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                     survivors.append(pid)
             except psutil.NoSuchProcess:
                 pass
-        result = bounded_worker_audit(child_output,case,metadata)
+        result = bounded_worker_audit(child_output,case,metadata,retain_proof=retain_proof,execution_budget=execution_budget)
         result.update(supervisor_seconds=round(time.monotonic()-start, 3), peak_owned_rss=peak,
                       owned_processes_seen=len(seen), live_owned_survivors=len(survivors),
                       supervisor_limit_hit=expired, process_cleanup='CLOSED' if not survivors else 'FAILED')
@@ -760,12 +800,15 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
             result['failure'] = result.get('failure') or 'EXECUTION_BUDGET_MISMATCH'
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
-        if retain_proof:
-            from verification.discovery.four_council_proof import write_audit
-            write_audit(output,result)
-        else:output.write_text(json.dumps(result, indent=2) + '\n')
-        print(json.dumps(result, sort_keys=True))
-        return 0 if result.get('failure') is None else 1
+    # The private child audit has been validated into memory. Remove its
+    # temporary directory before exporting the parent receipt, so the unchanged
+    # aggregate output guard never counts two copies of the same audit.
+    if retain_proof:
+        from verification.discovery.four_council_proof import write_audit
+        write_audit(output,result)
+    else:output.write_text(json.dumps(result, indent=2) + '\n')
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result.get('failure') is None else 1
 
 
 def _main():
@@ -790,8 +833,11 @@ def _main():
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),indent=2)+'\n'
-        if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
+        bound=worker_audit_bound(a.case,a.metadata,retain_proof=a.retain_four_council_proof,execution_budget=a.execution_budget)
+        # Preserve historical non-proof formatting and refusal behaviour.
+        formatting={'separators':(',',':')} if not a.metadata and bound==512000 else {'indent':2}
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),**formatting)+'\n'
+        if len(raw.encode())>=bound:raise ValueError('WORKER_AUDIT_BOUND')
         if a.retain_four_council_proof:
             from verification.discovery.four_council_proof import write_audit
             write_audit(a.output,json.loads(raw))

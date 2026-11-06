@@ -201,6 +201,12 @@ ATTEMPT06_OWNER_SQL=DIAGNOSTIC02_CAP_OWNER_SQL.replace("'b-dbpilot-20261027-1102
 
 ATTEMPT07_OWNER_SQL=ATTEMPT06_OWNER_SQL.replace("'b-dbpilot-20261027-1102-06_owner'","'b-dbpilot-20261027-1102-06_owner','b-dbpilot-20261027-1102-07_owner'")
 
+ATTEMPT08_OWNER_SQL=ATTEMPT07_OWNER_SQL.replace("'b-dbpilot-20261027-1102-07_owner'","'b-dbpilot-20261027-1102-07_owner','b-dbpilot-20261027-1102-08_owner'")
+
+ATTEMPT09_OWNER_SQL=ATTEMPT08_OWNER_SQL.replace("'b-dbpilot-20261027-1102-08_owner'","'b-dbpilot-20261027-1102-08_owner','b-dbpilot-20261027-1102-09_owner'")
+
+ATTEMPT10_OWNER_SQL=ATTEMPT09_OWNER_SQL.replace("'b-dbpilot-20261027-1102-09_owner'","'b-dbpilot-20261027-1102-09_owner','b-dbpilot-20261027-1102-10_owner'")
+
 def verify_inventory(c):
     from .intake_owner import require
     for contract in function_contracts():
@@ -209,7 +215,13 @@ def verify_inventory(c):
          (SELECT bool_or(a.is_grantable OR a.privilege_type<>'EXECUTE' OR a.grantor<>'ingestion_storage_owner'::regrole) FROM aclexplode(p.proacl) a)
          FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname=%s""",(contract['name'],)).fetchall()
         hashes={contract['sha256']}
-        if contract['name']=='ingestion_intake_owner_state':hashes.update(hashlib.sha256(x.split('$owner_state$',2)[1].encode()).hexdigest() for x in (QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL,DIAGNOSTIC02_CAP_OWNER_SQL,ATTEMPT06_OWNER_SQL,ATTEMPT07_OWNER_SQL))
+        if contract['name']=='ingestion_intake_owner_state':hashes.update(hashlib.sha256(x.split('$owner_state$',2)[1].encode()).hexdigest() for x in (QUALIFICATION_OWNER_SQL,DEADLINE_OWNER_SQL,DIAGNOSTIC02_CAP_OWNER_SQL,ATTEMPT06_OWNER_SQL,ATTEMPT07_OWNER_SQL,ATTEMPT08_OWNER_SQL,ATTEMPT09_OWNER_SQL,ATTEMPT10_OWNER_SQL))
+        if contract['name']=='ingestion_intake_owner_state':
+            from .intake_successor import owner_sql
+            hashes.add(hashlib.sha256(owner_sql().split('$owner_state$',2)[1].encode()).hexdigest())
+        if contract['name']=='ingestion_intake_evidence_write':
+            from .intake_successor import evidence_write_sql
+            hashes.add(hashlib.sha256(evidence_write_sql().split('$evidence_write$',2)[1].encode()).hexdigest())
         require(len(rows)==1 and rows[0][0] in hashes and rows[0][1:]==('ingestion_storage_owner',True,['search_path=pg_catalog'],contract['grantees'],False),'DATABASE_EVIDENCE_FUNCTION_OR_ACL_BINDING')
     row=c.execute("""SELECT c.relowner::regrole::text,c.relrowsecurity,c.relforcerowsecurity,
      (SELECT count(*) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)

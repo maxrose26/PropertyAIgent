@@ -39,7 +39,12 @@ def validate_policy(b, policy, *, now=None):
     op.require(hashlib.sha256(canonical(policy)).hexdigest() == b.get('period_policy_sha256'), 'PERIOD_POLICY_HASH')
     op.require(type(policy['max_runs']) is int and policy['max_runs'] == 1 and type(policy['overlap_days']) is int and policy['overlap_days'] == 7 and policy['test_evidence'] is False, 'PERIOD_SINGLE_RUN')
     application=op.reviewed_application_binding() if database else op.APPLICATION_BINDING
-    op.require(policy['councils'] == COUNCILS and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
+    from . import period09_successor as p09
+    from . import period10_successor as p10
+    from .intake_scope_policy import reviewed
+    scope=reviewed(b['period'])
+    expected_councils=scope.councils() if scope else p10.councils() if b['period']==p10.SUCCESSOR else p09.councils() if b['period']==p09.SUCCESSOR else COUNCILS
+    op.require(policy['councils'] == expected_councils and policy['screening_config'] == SCREENING and policy['execution_binding'] == application and policy['expected_stop'] == op.accepted_stop(b), 'PERIOD_REVIEWED_BINDINGS')
     op.require(policy['route'] == b['route'] and policy['hostaddr'] == b['hostaddr'] and type(policy['expires_at']) in (int,float) and (time.time() if now is None else now)+960 < policy['expires_at'] <= b['valid_until'] and (database or policy['expires_at'] <= b.get('publication_valid_until',0)), 'PERIOD_ROUTE_EXPIRY')
     if database:op.require(policy['evidence_backend']==b['evidence_backend'] and policy['fixed_window']==b['fixed_window'] and policy['access_deadline']==b['valid_until'] and policy['expires_at']==b['valid_until']-185,'PERIOD_DATABASE_FIXED_DEADLINES')
     if 'timing_policy' in b:
@@ -58,6 +63,16 @@ class PeriodIssuer(Owner):
     No new connection: wrapper supplies this exact terminal-owned connection.
     Checks surround BEGIN, the fixed registration call and COMMIT in the existing issuer.
     """
+    def daily_intake_inventory(self):
+        from .intake_scope_policy import reviewed
+        if reviewed(getattr(self,'period',None)):
+            from .intake_successor import function_inventory
+            return function_inventory()
+        from . import period09_successor as p09
+        from . import period10_successor as p10
+        if getattr(self,'period',None)==p10.SUCCESSOR:return p10.function_inventory()
+        return p09.function_inventory() if getattr(self,'period',None)==p09.SUCCESSOR else super().daily_intake_inventory()
+
     def q(self,c,statement,params=None,*,effect=False):
         if statement == 'COMMIT':
             op.require(c.execute(op.MEMBERS).fetchall()==self.prior_members and c.execute(FLAGS).fetchone()==(False,False), 'PERIOD_PRIVILEGE_RESTORATION')
@@ -84,6 +99,14 @@ class PeriodIssuer(Owner):
             op.retained_cleanup(c,before);op.no_hazards(c,before)
             from .attempt06_recovery import successor_guard
             successor_guard(c,self.journal['binding'],before)
+            from .period08_successor import successor_guard as guard08
+            guard08(c,self.journal['binding'],before,require_namespace=True)
+            from .period09_successor import successor_guard as guard09
+            guard09(c,self.journal['binding'],before,require_namespace=True)
+            from .period10_successor import successor_guard as guard10
+            guard10(c,self.journal['binding'],before,require_namespace=True)
+            from .intake_successor import guard
+            guard(c,self.journal['binding'],before,require_namespace=True)
             op.require(self.period not in before.get('intake_periods',{}),'PERIOD_ALREADY_EXISTS_NO_RETRY')
             server_now=float(c.execute('SELECT extract(epoch FROM clock_timestamp())').fetchone()[0])
             op.require(960 < self.policy['expires_at']-server_now <= 2100,'PERIOD_SERVER_EXPIRY')
@@ -95,6 +118,10 @@ class PeriodIssuer(Owner):
             op.require(type(entry) is dict and set(entry)==set(self.policy)|{'registered_at','days'} and type(entry.get('registered_at')) in (int,float) and self.server_before<=entry['registered_at']<=server_after and entry.get('days')=={} and {k:entry[k] for k in self.policy}==self.policy,'PERIOD_REGISTRATION_READBACK')
             self.expected_control=copy.deepcopy(self.prior_control)
             self.expected_control.setdefault('intake_periods',{})[self.period]=entry
+            from .intake_scope_policy import reviewed
+            if reviewed(self.period):
+                marker=self.prior_control['intake_run']
+                self.expected_control['intake_periods'][marker['period']]['verified_run']=copy.deepcopy(marker)
         return result
 
 

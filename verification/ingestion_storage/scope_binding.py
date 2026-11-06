@@ -66,9 +66,20 @@ def binding_for(council):
     return binding
 
 
+INTAKE_BOLTON = ScopeBinding('bolton','idox','RECEIVED','IDOX_REQUESTS',None,'')
+
+def intake_binding_for(council):
+    if council!='bolton':return binding_for(council)
+    from app.config import get_council
+    from verification.discovery.finite_acceptance import SEMANTICS
+    c=get_council(council)
+    if c.date_field_mode!='received' or c.doc_system!='idox' or SEMANTICS.get(council)!='RECEIVED':
+        raise Denied('SCOPE_BINDING_CONFIGURATION_MISMATCH')
+    return INTAKE_BOLTON
+
 def scope_for(binding, start, end):
     """The exact DISCOVERY_SCOPE (ledger task subject) of a window under this binding. Dates are ISO calendar days, start <= end, at most MAX_WINDOW_DAYS days."""
-    if not isinstance(binding, ScopeBinding) or CHAIN_BINDINGS.get(binding.council) != binding:
+    if not isinstance(binding, ScopeBinding) or (CHAIN_BINDINGS.get(binding.council) != binding and binding != INTAKE_BOLTON):
         raise Denied('SCOPE_NOT_BOUND')
     for value in (start, end):
         if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
@@ -98,6 +109,7 @@ def check_contract(binding, contract, start, end):
 
 def check_detail_target(binding, record, target):
     """A fresh-detail case target must name exactly the nominated record of exactly this council: no other URL, reference or identifier can be verified under a nomination."""
+    if binding == INTAKE_BOLTON:raise Denied('INTAKE_NO_DETAIL')
     from .idox_target import COUNCILS,derive,validate
     if binding.council in COUNCILS:
         if target!=derive(binding.council,record):raise Denied('SCOPE_DETAIL_TARGET_MISMATCH')

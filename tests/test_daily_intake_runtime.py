@@ -414,7 +414,7 @@ def test_source_poll_uses_main_thread_and_preserves_unknown_on_interruption(tmp_
     sources=tmp_path/'sources';sources.mkdir()
     (sources/'tameside.json').write_text(json.dumps(dict(_test_delay_seconds=3,
         resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
-    runtime.args=SimpleNamespace(disposable_sources=str(sources));runtime.test=True;runtime.policy={}
+    runtime.args=SimpleNamespace(period="poll-fixture",disposable_sources=str(sources));runtime.test=True;runtime.policy={}
     runtime.run=IntakeRun();runtime.memory=None;runtime.events=[]
     def synthetic_supervisor(command,*,check,root,**kw):
         root.mkdir();end=time.monotonic()+3

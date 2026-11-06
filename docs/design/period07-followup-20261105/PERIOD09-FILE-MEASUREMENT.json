@@ -1,0 +1,136 @@
+{
+  "version": "PERIOD09_OFFLINE_FILE_MEASUREMENT_V1",
+  "scraper_revision": "c7e8b51eac69686f8d54ac2c295f5cb2f0002dd7",
+  "workflow_run": 42111348922,
+  "job_id": 127539422174,
+  "transport": "LOOPBACK_TLS_DNS_MAPPING_ONLY_NO_COUNCIL_HTTP",
+  "scope": {
+    "council": "manchester",
+    "semantics": "VALIDATED",
+    "start": "2026-10-27",
+    "end": "2026-11-02"
+  },
+  "fixture": {
+    "pages": 6,
+    "records": 60
+  },
+  "measurements": [
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": null,
+      "failure": "BROWSER_Error",
+      "file_limit": 524288,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 583954432,
+      "physical_requests": 1,
+      "records": 0,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": null,
+      "failure": "BROWSER_Error",
+      "file_limit": 1048576,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 591835136,
+      "physical_requests": 1,
+      "records": 0,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 2097152,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 653643776,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 4194304,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 658579456,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 8388608,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 2097152,
+      "peak_owned_rss": 658276352,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 16777216,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 654925824,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    },
+    {
+      "actual_worker": false,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 20971520,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 653148160,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    },
+    {
+      "actual_worker": true,
+      "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "enumeration": "COUNT_RECONCILED",
+      "failure": null,
+      "file_limit": 2097152,
+      "live_owned_survivors": 0,
+      "max_file_bytes": 52800,
+      "peak_owned_rss": 657235968,
+      "physical_requests": 1,
+      "records": 60,
+      "requests": 1
+    }
+  ],
+  "limitations": [
+    "Temporary file sampling can miss short-lived files; observed 2 MiB allocation was captured at the 8 MiB trial.",
+    "Normal source worker is real; finite reader delegates to the real Chromium probe with fixture-only transport in the actual-worker test.",
+    "This does not prove live council traversal or the cause of the original period08 failure."
+  ]
+}
