@@ -42,6 +42,8 @@ def test_worker_browser_inside_reviewed_supervisor(tmp_path,inherited_temp):
  print('P09_BROWSER_BOUNDARY '+json.dumps(dict(outer=outer,inherited_temp=inherited_temp,observations=observations),sort_keys=True))
  if inherited_temp=='full':
   print('P09_FULL_READER '+(receipt.read_text() if receipt.exists() else '{}'))
+  inner=Path(str(receipt)+'.inner')
+  print('P09_INNER_WORKER '+(inner.read_text() if inner.exists() else '{}'))
   assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
   # Observation-only baseline: do not equate a failure with collector success.
   assert outer['limit_hit'] in (None,'OUTPUT_BOUND','ACCOUNTING_UNCERTAIN','OUTPUT_ACCOUNTING'),outer

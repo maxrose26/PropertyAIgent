@@ -17,3 +17,14 @@ def install(host,port):
    return SimpleNamespace(chromium=Chromium())
   async def __aexit__(self,*a):return await self.manager.__aexit__(*a)
  playwright.async_api.async_playwright=Wrapped
+
+def run(host,port,receipt):
+ import json
+ from pathlib import Path
+ install(host,port)
+ from verification.direct_reference.instrumented_probe import main
+ try:return main()
+ except Exception as error:
+  allowed={'WORKER_AUDIT_BOUND','PROOF_OUTPUT_BOUND','PROOF_OBSERVATION_OUTPUT_BOUND','PROFILE_AUDIT_BINDING','PROOF_MISSING','EXISTING_OUTPUT'}
+  Path(receipt).write_text(json.dumps(dict(exception_class=type(error).__name__,code=str(error) if str(error) in allowed else 'UNCLASSIFIED')))
+  raise

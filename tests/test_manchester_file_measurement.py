@@ -110,7 +110,7 @@ def test_normal_collector_file_growth(monkeypatch,record_property):
     original_popen=subprocess.Popen
     def start(command,*args,**kwargs):
      if len(command)>3 and command[1:3]==['-m','verification.direct_reference.instrumented_probe']:
-      bootstrap='from tests.manchester_loopback_transport import install;install('+repr(url.hostname)+','+str(server.server_port)+');from verification.direct_reference.instrumented_probe import main;raise SystemExit(main())'
+      bootstrap='from tests.manchester_loopback_transport import run;raise SystemExit(run('+repr(url.hostname)+','+str(server.server_port)+','+repr(os.environ['P09_BOUNDARY_RECEIPT']+'.inner')+'))'
       command=[command[0],'-c',bootstrap,*command[3:]]
      return original_popen(command,*args,**kwargs)
     monkeypatch.setattr(subprocess,'Popen',start)
