@@ -415,6 +415,9 @@ def test_source_poll_uses_main_thread_and_preserves_unknown_on_interruption(tmp_
     (sources/'tameside.json').write_text(json.dumps(dict(_test_delay_seconds=3,
         resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=3))))
     runtime.args=SimpleNamespace(period="poll-fixture",disposable_sources=str(sources));runtime.test=True;runtime.policy={}
+    # object.__new__ bypasses Runtime.__init__; match its normal unscoped default.
+    # Without this, the watcher fails before synthetic supervision starts.
+    runtime.scope_policy=None
     runtime.run=IntakeRun();runtime.memory=None;runtime.events=[]
     def synthetic_supervisor(command,*,check,root,**kw):
         root.mkdir();end=time.monotonic()+3
