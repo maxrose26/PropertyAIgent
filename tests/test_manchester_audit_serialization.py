@@ -13,13 +13,13 @@ def worker(monkeypatch,tmp_path,value):
  return path
 
 
-def test_compact_audit_preserves_all_fields_under_same_ceiling(monkeypatch,tmp_path):
+def test_historical_nonproof_format_and_bound_unchanged(monkeypatch,tmp_path):
  value={'records':[{'reference':str(n),'fields':[{'label':'Proposal','value':'x'*30} for _ in range(11)]} for n in range(60)]}
  assert len((json.dumps(value,indent=2)+'\n').encode())>=65536
  assert len((json.dumps(value,separators=(',',':'))+'\n').encode())<65536
  path=worker(monkeypatch,tmp_path,value)
- assert probe._main()==0
- assert json.loads(path.read_bytes())==value and path.stat().st_size<65536
+ with pytest.raises(ValueError,match='WORKER_AUDIT_BOUND'):probe._main()
+ assert not path.exists()
 
 
 def test_over_bound_compact_audit_still_refuses(monkeypatch,tmp_path):

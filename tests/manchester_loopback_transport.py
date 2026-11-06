@@ -24,11 +24,6 @@ def run(host,port,receipt,legacy=False):
  install(host,port)
  from verification.direct_reference import instrumented_probe as probe
  if legacy:
-  import inspect
-  body=inspect.getsource(probe._main)
-  old="))),separators=(',',':'))+'\\n'"
-  assert body.count(old)==1
-  exec(body.replace(old,"))),indent=2)+'\\n'"),probe.__dict__)
   probe.worker_audit_bound=lambda case,metadata=False,**kw:512000 if metadata else 65536
  try:return probe.main()
  except Exception as error:

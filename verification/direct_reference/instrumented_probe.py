@@ -830,8 +830,11 @@ def _main():
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),separators=(',',':'))+'\n'
-        if len(raw.encode())>=worker_audit_bound(a.case,a.metadata,retain_proof=a.retain_four_council_proof,execution_budget=a.execution_budget):raise ValueError('WORKER_AUDIT_BOUND')
+        bound=worker_audit_bound(a.case,a.metadata,retain_proof=a.retain_four_council_proof,execution_budget=a.execution_budget)
+        # Preserve historical non-proof formatting and refusal behaviour.
+        formatting={'separators':(',',':')} if not a.metadata and bound==512000 else {'indent':2}
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata,**({'retain_proof':True} if a.retain_four_council_proof else {}),**fonts,**({'deadline_origin':a.deadline_origin} if a.deadline_origin is not None else {}))),**formatting)+'\n'
+        if len(raw.encode())>=bound:raise ValueError('WORKER_AUDIT_BOUND')
         if a.retain_four_council_proof:
             from verification.discovery.four_council_proof import write_audit
             write_audit(a.output,json.loads(raw))
