@@ -63,7 +63,7 @@ def test_success_archive_atomic_and_readback(succeeded10,mode):
  assert c.execute(op.MEMBERS).fetchall()==w['members']
  assert c.execute('SELECT period,run_id,name,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()==w['evidence']
 
-@pytest.mark.parametrize('incomplete',[False,True,'retained-recovery'])
+@pytest.mark.parametrize('incomplete',[False,True,'retained-recovery','startup-boundary'])
 def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,monkeypatch,incomplete):
  w=succeeded10;c=w['boot'];b=w['binding'];p=w['policy']
  from scripts import owner_intake_scope
@@ -111,9 +111,27 @@ def test_actual_bolton_entry_capture_screen_backlog_close(succeeded10,tmp_path,m
    # Existing retained-capture recovery entry; fresh worker read, no source replay.
    return actual_slot(caller,key,lambda _:pytest.fail('SOURCE_REPLAY'),archive,prepare,**kw)
   monkeypatch.setattr(module,'intake_slot',interrupted_slot)
- result_code=main(argv,prepared_runtime=runtime)
+ if incomplete=='startup-boundary':
+  import time as real_time
+  monkeypatch.setattr(module,'time',SimpleNamespace(time=lambda:b['valid_until']-1500,monotonic=real_time.monotonic))
+ import sys
+ from collections import deque
+ boundaries=deque(maxlen=8)
+ def trace(frame,event,arg):
+  if event=='exception' and '/PropertyAIgent/' in frame.f_code.co_filename and arg[0] not in (StopIteration,GeneratorExit):
+   boundaries.append((frame.f_code.co_filename.split('/PropertyAIgent/')[-1],frame.f_lineno,arg[0].__name__))
+  return trace
+ sys.settrace(trace)
+ try:result_code=main(argv,prepared_runtime=runtime)
+ finally:sys.settrace(None)
  result=json.loads((runtime.root/'final-result.json').read_text())
- assert result_code==(1 if incomplete is True else 0),{k:result.get(k) for k in ('status','reason','cleanup','usage')}
+ if incomplete=='startup-boundary':
+  assert result_code==1 and result['reason']=='DATABASE_PILOT_STARTUP_RESERVE'
+  assert calls==[] and op.control(c)['intake_run']==w['marker']
+  with w['actor']() as actor:closed=op.close(actor,states[-1],lambda _:None)
+  assert closed['runtime_access']=='DISABLED' and closed['sessions']=='ABSENT'
+  return
+ assert result_code==(1 if incomplete is True else 0),({k:result.get(k) for k in ('status','reason','failure','cleanup','scopes')},list(boundaries))
  assert calls==[sc.SCOPE.row()]
  assert result['usage']['requests']==audit['resource']['requests_attempted']<=10
  assert result['usage']['all_connections_closed'] is True
@@ -180,7 +198,7 @@ def test_sql_admission_refuses_changed_scope(succeeded10,change):
 @pytest.mark.parametrize('mode',['before','lost'])
 def test_namespace_atomicity(succeeded10,mode):
  w=succeeded10;c=w['boot'];b=w['binding'];before=op.ledger_sha(c)
- query="SELECT proname,prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid=ANY(ARRAY['public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure,'public.ingestion_register_bolton_exception(jsonb)'::regprocedure]) ORDER BY proname"
+ query="SELECT proname,prosrc,proacl::text,proowner,prosecdef,proconfig FROM pg_proc WHERE oid=ANY(ARRAY['public.ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure,'public.ingestion_register_bolton_exception(jsonb)'::regprocedure,'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure]) ORDER BY proname"
  definitions=c.execute(query).fetchall();schema=c.execute("SELECT nspacl::text FROM pg_namespace WHERE nspname='public'").fetchone()
  with w['actor']() as actor:
   with pytest.raises(RuntimeError):migrate_owner_namespace(Fault(actor,mode),scope_binding=b,stable_verifiers=b['credential_verifier_sha256'])
