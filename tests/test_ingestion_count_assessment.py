@@ -162,15 +162,38 @@ def test_routing_fails_closed_on_anything_ambiguous_or_tampered():
 def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     """Phase A: nothing selected v3. Slice 1 (PR #171) adds exactly one explicit consumer set; this test pins it, and the held production paths are pinned in tests/test_ingestion_screening_v3_slice1.py."""
     # Owner-authorised inactive daily intake reads frozen v3 outcomes; no rule or live activation change.
-    allowed={'verification/ingestion_storage/daily_intake_runtime.py','app/ingestion/daily_intake.py','app/ingestion/nomination.py','verification/ingestion_storage/operational_controller.py','verification/ingestion_storage/v3_admission.py', 'verification/ingestion_storage/observation_worker_sql.py','app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/policy_screening_v3.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py','verification/ingestion_storage/oldham_authority.py','verification/ingestion_storage/oldham_owner_once.py', 'verification/ingestion_storage/chain_registration.py'}
+    allowed={'verification/ingestion_storage/daily_intake_runtime.py','app/ingestion/daily_intake.py','app/ingestion/nomination.py','verification/ingestion_storage/operational_controller.py','verification/ingestion_storage/v3_admission.py', 'verification/ingestion_storage/observation_worker_sql.py','app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/policy_screening_v3.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py','verification/ingestion_storage/oldham_authority.py','verification/ingestion_storage/oldham_owner_once.py', 'verification/ingestion_storage/chain_registration.py', 'verification/ingestion_storage/intake_successor.py'}
     offenders=set()
     for path in list((ROOT/'app').rglob('*.py'))+list((ROOT/'verification').rglob('*.py')):
         if path.name in ('listing_screening.py','count_assessment.py','count_evidence.py'):continue
         text=path.read_text(encoding='utf-8',errors='ignore')
         if re.search(r'RULE_V3|screening-assessment-v3|routing_of|ingestion\.count_(?:assessment|evidence)|from\s+\.count_(?:assessment|evidence)|from\s+\.\s+import\s+[^\n]*count_(?:assessment|evidence)',text):offenders.add(path.relative_to(ROOT).as_posix())
     assert offenders<=allowed,offenders      # explicit opt-in only: the disposable coordinator and the read-only projections; no production path
-    # Owner issuance validates the frozen configuration; it must not directly screen rows.
     import ast
+    # An existing successor verification recomputes the 35 frozen Manchester
+    # screens in memory for parity; it neither selects a new live rule nor
+    # writes screening outcomes. Permit ONLY that audited call shape.
+    successor=(ROOT/'verification/ingestion_storage/intake_successor.py').read_text(encoding='utf-8')
+    module=ast.parse(successor)
+    success=next(n for n in module.body if isinstance(n,ast.FunctionDef) and n.name=='success')
+    all_rule_uses=[n for n in ast.walk(module) if isinstance(n,ast.Name) and n.id=='RULE_V3']
+    success_rule_uses=[n for n in ast.walk(success) if isinstance(n,ast.Name) and n.id=='RULE_V3']
+    imports=[n for n in ast.walk(module) if isinstance(n,ast.ImportFrom) and any(a.name=='RULE_V3' for a in n.names)]
+    assert len(all_rule_uses)==len(success_rule_uses)==2
+    assert len(imports)==1 and imports[0] in ast.walk(success)
+    calls=[n for n in ast.walk(success) if isinstance(n,ast.Call)]
+    rules=[n for n in calls if isinstance(n.func,ast.Name) and n.func.id=='ScreeningRule']
+    assert len(rules)==2
+    assert all(len(rule.args)==1 and isinstance(rule.args[0],ast.Name) and rule.args[0].id=='RULE_V3' for rule in rules)
+    assert all({kw.arg:ast.literal_eval(kw.value) for kw in rule.keywords}==dict(unit_threshold=10,link_related=False) for rule in rules)
+    plans=[n for n in calls if isinstance(n.func,ast.Name) and n.func.id=='_screen_items']
+    assert len(plans)==1 and any(kw.arg=='capture_bound' and isinstance(kw.value,ast.Constant) and kw.value.value is True for kw in plans[0].keywords)
+    sql_calls=[n for n in calls if isinstance(n.func,ast.Attribute) and n.func.attr in {'execute','executemany','copy','commit','rollback'}]
+    assert len(sql_calls)==4 and all(n.func.attr=='execute' and isinstance(n.func.value,ast.Name) and n.func.value.id=='c'
+        and n.args and isinstance(n.args[0],ast.Constant) and isinstance(n.args[0].value,str)
+        and n.args[0].value.lstrip().upper().startswith('SELECT ') for n in sql_calls)
+    assert not re.search(r'screening-assessment-v3|routing_of|count_assessment',successor)
+    # Owner issuance validates the frozen configuration; it must not directly screen rows.
     owner=ast.parse((ROOT/'verification/ingestion_storage/oldham_authority.py').read_text())
     assert not [n for n in ast.walk(owner) if isinstance(n,ast.Call) and ((isinstance(n.func,ast.Attribute) and n.func.attr in {'screen','screen_row','rescreen','re_screen'}) or (isinstance(n.func,ast.Name) and n.func.id in {'screen_row','assess_proposal'}))]
     assert not [n for n in dir(ls) if 'rescreen' in n.lower() or 're_screen' in n.lower()]
