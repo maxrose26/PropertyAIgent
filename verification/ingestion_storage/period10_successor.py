@@ -6,9 +6,9 @@ from . import attempt06_recovery as a06, period09_settlement as settlement, inta
 
 SUCCESSOR='b-dbpilot-20261027-1102-10'
 RECEIPT_SHA='2549b1cde3f78f38b338a980003231ff8c9bc375de6720b40d05d4053afd0f1d'
-# Inactive until the independently validated scraper commit is pinned.
-BINDING=dict(revision='0'*40,workflow_sha256='0'*64,manifest_sha256='0'*64)
-TREE='0'*40
+# Exact scraper release; owner pin does not change its bound source files.
+BINDING=dict(revision='3ac568376685f448a8fa353ac82e24862302786b',workflow_sha256='946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9',manifest_sha256='65c6f54b7339bd2abe5fc337c1e82bd919c6385ecac2a00e80b642d22a7775da')
+TREE='3c7d854691dca7f758ee222594c851f535d1fdad'
 BRANCH='prep/b-timing-pg17-current-20261103'
 ACCEPTED=dict(settlement.STOP13,global_stop=None,manual_stop=None)
 
