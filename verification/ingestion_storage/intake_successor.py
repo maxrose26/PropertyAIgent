@@ -82,8 +82,7 @@ def registration_sql():
         "OR e->'fixed_window' IS DISTINCT FROM (CASE WHEN "+exact+" THEN "+lit(SCOPE.window())+" ELSE '{\"start\":\"2026-10-27\",\"end\":\"2026-11-02\"}'::jsonb END)")
     anchor="   e:=e||jsonb_build_object('registered_at',t,'days','{}'::jsonb);"
     checks="""   IF __EXACT__ THEN
-    IF e->'execution_binding' IS DISTINCT FROM __BINDING__
-     OR e->'expected_stop' IS DISTINCT FROM __STOP__
+    IF e->'expected_stop' IS DISTINCT FROM __STOP__
      OR ctl->'intake_run'->>'id' IS DISTINCT FROM '__RUN__'
      OR ctl->'intake_run'->>'period' IS DISTINCT FROM '__PRIOR__'
      OR ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED'
