@@ -1,0 +1,29 @@
+name: Bolton source diagnostic OFFLINE
+on:
+  pull_request:
+    paths:
+      - 'verification/discovery/bolton_diagnostic.py'
+      - 'tests/test_bolton_source_diagnostic.py'
+      - '.github/workflows/bolton-source-diagnostic-offline.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: timeout --kill-after=2s 120s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/diagnostic-venv"
+      - name: Synthetic transport only
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+        run: timeout --kill-after=2s 90s "$RUNNER_TEMP/diagnostic-venv/bin/python" -m pytest tests/test_bolton_source_diagnostic.py tests/test_discovery_idox_window.py -q --tb=short --junitxml="$RUNNER_TEMP/diagnostic.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bolton-source-diagnostic-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/diagnostic.xml
+          if-no-files-found: error
