@@ -6,6 +6,8 @@ on:
       - 'scripts/owner_intake_scope.py'
       - 'scripts/owner_pilot_job.py'
       - 'tests/test_intake_scope*'
+      - 'tests/test_bolton01*'
+      - 'scripts/owner_bolton01_settlement.py'
       - 'tests/test_bolton_canary_preparation.py'
       - 'tests/test_period10_successor_pg.py'
       - '.github/workflows/intake-scope-offline.yml'
@@ -14,7 +16,7 @@ permissions:
 jobs:
   postgres:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
@@ -35,7 +37,7 @@ jobs:
       - run: timeout 100s "$RUNNER_TEMP/scope-venv/bin/python" -m pytest tests/test_intake_scope_worker.py -q -x --tb=short
         env:
           BOLTON_WORKER_AUDIT: ${{ runner.temp }}/bolton-worker.json
-      - run: timeout 540s "$RUNNER_TEMP/scope-venv/bin/python" -m pytest tests/test_bolton_canary_preparation.py tests/test_intake_scope_contract.py tests/test_intake_scope_pg.py -q -x --tb=short --junitxml="$RUNNER_TEMP/scope.xml"
+      - run: timeout 650s "$RUNNER_TEMP/scope-venv/bin/python" -m pytest tests/test_bolton_canary_preparation.py tests/test_intake_scope_contract.py tests/test_intake_scope_pg.py tests/test_bolton01_settlement_pg.py tests/test_bolton01_evidence.py -q -x --tb=short --junitxml="$RUNNER_TEMP/scope.xml"
         env:
           BOLTON_WORKER_AUDIT: ${{ runner.temp }}/bolton-worker.json
           DATABASE_URL: 'sqlite:///:memory:'
