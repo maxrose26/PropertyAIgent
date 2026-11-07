@@ -150,7 +150,7 @@ def test_initial_28_day_overlap_is_not_supported_by_current_rolling_issuer(world
     assert restricted_sessions(world['boot'])==0
 
 
-@pytest.mark.parametrize('fault',['date','council','writes','expiry','run_limit','publication_path'])
+@pytest.mark.parametrize('fault',['date','initial_overlap_28','council','writes','expiry','run_limit','publication_path'])
 def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world,tmp_path,fault):
     from app.ingestion.ledger import DEFAULT_LIMITS
     from verification.ingestion_storage.chain_registration import capture_registration
@@ -164,13 +164,20 @@ def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world
     request=registration_payload(name,reg,execution_binding())
     if fault=='publication_path':request['publication_path']=request['publication_path'].replace(name,'foreign-period')
     if fault=='date':request['rows'][0]['subject']['start']='2000-01-01'
+    if fault=='initial_overlap_28':
+        # A valid 7-day owner period must not permit the 28-day first-pass window
+        # through the restricted capture issuer. This is NOT initial-overlap support.
+        request['rows'][0]['subject']['start']=(date.fromisoformat(row['end'])-timedelta(days=27)).isoformat()
     if fault=='council':request['rows'][0]['subject']['council']='oldham'
     if fault=='writes':request['grant']['writes']=1
     if fault=='expiry':request['grant']['expires_at']=time.time()+1900
     if fault=='run_limit':
         world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,ARRAY['intake_periods',%s,'days'],%s::jsonb)::json WHERE key=repeat('0',64)",(name,json.dumps({str(date(2000,1,1)+timedelta(days=i)):{} for i in range(7)})))
+    # The 28-day case must specifically reach the trusted SQL date-window
+    # refusal, not merely fail an unrelated grant or identity precondition.
+    refusal='INTAKE_ROLLING_SCOPE_OR_CONSUMED' if fault=='initial_overlap_28' else 'INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED|RUN_IDENTITY)'
     with world['connect']('ingestion_worker_login') as c:
-        with pytest.raises(Exception,match='INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED|RUN_IDENTITY)'):
+        with pytest.raises(Exception,match=refusal):
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
     assert world['boot'].execute('SELECT count(*) FROM ingestion_work_items').fetchone()[0]==1
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
