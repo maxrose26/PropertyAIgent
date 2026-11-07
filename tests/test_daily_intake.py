@@ -47,3 +47,81 @@ def test_capture_bound_revision_reuses_existing_observation_contract():
     first,second=observation_revision(assessment,'b'*64),observation_revision(assessment,'c'*64)
     assert first!=second
     assert first==digest(dict(assessment_revision=assessment,observation_sha256='b'*64))
+
+def test_unaccounted_supervised_source_is_unknown_and_blocks_next_scope():
+    # Zero accounted calls never proves zero physical requests after a
+    # source worker starts. Only a validated complete audit resolves UNKNOWN.
+    from verification.ingestion_storage.intake_budget import IntakeRun
+    run=IntakeRun(clock=lambda:0)
+    run.before_scope('idox')
+    run.begin_source()
+    usage=run.totals()
+    assert usage['requests'] is None and usage['requests_status']=='UNKNOWN'
+    assert usage['requests_accounted']==0
+    with pytest.raises(Denied,match='SOURCE_ACCOUNTING_UNKNOWN_NO_CONTINUATION'):
+        run.before_scope('idox')
+    with pytest.raises(Denied,match='SOURCE_ACCOUNTING'):
+        run.source(dict(requests=1))
+    assert run.totals()['requests'] is None
+    run.source(dict(requests=2,source_bytes=512,source_seconds=1,supervised_seconds=2))
+    assert run.totals()['requests']==2 and run.totals()['requests_status']=='COMPLETE'
+    run.before_scope('idox')
+
+@pytest.mark.parametrize('poll_changes',[False,True])
+def test_source_supervision_keeps_database_deadline_on_main_thread(tmp_path,monkeypatch,poll_changes):
+    """No network/SQL. A supervised source must outlive a bounded main-thread poll."""
+    import json,time,threading
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from verification.ingestion_storage.operational_controller import DatabaseBudget
+    from verification.ingestion_storage.intake_budget import IntakeRun
+
+    runtime=object.__new__(Runtime)
+    runtime.root=tmp_path/'output';runtime.root.mkdir()
+    sources=tmp_path/'source-fixtures';sources.mkdir()
+    runtime.args=SimpleNamespace(period='safe-poll-fixture',disposable_sources=str(sources))
+    runtime.test=True;runtime.policy={};runtime.run=IntakeRun()
+    runtime.memory=None;runtime.events=[]
+    budget=DatabaseBudget();poll_threads=[];supervisor_threads=[]
+
+    def synthetic_supervisor(command,*,check,root,**kw):
+        supervisor_threads.append(threading.current_thread())
+        root.mkdir()
+        deadline=time.monotonic()+2.4
+        try:
+            while time.monotonic()<deadline:
+                check()
+                time.sleep(.025)
+            (runtime.root/'tameside-source.json').write_text(json.dumps(
+                dict(resource=dict(requests_attempted=4,received_bytes=30,elapsed_seconds=2))))
+        except Denied:
+            pass
+        return dict(cleanup='CLOSED',exit_code=0,limit_hit=None,elapsed_seconds=2)
+
+    monkeypatch.setattr('verification.ingestion_storage.daily_intake_runtime.supervise',synthetic_supervisor)
+    @contextmanager
+    def connection(**kwargs):
+        yield None,budget
+    runtime.connection=connection
+
+    def read_policy(connection):
+        poll_threads.append(threading.current_thread())
+        budget.guarded(None,lambda:None)  # signal deadline must run on main thread
+        if poll_changes and len(poll_threads)==2:
+            raise Denied('INTAKE_SHARED_STOP_CHANGED')
+    runtime.policy_read=read_policy
+    if poll_changes:
+        with pytest.raises(Denied,match='SOURCE_STOP_OR_ACCESS_CHANGED'):
+            runtime.collect(dict(council='tameside'))
+        usage=runtime.run.totals()
+        assert usage['requests'] is None and usage['requests_status']=='UNKNOWN'
+        with pytest.raises(Denied,match='UNKNOWN_NO_CONTINUATION'):
+            runtime.run.before_scope('arcus')
+    else:
+        source,outer=runtime.collect(dict(council='tameside'))
+        assert outer['cleanup']=='CLOSED' and source['resource']['requests_attempted']==4
+        assert runtime.run.totals()['requests']==4
+        assert runtime.run.totals()['requests_status']=='COMPLETE'
+    assert len(poll_threads)>=2 and all(t is threading.main_thread() for t in poll_threads)
+    assert len(supervisor_threads)==1 and supervisor_threads[0] is not threading.main_thread()

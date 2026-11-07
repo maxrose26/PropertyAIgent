@@ -372,3 +372,24 @@ def test_stop_during_owned_source_closes_worker_and_preserves_original_stop(worl
     assert restricted_sessions(world['boot'])==0 and not (output/'manchester-source.json').exists()
     control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
     assert control['manual_stop']=='DISPOSABLE_ATTENDED_STOP'
+
+def test_invalid_disposable_source_audit_never_reports_zero_requests_or_continues(world,tmp_path):
+    # A supervised source failure has no trustworthy physical request count,
+    # even if the synthetic worker did not return a usable audit.
+    reset(world);authorise(world,'unaccounted-source')
+    env,sources=env_and_sources(world,tmp_path)
+    (sources/'tameside.json').write_text('{not-json')
+    output=tmp_path/'result'
+    command=[sys.executable,'-m','scripts.run_daily_councils','--period','unaccounted-source','--output',str(output),
+             '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
+    completed=subprocess.run(command,env=env,capture_output=True,text=True,timeout=60)
+    result=json.loads((output/'final-result.json').read_bytes())
+    assert completed.returncode==1,completed.stderr
+    assert result['status']=='STOP_RECONCILE_NO_RETRY',json.dumps(result,sort_keys=True)
+    assert result['usage']['requests'] is None
+    assert result['usage']['requests_status']=='UNKNOWN'
+    assert result['usage']['requests_accounted']==0
+    assert result['coverage_advance'] is False
+    assert not (output/'manchester-source.json').exists()
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchone()[0]==0
+    assert restricted_sessions(world['boot'])==0
