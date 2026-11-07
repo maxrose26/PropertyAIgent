@@ -47,3 +47,22 @@ def test_capture_bound_revision_reuses_existing_observation_contract():
     first,second=observation_revision(assessment,'b'*64),observation_revision(assessment,'c'*64)
     assert first!=second
     assert first==digest(dict(assessment_revision=assessment,observation_sha256='b'*64))
+
+def test_unaccounted_supervised_source_is_unknown_and_blocks_next_scope():
+    # Zero accounted calls never proves zero physical requests after a
+    # source worker starts. Only a validated complete audit resolves UNKNOWN.
+    from verification.ingestion_storage.intake_budget import IntakeRun
+    run=IntakeRun(clock=lambda:0)
+    run.before_scope('idox')
+    run.begin_source()
+    usage=run.totals()
+    assert usage['requests'] is None and usage['requests_status']=='UNKNOWN'
+    assert usage['requests_accounted']==0
+    with pytest.raises(Denied,match='SOURCE_ACCOUNTING_UNKNOWN_NO_CONTINUATION'):
+        run.before_scope('idox')
+    with pytest.raises(Denied,match='SOURCE_ACCOUNTING'):
+        run.source(dict(requests=1))
+    assert run.totals()['requests'] is None
+    run.source(dict(requests=2,source_bytes=512,source_seconds=1,supervised_seconds=2))
+    assert run.totals()['requests']==2 and run.totals()['requests_status']=='COMPLETE'
+    run.before_scope('idox')
