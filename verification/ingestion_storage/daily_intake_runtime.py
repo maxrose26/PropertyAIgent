@@ -182,33 +182,48 @@ class Runtime:
         plan=dict(row=row,fixture=str(Path(self.args.disposable_sources).resolve()/(row['council']+'.json')) if self.test else None)
         plan_path=self.root/(row['council']+'-plan.json');plan_path.write_bytes(canonical(plan))
         output=self.root/(row['council']+'-source.json')
-        # One persistent, metered restricted connection polls the DB stop while
-        # the existing credential-free owned-process supervisor runs the reader.
+        # The SQL policy and its hard statement deadline stay on the main thread.
+        # The source supervisor runs independently, so a slow database poll
+        # cannot postpone owned-process, memory or source-time enforcement.
         with self.connection(seconds=90) as (c,budget):
             import threading
-            done=threading.Event();errors=[]
+            done=threading.Event();stop=threading.Event();errors=[];results=[]
             self.policy_read(c)
-            def poll():
-                while not done.wait(2):
-                    try:self.policy_read(c)
-                    except BaseException as error:errors.append(error);return
             def check():
                 self.run.check();budget.check()
                 if self.memory:self.memory.check()
-                if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
-            watcher=threading.Thread(target=poll,daemon=True);watcher.start()
+                if stop.is_set():raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+            def supervise_source():
+                try:
+                    profile=self.policy.get('render_profile') if row['council']=='manchester' and not self.test else None
+                    environment={'INGESTION_SOURCE_PRIVATE':'ONCE'}
+                    if profile:environment.update(PLAYWRIGHT_BROWSERS_PATH=profile['browser_path'],INGESTION_RENDER_PROFILE=json.dumps(profile))
+                    results.append(supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
+                                    environment=environment,root=self.root/(row['council']+'-owned'),
+                                    source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
+                                    execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile))
+                except BaseException:
+                    # Do not expose secrets or an uncontrolled exception text.
+                    errors.append('SOURCE_SUPERVISION_FAILED')
+                finally:
+                    done.set()
+            # Once a source may have been contacted, an interrupted/missing
+            # audit is UNKNOWN, never zero requests or safe to recollect.
+            self.run.begin_source()
+            watcher=threading.Thread(target=supervise_source,name='intake-source-supervisor',daemon=True);watcher.start()
+            failure=False
             try:
-                profile=self.policy.get('render_profile') if row['council']=='manchester' and not self.test else None
-                environment={'INGESTION_SOURCE_PRIVATE':'ONCE'}
-                if profile:environment.update(PLAYWRIGHT_BROWSERS_PATH=profile['browser_path'],INGESTION_RENDER_PROFILE=json.dumps(profile))
-                outer=supervise([sys.executable,'-m',__name__,'--source-worker','--plan',str(plan_path),'--output',str(output)],
-                                environment=environment,root=self.root/(row['council']+'-owned'),
-                                source=True,seconds=profile['source_seconds'] if profile else 75 if row['council']=='manchester' else 45,stop_file=self.root/'STOP',check=check,
-                                execution_budget='BROWSER_SOURCE_V2' if row['council']=='manchester' else None,render_profile=profile)
+                while not done.wait(2):
+                    try:self.policy_read(c)
+                    except BaseException:
+                        failure=True
+                        break
             finally:
-                done.set();watcher.join(timeout=14)
-            if watcher.is_alive():raise Denied('STOP_POLL_CLOSURE_UNCERTAIN')
-            if errors:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+                stop.set();watcher.join(timeout=14)
+            if watcher.is_alive():raise Denied('SOURCE_SUPERVISOR_CLOSURE_UNCERTAIN')
+            if failure:raise Denied('SOURCE_STOP_OR_ACCESS_CHANGED')
+            if errors or len(results)!=1:raise Denied('SOURCE_SUPERVISION_FAILED')
+            outer=results[0]
             self.policy_read(c)
         if outer['cleanup']!='CLOSED' or outer['exit_code']!=0 or outer['limit_hit'] is not None or not output.is_file() or output.stat().st_size>512*1024:
             raise Denied('SOURCE_OR_CLEANUP_UNCERTAIN_NO_REPLAY')
