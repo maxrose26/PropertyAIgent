@@ -16,6 +16,7 @@ class IntakeRun:
         self.clock=clock;self.started=clock();self.stop_file=stop_file;self.budgets=[]
         self.used=dict(requests=0,source_bytes=0,source_seconds=0,supervised_seconds=0,github_calls=0,export_bytes=0)
         self.closing=False
+        self.source_unaccounted=False
 
     def check(self):
         from pathlib import Path
@@ -24,7 +25,9 @@ class IntakeRun:
 
     def totals(self):
         cancels=sum(b.prior_cancel_attempts+sum(e.get('cancel_attempts',0) for e in b.hard_deadline_events) for b in self.budgets)
-        return dict(self.used,driver_statements=sum(b.statements for b in self.budgets),
+        return dict(self.used,requests=None if self.source_unaccounted else self.used['requests'],
+                    requests_accounted=self.used['requests'],requests_status='UNKNOWN' if self.source_unaccounted else 'COMPLETE',
+                    driver_statements=sum(b.statements for b in self.budgets),
                     connection_attempts=sum(b.attempts for b in self.budgets)+cancels,cancel_requests=cancels,returned_bytes=sum(b.returned_bytes for b in self.budgets),
                     elapsed_seconds=self.clock()-self.started,
                     all_connections_closed=all(c.closed for b in self.budgets for c in b.opened))
@@ -45,6 +48,7 @@ class IntakeRun:
 
     def before_scope(self,family):
         if self.closing:raise Denied('CLOSING_NO_WORK')
+        if self.source_unaccounted:raise Denied('SOURCE_ACCOUNTING_UNKNOWN_NO_CONTINUATION')
         self.check();t=self.totals()
         # Reserve a whole supported scope BEFORE its claim/source intent, not
         # merely one request. Actual closed use, not a fresh budget, carries on.
@@ -56,6 +60,10 @@ class IntakeRun:
             if t[k]+v+RESERVE.get(k,0)+auxiliary>LIMITS[k]:raise Denied('INTAKE_RUN_SCOPE_CANNOT_FIT:'+k)
         if LIMITS['wall_seconds']-t['elapsed_seconds']<300+90+RESERVE['wall_seconds']:raise Denied('INTAKE_RUN_SCOPE_CANNOT_FIT:time')
 
+    def begin_source(self):
+        if self.closing or self.source_unaccounted:raise Denied('SOURCE_ACCOUNTING_UNKNOWN_NO_CONTINUATION')
+        self.source_unaccounted=True
+
     def source(self,metrics):
         if self.closing:raise Denied('CLOSING_NO_SOURCE')
         self.check()
@@ -63,6 +71,7 @@ class IntakeRun:
         for k,v in metrics.items():
             if type(v) not in (int,float) or not math.isfinite(v) or v<0 or self.used[k]+v>LIMITS[k]:raise Denied('INTAKE_RUN_SOURCE_BOUND')
         for k,v in metrics.items():self.used[k]+=v
+        self.source_unaccounted=False
 
     def publication(self,raw_bytes,calls):
         self.check()
