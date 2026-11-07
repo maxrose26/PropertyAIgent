@@ -132,6 +132,24 @@ def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(dict(operation='intake_period',period='self',policy=policy(world))),))
 
 
+
+def test_initial_28_day_overlap_is_not_supported_by_current_rolling_issuer(world):
+    """Characterise the release blocker; never treat a seven-day pass as initial 28-day coverage."""
+    reset(world)
+    reference=datetime(2026,11,7,tzinfo=timezone.utc)
+    initial=current_windows(reference,['tameside'],overlap_days=28)[0]
+    recurring=current_windows(reference,['tameside'])[0]
+    assert (initial['start'],initial['end'])==('2026-10-10','2026-11-06')
+    assert (recurring['start'],recurring['end'])==('2026-10-31','2026-11-06')
+    before=snapshot(world['boot'])
+    candidate=policy(world)
+    candidate['overlap_days']=28
+    with pytest.raises(Exception,match='ADMIN_EFFECT_UNCERTAIN'):
+        authorise(world,'initial-overlap-28',candidate)
+    assert snapshot(world['boot'])==before
+    assert restricted_sessions(world['boot'])==0
+
+
 @pytest.mark.parametrize('fault',['date','council','writes','expiry','run_limit','publication_path'])
 def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world,tmp_path,fault):
     from app.ingestion.ledger import DEFAULT_LIMITS
