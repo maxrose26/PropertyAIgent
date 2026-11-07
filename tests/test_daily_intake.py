@@ -153,3 +153,30 @@ def test_execution_binding_tracks_council_and_screening_inputs(tmp_path,monkeypa
         assert actual['revision']==previous['revision']
         assert actual['workflow_sha256']==previous['workflow_sha256']
         previous=actual
+
+@pytest.mark.parametrize('source_dependency',[
+    'verification/discovery/campaign_manifest.py',
+    'verification/discovery/arcus_ui_config.py',
+    'verification/discovery/arcus_ui_audit.py',
+])
+def test_execution_binding_tracks_source_selection_route_and_audit(tmp_path,monkeypatch,source_dependency):
+    """Source selection, Arcus routing and source-audit validators are executable inputs."""
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    assert len(runtime.BOUND_FILES)==len(set(runtime.BOUND_FILES))
+    assert source_dependency in runtime.BOUND_FILES
+    for name in runtime.BOUND_FILES:
+        f=tmp_path/name
+        f.parent.mkdir(parents=True,exist_ok=True)
+        f.write_bytes(b'baseline')
+    workflow=tmp_path/'.github/workflows/stage4-discovery-offline.yml'
+    workflow.parent.mkdir(parents=True,exist_ok=True)
+    workflow.write_bytes(b'workflow unchanged')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(runtime.subprocess,'check_output',lambda *_a,**_kw:'a'*40)
+    monkeypatch.delenv('RENDER_GIT_COMMIT',raising=False)
+    baseline=runtime.execution_binding()
+    (tmp_path/source_dependency).write_bytes(b'route-or-audit-modified')
+    changed=runtime.execution_binding()
+    assert changed['manifest_sha256']!=baseline['manifest_sha256']
+    assert changed['revision']==baseline['revision']
+    assert changed['workflow_sha256']==baseline['workflow_sha256']
