@@ -125,3 +125,31 @@ def test_source_supervision_keeps_database_deadline_on_main_thread(tmp_path,monk
         assert runtime.run.totals()['requests_status']=='COMPLETE'
     assert len(poll_threads)>=2 and all(t is threading.main_thread() for t in poll_threads)
     assert len(supervisor_threads)==1 and supervisor_threads[0] is not threading.main_thread()
+
+
+def test_execution_binding_tracks_council_and_screening_inputs(tmp_path,monkeypatch):
+    """Source route, council binding and v3 screening bytes must affect the executable manifest."""
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    required=('app/config.py','app/pipeline/discovery_contract.py',
+              'verification/ingestion_storage/scope_binding.py','app/ingestion/listing_screening.py')
+    assert len(runtime.BOUND_FILES)==len(set(runtime.BOUND_FILES))
+    assert set(required)<=set(runtime.BOUND_FILES)
+    for name in runtime.BOUND_FILES:
+        target=tmp_path/name
+        target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_bytes(b'baseline')
+    workflow=tmp_path/'.github/workflows/stage4-discovery-offline.yml'
+    workflow.parent.mkdir(parents=True,exist_ok=True)
+    workflow.write_bytes(b'unchanged workflow')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(runtime.subprocess,'check_output',lambda *_a,**_kw:'a'*40)
+    monkeypatch.delenv('RENDER_GIT_COMMIT',raising=False)
+    previous=runtime.execution_binding()
+    for name in required:
+        target=tmp_path/name
+        target.write_bytes(target.read_bytes()+b'changed')
+        actual=runtime.execution_binding()
+        assert actual['manifest_sha256']!=previous['manifest_sha256'],name
+        assert actual['revision']==previous['revision']
+        assert actual['workflow_sha256']==previous['workflow_sha256']
+        previous=actual

@@ -23,7 +23,9 @@ from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
-             'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
+             'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
+             'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
+             'verification/discovery/finite_acceptance.py',
              'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/render_intake.py','verification/direct_reference/instrumented_probe.py','verification/ingestion_storage/chain_caller.py',
