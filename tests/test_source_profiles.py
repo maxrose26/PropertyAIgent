@@ -288,3 +288,28 @@ def test_unsupported_idox_metadata_shape_refuses_parent(kind,tmp_path):
     else:record['source_key']='OTHER'
     with pytest.raises((r.Stop,ValueError,KeyError)):
         r.Launcher(registration(selection(('bolton',))),tmp_path,github=None,memory=None,source=None).accept(0,value)
+
+def test_28_day_nine_council_partition_fits_only_separate_source_only_packages():
+    """Prove bounded reuse, not operational 28-day collection or SQL authority."""
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in f.ARCUS]
+    idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in f.ARCUS]
+    assert len(plan['rows'])==36 and len(arcus)==12 and len(idox)==24
+    checked=set()
+    for index in range(12):
+        ordinals=sorted([arcus[index],*idox[2*index:2*index+2]])
+        payload=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+                     selected_ordinals=ordinals,collection_mode='SCREENING_METADATA')
+        rows=campaign.select(payload,profiled=True)
+        assert len(rows)==3 and sum(row['council'] in f.ARCUS for row in rows)==1
+        limits=campaign.capacity(rows,r.SUCCESSOR_V2_LIMITS,profiled=True)
+        assert limits['requests']==100 and limits['observations']==3
+        reg=registration(payload)
+        assert reg['manifest']['rows']==rows and reg['manifest']['persistence'] is False
+        checked.update(ordinals)
+    assert checked==set(range(36))
+    full=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+              selected_ordinals=list(range(36)),collection_mode='SCREENING_METADATA')
+    with pytest.raises(r.Stop,match='CAMPAIGN_MANIFEST_OR_CAPACITY'):
+        registration(full)
