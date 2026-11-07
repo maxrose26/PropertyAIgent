@@ -173,8 +173,11 @@ def test_trusted_sql_issuer_refuses_widened_or_consumed_work_before_insert(world
     if fault=='expiry':request['grant']['expires_at']=time.time()+1900
     if fault=='run_limit':
         world['boot'].execute("UPDATE ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,ARRAY['intake_periods',%s,'days'],%s::jsonb)::json WHERE key=repeat('0',64)",(name,json.dumps({str(date(2000,1,1)+timedelta(days=i)):{} for i in range(7)})))
+    # The 28-day case must specifically reach the trusted SQL date-window
+    # refusal, not merely fail an unrelated grant or identity precondition.
+    refusal='INTAKE_ROLLING_SCOPE_OR_CONSUMED' if fault=='initial_overlap_28' else 'INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED|RUN_IDENTITY)'
     with world['connect']('ingestion_worker_login') as c:
-        with pytest.raises(Exception,match='INTAKE_(GRANT_BOUND|ROLLING_SCOPE_OR_CONSUMED|RUN_IDENTITY)'):
+        with pytest.raises(Exception,match=refusal):
             c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(request),))
     assert world['boot'].execute('SELECT count(*) FROM ingestion_work_items').fetchone()[0]==1
     ctl=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
