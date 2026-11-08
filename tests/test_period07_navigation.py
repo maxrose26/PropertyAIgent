@@ -42,3 +42,28 @@ def test_refusal_diagnostic_does_not_relax_navigation(kind,detail):
  assert d==dict(version='PAGINATION_REFUSAL_V1',check=detail,stage='PAGE_PARSE',ordinal=1,body_sha256=hashlib.sha256(page).hexdigest())
  assert 'PRIVATE' not in json.dumps(d)
  with pytest.raises(Denied,match='IDOX_PAGINATION_PROFILE_BINDING'):contract().project(source,outer(),DEFAULT_LIMITS,source_bytes_limit=524288)
+
+@pytest.mark.parametrize('total,complete,requests',[(30,True,9),(31,False,8)],ids=['thirty-terminal','thirty-one-page-cap'])
+def test_six_page_boundary_counted_acceptance_and_refusal(total,complete,requests):
+ # Synthetic transport through the actual counted engine and trusted receipt projection.
+ # The 31st result is *not* fetched: six full pages cannot establish a 31-row window.
+ pages=[body(n,count=5,nxt=n<6 or not complete,previous=n>1,total=total) for n in range(1,7)]
+ source,calls=run([FORM,SEARCH,*pages]+([ECHO] if complete else []))
+ assert len(calls)==requests and source['resource']['requests_attempted']==requests
+ assert source['resource']['retries']==0 and source['cleanup']=='BOUNDARY_CLOSED'
+ assert len(source['records'])==30 and len(source['pages'])==6
+ if complete:
+  assert source['failure'] is None and not source['capped']
+  assert source['enumeration_evidence']=='COUNT_RECONCILED'
+  assert source['pagination_evidence']['criteria_verified'] is True
+  receipt=contract().project(source,outer(),DEFAULT_LIMITS,source_bytes_limit=524288)
+  assert len(receipt['records'])==30 and len(receipt['segments'])==6
+  assert receipt['segments'][-1]['terminal']=='EXPLICIT_LAST_EQUALS_TOTAL'
+ else:
+  assert source['failure']=='CALIBRATION_PAGE_CAP' and source['capped'] is True
+  assert source['completeness']!='COMPLETE'
+  assert source['pagination_evidence']['state']=='STOPPED_REQUIRES_REVIEW'
+  assert source['pagination_evidence']['criteria_verified'] is False
+  assert source['applied_interval'] is None
+  with pytest.raises(Denied):
+   contract().project(source,outer(),DEFAULT_LIMITS,source_bytes_limit=524288)
