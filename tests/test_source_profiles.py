@@ -439,8 +439,7 @@ def test_tameside_counted_finite_engine_is_bounded_and_adapter_fails_closed(rows
         assert receipt["pagination_mode"]==COUNTED_MODE
 
 
-@pytest.mark.parametrize('count',[22,31])
-def test_tameside_credential_free_finite_child_through_owned_source_supervisor(tmp_path,count):
+def synthetic_tameside_source_from_owned_child(tmp_path,count,*,row=None):
     """Source worker -> finite Idox child -> counted HTML, with absolutely no network.
 
     The two OS subprocesses and existing supervisors genuinely execute. A
@@ -455,7 +454,8 @@ def test_tameside_credential_free_finite_child_through_owned_source_supervisor(t
     from tests.test_discovery_idox_window import page as old_page
     from verification.ingestion_storage.operational_supervisor import supervise as owned_supervise
 
-    row=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30')
+    if row is None:
+        row=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30')
     start,end=map(date.fromisoformat,(row['start'],row['end']))
     literal=(start+timedelta(days=3)).strftime('%a %d %b %Y').encode()
     begin=start.strftime('%d/%m/%Y').encode()
@@ -541,10 +541,10 @@ finally:
     assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
     assert observed.exists(),outer
     assert int(observed.read_text())==3+(count+4)//5 if count<=30 else int(observed.read_text())==8
-    if count==31 and not output.exists():
-        assert outer['exit_code']!=0,outer
-        return
+    # A cap refusal is not sufficient if its bounded source audit is lost.
+    # Require the source worker to return a retained, inspectable audit.
     assert outer['exit_code']==0,outer
+    assert output.is_file(),outer
     source=json.loads(output.read_bytes())
     assert source['pagination_mode']=='TAMESIDE_FIVE_COUNT_V1'
     assert source['collection_profile']['council']=='tameside'
@@ -556,3 +556,9 @@ finally:
         assert source['failure'] is None
         assert source['enumeration_evidence']=='COUNT_RECONCILED'
         assert len(source['records'])==22
+    return source
+
+
+@pytest.mark.parametrize('count',[22,31])
+def test_tameside_credential_free_finite_child_through_owned_source_supervisor(tmp_path,count):
+    synthetic_tameside_source_from_owned_child(tmp_path,count)
