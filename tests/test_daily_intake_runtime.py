@@ -420,7 +420,7 @@ def test_invalid_disposable_source_audit_never_reports_zero_requests_or_continue
     assert restricted_sessions(world['boot'])==0
 
 
-@pytest.mark.parametrize('count',[22,30])
+@pytest.mark.parametrize('count',[22,30,31])
 def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world,tmp_path,count):
     """Exercise counted navigation -> the real daily command/issuer/retention/screening.
 
@@ -467,7 +467,8 @@ def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world
     first=counted_page(1,5)
     search=first.replace(b'<option value="5" selected>5</option>',
                          b'<option value="5">5</option><option value="10" selected>10</option>')
-    bodies=[FORM,search,*[counted_page(n,min(5,count-5*(n-1))) for n in range(1,(count+4)//5+1)],echo]
+    bodies=[FORM,search,*[counted_page(n,min(5,count-5*(n-1))) for n in range(1,min((count+4)//5,6)+1)]]
+    if count<=30:bodies.append(echo)
     calls=[]
     def transport(method,url,**kwargs):
         calls.append((method,url))
@@ -477,9 +478,18 @@ def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world
     with manifest_scope(row,selected):
         source=run_counted_window(transport,config)
     source=retain_screening(bind_audit(selected,source))
-    assert source['failure'] is None and source['enumeration_evidence']=='COUNT_RECONCILED'
-    assert len(calls)==3+(count+4)//5
-    assert len(source['records'])==count and source['pagination_mode']==COUNTED_MODE
+    assert source['pagination_mode']==COUNTED_MODE
+    if count>30:
+        # Six pages are retained, but a seventh page and criteria refinement are refused.
+        # This is evidence of an incomplete source, never permission to infer coverage.
+        assert source['failure']=='CALIBRATION_PAGE_CAP'
+        assert source['completeness']=='FAILED' and source['capped'] is True
+        assert source['enumeration_evidence']!='COUNT_RECONCILED'
+        assert len(calls)==8 and len(source['records'])==30
+    else:
+        assert source['failure'] is None and source['enumeration_evidence']=='COUNT_RECONCILED'
+        assert len(calls)==3+(count+4)//5
+        assert len(source['records'])==count
 
     # The disposable issuer accepts a test-only binding, independently of
     # whether any corresponding installed production policy is authorised.
@@ -497,6 +507,19 @@ def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world
              '--disposable-archive',str(tmp_path/'archive')]
     run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=75)
     result=json.loads((output/'final-result.json').read_bytes()) if (output/'final-result.json').exists() else {}
+    if count>30:
+        # The real disposable issuer/worker must not turn 30 retained partial
+        # observations into a successful 31-record complete source capture.
+        assert run.returncode!=0,(run.stderr,result)
+        assert result['status'] in {'INCOMPLETE','STOP_RECONCILE_NO_RETRY'},result
+        assert result['coverage_advance'] is False and result['admission_connected'] is False
+        assert result['cleanup']=='CLOSED'
+        assert not any(r.get('council')=='tameside' for r in result.get('backlog',{}).get('records',[]))
+        assert world['boot'].execute(
+            "SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
+        ).fetchone()[0]==0
+        assert restricted_sessions(world['boot'])==0
+        return
     assert run.returncode==0,(run.stderr,result)
     assert result['status']=='RETAINED_AND_SCREENED',result
     assert result['coverage_advance'] is False and result['admission_connected'] is False
