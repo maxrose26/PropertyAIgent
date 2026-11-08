@@ -532,3 +532,64 @@ def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world
     assert checkpoint['pagination_mode']==COUNTED_MODE
     assert len(checkpoint['records'])==count
     assert restricted_sessions(world['boot'])==0
+
+@pytest.mark.parametrize('count',[22,31])
+def test_owned_tameside_child_audit_reaches_disposable_pg_intake_without_false_coverage(world,tmp_path,count):
+    """Actual owned source worker/finite child audit -> existing disposable intake.
+
+    A socket-denied synthetic HTTP shim runs inside the genuine finite child;
+    the produced source-worker output (not a separately constructed audit) is
+    handed to the unmodified disposable source fixture and then the real
+    restricted SQL issuer/worker, archive and PostgreSQL path. This is an
+    offline test-level handoff, NOT an unmodified production child-to-PG run
+    or live source qualification.
+    """
+    from tests.test_source_profiles import synthetic_tameside_source_from_owned_child
+
+    row=current_windows(datetime.now(timezone.utc),['tameside'])[0]
+    source=synthetic_tameside_source_from_owned_child(tmp_path,count,row=row)
+    assert source['requested_interval']==[row['start'],row['end']]
+    assert source['pagination_mode']=='TAMESIDE_FIVE_COUNT_V1'
+    assert len(source['records'])==(30 if count==31 else count)
+
+    reset(world)
+    period=f'owned-child-to-disposable-pg-{count}'
+    permitted=policy(world)
+    permitted['councils']['tameside']['contract']='tameside-screening-metadata-five-v1'
+    authorise(world,period,permitted)
+    env,sources=env_and_sources(world,tmp_path)
+    (sources/'tameside.json').write_text(json.dumps(source))
+    output=tmp_path/'result'
+    command=[sys.executable,'-m','scripts.run_daily_councils',
+             '--period',period,'--output',str(output),
+             '--disposable-sources',str(sources),
+             '--disposable-archive',str(tmp_path/'archive')]
+    run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=75)
+    final=output/'final-result.json'
+    assert final.is_file(),(run.returncode,run.stderr)
+    result=json.loads(final.read_bytes())
+    assert result['cleanup']=='CLOSED' and result['coverage_advance'] is False
+    assert result['admission_connected'] is False
+    assert restricted_sessions(world['boot'])==0
+
+    if count==31:
+        assert source['failure']=='CALIBRATION_PAGE_CAP'
+        assert source['completeness']=='FAILED'
+        assert run.returncode!=0,(run.stderr,result)
+        assert result['status'] in {'INCOMPLETE','STOP_RECONCILE_NO_RETRY'},result
+        assert not any(r.get('council')=='tameside' for r in result.get('backlog',{}).get('records',[]))
+        assert world['boot'].execute(
+            "SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
+        ).fetchone()[0]==0
+    else:
+        assert source['failure'] is None and source['enumeration_evidence']=='COUNT_RECONCILED'
+        assert run.returncode==0,(run.stderr,result)
+        assert result['status']=='RETAINED_AND_SCREENED',result
+        assert result['authority_closure']=='INVALIDATED'
+        assert result['publication']=='TEST_LOCAL_ARCHIVE'
+        assert len(result['backlog']['records'])==count+1
+        checkpoint=world['boot'].execute(
+            "SELECT checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
+        ).fetchone()[0]
+        assert checkpoint['pagination_mode']=='TAMESIDE_FIVE_COUNT_V1'
+        assert len(checkpoint['records'])==count
