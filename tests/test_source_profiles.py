@@ -437,3 +437,122 @@ def test_tameside_counted_finite_engine_is_bounded_and_adapter_fails_closed(rows
         receipt = contract.project(source,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=512*1024)
         assert len(receipt["records"])==rows
         assert receipt["pagination_mode"]==COUNTED_MODE
+
+
+@pytest.mark.parametrize('count',[22,31])
+def test_tameside_credential_free_finite_child_through_owned_source_supervisor(tmp_path,count):
+    """Source worker -> finite Idox child -> counted HTML, with absolutely no network.
+
+    The two OS subprocesses and existing supervisors genuinely execute. A
+    test-only command shim substitutes in-memory HTTP responses in the *inner*
+    subprocess, not a source audit supplied to the daily intake fixture.
+    Disposable PostgreSQL and installed production policy are not exercised.
+    """
+    import base64
+    import sys
+    from datetime import date,timedelta
+    from verification.bolton_recon.fixtures import FORM
+    from tests.test_discovery_idox_window import page as old_page
+    from verification.ingestion_storage.operational_supervisor import supervise as owned_supervise
+
+    row=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30')
+    start,end=map(date.fromisoformat,(row['start'],row['end']))
+    literal=(start+timedelta(days=3)).strftime('%a %d %b %Y').encode()
+    begin=start.strftime('%d/%m/%Y').encode()
+    finish=end.strftime('%d/%m/%Y').encode()
+    echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',
+                      b'name="date(applicationReceivedStart)" value="'+begin+b'"').replace(
+                      b'name="date(applicationReceivedEnd)" value=""',
+                      b'name="date(applicationReceivedEnd)" value="'+finish+b'"')
+
+    def page_number(number,take):
+        refs=tuple(f'{(number-1)*5+i+1:03}/26' for i in range(take))
+        body=old_page(refs=refs,pager=False).replace(b'Mon 28 Sep 2026',literal)
+        for i in reversed(range(take)):
+            body=body.replace(f'keyVal=K{i}'.encode(),f'keyVal=P{number}K{i}'.encode())
+        body=body.replace(b'value="10" selected>10',b'value="5" selected>5')
+        body=body.replace(b'name="action" value="order"',b'name="action" value="page"')
+        body=body.replace(b'name="searchCriteria.page" value="1"',
+                          f'name="searchCriteria.page" value="{number}"'.encode())
+        first=(number-1)*5+1
+        nav=f'<div class="pagination"><span class="current">{number}</span><p class="pager">Showing {first}-{first+take-1} of {count}</p>'
+        if number*5<count:
+            nav+=f'<a rel="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={number+1}">Next</a>'
+        return body.replace(b'</html>',(nav+'</div></html>').encode())
+
+    first=page_number(1,5)
+    search=first.replace(b'<option value="5" selected>5</option>',
+                         b'<option value="5">5</option><option value="10" selected>10</option>')
+    bodies=[FORM,search,*[page_number(n,min(5,count-5*(n-1)))
+                           for n in range(1,min((count+4)//5,6)+1)]]
+    if count<=30:bodies.append(echo)
+    bodies_file=tmp_path/'synthetic-http.json'
+    bodies_file.write_text(json.dumps([base64.b64encode(x).decode() for x in bodies]))
+    observed=tmp_path/'child-call-count.txt'
+    plan=tmp_path/'source-plan.json'
+    output=tmp_path/'source-audit.json'
+    plan.write_text(json.dumps(dict(row=row,fixture=None)))
+
+    # This runs only in the inner disposable Python subprocess. Even an
+    # unexpected request is refused; socket.connect is denied as a fallback.
+    finite_child_code="""
+import base64,json,socket,sys
+from pathlib import Path
+from unittest.mock import patch
+import requests
+from tests.test_discovery_idox_window import Response
+from verification.discovery import finite_acceptance as finite
+bodies=[base64.b64decode(x) for x in json.loads(Path(sys.argv[1]).read_text())]
+marker=Path(sys.argv[2]);real_argv=sys.argv[3:];calls=[]
+def forbidden_connect(*args,**kwargs):
+    raise AssertionError('NETWORK_DISALLOWED')
+def fake_request(self,method,url,**kwargs):
+    calls.append((method,url))
+    if len(calls)>len(bodies):raise AssertionError('UNEXPECTED_SOURCE_REQUEST')
+    return Response(bodies[len(calls)-1])
+try:
+    with patch.object(requests.Session,'request',fake_request),patch.object(socket.socket,'connect',forbidden_connect):
+        sys.argv=['finite_acceptance',*real_argv]
+        finite.main()
+finally:
+    marker.write_text(str(len(calls)))
+"""
+    # The owned source process executes the genuine source_worker + finite.read.
+    # Only the nested child command is wrapped to install fake HTTP transport;
+    # the original bounded actions supervisor still owns that child.
+    source_code=(
+        "import sys\n"
+        "from argparse import Namespace\n"
+        "from verification.discovery import finite_acceptance as finite\n"
+        "from verification.stage26b_l1.actions_runner import supervise as genuine\n"
+        f"child_code={finite_child_code!r}\n"
+        f"responses={str(bodies_file)!r}\n"
+        f"marker={str(observed)!r}\n"
+        "def source_only(command,*,env,deadline):\n"
+        "    assert command[1:3]==['-m','verification.discovery.finite_acceptance']\n"
+        "    return genuine([command[0],'-c',child_code,responses,marker,*command[3:]],env=env,deadline=deadline)\n"
+        "finite.supervise=source_only\n"
+        "from verification.ingestion_storage.daily_intake_runtime import source_worker\n"
+        f"source_worker(Namespace(plan={str(plan)!r},output={str(output)!r}))\n"
+    )
+    outer=owned_supervise([sys.executable,'-c',source_code],
+                          environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},
+                          root=tmp_path/'owned',seconds=45,source=True)
+    assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
+    assert observed.exists(),outer
+    assert int(observed.read_text())==3+(count+4)//5 if count<=30 else int(observed.read_text())==8
+    if count==31 and not output.exists():
+        assert outer['exit_code']!=0,outer
+        return
+    assert outer['exit_code']==0,outer
+    source=json.loads(output.read_bytes())
+    assert source['pagination_mode']=='TAMESIDE_FIVE_COUNT_V1'
+    assert source['collection_profile']['council']=='tameside'
+    if count==31:
+        assert source['failure']=='CALIBRATION_PAGE_CAP'
+        assert source['completeness']=='FAILED' and len(source['records'])==30
+        assert source['enumeration_evidence']!='COUNT_RECONCILED'
+    else:
+        assert source['failure'] is None
+        assert source['enumeration_evidence']=='COUNT_RECONCILED'
+        assert len(source['records'])==22
