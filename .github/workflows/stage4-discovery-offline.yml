@@ -41,6 +41,7 @@ on:
       - 'app/scrapers/discovery_idox.py'
       - 'app/scrapers/arcus_portal.py'
       - 'tests/test_discovery_*.py'
+      - 'tests/test_period07_navigation.py'
       - 'tests/storage_gh_fixture.py'
       - 'tests/four_council_release_fixture_cli.py'
       - 'docs/design/four-council-release-20261022/**'
