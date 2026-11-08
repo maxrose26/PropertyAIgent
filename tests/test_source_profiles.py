@@ -352,3 +352,20 @@ def test_tameside_five_row_sort_requires_boolean_opt_in():
     assert sort_payload(body,base,calibration_five=True)[1]['searchCriteria.resultsPerPage']=='5'
     with pytest.raises(ListingError,match='calibration selection'):
         sort_payload(body,base,calibration_five='true')
+
+
+def test_reviewed_counted_receipt_requires_source_mode():
+    """A five-row contract must reject an uncounted or claimed-only source audit."""
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from verification.discovery.idox_window import WindowConfig
+    row=next(x for x in ROWS if x['council']=='tameside')
+    start,end=map(date.fromisoformat,(row['start'],row['end']))
+    counted=IdoxListingContract('tameside-screening-metadata-five-v1',
+        WindowConfig('tameside','RECEIVED',start,end,max_transport_retries=0,max_rows=60),
+        'a'*64)
+    source=audit(row,'SCREENING_METADATA')
+    for mode in (None,'TAMESIDE_FIVE_COUNT_V1'):
+        candidate=deepcopy(source)
+        if mode is not None:candidate['pagination_mode']=mode
+        with pytest.raises(Denied,match='IDOX_PAGINATION_PROFILE_BINDING'):
+            counted.project(candidate,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=524288)
