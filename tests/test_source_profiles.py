@@ -369,3 +369,71 @@ def test_reviewed_counted_receipt_requires_source_mode():
         if mode is not None:candidate['pagination_mode']=mode
         with pytest.raises(Denied,match='IDOX_PAGINATION_PROFILE_BINDING'):
             counted.project(candidate,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=524288)
+
+# Synthetic transport only: this test must never perform source/network or DB calls.
+@pytest.mark.parametrize("rows", [22, 30, 31])
+def test_tameside_counted_finite_engine_is_bounded_and_adapter_fails_closed(rows, monkeypatch):
+    import os, socket, requests, hashlib
+    from tests.test_discovery_idox_window import page as original_page, Response
+    from verification.bolton_recon.fixtures import FORM
+    from verification.discovery.pagination_calibration import run_counted_window, COUNTED_MODE
+    from verification.discovery.idox_window import WindowConfig
+    from verification.discovery.four_council_proof import manifest_scope
+    from verification.discovery.source_profiles import profile, bind_audit
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from tests.e2e_connection_support import outer
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from datetime import date
+
+    def forbidden(*a, **kw): raise AssertionError("NETWORK_FORBIDDEN")
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setattr(requests.sessions.Session, "request", forbidden)
+    row = dict(council="tameside", semantics="RECEIVED", start="2026-10-24", end="2026-10-30")
+    c = WindowConfig("tameside", "RECEIVED", date(2026, 10, 24), date(2026, 10, 30), 0, 60)
+    p = profile(row, "SCREENING_METADATA", idox_pagination=COUNTED_MODE)
+    echo = FORM.replace(b'name="date(applicationReceivedStart)" value=""', b'name="date(applicationReceivedStart)" value="24/10/2026"').replace(b'name="date(applicationReceivedEnd)" value=""', b'name="date(applicationReceivedEnd)" value="30/10/2026"')
+    def page(n, count, total):
+        refs = tuple(f"{(n-1)*5+i+1:03}/26" for i in range(count))
+        b = original_page(refs=refs, pager=False).replace(b"Mon 28 Sep 2026", b"Tue 27 Oct 2026")
+        for i in reversed(range(count)):
+            b = b.replace(f"keyVal=K{i}".encode(), f"keyVal=P{n}K{i}".encode())
+        b = b.replace(b'value="10" selected>10', b'value="5" selected>5')
+        b = b.replace(b'name="action" value="order"', b'name="action" value="page"')
+        b = b.replace(b'name="searchCriteria.page" value="1"', f'name="searchCriteria.page" value="{n}"'.encode())
+        nav = f'<div class="pagination"><span class="current">{n}</span><p class="pager">Showing {(n-1)*5+1}-{(n-1)*5+count} of {total}</p>'
+        if n * 5 < total:
+            nav += f'<a rel="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={n+1}">Next</a>'
+        return b.replace(b"</html>", (nav+"</div></html>").encode())
+    first = page(1, 5, rows)
+    search = first.replace(b'<option value="5" selected>5</option>', b'<option value="5">5</option><option value="10" selected>10</option>')
+    bodies = [FORM, search]
+    for n in range(1, min((rows+4)//5, 6)+1):
+        bodies.append(page(n, min(5, max(0, rows-5*(n-1))), rows))
+    if rows<=30: bodies.append(echo)
+    calls = []
+    def dispatch(method, url, **kwargs):
+        calls.append((method,url,kwargs))
+        assert len(calls)<=len(bodies), "NO_EXTRA_REQUEST"
+        return Response(bodies[len(calls)-1])
+    with manifest_scope(row, p):
+        source = run_counted_window(dispatch, c)
+    source = bind_audit(p, source)
+    assert source["cleanup"]=="BOUNDARY_CLOSED"
+    assert source["resource"]["requests_attempted"]==len(calls)
+    assert source["pagination_mode"]==COUNTED_MODE
+    assert len(source["records"])==min(rows,30)
+    contract = IdoxListingContract("tameside-screening-metadata-five-v1",c,"a"*64)
+    if rows>30:
+        assert source["failure"]=="CALIBRATION_PAGE_CAP"
+        assert source["enumeration_evidence"]!="COUNT_RECONCILED"
+        assert len(calls)==8  # no seventh page or criteria-refine
+        with pytest.raises(Denied):
+            contract.project(source,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=512*1024)
+    else:
+        assert source["failure"] is None
+        assert source["enumeration_evidence"]=="COUNT_RECONCILED"
+        assert len(calls)==3+(rows+4)//5
+        receipt = contract.project(source,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=512*1024)
+        assert len(receipt["records"])==rows
+        assert receipt["pagination_mode"]==COUNTED_MODE
