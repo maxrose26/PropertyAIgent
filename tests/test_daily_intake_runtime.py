@@ -418,3 +418,94 @@ def test_invalid_disposable_source_audit_never_reports_zero_requests_or_continue
     assert not (output/'manchester-source.json').exists()
     assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchone()[0]==0
     assert restricted_sessions(world['boot'])==0
+
+
+@pytest.mark.parametrize('count',[22,30])
+def test_counted_tameside_synthetic_audit_through_disposable_issuer_and_pg(world,tmp_path,count):
+    """Exercise counted navigation -> the real daily command/issuer/retention/screening.
+
+    Synthetic dispatch generates the source audit outside the credential-free
+    source subprocess, which then reads it as a disposable fixture. This does
+    NOT prove source-worker live transport or production Tameside authority.
+    """
+    from datetime import timedelta
+    from tests.test_discovery_idox_window import page as old_page, Response
+    from verification.bolton_recon.fixtures import FORM
+    from verification.discovery.pagination_calibration import run_counted_window, COUNTED_MODE
+    from verification.discovery.idox_window import WindowConfig
+    from verification.discovery.source_profiles import profile,bind_audit
+    from verification.discovery.four_council_proof import manifest_scope
+    from app.pipeline.discovery_screening import retain_screening
+
+    row=current_windows(datetime.now(timezone.utc),['tameside'])[0]
+    start,end=map(date.fromisoformat,(row['start'],row['end']))
+    config=WindowConfig('tameside','RECEIVED',start,end,0,60)
+    selected=profile(row,'SCREENING_METADATA',idox_pagination=COUNTED_MODE)
+    literal=(start+timedelta(days=3)).strftime('%a %d %b %Y').encode()
+    begin=start.strftime('%d/%m/%Y').encode()
+    finish=end.strftime('%d/%m/%Y').encode()
+    echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',
+                      b'name="date(applicationReceivedStart)" value="'+begin+b'"').replace(
+                      b'name="date(applicationReceivedEnd)" value=""',
+                      b'name="date(applicationReceivedEnd)" value="'+finish+b'"')
+
+    def counted_page(number,take):
+        refs=tuple(f'{(number-1)*5+i+1:03}/26' for i in range(take))
+        body=old_page(refs=refs,pager=False).replace(b'Mon 28 Sep 2026',literal)
+        for i in reversed(range(take)):
+            body=body.replace(f'keyVal=K{i}'.encode(),f'keyVal=P{number}K{i}'.encode())
+        body=body.replace(b'value="10" selected>10',b'value="5" selected>5')
+        body=body.replace(b'name="action" value="order"',b'name="action" value="page"')
+        body=body.replace(b'name="searchCriteria.page" value="1"',
+                          f'name="searchCriteria.page" value="{number}"'.encode())
+        first=(number-1)*5+1
+        nav=f'<div class="pagination"><span class="current">{number}</span><p class="pager">Showing {first}-{first+take-1} of {count}</p>'
+        if number*5<count:
+            nav+=f'<a rel="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={number+1}">Next</a>'
+        return body.replace(b'</html>',(nav+'</div></html>').encode())
+
+    first=counted_page(1,5)
+    search=first.replace(b'<option value="5" selected>5</option>',
+                         b'<option value="5">5</option><option value="10" selected>10</option>')
+    bodies=[FORM,search,*[counted_page(n,min(5,count-5*(n-1))) for n in range(1,(count+4)//5+1)],echo]
+    calls=[]
+    def transport(method,url,**kwargs):
+        calls.append((method,url))
+        assert len(calls)<=len(bodies),'UNEXPECTED_SOURCE_REQUEST'
+        return Response(bodies[len(calls)-1])
+
+    with manifest_scope(row,selected):
+        source=run_counted_window(transport,config)
+    source=retain_screening(bind_audit(selected,source))
+    assert source['failure'] is None and source['enumeration_evidence']=='COUNT_RECONCILED'
+    assert len(calls)==3+(count+4)//5
+    assert len(source['records'])==count and source['pagination_mode']==COUNTED_MODE
+
+    # The disposable issuer accepts a test-only binding, independently of
+    # whether any corresponding installed production policy is authorised.
+    reset(world)
+    period=f'counted-disposable-{count}'
+    permitted=policy(world)
+    permitted['councils']['tameside']['contract']='tameside-screening-metadata-five-v1'
+    authorise(world,period,permitted)
+    env,sources=env_and_sources(world,tmp_path)
+    (sources/'tameside.json').write_text(json.dumps(source))
+    output=tmp_path/'result'
+    command=[sys.executable,'-m','scripts.run_daily_councils',
+             '--period',period,'--output',str(output),
+             '--disposable-sources',str(sources),
+             '--disposable-archive',str(tmp_path/'archive')]
+    run=subprocess.run(command,env=env,capture_output=True,text=True,timeout=75)
+    result=json.loads((output/'final-result.json').read_bytes()) if (output/'final-result.json').exists() else {}
+    assert run.returncode==0,(run.stderr,result)
+    assert result['status']=='RETAINED_AND_SCREENED',result
+    assert result['coverage_advance'] is False and result['admission_connected'] is False
+    assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED'
+    assert result['publication']=='TEST_LOCAL_ARCHIVE'
+    assert len(result['backlog']['records'])==count+1
+    checkpoint=world['boot'].execute(
+        "SELECT checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
+    ).fetchone()[0]
+    assert checkpoint['pagination_mode']==COUNTED_MODE
+    assert len(checkpoint['records'])==count
+    assert restricted_sessions(world['boot'])==0
