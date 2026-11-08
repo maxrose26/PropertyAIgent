@@ -313,3 +313,42 @@ def test_28_day_nine_council_partition_fits_only_separate_source_only_packages()
               selected_ordinals=list(range(36)),collection_mode='SCREENING_METADATA')
     with pytest.raises(r.Stop,match='CAMPAIGN_MANIFEST_OR_CAPACITY'):
         registration(full)
+
+
+def test_tameside_counted_profile_is_explicit_and_hash_bound():
+    """Only the reviewed seven-day Tameside screening scope selects counted pages."""
+    row=next(x for x in ROWS if x['council']=='tameside')
+    old=p.profile(row,'SCREENING_METADATA')
+    counted=p.profile(row,'SCREENING_METADATA',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    assert old.get('idox_pagination') is None
+    assert counted['page_size']==5 and counted['idox_pagination']=='TAMESIDE_FIVE_COUNT_V1'
+    assert counted['sha256']!=old['sha256']
+    assert p.validate(counted,row)==counted
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(row,'IDENTITY_ONLY',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(ROWS[2],'SCREENING_METADATA',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(row,'SCREENING_METADATA',idox_pagination='UNREVIEWED_MODE')
+    mutated=dict(counted,idox_pagination='UNREVIEWED_MODE')
+    with pytest.raises(ValueError):
+        p.validate(mutated,row)
+
+
+def test_tameside_five_row_sort_requires_boolean_opt_in():
+    """The existing ten-row form stays the default; no source route is enabled."""
+    from verification.discovery.idox_sort import sort_payload
+    from app.scrapers.discovery_idox import ListingError
+    base='https://publicaccess.tameside.gov.uk'
+    body=b'''<html><form action="pagedSearchResults.do" method="POST">
+    <input type="hidden" name="_csrf" value="TEST_ONLY"/>
+    <input type="hidden" name="searchCriteria.page" value="1"/>
+    <input type="hidden" name="action" value="page"/>
+    <select name="orderBy"><option value="Reference">Reference</option></select>
+    <select name="orderByDirection"><option value="Descending">Descending</option></select>
+    <select name="searchCriteria.resultsPerPage"><option value="5">5</option>
+    <option value="10">10</option></select></form></html>'''
+    assert sort_payload(body,base)[1]['searchCriteria.resultsPerPage']=='10'
+    assert sort_payload(body,base,calibration_five=True)[1]['searchCriteria.resultsPerPage']=='5'
+    with pytest.raises(ListingError,match='calibration selection'):
+        sort_payload(body,base,calibration_five='true')
