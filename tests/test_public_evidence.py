@@ -48,6 +48,7 @@ def test_blocked_or_incomplete_never_promotes_coverage(status):
     lambda p: {**p, 'coverage_advance': 0},
     lambda p: {**p, 'authority_closure': SECRET},
     lambda p: {**p, 'scopes': [{'council': SECRET, 'status': 'INCOMPLETE', 'records': 5}]},
+    lambda p: {**p, 'scopes': [{'council': 'unknowncity', 'status': 'INCOMPLETE', 'records': 5}]},
     lambda p: {**p, 'scopes': [{'council': 'tameside', 'status': SECRET, 'records': 5}]},
     lambda p: {**p, 'scopes': [{'council': 'tameside', 'status': 'INCOMPLETE', 'records': True}]},
     lambda p: {**p, 'scopes': [{'council': 'tameside', 'status': 'INCOMPLETE', 'records': 61}]},
