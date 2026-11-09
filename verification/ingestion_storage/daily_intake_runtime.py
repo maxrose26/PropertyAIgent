@@ -440,6 +440,12 @@ class Runtime:
                     caller.retain_unqualified_source=self.retain_unqualified_source
                 def before_archive(ledger):
                     with ledger.worker_engine.begin() as connection:self.policy_read(connection)
+                    if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
+                        # The installed restricted worker login has CONNECTION LIMIT 1.
+                        # The caller's idle pooled session must be released before
+                        # the distinct committed private write/readback transactions.
+                        # No permission or connection-limit increase is allowed.
+                        ledger.worker_engine.dispose()
                 caller.before_archive=before_archive
                 def prepare(receipt):
                     root=caller.read_intake_items([reg.root_key])[0]
