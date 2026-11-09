@@ -399,7 +399,8 @@ class Runtime:
             try:
                 p=self.policy_read(c,read_only=True)
                 ledger=ControllerLedger(budget.engines[0],budget=budget,owner=WORKER,authority='',bindings={})
-                page=backlog_page(ledger,sorted(p['councils']),[v['contract'] for v in p['councils'].values()],
+                councils=sorted(p['councils'])
+                page=backlog_page(ledger,councils,[p['councils'][c]['contract'] for c in councils],
                                   ScreeningRule(RULE_V3,unit_threshold=10,link_related=False),after=self.args.after,limit=self.args.page_size,connection=c)
             finally:c.execute(text('ROLLBACK'))
         page.update(unfinished_run=self.durable_run if self.durable_run and self.durable_run.get('state')!='VERIFIED' else None,status='BACKLOG_READ',usage=self.run.totals(),source_calls=0,registrations=0)
