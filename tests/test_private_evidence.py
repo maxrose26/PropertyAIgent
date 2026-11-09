@@ -328,3 +328,95 @@ def test_runtime_unqualified_retention_is_disposable_scope_bound_and_minimal():
     with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
         rt.retain_unqualified_source(source,outer,root)
     assert len(archived)==1
+
+def test_private_final_receipts_refuse_unknown_ack_and_unverified_storage():
+    from app.ingestion.private_evidence import verified_private_final
+    period='test-final';run_id='a'*32
+    for name,body in [
+        ('final/result-before-publication.json',{'raw':'PRIVATE_ADDRESS'}),
+        ('final/events-before-publication.json',[{'raw':'PRIVATE_ADDRESS'}])]:
+        raw=canonical(body);calls=[]
+        def write(data):
+            calls.append('write')
+            return dict(backend='POSTGRES_PILOT_V1',period=period,run_id=run_id,
+                name=name,path='docs/design/ingestion-operational-execution-daily-intake/'
+                +period+'/'+run_id+'/'+name,
+                sha256=hashlib.sha256(data).hexdigest(),bytes=len(data),
+                readback_verified=False)
+        def readback():
+            calls.append('read');return raw
+        receipt=verified_private_final(raw,period=period,run_id=run_id,
+                                       name=name,write=write,readback=readback)
+        assert receipt['readback_verified'] is True
+        assert calls==['write','read']
+        with pytest.raises(Denied,match='PRIVATE_FINAL_WRITE_ACK_UNVERIFIED'):
+            verified_private_final(raw,period=period,run_id=run_id,name=name,
+                write=lambda data:{**write(data),'path':'wrong'},readback=readback)
+        with pytest.raises(Denied,match='PRIVATE_FINAL_READBACK_MISMATCH'):
+            verified_private_final(raw,period=period,run_id=run_id,name=name,
+                write=write,readback=lambda:b'{"mutated":"value"}')
+    with pytest.raises(Denied,match='PRIVATE_FINAL_BODY_BOUND'):
+        verified_private_final(b'{"secret":"a"}',period=period,run_id=run_id,
+            name='capture-1/source.json',write=lambda _:pytest.fail('write'),
+            readback=lambda:pytest.fail('read'))
+    with pytest.raises(Denied,match='PRIVATE_FINAL_BODY_BOUND'):
+        verified_private_final(b'[]',period=period,run_id=run_id,
+            name='final/result-before-publication.json',write=lambda _:pytest.fail('write'),
+            readback=lambda:pytest.fail('read'))
+
+def test_runtime_private_final_commits_and_reads_both_objects_separately():
+    """Simulated SQL only; physical disposable PG still needs a separate test."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from app.ingestion.private_evidence import READ_FUNCTION_SHA256,WRITE_FUNCTION_SHA256
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    period='test-final';run='a'*32;saved={};calls=[]
+    inventory=[
+        ('ingestion_intake_evidence_read',READ_FUNCTION_SHA256,'ingestion_storage_owner',
+         True,['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True),
+        ('ingestion_intake_evidence_write',WRITE_FUNCTION_SHA256,'ingestion_storage_owner',
+         True,['search_path=pg_catalog'],
+         'p_period text, p_run text, p_name text, p_body bytea',True)]
+    class SQL:
+        def execute(self,statement,args=None):
+            q=str(statement)
+            if 'FROM pg_catalog.pg_proc' in q:
+                calls.append('inventory')
+                return SimpleNamespace(all=lambda:inventory)
+            assert args['period']==period and args['run_id']==run
+            if 'ingestion_intake_evidence_write(' in q:
+                calls.append('write');saved[args['name']]=args['body']
+                ack=dict(backend='POSTGRES_PILOT_V1',period=period,run_id=run,
+                    name=args['name'],path='docs/design/ingestion-operational-execution-daily-intake/'
+                    +period+'/'+run+'/'+args['name'],
+                    sha256=hashlib.sha256(args['body']).hexdigest(),bytes=len(args['body']),
+                    readback_verified=False)
+                return SimpleNamespace(scalar_one=lambda:ack)
+            if 'ingestion_intake_evidence_read(' in q:
+                calls.append('read')
+                return SimpleNamespace(scalar_one=lambda:saved[args['name']])
+            raise AssertionError(q)
+    @contextmanager
+    def connection(*,seconds=90):
+        assert seconds==30
+        calls.append('new_transaction')
+        yield SQL(),None
+    runtime=Runtime.__new__(Runtime)
+    runtime.test=True;runtime.policy={'evidence_backend':'POSTGRES_PILOT_V1'}
+    runtime.args=SimpleNamespace(period=period);runtime.run_id=run
+    runtime.connection=connection
+    runtime.policy_read=lambda c,*,read_only=False:(
+        calls.append('policy_read_only') if read_only else pytest.fail('fresh source grant forbidden'))
+    result=canonical({'private':'PRIVATE_ADDRESS'})
+    events=canonical([{'private':'PRIVATE_ADDRESS'}])
+    receipts=runtime.archive_private_final(result,events)
+    assert len(receipts)==2 and all(r['readback_verified'] for r in receipts.values())
+    assert saved['final/result-before-publication.json']==result
+    assert saved['final/events-before-publication.json']==events
+    assert calls.count('new_transaction')==4
+    assert calls.count('read')==calls.count('write')==2
+    assert calls.count('policy_read_only')==2
+    runtime.test=False
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
+        runtime.archive_private_final(result,events)
+    assert calls.count('write')==2

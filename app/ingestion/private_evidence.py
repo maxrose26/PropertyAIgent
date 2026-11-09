@@ -18,6 +18,7 @@ SQL_BACKEND = 'POSTGRES_PILOT_V1'
 WRITE_FUNCTION_SHA256 = '8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
 READ_FUNCTION_SHA256 = '8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a'
 CAPTURE_NAMES = frozenset(('capture-1/source.json', 'capture-2/source.json'))
+FINAL_NAMES = frozenset(('final/result-before-publication.json', 'final/events-before-publication.json'))
 SOURCE_BYTES_LIMIT = 524288
 RECEIPT_FIELDS = frozenset(
     ('backend', 'period', 'run_id', 'name', 'sha256', 'bytes', 'readback_verified')
@@ -82,3 +83,39 @@ def require_private_receipt(receipt, raw):
             or type(receipt.get('name')) is not str or receipt['name'] not in CAPTURE_NAMES):
         raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
     return receipt
+
+def verified_private_final(raw, *, period, run_id, name, write, readback):
+    """Offline final-only SQL receipt; never retry an uncertain write."""
+    import json
+    if (type(raw) is not bytes or not 1 <= len(raw) <= 2097152
+            or type(name) is not str or name not in FINAL_NAMES
+            or (name.endswith('events-before-publication.json') and len(raw)>128*1024)
+            or not callable(write) or not callable(readback)):
+        raise Denied('PRIVATE_FINAL_BODY_BOUND')
+    try:
+        parsed=json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        raise Denied('PRIVATE_FINAL_BODY_BOUND')
+    expected=list if name.endswith('events-before-publication.json') else dict
+    if type(parsed) is not expected:
+        raise Denied('PRIVATE_FINAL_BODY_BOUND')
+    if (type(period) is not str or re.fullmatch(r'[A-Za-z0-9_-]{1,60}',period) is None
+            or type(run_id) is not str or re.fullmatch(r'[a-f0-9]{32}',run_id) is None):
+        raise Denied('PRIVATE_FINAL_SCOPE_BOUND')
+    sha=hashlib.sha256(raw).hexdigest()
+    ack=write(raw)
+    path='docs/design/ingestion-operational-execution-daily-intake/'+period+'/'+run_id+'/'+name
+    if (type(ack) is not dict or set(ack)!={
+            'backend','period','run_id','name','path','sha256','bytes','readback_verified'}
+            or ack.get('backend')!=SQL_BACKEND or ack.get('period')!=period
+            or ack.get('run_id')!=run_id or ack.get('name')!=name
+            or ack.get('path')!=path or ack.get('sha256')!=sha
+            or type(ack.get('bytes')) is not int or ack['bytes']!=len(raw)
+            or ack.get('readback_verified') is not False):
+        raise Denied('PRIVATE_FINAL_WRITE_ACK_UNVERIFIED')
+    persisted=readback()
+    if (type(persisted) is not bytes or len(persisted)!=len(raw)
+            or not hmac.compare_digest(persisted,raw)):
+        raise Denied('PRIVATE_FINAL_READBACK_MISMATCH')
+    return dict(backend=BACKEND,period=period,run_id=run_id,name=name,
+                sha256=sha,bytes=len(raw),readback_verified=True)

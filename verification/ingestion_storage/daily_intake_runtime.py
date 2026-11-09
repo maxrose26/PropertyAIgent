@@ -213,6 +213,44 @@ class Runtime:
         return verified_private_capture(raw,period=period,run_id=run_id,
             name=name,write=write,readback=readback)
 
+    def archive_private_final(self, raw, events):
+        """Preserve detailed finals privately after grant closure (offline only).
+
+        Each installed restricted SQL write is followed by a separate committed
+        reader transaction. Uncertain effects remain STOP/RECONCILE, no replay.
+        """
+        from app.ingestion.private_evidence import verified_private_final,SQL_BACKEND
+        if (not self.test or self.policy is None
+                or self.policy.get('evidence_backend')!=SQL_BACKEND):
+            raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
+        receipts={}
+        for name,body in (
+            ('final/result-before-publication.json',raw),
+            ('final/events-before-publication.json',events)):
+            def write(data):
+                with self.connection(seconds=30) as (c,_):
+                    # A stopped run may preserve existing evidence, not open
+                    # a new source permission or clear the original stop.
+                    self.policy_read(c,read_only=True)
+                    self.private_evidence_inventory(c)
+                    return c.execute(text(
+                        'SELECT public.ingestion_intake_evidence_write('
+                        ':period,:run_id,:name,:body)'),
+                        dict(period=self.args.period,run_id=self.run_id,
+                             name=name,body=data)).scalar_one()
+            def readback():
+                with self.connection(seconds=30) as (c,_):
+                    self.private_evidence_inventory(c)
+                    return c.execute(text(
+                        'SELECT public.ingestion_intake_evidence_read('
+                        ':period,:run_id,:name)'),
+                        dict(period=self.args.period,run_id=self.run_id,
+                             name=name)).scalar_one()
+            receipts[name]=verified_private_final(
+                body,period=self.args.period,run_id=self.run_id,
+                name=name,write=write,readback=readback)
+        return receipts
+
     def retain_unqualified_source(self,source,outer,root):
         """Retain incomplete source privately without claiming any capture.
 
@@ -452,22 +490,31 @@ class Runtime:
             if self.memory:
                 result['memory']=self.memory.evidence();result['render_profile']=self.policy['render_profile']
             raw=canonical(result);events=canonical(self.events)
+            private_backend=(self.policy or {}).get('evidence_backend')=='POSTGRES_PILOT_V1'
+            publication_raw=raw
             try:
                 if self.authorities:self.run.publication(len(raw)+len(events),10)
+                if self.authorities and private_backend:
+                    self.archive_private_final(raw,events)
+                    from app.ingestion.public_evidence import project_public_summary
+                    publication_raw=canonical(project_public_summary(
+                        result,original_raw=raw,original_events=events))
                 if self.authorities and not self.test:
                     if self.github is None:
                         self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
-                    self.head=self.github.publish({'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final',expected_head=self.head)
-                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                    self.head=self.github.publish(
+                        {'result-before-publication.json':publication_raw} if private_backend
+                        else {'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final',expected_head=self.head)
+                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_PRIVATE_SUMMARY' if self.test and private_backend else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
                 if self.authorities and result['status'] in ('RETAINED_AND_SCREENED','INCOMPLETE'):
                     path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
                     if self.test:
                         dest=Path(self.args.disposable_archive)/(self.run_id+'-final.json')
-                        dest.write_bytes(raw)
-                        if dest.read_bytes()!=raw:raise Denied('FINAL_ARCHIVE_READBACK')
-                    publication=dict(path=path,sha256=hashlib.sha256(raw).hexdigest(),
-                        commit=hashlib.sha1(b'TEST_FINAL'+raw).hexdigest() if self.test else self.head,readback_verified=True)
+                        dest.write_bytes(publication_raw)
+                        if dest.read_bytes()!=publication_raw:raise Denied('FINAL_ARCHIVE_READBACK')
+                    publication=dict(path=path,sha256=hashlib.sha256(publication_raw).hexdigest(),
+                        commit=hashlib.sha1(b'TEST_FINAL'+publication_raw).hexdigest() if self.test else self.head,readback_verified=True)
                     payload=dict(operation='intake_finish',period=self.args.period,run_id=self.run_id,
                                  execution_binding=self.binding,status=result['status'],publication=publication)
                     with self.connection() as (c,_):
