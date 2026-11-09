@@ -108,6 +108,42 @@ def test_actual_restricted_sql_source_and_final_readback():
                 worker.execute(
                     'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
                     (PERIOD, RUN, 'capture-3/source.json', data))
+        # Source transactions are not durable until COMMIT. In this fixture
+        # restricted sessions are autocommit by default, so BEGIN/ROLLBACK
+        # must be explicit (an exception in a context manager is insufficient).
+        with world['connect']('ingestion_worker_login') as worker:
+            worker.execute('BEGIN')
+            try:
+                pending = worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-2/source.json', data)).fetchone()[0]
+                assert pending['readback_verified'] is False
+            finally:
+                worker.execute('ROLLBACK')
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
+        # A final report cannot be inserted while an active source grant
+        # remains open; a refusal must leave the retained source untouched.
+        with pytest.raises(Exception, match='EVIDENCE_FINITE_AUTHORITIES_NOT_CLOSED'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'final/result-before-publication.json', b'{}'))
+        # Expired period cannot gain a fresh source even if its SOURCE_INTENT
+        # work item and finite grant still appear open.
+        original_expiry = ctl['intake_periods'][PERIOD]['expires_at']
+        ctl['intake_periods'][PERIOD]['expires_at'] = now-1
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
+        with pytest.raises(Exception, match='EVIDENCE_SOURCE_AUTHORITY'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-2/source.json', data))
+        ctl['intake_periods'][PERIOD]['expires_at'] = original_expiry
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
         assert boot.execute(
             'SELECT count(*) FROM public.ingestion_run_evidence '
             'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
@@ -142,6 +178,21 @@ def test_actual_restricted_sql_source_and_final_readback():
                     'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
                     (PERIOD, RUN, 'final/result-before-publication.json',
                      over_total))
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
+        # A previously verified run cannot append fresh final evidence.
+        ctl['intake_run']['state'] = 'VERIFIED'
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
+        with pytest.raises(Exception, match='EVIDENCE_RUN_CLOSED'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'final/result-before-publication.json', b'{}'))
+        ctl['intake_run']['state'] = 'OPEN'
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
         assert boot.execute(
             'SELECT count(*) FROM public.ingestion_run_evidence '
             'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
