@@ -9,6 +9,7 @@ import hashlib
 import re
 
 from .ledger import Denied
+from app.pipeline.discovery_contract import COUNCILS
 
 PUBLIC_STATUSES = frozenset(('RETAINED_AND_SCREENED', 'INCOMPLETE', 'STOP_RECONCILE_NO_RETRY'))
 SCOPE_STATUSES = frozenset(('RETAINED_AND_SCREENED', 'INCOMPLETE', 'ALREADY_RETAINED'))
@@ -31,7 +32,7 @@ def project_public_summary(result, *, original_raw, original_events):
     scopes = []
     for scope in result['scopes']:
         if (type(scope) is not dict or type(scope.get('council')) is not str
-                or re.fullmatch(r'[a-z_]{1,32}', scope['council']) is None
+                or scope['council'] not in COUNCILS
                 or type(scope.get('status')) is not str or scope['status'] not in SCOPE_STATUSES
                 or type(scope.get('records')) is not int
                 or not 0 <= scope['records'] <= 60):
