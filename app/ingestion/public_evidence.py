@@ -32,7 +32,7 @@ def project_public_summary(result, *, original_raw, original_events):
     for scope in result['scopes']:
         if (type(scope) is not dict or type(scope.get('council')) is not str
                 or re.fullmatch(r'[a-z_]{1,32}', scope['council']) is None
-                or scope.get('status') not in SCOPE_STATUSES
+                or type(scope.get('status')) is not str or scope['status'] not in SCOPE_STATUSES
                 or type(scope.get('records')) is not int
                 or not 0 <= scope['records'] <= 60):
             raise Denied('PUBLIC_SUMMARY_SCOPE_BOUND')
