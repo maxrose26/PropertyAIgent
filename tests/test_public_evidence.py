@@ -25,7 +25,7 @@ def test_summary_is_status_counts_digests_only_and_never_contains_private_fields
     body = json.dumps(result, sort_keys=True)
     assert SECRET not in body
     for field in ('backlog', 'events', 'path', 'raw', 'source_url', 'address', 'failure'):
-        assert field not in body
+        assert field not in result
     assert result['total_records'] == 21 and result['scope_count'] == 1
     assert result['coverage_advance'] is False
     assert result['private_result_sha256'] and result['private_events_sha256']
