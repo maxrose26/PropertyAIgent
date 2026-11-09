@@ -122,3 +122,62 @@ def test_actual_restricted_sql_source_and_final_readback():
         rt.test=False
         with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
             rt.archive_private_final(result,events)
+
+
+def test_actual_daily_entrypoint_private_source_and_public_summary(tmp_path):
+    """CLI -> supported issuer -> PG private sources/finals -> local safe summary.
+
+    Entirely synthetic Idox/Arcus fixtures. Real fixed disposable SQL and
+    owner/worker function boundaries. No source, live Git, or production call.
+    """
+    from tests.test_daily_intake_runtime import reset, policy, authorise, invoke
+    from verification.ingestion_storage import intake_policy
+
+    for world in disposable_world():
+        with world['connect']('provisioning_migrator') as migrator:
+            migrator.execute(intake_policy.installation_script())
+        world['boot'].execute(
+            Path('tests/fixtures/pa_d002_private_postgres.sql').read_text())
+        reset(world)
+        p = policy(world)
+        p['max_runs'] = 1  # Existing private SQL write function's exact bound.
+        p['evidence_backend'] = 'POSTGRES_PILOT_V1'
+        name = 'test-pa-d002-cli'
+        authorise(world, name, p)  # Actual owner issuer in disposable PG.
+        run, result, command = invoke(world, tmp_path, name, count=1)
+        assert run.returncode == 0, dict(stderr=run.stderr[-1000:],
+                                           result=result)
+        assert result['status'] == 'RETAINED_AND_SCREENED', result
+        assert result['publication'] == 'TEST_PRIVATE_SUMMARY'
+        assert result['authority_closure'] == 'INVALIDATED'
+        assert result['cleanup'] == 'CLOSED'
+        assert result['coverage_advance'] is False
+        assert result['durable_finalisation']['state'] == 'VERIFIED'
+        persisted = world['boot'].execute(
+            'SELECT name, body, sha256 FROM public.ingestion_run_evidence '
+            'WHERE period=%s ORDER BY name', (name,)).fetchall()
+        assert len(persisted) == 4
+        assert {r[0] for r in persisted} == {
+            'capture-1/source.json', 'capture-2/source.json',
+            'final/result-before-publication.json',
+            'final/events-before-publication.json'}
+        for record_name, body, sha in persisted:
+            assert hashlib.sha256(body).hexdigest() == sha
+            assert len(body) > 0
+        public = (tmp_path / 'archive' /
+                  (result['durable_finalisation']['id'] + '-final.json')).read_bytes()
+        public_data = json.loads(public)
+        assert public_data['schema'] == 'INTAKE_PUBLIC_SUMMARY_V1'
+        assert len(public) < 8192
+        assert b'DAILY/' not in public  # Synthetic raw reference stays private.
+        assert b'listing_records' not in public
+        assert b'events-before-publication.json' not in public
+        assert b'PRIVATE-FIXTURE-ONLY' not in public
+        assert result['durable_finalisation']['publication']['sha256'] == (
+            hashlib.sha256(public).hexdigest())
+        assert result['durable_finalisation']['publication']['readback_verified'] is True
+        ctl = world['boot'].execute(
+            "SELECT outcome FROM public.ingestion_work_items "
+            "WHERE key=repeat('0',64)").fetchone()[0]
+        assert ctl['global_stop'] is None and ctl['manual_stop'] is None
+        assert all(g['expires_at'] == 0 for g in ctl['grants'].values())
