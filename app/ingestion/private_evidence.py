@@ -15,7 +15,9 @@ BACKEND = 'PRIVATE_POSTGRES_V1'
 # The installed restricted SQL writer uses POSTGRES_PILOT_V1 in its return;
 # the outward typed receipt has a distinct, explicit source archive backend.
 SQL_BACKEND = 'POSTGRES_PILOT_V1'
-WRITE_FUNCTION_SHA256 = '8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
+# Offline candidate SQL fingerprint only (fixture; never installed in production).
+# Future operational migration requires distinct owner/provider approval.
+WRITE_FUNCTION_SHA256 = '9cfe2a19871e5498bd281012488e2febb5c7b9393f4c1800fcf3212a1a8e314d'
 READ_FUNCTION_SHA256 = '8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a'
 CAPTURE_NAMES = frozenset(('capture-1/source.json', 'capture-2/source.json'))
 FINAL_NAMES = frozenset(('final/result-before-publication.json', 'final/events-before-publication.json'))

@@ -1,7 +1,8 @@
 -- PA-D002: synthetic PostgreSQL 17 fixture; DO NOT APPLY TO PRODUCTION.
 -- Existing installed function bodies independently inspected SELECT-only 2026-11-09.
 -- read SHA256(prosrc) 8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a
--- write SHA256(prosrc) 8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290
+-- installed baseline write SHA256(prosrc) 8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290
+-- OFFLINE STOP-CAS candidate write SHA256(prosrc) 9cfe2a19871e5498bd281012488e2febb5c7b9393f4c1800fcf3212a1a8e314d
 -- These operations execute ONLY in disposable_world() with fixed loopback host/DB.
 CREATE TABLE public.ingestion_run_evidence (
  period text NOT NULL, run_id text NOT NULL, name text NOT NULL,
@@ -47,6 +48,17 @@ BEGIN
  policy:=ctl->'intake_periods'->p_period;run:=ctl->'intake_run';t:=extract(epoch FROM clock_timestamp());
  IF policy->>'evidence_backend' IS DISTINCT FROM 'POSTGRES_PILOT_V1' OR policy->'max_runs' IS DISTINCT FROM '1'::jsonb
  OR run->>'period' IS DISTINCT FROM p_period OR run->>'id' IS DISTINCT FROM p_run OR run->>'state' NOT IN ('OPEN','VERIFIED') THEN RAISE EXCEPTION 'EVIDENCE_RUN_BINDING'; END IF;
+ -- PA-D002 OFFLINE candidate: controller row FOR UPDATE serialises an
+ -- owner stop and a SOURCE write. A separate policy_read is not atomic.
+ -- Final diagnostics after source close remain intentionally permitted.
+ IF p_name LIKE 'capture-%' AND (
+  ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb
+  OR ctl->'manual_stop' IS DISTINCT FROM 'null'::jsonb
+  OR policy->'expected_stop' IS DISTINCT FROM jsonb_build_object(
+   'global_stop',ctl->'global_stop','manual_stop',ctl->'manual_stop',
+   'last_hard_stop',ctl->'last_hard_stop',
+   'hard_stop_generation',coalesce(ctl->'hard_stop_generation','0'::jsonb))
+ ) THEN RAISE EXCEPTION 'EVIDENCE_STOP_CHANGED'; END IF;
  SELECT * INTO prior FROM public.ingestion_run_evidence WHERE period=p_period AND run_id=p_run AND name=p_name;
  IF FOUND THEN
   IF prior.body IS DISTINCT FROM p_body THEN RAISE EXCEPTION 'EVIDENCE_CONFLICT_NO_OVERWRITE'; END IF;

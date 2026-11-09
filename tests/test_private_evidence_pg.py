@@ -10,6 +10,8 @@ import json
 import re
 import time
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +19,7 @@ import pytest
 
 from app.ingestion.ledger import Denied
 from tests.e2e_pg_world import disposable_world
-from verification.ingestion_storage.daily_intake_runtime import Runtime
+from verification.ingestion_storage.daily_intake_runtime import Runtime, stop_snapshot
 
 PERIOD = 'test-pa-d002-physical'
 RUN = 'a' * 32
@@ -35,6 +37,7 @@ def test_actual_restricted_sql_source_and_final_readback():
         policy = dict(evidence_backend='POSTGRES_PILOT_V1', max_runs=1,
                       expires_at=now+900, execution_binding={'revision':'offline'})
         ctl = copy.deepcopy(world['control'])
+        policy['expected_stop'] = stop_snapshot(ctl)
         ctl['intake_periods'] = {PERIOD: policy}
         ctl['intake_run'] = dict(id=RUN,period=PERIOD,state='OPEN')
         ctl['grants'] = {AUTH: dict(intake_period=PERIOD,intake_run=RUN,
@@ -85,6 +88,43 @@ def test_actual_restricted_sql_source_and_final_readback():
             sha256=hashlib.sha256(data).hexdigest(),
             bytes=len(data),readback_verified=True)
         assert len(transactions)==2
+        # Physical lock-order falsification: after an owner stop-generation
+        # change commits, a waiting worker cannot persist another source.
+        stopped=copy.deepcopy(ctl)
+        stopped['hard_stop_generation']=(ctl.get('hard_stop_generation') or 0)+1
+        started=Event()
+        with world['connect']('provisioning_migrator') as owner:
+            owner.execute('BEGIN')
+            committed=False
+            try:
+                owner.execute(
+                    "UPDATE public.ingestion_work_items SET outcome=%s::json "
+                    "WHERE key=repeat('0',64)", (json.dumps(stopped),))
+                def concurrent_source():
+                    with world['connect']('ingestion_worker_login') as worker:
+                        started.set()
+                        return worker.execute(
+                            'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                            (PERIOD,RUN,'capture-2/source.json',data)).fetchone()[0]
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    attempt=pool.submit(concurrent_source)
+                    try:
+                        assert started.wait(8), 'restricted writer never started'
+                        assert not attempt.done(), 'worker bypassed controller lock'
+                    finally:
+                        owner.execute('COMMIT')
+                        committed=True
+                    with pytest.raises(Exception,match='EVIDENCE_STOP_CHANGED'):
+                        attempt.result(timeout=20)
+            finally:
+                if not committed:
+                    owner.execute('ROLLBACK')
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s',(PERIOD,RUN)).fetchone()[0]==1
+        # Restore the disposable fixture only; no live stop is ever cleared.
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
         # Genuine restricted-worker SQL refusals, not mocked callback failures.
         # An authorised Tameside capture must not accept a Bolton record,
         # an altered date window, or a capture larger than 512 KiB.
