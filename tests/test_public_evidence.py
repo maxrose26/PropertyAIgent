@@ -96,7 +96,7 @@ def _fake_publication_transport(*, corrupt_readback=False):
                 reply = {'tree': {'sha': 'b' * 40}}
             elif method == 'POST' and path.endswith('/git/blobs'):
                 raw = base64.b64decode(body['content'])
-                sha = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\\0' + raw).hexdigest()
+                sha = hashlib.sha1(b'blob ' + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
                 self.blobs[sha] = raw
                 reply = {'sha': sha}
             elif method == 'POST' and path.endswith('/git/trees'):
