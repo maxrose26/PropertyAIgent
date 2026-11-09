@@ -17,7 +17,8 @@ CLOSURE_STATUSES = frozenset(('INVALIDATED', 'NOT_ISSUED', 'UNCERTAIN'))
 
 def project_public_summary(result, *, original_raw, original_events):
     """Return strictly typed, non-personal status/count/hash-only metadata."""
-    if (type(result) is not dict or result.get('status') not in PUBLIC_STATUSES
+    if (type(result) is not dict or type(result.get('status')) is not str
+            or result['status'] not in PUBLIC_STATUSES
             or type(original_raw) is not bytes or type(original_events) is not bytes
             or len(original_raw) > 2 * 1024 * 1024 or len(original_events) > 128 * 1024
             or type(result.get('coverage_advance')) is not bool
