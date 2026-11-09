@@ -562,3 +562,45 @@ finally:
 @pytest.mark.parametrize('count',[22,31])
 def test_tameside_credential_free_finite_child_through_owned_source_supervisor(tmp_path,count):
     synthetic_tameside_source_from_owned_child(tmp_path,count)
+
+
+def test_real_historical_bury_complete_shape_is_not_a_current_screening_receipt():
+    """The source-date COMPLETE decision is not a durable, screened intake receipt.
+
+    Reuse the *actual retained 28 Sep–4 Oct Bury audit*, not a synthetic
+    Idox page. This offline check does not contact Bury or alter issuer policy.
+    """
+    from verification.discovery.idox_window import WindowConfig
+    from app.ingestion.idox_adapter import validate_listing_record
+
+    evidence = Path('docs/design/stage4-discovery/evidence/remaining-primary1-bury.json')
+    source = json.loads(evidence.read_bytes())
+    start, end = date(2026, 9, 28), date(2026, 10, 4)
+    assert source['council'] == 'bury'
+    assert source['requested_interval'] == [start.isoformat(), end.isoformat()]
+    assert source['applied_interval'] == source['requested_interval']
+    assert source['date_semantics'] == 'RECEIVED'
+    assert source['enumeration_evidence'] == 'COUNT_RECONCILED'
+    assert source['completeness'] == 'UNKNOWN'  # historical selected-window decision is separate
+    assert source['failure'] is None and source['capped'] is False
+    assert len(source['pages']) == 2 and len(source['records']) == 18
+    assert source['pages'][-1]['terminal'] == 'EXPLICIT_LAST_EQUALS_TOTAL'
+
+    config = WindowConfig('bury', 'RECEIVED', start, end, max_transport_retries=0)
+    keys, refs = set(), set()
+    for row in source['records']:
+        _, _, fields = validate_listing_record(config, row, keys, refs)
+        # The old, count-qualified audit retained identities and dates, but
+        # not proposal/address evidence needed for useful Stage 4 screening.
+        assert fields['proposal']['state'] == 'UNKNOWN'
+        assert fields['address']['state'] == 'UNKNOWN'
+    assert len(keys) == len(refs) == 18
+
+    # No response-provenance or same-session criteria-result receipt existed in
+    # that historical audit. It must not be retroactively promoted by the
+    # current intake contract without a new, separately qualified collection.
+    assert 'response_provenance' not in source
+    assert 'criteria_result_binding' not in source
+    assert 'collection_profile' not in source
+    with pytest.raises(Denied, match='IDOX_RESPONSE_ACCOUNTING'):
+        idox_contract('bury', start, end).project(source, outer(), DEFAULT_LIMITS)
