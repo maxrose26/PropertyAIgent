@@ -420,3 +420,69 @@ def test_runtime_private_final_commits_and_reads_both_objects_separately():
     with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
         runtime.archive_private_final(result,events)
     assert calls.count('write')==2
+
+def test_private_finalisation_exports_only_allowlisted_local_summary(tmp_path,monkeypatch):
+    """Execution-finalisation seam: simulated issuer, no physical PG or Git."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    import verification.ingestion_storage.daily_intake_runtime as m
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+    from app.ingestion.ledger import digest
+
+    private='PRIVATE_ADDRESS_MUST_NOT_PUBLISH'
+    policy=dict(councils={},screening_config=digest(ScreeningRule(
+        RULE_V3,unit_threshold=10,link_related=False).config()),
+        evidence_backend='POSTGRES_PILOT_V1')
+    monkeypatch.setattr(m,'current_windows',lambda *a,**kw:[])
+    monkeypatch.setattr(m,'require_source_context',lambda *a,**kw:None)
+    monkeypatch.setattr(m,'ControllerLedger',lambda *a,**kw:object())
+    monkeypatch.setattr(m,'backlog_page',lambda *a,**kw:{'records':[]})
+
+    period='test-final';run='a'*32;published={};stored={}
+    class SQL:
+        def execute(self,stmt,args=None):
+            q=str(stmt)
+            if 'ingestion_register_bolton_exception' in q:
+                request=json.loads(args['p'])
+                if request['operation']=='intake_close':
+                    return SimpleNamespace(scalar_one=lambda:{'authorities_invalidated':True})
+                assert request['operation']=='intake_finish'
+                published.update(request['publication'])
+                return SimpleNamespace(scalar_one=lambda:dict(
+                    state='VERIFIED',id=run,publication=published))
+            if "outcome::jsonb->'grants'" in q:
+                return SimpleNamespace(scalar_one=lambda:{
+                    'test-authority':{'expires_at':0}})
+            if "outcome::jsonb->'intake_run'" in q:
+                return SimpleNamespace(scalar_one=lambda:dict(
+                    state='VERIFIED',id=run,publication=published))
+            raise AssertionError(q)
+    @contextmanager
+    def connection(*args,**kwargs):
+        yield SQL(),SimpleNamespace(engines=[object()])
+    root=tmp_path/'out';root.mkdir()
+    archive=tmp_path/'private-disposable-archive';archive.mkdir()
+    rt=Runtime.__new__(Runtime)
+    rt.args=SimpleNamespace(period=period,disposable_archive=str(archive))
+    rt.root=root;rt.run_id=run;rt.binding={'test':'offline'}
+    rt.policy=policy;rt.policy_read=lambda c:policy
+    rt.durable_run=None;rt.test=True;rt.memory=None;rt.authorities=['test-authority']
+    rt.events=[{'raw':private}];rt.github=None;rt.head=None
+    rt.connection=connection
+    rt.run=SimpleNamespace(closing=False,check=lambda:None,
+        totals=lambda:{'all_connections_closed':True},
+        publication=lambda *args:None)
+    rt.stop_run=lambda reason:pytest.fail('spurious shared stop: '+reason)
+    rt.archive_private_final=lambda raw,events:stored.update(raw=raw,events=events)
+    result=rt.execute()
+    assert result['status']=='RETAINED_AND_SCREENED'
+    assert result['publication']=='TEST_PRIVATE_SUMMARY'
+    assert private in stored['events'].decode()
+    public=(archive/(run+'-final.json')).read_bytes()
+    assert private.encode() not in public
+    summary=json.loads(public)
+    assert summary['schema']=='INTAKE_PUBLIC_SUMMARY_V1'
+    assert summary['private_events_sha256']==hashlib.sha256(stored['events']).hexdigest()
+    assert published['sha256']==hashlib.sha256(public).hexdigest()
+    assert published['readback_verified'] is True
