@@ -259,6 +259,92 @@ def test_actual_restricted_sql_source_and_final_readback():
             rt.archive_private_final(result,events)
 
 
+
+def test_committed_private_source_with_lost_ack_is_readback_only():
+    """Physical lost-ACK case: persisted bytes do not authorise write replay.
+
+    The synthetic client deliberately drops its acknowledgement AFTER the
+    restricted PostgreSQL statement commits. Exact-name readback is permitted
+    after authority expiry, but no automatic receipt/retry or promotion follows.
+    """
+    from app.ingestion.private_evidence import verified_private_capture
+
+    for world in disposable_world():
+        boot = world['boot']
+        boot.execute(Path('tests/fixtures/pa_d002_private_postgres.sql').read_text())
+        now = time.time()
+        ctl = copy.deepcopy(world['control'])
+        policy = dict(evidence_backend='POSTGRES_PILOT_V1', max_runs=1,
+                      expires_at=now + 900,
+                      execution_binding={'revision': 'offline'})
+        policy['expected_stop'] = stop_snapshot(ctl)
+        ctl['intake_periods'] = {PERIOD: policy}
+        ctl['intake_run'] = dict(id=RUN, period=PERIOD, state='OPEN')
+        ctl['grants'] = {AUTH: dict(intake_period=PERIOD, intake_run=RUN,
+              capture_key=ROOT, execution_binding=policy['execution_binding'],
+              expires_at=now + 800)}
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
+        scope = dict(kind='DISCOVERY_SCOPE', council='tameside',
+                     start='2026-11-02', end='2026-11-08', semantics='RECEIVED')
+        boot.execute("""INSERT INTO public.ingestion_work_items
+            (key,subject,task,contract,revision,dependencies,priority,eligible_at,
+             state,reason,next_action,limits,authority,attempt_count,max_attempts,
+             fence,owner,lease_until,phase,checkpoint,outcome)
+            VALUES (%s,%s::json,'DISCOVERY','tameside-screening-metadata-five-v1',
+             'offline',%s::json,50,0,'CLAIMED',NULL,'RECONCILE',%s::json,
+             %s,1,1,1,'offline',%s,'SOURCE_INTENT',NULL,NULL)""",
+             (ROOT, json.dumps(scope), '[]', '{}', AUTH, now + 800))
+        raw = json.dumps(dict(council='tameside', date_semantics='RECEIVED',
+            requested_interval=['2026-11-02', '2026-11-08'],
+            listing_records=[dict(reference='SYNTHETIC-LOST-ACK')]),
+            sort_keys=True, separators=(',', ':')).encode()
+        attempts = []
+
+        def write_then_drop_ack(body):
+            attempts.append('one-physical-write')
+            with world['connect']('ingestion_worker_login') as worker:
+                ack = worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-1/source.json', body)).fetchone()[0]
+                assert ack['readback_verified'] is False
+            # The SQL connection has closed: simulate lost network response,
+            # without reporting a verified receipt or retrying the write.
+            raise ConnectionError('SYNTHETIC_ACK_LOST_AFTER_COMMIT')
+
+        with pytest.raises(ConnectionError,
+                           match='SYNTHETIC_ACK_LOST_AFTER_COMMIT'):
+            verified_private_capture(raw, period=PERIOD, run_id=RUN,
+                name='capture-1/source.json', write=write_then_drop_ack,
+                readback=lambda: pytest.fail('no trusted read on uncertain ack'))
+        assert attempts == ['one-physical-write']
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
+
+        # Expire the source permission after the missing ACK; a restricted
+        # read still permits reconciliation of the exact immutable bytes.
+        ctl['grants'][AUTH]['expires_at'] = 0
+        ctl['intake_periods'][PERIOD]['expires_at'] = now - 1
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                     "WHERE key=repeat('0',64)", (json.dumps(ctl),))
+        with world['connect']('ingestion_worker_login') as reader:
+            recovered = reader.execute(
+                'SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',
+                (PERIOD, RUN, 'capture-1/source.json')).fetchone()[0]
+        assert recovered == raw
+        assert hashlib.sha256(recovered).digest() == hashlib.sha256(raw).digest()
+        assert attempts == ['one-physical-write']
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
+        # This is evidence of persistence only, not intake finalisation.
+        assert boot.execute(
+            "SELECT outcome::jsonb->'intake_run'->>'state' "
+            "FROM public.ingestion_work_items WHERE key=repeat('0',64)"
+        ).fetchone()[0] == 'OPEN'
+
+
 def test_actual_daily_entrypoint_private_source_and_public_summary(tmp_path):
     """CLI -> supported issuer -> PG private sources/finals -> local safe summary.
 
