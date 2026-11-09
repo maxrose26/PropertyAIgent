@@ -511,6 +511,10 @@ class Runtime:
                     path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
                     if self.test:
                         dest=Path(self.args.disposable_archive)/(self.run_id+'-final.json')
+                        if private_backend:
+                            # Private sources do not create the legacy local archive directory.
+                            # This is a synthetic summary fixture ONLY; never a live fallback.
+                            dest.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
                         dest.write_bytes(publication_raw)
                         if dest.read_bytes()!=publication_raw:raise Denied('FINAL_ARCHIVE_READBACK')
                     publication=dict(path=path,sha256=hashlib.sha256(publication_raw).hexdigest(),
