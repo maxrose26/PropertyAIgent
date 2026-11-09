@@ -87,6 +87,14 @@ def intake_slot(caller, root_key, collect, archive, prepare_screening, *, check=
             caller.settle_intake_failure(claim,category,source,outer,archive)
             return dict(status='INCOMPLETE',failure=category,council=root['subject']['council'],
                         records=[],coverage_advance=False,window_claim='NONE')
+        # A non-contained, incomplete audit is not a qualified capture. Only
+        # the selected private backend can preserve the original evidence;
+        # never promote it to a checkpoint, screening, or coverage claim.
+        if isinstance(source,dict) and source.get('failure'):
+            retain=getattr(caller,'retain_unqualified_source',None)
+            if retain is not None:
+                retain(source,outer,root)
+                raise Denied('INTAKE_UNQUALIFIED_SOURCE_EVIDENCE_ONLY')
         # Timestamp supplied by the supervised collection envelope, not retention
         # time or the historical date filter. Missing timestamp is a blocker.
         stamp=outer.get('observed_at')

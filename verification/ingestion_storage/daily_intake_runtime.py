@@ -213,6 +213,36 @@ class Runtime:
         return verified_private_capture(raw,period=period,run_id=run_id,
             name=name,write=write,readback=readback)
 
+    def retain_unqualified_source(self,source,outer,root):
+        """Retain incomplete source privately without claiming any capture.
+
+        The still-open SOURCE_INTENT and existing storage limits remain binding.
+        The caller raises immediately on return; no checkpoint, screening,
+        source replay, or coverage promotion is permitted.
+        """
+        from app.ingestion.coordinator import validate_outer
+        if (not self.test or self.policy is None
+                or self.policy.get('evidence_backend')!='POSTGRES_PILOT_V1'):
+            raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
+        if (type(source) is not dict or type(source.get('failure')) is not str
+                or not source['failure'] or type(root) is not dict
+                or type(root.get('subject')) is not dict):
+            raise Denied('PRIVATE_EVIDENCE_UNQUALIFIED_SOURCE_BOUND')
+        scope=root['subject']
+        if (scope.get('kind')!='DISCOVERY_SCOPE'
+                or source.get('requested_interval')!=[scope.get('start'),scope.get('end')]
+                or source.get('council') not in (None,scope.get('council'))):
+            raise Denied('PRIVATE_EVIDENCE_UNQUALIFIED_SCOPE_BOUND')
+        validate_outer(outer,root['limits'])
+        saved=self.archive(canonical(source))
+        if saved.get('backend')!='PRIVATE_POSTGRES_V1' or saved.get('readback_verified') is not True:
+            raise Denied('PRIVATE_EVIDENCE_UNQUALIFIED_RECEIPT')
+        self.emit('unqualified_private_evidence_retained',dict(
+            council=scope['council'],source_sha256=saved['sha256'],
+            bytes=saved['bytes'],backend=saved['backend'],
+            screened=False,coverage_advance=False))
+        return saved
+
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
         backend=(self.policy or {}).get('evidence_backend')
@@ -368,6 +398,8 @@ class Runtime:
                 caller=ChainCaller(sb,contract,rule,self.urls,revision=revision,bindings=dict(reg.bindings),capture_authority=reg.authority,
                                    chain_authority=reg.authority,stop_file=self.root/'STOP',allow_test_evidence=self.test,engine_options=self.options,intake_only=True,intake_run=self.run)
                 caller.contained_failure=contained_idox_failure
+                if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1':
+                    caller.retain_unqualified_source=self.retain_unqualified_source
                 def before_archive(ledger):
                     with ledger.worker_engine.begin() as connection:self.policy_read(connection)
                 caller.before_archive=before_archive

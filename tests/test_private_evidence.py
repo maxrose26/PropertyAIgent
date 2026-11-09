@@ -259,3 +259,72 @@ def test_runtime_archive_private_refuses_inventory_drift_and_live_fallback():
     with pytest.raises(Denied,match='PRIVATE_EVIDENCE_BACKEND_UNKNOWN'):
         runtime.archive(raw)
     assert len(events)==1
+
+
+def test_private_incomplete_audit_is_evidence_only_and_still_stops_before_screening():
+    """A failed counted-window source cannot become a captured record."""
+    from app.ingestion.daily_intake import intake_slot
+    events=[];claim=object()
+    scope=dict(kind='DISCOVERY_SCOPE',council='tameside',
+               start='2026-11-02',end='2026-11-08',semantics='RECEIVED')
+    root=dict(state='QUEUED',attempt_count=0,checkpoint=None,subject=scope)
+    class Caller:
+        intake_only=True
+        def preflight(self,key):events.append('preflight')
+        def read_intake_items(self,keys):return [root]
+        def claim_intake_capture(self):events.append('claim');return claim
+        contained_failure=lambda self,*args:None
+        def retain_unqualified_source(self,source,outer,original):
+            assert source['failure']=='CALIBRATION_PAGE_CAP'
+            assert original is root
+            events.append('private_evidence_verified')
+        def capture(self,*args,**kwargs):raise AssertionError('PARTIAL_CAPTURE_FORBIDDEN')
+        def settle_intake_failure(self,*args,**kwargs):raise AssertionError('UNQUALIFIED_SETTLEMENT_FORBIDDEN')
+        def screen(self):raise AssertionError('PARTIAL_SCREEN_FORBIDDEN')
+    source=dict(council='tameside',requested_interval=[scope['start'],scope['end']],
+                failure='CALIBRATION_PAGE_CAP',completeness='FAILED',
+                listing_records=[{'reference':'SYNTHETIC/26'}])
+    with pytest.raises(Denied,match='INTAKE_UNQUALIFIED_SOURCE_EVIDENCE_ONLY'):
+        intake_slot(Caller(),'synthetic-root',lambda _: (source,{}),
+                    lambda _: (_ for _ in ()).throw(AssertionError('UNSAFE_PUBLIC_ARCHIVE')),
+                    lambda _: (_ for _ in ()).throw(AssertionError('UNSAFE_SCREENING_REGISTRATION')))
+    assert events==['preflight','claim','private_evidence_verified']
+
+
+def test_runtime_unqualified_retention_is_disposable_scope_bound_and_minimal():
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from app.ingestion.private_evidence import BACKEND
+    rt=Runtime.__new__(Runtime)
+    rt.test=True;rt.policy={'evidence_backend':'POSTGRES_PILOT_V1'}
+    archived=[];exported=[]
+    def archive(raw):
+        archived.append(raw)
+        return dict(backend=BACKEND,sha256=hashlib.sha256(raw).hexdigest(),
+                    bytes=len(raw),readback_verified=True)
+    rt.archive=archive;rt.emit=lambda kind,data:exported.append((kind,data))
+    scope=dict(kind='DISCOVERY_SCOPE',council='tameside',
+               start='2026-11-02',end='2026-11-08')
+    root=dict(subject=scope,limits=dict(aggregate_rss=1024,outer_seconds=30))
+    source=dict(council='tameside',requested_interval=[scope['start'],scope['end']],
+                failure='CALIBRATION_PAGE_CAP',records=[dict(address='PRIVATE ADDRESS')])
+    outer=dict(exit_code=0,peak_owned_rss=0,elapsed_seconds=1,cleanup='CLOSED',
+               live_owned_survivors=0,expired=False,limit_hit=None)
+    result=rt.retain_unqualified_source(source,outer,root)
+    assert result['backend']==BACKEND and len(archived)==1
+    assert archived[0]==canonical(source)
+    assert len(exported)==1 and exported[0][0]=='unqualified_private_evidence_retained'
+    assert 'PRIVATE ADDRESS' not in json.dumps(exported)
+    assert exported[0][1]['coverage_advance'] is False and exported[0][1]['screened'] is False
+    for bad_source,bad_outer in [
+        ({**source,'council':'manchester'},outer),
+        ({**source,'requested_interval':['2026-10-01','2026-10-07']},outer),
+        (source,{**outer,'cleanup':'UNCERTAIN'}),
+        (source,{**outer,'live_owned_survivors':1}),
+    ]:
+        with pytest.raises(Denied):
+            rt.retain_unqualified_source(bad_source,bad_outer,root)
+    assert len(archived)==1
+    rt.test=False
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
+        rt.retain_unqualified_source(source,outer,root)
+    assert len(archived)==1
