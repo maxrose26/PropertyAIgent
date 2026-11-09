@@ -168,15 +168,19 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
     Separate observations remain separate with their original provenance.
     """
     import re
-    from sqlalchemy import select,cast
+    from sqlalchemy import select,cast,and_,or_
     from sqlalchemy.dialects.postgresql import JSONB
     from .schema import WorkItem as W
     if (type(limit) is not int or not 1<=limit<=3 or not 1<=len(councils)<=2
         or len(set(councils))!=len(councils) or len(contracts)!=len(councils)
         or after is not None and not re.fullmatch('[a-f0-9]{64}',after)):
         raise Denied('BACKLOG_PAGE_BOUND')
-    query=select(W).where(W.c.task=='DISCOVERY',W.c.subject['kind'].as_string()=='DISCOVERY_SCOPE',
-                         W.c.subject['council'].as_string().in_(councils),W.c.contract.in_(contracts))
+    # A cross-product of councils and contracts would admit a root under a
+    # different council's approved contract. Bind each exact pair instead.
+    paired=or_(*(and_(W.c.subject['council'].as_string()==c,
+                      W.c.contract==contract) for c,contract in zip(councils,contracts)))
+    query=select(W).where(W.c.task=='DISCOVERY',
+                          W.c.subject['kind'].as_string()=='DISCOVERY_SCOPE',paired)
     if after is not None:query=query.where(W.c.key>after)
     from contextlib import nullcontext
     with (nullcontext(connection) if connection is not None else ledger.worker_engine.begin()) as connection:
