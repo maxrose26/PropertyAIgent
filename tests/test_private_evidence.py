@@ -27,7 +27,11 @@ def verified_stubs(raw):
     def write(body):
         calls.append('write')
         persisted['raw'] = body
-        return {'sha256': hashlib.sha256(body).hexdigest(),
+        return {'backend': 'POSTGRES_PILOT_V1', 'period': PERIOD,
+                'run_id': RUN, 'name': NAME,
+                'path': ('docs/design/ingestion-operational-execution-daily-intake/'
+                         + PERIOD + '/' + RUN + '/' + NAME),
+                'sha256': hashlib.sha256(body).hexdigest(),
                 'bytes': len(body), 'readback_verified': False}
 
     def readback():
@@ -129,6 +133,11 @@ def test_acknowledged_but_mismatched_or_unavailable_sql_readback_refused(alter):
 
 @pytest.mark.parametrize('tamper', [
     lambda ack: {**ack, 'readback_verified': True},
+    lambda ack: {**ack, 'backend': 'FAKE'},
+    lambda ack: {**ack, 'period': 'other'},
+    lambda ack: {**ack, 'run_id': 'b' * 32},
+    lambda ack: {**ack, 'name': 'capture-2/source.json'},
+    lambda ack: {**ack, 'path': 'docs/design/sneaky'},
     lambda ack: {**ack, 'sha256': '0' * 64},
     lambda ack: {**ack, 'bytes': True},
     lambda ack: {**ack, 'bytes': ack['bytes'] + 1},
