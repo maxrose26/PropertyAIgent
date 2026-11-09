@@ -85,6 +85,32 @@ def test_actual_restricted_sql_source_and_final_readback():
             sha256=hashlib.sha256(data).hexdigest(),
             bytes=len(data),readback_verified=True)
         assert len(transactions)==2
+        # Genuine restricted-worker SQL refusals, not mocked callback failures.
+        # An authorised Tameside capture must not accept a Bolton record,
+        # an altered date window, or a capture larger than 512 KiB.
+        for invalid_body, refusal in (
+            (json.dumps({**source, 'council': 'bolton'}).encode(),
+             'EVIDENCE_SOURCE_AUTHORITY'),
+            (json.dumps({**source, 'requested_interval':
+                         ['2026-11-01', '2026-11-08']}).encode(),
+             'EVIDENCE_SOURCE_AUTHORITY'),
+            (b'{"payload":"' + b'x' * 524289 + b'"}',
+             'EVIDENCE_ARGUMENT_BOUND'),
+        ):
+            with pytest.raises(Exception, match=refusal):
+                with world['connect']('ingestion_worker_login') as worker:
+                    worker.execute(
+                        'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                        (PERIOD, RUN, 'capture-2/source.json', invalid_body))
+        # A third source slot is forbidden even when source authority is live.
+        with pytest.raises(Exception, match='EVIDENCE_ARGUMENT_BOUND'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-3/source.json', data))
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
         with world['connect']('ingestion_worker_login') as worker:
             assert worker.execute(
                 'SELECT public.ingestion_intake_evidence_read(%s,%s,%s)',
@@ -104,6 +130,21 @@ def test_actual_restricted_sql_source_and_final_readback():
         rt.archive_ordinal=1
         with pytest.raises(Exception,match='EVIDENCE_SOURCE_AUTHORITY'):
             rt.archive(data)
+        # The installed function applies the 2 MiB *aggregate* limit, not
+        # merely its per-object limit. A valid 2 MiB final object would exceed
+        # the run budget because capture 1 already occupies private storage.
+        prefix, suffix = b'{"padding":"', b'"}'
+        over_total = prefix + b'x' * (2097152-len(prefix)-len(suffix)) + suffix
+        assert len(over_total) == 2097152
+        with pytest.raises(Exception, match='EVIDENCE_RUN_EXPORT_BOUND'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'final/result-before-publication.json',
+                     over_total))
+        assert boot.execute(
+            'SELECT count(*) FROM public.ingestion_run_evidence '
+            'WHERE period=%s AND run_id=%s', (PERIOD, RUN)).fetchone()[0] == 1
         result=json.dumps({'status':'INCOMPLETE','private':'FAKE ADDRESS'}).encode()
         events=json.dumps([{'private':'FAKE ADDRESS'}]).encode()
         receipts=rt.archive_private_final(result,events)
