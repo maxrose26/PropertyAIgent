@@ -23,7 +23,8 @@ def project_public_summary(result, *, original_raw, original_events):
             or len(original_raw) > 2 * 1024 * 1024 or len(original_events) > 128 * 1024
             or type(result.get('coverage_advance')) is not bool
             or result['coverage_advance'] is not False
-            or result.get('authority_closure') not in CLOSURE_STATUSES
+            or type(result.get('authority_closure')) is not str
+            or result['authority_closure'] not in CLOSURE_STATUSES
             or type(result.get('scopes')) is not list
             or len(result['scopes']) > 2):
         raise Denied('PUBLIC_SUMMARY_INPUT_BOUND')
