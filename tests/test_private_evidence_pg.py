@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from pathlib import Path
@@ -93,7 +93,10 @@ def test_actual_restricted_sql_source_and_final_readback():
         stopped=copy.deepcopy(ctl)
         stopped['hard_stop_generation']=(ctl.get('hard_stop_generation') or 0)+1
         started=Event()
-        with world['connect']('provisioning_migrator') as owner:
+        # The restricted migrator intentionally lacks controller UPDATE.
+        # Simulate the owner stop using the disposable bootstrap connection;
+        # this never grants an extra permission or touches any live database.
+        with nullcontext(boot) as owner:
             owner.execute('BEGIN')
             committed=False
             try:
