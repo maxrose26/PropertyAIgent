@@ -145,8 +145,19 @@ def test_actual_daily_entrypoint_private_source_and_public_summary(tmp_path):
         name = 'test-pa-d002-cli'
         authorise(world, name, p)  # Actual owner issuer in disposable PG.
         run, result, command = invoke(world, tmp_path, name, count=1)
-        assert run.returncode == 0, dict(stderr=run.stderr[-1000:],
-                                           result=result)
+        # On a refusal, print only synthetic fixture result codes and event
+        # kinds; do not dump private source, records, message bodies or URLs.
+        events_file = tmp_path / 'result' / 'events.json'
+        event_names = ([e.get('event') for e in json.loads(events_file.read_text())]
+                       if events_file.exists() else [])
+        assert run.returncode == 0, dict(
+            returncode=run.returncode, status=result.get('status'),
+            failure=result.get('failure'), reason=result.get('reason'),
+            publication=result.get('publication'),
+            stop_readback=result.get('stop_readback'),
+            scopes=[(s.get('council'), s.get('status'), s.get('failure'))
+                    for s in result.get('scopes', [])],
+            event_names=event_names[-20:])
         assert result['status'] == 'RETAINED_AND_SCREENED', result
         assert result['publication'] == 'TEST_PRIVATE_SUMMARY'
         assert result['authority_closure'] == 'INVALIDATED'
