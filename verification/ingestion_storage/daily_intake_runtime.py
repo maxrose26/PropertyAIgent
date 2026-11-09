@@ -314,7 +314,8 @@ class Runtime:
                 # Existing worker SELECT access; no unknown historical key list.
                 engine=budget.engines[0]
                 ledger=ControllerLedger(engine,budget=budget,owner=WORKER,authority='',bindings={})
-                result['backlog']=backlog_page(ledger,sorted(self.policy['councils']),[v['contract'] for v in self.policy['councils'].values()],rule,connection=c)
+                councils=sorted(self.policy['councils'])
+                result['backlog']=backlog_page(ledger,councils,[self.policy['councils'][c]['contract'] for c in councils],rule,connection=c)
             result['status']='INCOMPLETE' if any(s['status']=='INCOMPLETE' for s in result['scopes']) else 'RETAINED_AND_SCREENED'
         except BaseException as error:
             # Never continue another council after shared/unclassified failure.
