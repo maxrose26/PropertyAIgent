@@ -12,6 +12,11 @@ import re
 from .ledger import Denied
 
 BACKEND = 'PRIVATE_POSTGRES_V1'
+# The installed restricted SQL writer uses POSTGRES_PILOT_V1 in its return;
+# the outward typed receipt has a distinct, explicit source archive backend.
+SQL_BACKEND = 'POSTGRES_PILOT_V1'
+WRITE_FUNCTION_SHA256 = '8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
+READ_FUNCTION_SHA256 = '8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a'
 CAPTURE_NAMES = frozenset(('capture-1/source.json', 'capture-2/source.json'))
 SOURCE_BYTES_LIMIT = 524288
 RECEIPT_FIELDS = frozenset(
@@ -29,20 +34,26 @@ def verified_private_capture(raw, *, period, run_id, name, write, readback):
     A rejected/unrecognised acknowledgement or uncertain read raises a fixed
     Denied reason; the caller retains the existing stop/reconcile requirement.
     """
-    if (type(raw) is not bytes or len(raw) > SOURCE_BYTES_LIMIT
+    if (type(raw) is not bytes or not 1 <= len(raw) <= SOURCE_BYTES_LIMIT
             or not callable(write) or not callable(readback)):
         raise Denied('PRIVATE_EVIDENCE_SOURCE_BOUND')
-    if (type(period) is not str or re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', period) is None
+    if (type(period) is not str or re.fullmatch(r'[a-zA-Z0-9_-]{1,60}', period) is None
             or type(run_id) is not str or re.fullmatch(r'[a-f0-9]{32}', run_id) is None
-            or name not in CAPTURE_NAMES):
+            or type(name) is not str or name not in CAPTURE_NAMES):
         raise Denied('PRIVATE_EVIDENCE_SCOPE_BOUND')
     sha = hashlib.sha256(raw).hexdigest()
     # Do not retry a write with unknown effects. The caller must reconcile via
     # exact-name/hash readback before any further execution.
     ack = write(raw)
-    if (type(ack) is not dict or type(ack.get('bytes')) is not int
-            or ack['bytes'] != len(raw) or ack.get('sha256') != sha
-            or ack.get('readback_verified') is not False):
+    expected_path = ('docs/design/ingestion-operational-execution-daily-intake/'
+                     + period + '/' + run_id + '/' + name)
+    if (type(ack) is not dict or set(ack) != {
+            'backend', 'period', 'run_id', 'name', 'path', 'sha256', 'bytes', 'readback_verified'}
+            or ack.get('backend') != SQL_BACKEND or ack.get('period') != period
+            or ack.get('run_id') != run_id or ack.get('name') != name
+            or ack.get('path') != expected_path
+            or type(ack.get('bytes')) is not int or ack['bytes'] != len(raw)
+            or ack.get('sha256') != sha or ack.get('readback_verified') is not False):
         raise Denied('PRIVATE_EVIDENCE_WRITE_ACK_UNVERIFIED')
     persisted = readback()
     if (type(persisted) is not bytes or len(persisted) != len(raw)
@@ -66,8 +77,8 @@ def require_private_receipt(receipt, raw):
             or receipt['bytes'] != len(raw) or receipt['bytes'] > SOURCE_BYTES_LIMIT
             or receipt.get('sha256') != hashlib.sha256(raw).hexdigest()):
         raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
-    if (type(receipt.get('period')) is not str or re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', receipt['period']) is None
+    if (type(receipt.get('period')) is not str or re.fullmatch(r'[a-zA-Z0-9_-]{1,60}', receipt['period']) is None
             or type(receipt.get('run_id')) is not str or re.fullmatch(r'[a-f0-9]{32}', receipt['run_id']) is None
-            or receipt.get('name') not in CAPTURE_NAMES):
+            or type(receipt.get('name')) is not str or receipt['name'] not in CAPTURE_NAMES):
         raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
     return receipt
