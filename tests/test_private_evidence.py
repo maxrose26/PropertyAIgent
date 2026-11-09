@@ -169,3 +169,93 @@ def test_unknown_or_mixed_backend_receipts_cannot_pass_archive_capture():
                     {**valid, 'name': 'capture-3/source.json'}):
         with pytest.raises(Denied, match='DURABLE_ARCHIVE_NOT_VERIFIED'):
             archive_capture(SOURCE, lambda _: changed)
+
+def test_runtime_archive_private_worker_receipt_is_verified_across_transactions():
+    """Simulated SQL seam: actual Runtime.archive with distinct readback."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    from app.ingestion.private_evidence import READ_FUNCTION_SHA256,WRITE_FUNCTION_SHA256
+    saved={};events=[]
+    period='test-private-20261109';run='a'*32
+    class SQL:
+        inventory=[
+            ('ingestion_intake_evidence_read',READ_FUNCTION_SHA256,
+             'ingestion_storage_owner',True,['search_path=pg_catalog'],
+             'p_period text, p_run text, p_name text',True),
+            ('ingestion_intake_evidence_write',WRITE_FUNCTION_SHA256,
+             'ingestion_storage_owner',True,['search_path=pg_catalog'],
+             'p_period text, p_run text, p_name text, p_body bytea',True)]
+        def execute(self,stmt,args=None):
+            q=str(stmt)
+            if 'FROM pg_catalog.pg_proc' in q:
+                events.append('inventory')
+                return SimpleNamespace(all=lambda:self.inventory)
+            assert args['period']==period and args['run_id']==run
+            assert args['name']=='capture-1/source.json'
+            if 'ingestion_intake_evidence_write(' in q:
+                events.append('write')
+                saved['data']=args['body']
+                ack=dict(backend='POSTGRES_PILOT_V1',period=period,run_id=run,
+                    name=args['name'],path='docs/design/ingestion-operational-execution-daily-intake/'
+                    +period+'/'+run+'/'+args['name'],sha256=hashlib.sha256(args['body']).hexdigest(),
+                    bytes=len(args['body']),readback_verified=False)
+                return SimpleNamespace(scalar_one=lambda:ack)
+            if 'ingestion_intake_evidence_read(' in q:
+                events.append('read')
+                return SimpleNamespace(scalar_one=lambda:saved['data'])
+            raise AssertionError(q)
+    db=SQL()
+    @contextmanager
+    def connection(*,seconds=90):
+        assert seconds==30
+        events.append('new_transaction')
+        yield db,None
+    runtime=Runtime.__new__(Runtime)
+    runtime.test=True;runtime.policy={'evidence_backend':'POSTGRES_PILOT_V1'}
+    runtime.args=SimpleNamespace(period=period);runtime.run_id=run
+    runtime.archive_ordinal=0;runtime.connection=connection
+    runtime.policy_read=lambda conn:events.append('policy_checked')
+    runtime.run=SimpleNamespace(publication=lambda *_:None)
+    source={'requested_interval':['2026-11-02','2026-11-08'],'council':'tameside'}
+    raw=json.dumps(source,sort_keys=True,separators=(',',':')).encode()
+    receipt=runtime.archive(raw)
+    assert receipt==dict(backend='PRIVATE_POSTGRES_V1',period=period,run_id=run,
+                        name='capture-1/source.json',sha256=hashlib.sha256(raw).hexdigest(),
+                        bytes=len(raw),readback_verified=True)
+    assert events==['new_transaction','policy_checked','inventory','write',
+                    'new_transaction','inventory','read']
+    assert saved['data']==raw
+    runtime.archive_ordinal=2
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_CAPTURE_SLOT_BOUND'):
+        runtime.archive(raw)
+    assert events.count('write')==1
+
+def test_runtime_archive_private_refuses_inventory_drift_and_live_fallback():
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    raw=b'{"council":"tameside"}';events=[]
+    class SQL:
+        def execute(self,stmt,args=None):
+            events.append(str(stmt))
+            return SimpleNamespace(all=lambda:[])  # no approved function identities
+    @contextmanager
+    def connection(*,seconds=90):
+        yield SQL(),None
+    runtime=Runtime.__new__(Runtime)
+    runtime.test=True;runtime.policy={'evidence_backend':'POSTGRES_PILOT_V1'}
+    runtime.args=SimpleNamespace(period='test-private-20261109')
+    runtime.run_id='a'*32;runtime.archive_ordinal=0
+    runtime.connection=connection;runtime.policy_read=lambda _:None
+    runtime.run=SimpleNamespace(publication=lambda *_:None)
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_FUNCTION_INVENTORY'):
+        runtime.archive(raw)
+    assert len(events)==1 and 'FROM pg_catalog.pg_proc' in events[0]
+    runtime.test=False
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_OFFLINE_ONLY'):
+        runtime.archive(raw)
+    runtime.test=True;runtime.policy={'evidence_backend':'UNKNOWN'}
+    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_BACKEND_UNKNOWN'):
+        runtime.archive(raw)
+    assert len(events)==1

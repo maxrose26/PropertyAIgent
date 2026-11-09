@@ -22,7 +22,7 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
-BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
              'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
              'verification/discovery/finite_acceptance.py',
@@ -153,10 +153,78 @@ class Runtime:
         self.emit('supported_registration',dict(kind=reg.kind,authority=reg.authority,keys=len(reg.bindings)))
         return None
 
+    def private_evidence_inventory(self,connection):
+        """Fail closed unless both restricted source-evidence functions match
+        the reviewed installed bodies, owner, signature and worker EXECUTE grant.
+        This never creates or changes a SQL function or permission.
+        """
+        from app.ingestion.private_evidence import READ_FUNCTION_SHA256,WRITE_FUNCTION_SHA256
+        names=['ingestion_intake_evidence_read','ingestion_intake_evidence_write']
+        rows=connection.execute(text(
+            "SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),"
+            "r.rolname,p.prosecdef,p.proconfig,"
+            "pg_catalog.pg_get_function_identity_arguments(p.oid),"
+            "pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE') "
+            "FROM pg_catalog.pg_proc p "
+            "JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace "
+            "JOIN pg_catalog.pg_roles r ON r.oid=p.proowner "
+            "WHERE n.nspname='public' AND p.proname=ANY(:names) "
+            "ORDER BY p.proname"),dict(names=names)).all()
+        expected=[
+            (names[0],READ_FUNCTION_SHA256,'ingestion_storage_owner',True,
+             ['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True),
+            (names[1],WRITE_FUNCTION_SHA256,'ingestion_storage_owner',True,
+             ['search_path=pg_catalog'],
+             'p_period text, p_run text, p_name text, p_body bytea',True)]
+        if [tuple(r) for r in rows]!=expected:
+            raise Denied('PRIVATE_EVIDENCE_FUNCTION_INVENTORY')
+
+    def archive_private_source(self,raw):
+        """Offline-only SOURCE_INTENT-bound SQL write plus separate committed read.
+
+        The installed writer also enforces the exact current grant, run, source
+        council/date, quota and expiry. Never retry a write on uncertain effect.
+        """
+        from app.ingestion.private_evidence import verified_private_capture,SQL_BACKEND
+        if (not self.test or self.policy is None
+                or self.policy.get('evidence_backend')!=SQL_BACKEND):
+            raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
+        if self.archive_ordinal not in (1,2):
+            raise Denied('PRIVATE_EVIDENCE_CAPTURE_SLOT_BOUND')
+        period=self.args.period;run_id=self.run_id
+        name='capture-'+str(self.archive_ordinal)+'/source.json'
+        def write(data):
+            with self.connection(seconds=30) as (c,_):
+                self.policy_read(c)
+                self.private_evidence_inventory(c)
+                return c.execute(text(
+                    'SELECT public.ingestion_intake_evidence_write('
+                    ':period,:run_id,:name,:body)'),
+                    dict(period=period,run_id=run_id,name=name,body=data)).scalar_one()
+        def readback():
+            # Fresh transaction AFTER the write's committed acknowledgement.
+            # An expired authority may still inspect; it may never replay a write.
+            with self.connection(seconds=30) as (c,_):
+                self.private_evidence_inventory(c)
+                return c.execute(text(
+                    'SELECT public.ingestion_intake_evidence_read('
+                    ':period,:run_id,:name)'),
+                    dict(period=period,run_id=run_id,name=name)).scalar_one()
+        return verified_private_capture(raw,period=period,run_id=run_id,
+            name=name,write=write,readback=readback)
+
     def archive(self,raw):
         if not isinstance(raw,bytes) or len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
+        backend=(self.policy or {}).get('evidence_backend')
+        if backend not in (None,'POSTGRES_PILOT_V1'):
+            raise Denied('PRIVATE_EVIDENCE_BACKEND_UNKNOWN')
+        if backend=='POSTGRES_PILOT_V1' and not self.test:
+            # No live activation. Never fall back to publishing private source.
+            raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
         self.run.publication(len(raw),10)
         sha=hashlib.sha256(raw).hexdigest();self.archive_ordinal+=1
+        if backend=='POSTGRES_PILOT_V1':
+            return self.archive_private_source(raw)
         directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/capture-'+str(self.archive_ordinal)
         if self.test:
             target=Path(self.args.disposable_archive);target.mkdir(exist_ok=True,parents=True)
