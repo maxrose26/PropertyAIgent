@@ -147,6 +147,19 @@ def assess_retention(entries, *, as_of, verified_run_index=None):
             reason = 'PRESERVE_RUN_UNRESOLVED'
         elif len({(row['resolution'], row['resolved_at']) for row in metadata}) != 1:
             reason = 'PRESERVE_RUN_RESOLUTION_CONFLICT'
+        elif metadata[0]['resolution'] == 'VERIFIED' and (
+                not {'final/result-before-publication.json',
+                     'final/events-before-publication.json'}.issubset(
+                         {row['name'] for row in metadata})
+                or not any(row['name'].startswith('capture-') for row in metadata)):
+            # An apparently VERIFIED run without its original two private
+            # final receipts has not demonstrated the finish contract. The
+            # run index must not make a lone old capture eligible for review.
+            reason = 'PRESERVE_RUN_FINAL_EVIDENCE_UNVERIFIED'
+        elif sum(row['bytes'] for row in metadata) > 2 * 1024 * 1024:
+            # The exact private-store aggregate allowance is 2 MiB/run.
+            # Impossible inventory metadata cannot establish safe retention.
+            reason = 'PRESERVE_RUN_STORAGE_BOUND_UNVERIFIED'
         elif (verified_run_index is None or
               verified_run_index.get((metadata[0]['period'], metadata[0]['run_id'])) !=
               frozenset((row['name'], row['sha256']) for row in metadata)):
@@ -155,7 +168,10 @@ def assess_retention(entries, *, as_of, verified_run_index=None):
             reason = None
         # Preserve the more specific single-row refusal reason; only the
         # missing exact-run manifest must override a previously eligible row.
-        if len(siblings) == 1 and reason != 'PRESERVE_RUN_INVENTORY_UNVERIFIED':
+        if len(siblings) == 1 and reason not in (
+                'PRESERVE_RUN_INVENTORY_UNVERIFIED',
+                'PRESERVE_RUN_FINAL_EVIDENCE_UNVERIFIED',
+                'PRESERVE_RUN_STORAGE_BOUND_UNVERIFIED'):
             reason = None
         raw_until = latest + timedelta(days=RAW_DAYS)
         index_until = latest + timedelta(days=INDEX_DAYS)
