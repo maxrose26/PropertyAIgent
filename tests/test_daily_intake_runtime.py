@@ -315,6 +315,26 @@ def test_disposable_historical_issuer_actual_daily_command_and_committed_readbac
     assert prepared.facts[nominee.reference]['dependencies']
     assert snapshot(world['boot'])==before  # preparation never issues or writes facts
 
+    # A historical catch-up screening child changed after retention must
+    # fail closed before preparing factual admission; rollback proves this
+    # test never changes a committed fixture or production database.
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET checkpoint = "
+            "jsonb_set(checkpoint::jsonb, '{capture_checkpoint_sha256}', "
+            "to_jsonb(repeat('0',64)))::json "
+            "WHERE task='SCREENING' AND subject->>'council'='tameside'")
+        with pytest.raises(Denied,match='STAGED_ASSESSMENT_CHECKPOINT'):
+            prepare_admission_from_persisted_captures(
+                world['boot'],owner,binding_for('tameside'),contract,root['key'],
+                RULE,{nominee.reference:target},
+                revision='offline-historical-prepare-only',
+                item_limits=root['limits'],allow_test_evidence=True)
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot'])==before
+
 
 @pytest.mark.parametrize('fault',['rolling_smuggle','live_mode','too_long','unfinished_day','changed_capture'])
 def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
