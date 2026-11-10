@@ -282,6 +282,39 @@ def test_disposable_historical_issuer_actual_daily_command_and_committed_readbac
     assert len(saved)==2
     assert all(s[0]['start']==scope['start'] and s[0]['end']==scope['end'] for s in saved)
 
+    # The historical disposable issuer must feed the SAME capture-bound
+    # persisted-screening admission preparation as the ordinary intake.
+    # This is read-only preparation: it neither issues an admission grant nor
+    # creates an Application, and is not evidence of real catch-up population.
+    from app.ingestion.nomination import derive_nominees
+    from verification.ingestion_storage.chain_registration import (
+        persisted_council_capture_inventory, prepare_admission_from_persisted_captures)
+    from verification.ingestion_storage.scope_binding import binding_for
+    from tests.e2e_connection_support import idox_contract
+    before=snapshot(world['boot'])
+    retained=persisted_council_capture_inventory(world['boot'],'tameside')
+    assert len(retained)==1 and retained[0]['state']=='COMPLETE'
+    root=retained[0]
+    derived=derive_nominees([root['checkpoint']],RULE,allow_test_evidence=True,
+                            capture_bound=True)
+    assert len(derived.nominees)==1
+    nominee=derived.nominees[0]
+    target=dict(council='tameside',reference=nominee.reference,
+                source_url=nominee.source_url,source_identifier=nominee.source_record_id)
+    contract=idox_contract('tameside',date.fromisoformat(scope['start']),
+                           date.fromisoformat(scope['end']),name=root['contract'])
+    owner=Owner(None,lambda *_:None,lambda:None,
+                expiry=datetime.now(timezone.utc)+timedelta(minutes=25),
+                bindings=execution_binding())
+    prepared,saved_nominees=prepare_admission_from_persisted_captures(
+        world['boot'],owner,binding_for('tameside'),contract,root['key'],RULE,
+        {nominee.reference:target},revision='offline-historical-prepare-only',
+        item_limits=root['limits'],allow_test_evidence=True)
+    assert prepared.kind=='ADMISSION' and len(prepared.facts)==1
+    assert saved_nominees.sha256==derived.sha256
+    assert prepared.facts[nominee.reference]['dependencies']
+    assert snapshot(world['boot'])==before  # preparation never issues or writes facts
+
 
 @pytest.mark.parametrize('fault',['rolling_smuggle','live_mode','too_long','unfinished_day','changed_capture'])
 def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
