@@ -4,6 +4,7 @@ Accepts only a trusted, pre-sanitised inventory. This module performs no SQL,
 I/O, access changes or deletion, and does not confer deletion authority.
 """
 from datetime import datetime, timedelta, timezone
+import hmac
 import re
 
 RAW_DAYS = 90
@@ -102,3 +103,41 @@ def assess_retention(entries, *, as_of):
     return {'schema': 'PA_D002_RETENTION_DRY_RUN_V1', 'as_of': now.isoformat(),
             'dry_run_only': True, 'sql_or_delete_operations': 0,
             'total': len(results), 'items': results}
+
+
+SNAPSHOT_FIELDS = frozenset({
+    'period', 'run_id', 'name', 'stored_sha256', 'actual_sha256',
+    'bytes', 'created_at',
+})
+
+
+def assess_unverified_storage_snapshot(rows, *, as_of):
+    """Fail-closed prospective retention *preview* from bounded SQL metadata.
+
+    A table row's timestamp/hash does not authenticate prospective capture,
+    legal holds or independent resolution. All entries remain PRESERVED and
+    no deletion is proposed. Querying/role authentication is the caller's job;
+    this function never connects to SQL or reads raw evidence.
+    """
+    if type(rows) is not list or len(rows) > 10000:
+        raise ValueError('RETENTION_SNAPSHOT_BOUND')
+    entries = []
+    for row in rows:
+        if type(row) is not dict or set(row) != SNAPSHOT_FIELDS:
+            raise ValueError('RETENTION_SNAPSHOT_SHAPE')
+        stored, actual = row['stored_sha256'], row['actual_sha256']
+        if (type(stored) is not str or type(actual) is not str
+                or re.fullmatch(r'[a-f0-9]{64}', stored) is None
+                or re.fullmatch(r'[a-f0-9]{64}', actual) is None
+                or not hmac.compare_digest(stored, actual)):
+            raise ValueError('RETENTION_STORAGE_HASH_MISMATCH')
+        entries.append({
+            'period': row['period'], 'run_id': row['run_id'],
+            'name': row['name'], 'sha256': stored, 'bytes': row['bytes'],
+            'captured_at': row['created_at'],
+            'retention_tag': 'UNVERIFIED_PROVENANCE',
+            'readback_verified': False, 'resolution': 'UNRESOLVED',
+            'resolved_at': None, 'explicit_hold': False,
+            'historical': True,
+        })
+    return assess_retention(entries, as_of=as_of)
