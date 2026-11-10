@@ -8,6 +8,7 @@ import copy,json,os,subprocess,sys,time
 from datetime import datetime,timedelta,timezone,date
 from pathlib import Path
 from types import SimpleNamespace
+from contextlib import nullcontext
 import pytest
 from app.ingestion.daily_intake import current_windows,backlog_page
 from app.ingestion.ledger import Denied,digest
@@ -103,7 +104,7 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     # Owner-side exact SQL inventory: one committed readback per council.
     # Unknown/failed roots cannot be silently dropped before nomination.
     from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
-    with world['connect']('provisioning_migrator') as inventory_db:
+    with nullcontext(world['boot']) as inventory_db:
         verified_m = persisted_council_capture_inventory(inventory_db, 'manchester')
         assert len(verified_m) == 1 and verified_m[0]['checkpoint']['council'] == 'manchester'
         if failed:
@@ -461,7 +462,7 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     all_rows=[row[0] for row in world['boot'].execute(
         "SELECT row_to_json(w) FROM ingestion_work_items w WHERE key<>repeat('0',64)").fetchall()]
     from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
-    with world['connect']('provisioning_migrator') as inventory_db:
+    with nullcontext(world['boot']) as inventory_db:
         roots=persisted_council_capture_inventory(inventory_db,'tameside')
     assert len(roots)==1 and roots[0]['state']=='COMPLETE'
     root=roots[0]
@@ -494,8 +495,10 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     # A corrupt committed archive readback must not be accepted as a complete
     # candidate merely because the underlying root state still says COMPLETE.
     # Change only a disposable transaction and roll it back before exit.
-    with world['connect']('provisioning_migrator') as inventory_db:
-        inventory_db.execute('SAVEPOINT capture_inventory_negative')
+    with nullcontext(world['boot']) as inventory_db:
+        # The disposable bootstrap connection is autocommit. Explicitly
+        # bound this negative mutation to a transaction and always rollback.
+        inventory_db.execute('BEGIN')
         try:
             inventory_db.execute(
                 "UPDATE ingestion_work_items SET checkpoint = "
@@ -505,7 +508,7 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
             with pytest.raises(Denied, match='CAPTURE_INVENTORY_UNVERIFIED'):
                 persisted_council_capture_inventory(inventory_db, 'tameside')
         finally:
-            inventory_db.execute('ROLLBACK TO SAVEPOINT capture_inventory_negative')
+            inventory_db.execute('ROLLBACK')
     assert snapshot(world['boot'])==before  # no issuer/grant/work-item/learnt fact changed
     with pytest.raises(Denied):
         admission_registration(owner,binding_for('tameside'),contract,root,receipt,
