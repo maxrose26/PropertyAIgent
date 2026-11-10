@@ -11,7 +11,9 @@ from urllib.parse import urljoin, urlsplit, parse_qsl
 from bs4 import BeautifulSoup
 from app.pipeline.discovery_contract import SOURCE_ROOTS, Literal
 
-IDOX = frozenset({'bolton','bury','oldham','stockport','tameside','wigan'})
+IDOX = frozenset({'bolton','bury','oldham','stockport','tameside','wigan','trafford'})
+# Trafford shares only the pure *synthetic parser* contract at this checkpoint.
+# The networked window reader and Stage4 admission remain explicitly gated.
 MAX_BODY = 500_000
 MAX_ROWS = 100
 

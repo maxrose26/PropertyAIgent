@@ -36,6 +36,9 @@ class WindowConfig:
         if self.max_rows is not None and (type(self.max_rows) is not int or self.max_rows!=60):raise ValueError('fixed row ceiling')
         if type(self.max_transport_retries) is not int or self.max_transport_retries not in (0,1):
             raise ValueError('retry policy')
+        # Trafford's repository URL hint is now parsable offline; it is NOT an
+        # observed/qualified live source. Do not expose it to this HTTP reader.
+        if self.council == 'trafford':raise ValueError('TRAFFORD_SOURCE_NOT_QUALIFIED')
         if self.council not in IDOX or self.semantics not in {'RECEIVED','VALIDATED'} or not self.start<=self.end or (self.end-self.start).days>27:
             raise ValueError('unadmitted council/date window')
 
