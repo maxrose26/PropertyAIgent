@@ -336,6 +336,50 @@ def test_disposable_historical_issuer_actual_daily_command_and_committed_readbac
     assert snapshot(world['boot'])==before
 
 
+
+def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming_coverage(world,tmp_path):
+    """Existing real disposable catch-up command -> all-ten interval SQL readback.
+
+    Missing windows remain explicit, and tampered saved screening never upgrades
+    a persisted discovery into verified screening or a buyer Application.
+    """
+    from verification.ingestion_storage.chain_registration import shutdown_gap_sql_readback
+    reset(world)
+    p,_ = _catchup_fixture(world)
+    name = 'sql-gap-readback'
+    _catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
+    run,result,_ = invoke(world,tmp_path,name,catchup_window=p['catchup_scope'])
+    assert run.returncode == 0 and result['status'] == 'RETAINED_AND_SCREENED', (run.stderr,result)
+    before = snapshot(world['boot'])
+    as_of = datetime(2026,11,10,12,tzinfo=timezone.utc)
+    ledger = shutdown_gap_sql_readback(world['boot'],as_of)
+    assert ledger['required_date_scopes'] == 90 and len(ledger['entries']) == 90
+    assert ledger['sql_readback_scopes'] == 2
+    assert ledger['sql_readback_screened_records'] == 2
+    first = [x for x in ledger['entries'] if x['start']=='2026-09-15' and x['end']=='2026-09-21']
+    assert {x['council'] for x in first if x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK'} == {'manchester','tameside'}
+    assert next(x for x in first if x['council']=='trafford')['state'] == 'NO_EXACT_PERSISTED_SQL_CAPTURE'
+    assert all(x['source_coverage']=='UNKNOWN' and x['source_qualified'] is False and
+               x['factual_qualifications'] is None and x['newly_added'] is None and
+               x['saved_key_facts'] is None and x['buyer_backlog'] is None for x in ledger['entries'])
+    assert snapshot(world['boot']) == before
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET checkpoint = "
+            "jsonb_set(checkpoint::jsonb, '{capture_checkpoint_sha256}', "
+            "to_jsonb(repeat('0',64)))::json "
+            "WHERE task='SCREENING' AND subject->>'council'='tameside'")
+        altered=shutdown_gap_sql_readback(world['boot'],as_of)
+        changed=next(x for x in altered['entries'] if x['council']=='tameside' and x['start']=='2026-09-15')
+        assert changed['state']=='SQL_CAPTURE_SCREENING_UNVERIFIED'
+        assert changed['screened_sql_records'] is None
+        assert altered['sql_readback_scopes']==1
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot'])==before
+
+
 @pytest.mark.parametrize('fault',['rolling_smuggle','live_mode','too_long','unfinished_day','changed_capture'])
 def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
     from zoneinfo import ZoneInfo

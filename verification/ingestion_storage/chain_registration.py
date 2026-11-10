@@ -158,6 +158,119 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
 
 
 
+
+def shutdown_gap_sql_readback(connection, as_of):
+    """Read-only, bounded per-council/window SQL checkpoint for PA-D004 v1.2.
+
+    This checks persisted capture and saved screening *only*. It does not
+    authenticate official-source enumeration, mark dates covered, determine
+    qualification, count new changes, or establish buyer-facing facts. The
+    caller owns its SQL connection/transaction; this function grants nothing.
+    Every required council/window remains visible when no trusted SQL rows
+    exist, including unqualified Trafford and historical UNKNOWN Bolton.
+    """
+    from datetime import date
+    from app.ingestion.listing_screening import RULE_V3, ScreeningRule
+    from app.ingestion.ledger import bounded
+    from verification.discovery.campaign_manifest import shutdown_gap_source_packages
+    plan = shutdown_gap_source_packages(as_of)
+    rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
+    entries = []
+    for council in plan['required_councils']:
+        raw = connection.execute(
+            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+            "WHERE w.task='DISCOVERY' AND w.subject->>'council'=%s "
+            "ORDER BY w.key LIMIT 129", (council,),
+        ).fetchall()
+        if len(raw) > 128:
+            raise Denied('SHUTDOWN_SQL_READBACK_ROOT_BOUND')
+        roots = [row[0] for row in raw]
+        bounded(roots, 2 * 1024 ** 2)
+        verified = ()
+        if roots:
+            try:
+                verified = persisted_council_capture_inventory(connection, council)
+            except Denied:
+                pass  # preserve unknown/failed roots; never silently omit them
+        for window in plan['windows']:
+            start, end = window['start'], window['end']
+            exact, other_overlap = [], False
+            for root in roots:
+                subject = root.get('subject')
+                if not isinstance(subject, dict):
+                    other_overlap = True
+                    continue
+                a, b = subject.get('start'), subject.get('end')
+                try:
+                    if (type(a) is not str or type(b) is not str or
+                            date.fromisoformat(a).isoformat() != a or
+                            date.fromisoformat(b).isoformat() != b or a > b):
+                        raise ValueError('bad interval')
+                except (TypeError, ValueError):
+                    other_overlap = True
+                    continue
+                if a <= end and b >= start:
+                    if (a, b) == (start, end):
+                        exact.append(root)
+                    else:
+                        other_overlap = True
+            entry = dict(council=council, start=start, end=end,
+                         source_coverage='UNKNOWN', source_qualified=False,
+                         retained_sql_records=None, screened_sql_records=None,
+                         factual_qualifications=None, newly_added=None,
+                         saved_key_facts=None, buyer_backlog=None)
+            if other_overlap or len(exact) > 1:
+                entry['state'] = 'OVERLAP_OR_CONFLICT_REQUIRES_REVIEW'
+            elif not exact:
+                entry['state'] = 'NO_EXACT_PERSISTED_SQL_CAPTURE'
+            elif not verified or exact[0] not in verified:
+                entry['state'] = 'SQL_CAPTURE_UNVERIFIED'
+            else:
+                root = exact[0]
+                receipt = root['checkpoint']
+                if (root['subject'].get('kind') != 'DISCOVERY_SCOPE' or
+                        not isinstance(receipt.get('records'), list)):
+                    entry['state'] = 'SQL_CAPTURE_UNVERIFIED'
+                else:
+                    entry['state'] = 'SQL_CAPTURE_SCREENING_UNVERIFIED'
+                    entry['retained_sql_records'] = len(receipt['records'])
+                    try:
+                        binding = binding_for(council)
+                        batches, screens = _screen_items(
+                            binding, root, receipt, rule, root['limits'],
+                            capture_bound=True)
+                        expected = [*batches, *screens.values()]
+                        if len(expected) > 72:
+                            raise Denied('SHUTDOWN_SQL_SCREENING_BOUND')
+                        keys = [r['key'] for r in expected]
+                        saved = ([r[0] for r in connection.execute(
+                            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+                            "WHERE w.key = ANY(%s)", (keys,),
+                        ).fetchall()] if keys else [])
+                        bounded(saved, 2 * 1024 ** 2)
+                        registration = Registration(
+                            'SCREENING', '', [], [], {}, {}, root['key'],
+                            batches=batches, screens=screens)
+                        completed_screening(registration, receipt, rule, saved)
+                        entry['state'] = 'SQL_CAPTURE_AND_SCREENING_READBACK'
+                        entry['screened_sql_records'] = len(screens)
+                    except (Denied, KeyError, TypeError, ValueError, IndexError):
+                        # Unqualified source contracts and inconsistent saved
+                        # children must never be counted as screened evidence.
+                        pass
+            entries.append(entry)
+    if len(entries) != plan['total_date_scopes']:
+        raise Denied('SHUTDOWN_SQL_READBACK_LEDGER_BOUND')
+    return dict(as_of_london=plan['as_of_london'],
+                fallback_is_verified_shutdown=False,
+                required_date_scopes=plan['total_date_scopes'],
+                entries=entries,
+                sql_readback_scopes=sum(x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK' for x in entries),
+                sql_readback_screened_records=sum(x['screened_sql_records'] or 0 for x in entries),
+                all_source_coverage_proven=False,
+                qualification_or_application_admission_proven=False)
+
+
 def prepare_admission_from_persisted_captures(connection, owner, binding, contract, root_key,
                                                rule, detail_targets, *, revision, item_limits,
                                                allow_test_evidence=False):
