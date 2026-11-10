@@ -43,6 +43,11 @@ REGISTRATION = r"""
    THEN RAISE EXCEPTION 'INTAKE_PERIOD_POLICY'; END IF;
    -- Distinct disposable-only historical issuer. No live or rolling widening.
    IF p->>'operation'='intake_catchup_period' THEN
+    -- A caller-controlled test flag cannot assert a disposable endpoint.
+    -- Refuse historical test issuance from any other SQL server/database.
+    IF current_database() IS DISTINCT FROM 'ingestion_provisioning_test'
+     OR inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_DISPOSABLE_ONLY'; END IF;
     IF e->'test_evidence' IS DISTINCT FROM 'true'::jsonb OR e->>'route' IS DISTINCT FROM 'DISPOSABLE'
      OR e->'hostaddr' IS DISTINCT FROM 'null'::jsonb OR e->'max_runs' IS DISTINCT FROM '1'::jsonb
      OR e ? 'mode' OR jsonb_typeof(e->'catchup_scope') IS DISTINCT FROM 'object'

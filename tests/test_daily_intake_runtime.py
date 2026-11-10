@@ -247,6 +247,23 @@ def _catchup_owner(world):
                  bindings=execution_binding())
 
 
+def test_disposable_catchup_installed_sql_is_bound_to_actual_loopback_database(world):
+    """Read the effective installed SQL issuer, not just the Python source.
+
+    The positive end-to-end test below executes this exact disposable route.
+    No live or remote database is contacted to test the refusal predicate.
+    """
+    reset(world)
+    with world['connect']('provisioning_migrator') as c:
+        db,host,body=c.execute(
+            "SELECT current_database(),inet_server_addr()::text,prosrc "
+            "FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure"
+        ).fetchone()
+    assert (db,host)==('ingestion_provisioning_test','127.0.0.1')
+    assert "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'" in body
+    assert "inet_server_addr() IS DISTINCT FROM '127.0.0.1'::inet" in body
+
+
 def test_disposable_historical_issuer_actual_daily_command_and_committed_readback(world,tmp_path):
     reset(world);p,scope=_catchup_fixture(world);name='synthetic-catchup-window'
     issued=_catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
