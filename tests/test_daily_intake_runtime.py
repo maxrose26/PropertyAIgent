@@ -225,9 +225,10 @@ def test_initial_28_day_overlap_is_not_supported_by_current_rolling_issuer(world
 
 def _catchup_fixture(world):
     from zoneinfo import ZoneInfo
+    from verification.discovery.finite_acceptance import manifest,digest as manifest_digest
     scope=dict(start='2026-09-15',end='2026-09-21',
                execution_day=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat(),
-               source_plan_sha256=__import__('verification.discovery.finite_acceptance',fromlist=['manifest','digest']).digest(__import__('verification.discovery.finite_acceptance',fromlist=['manifest']).manifest('2026-09-15','2026-09-21','SUSPENSION_CATCHUP')))
+               source_plan_sha256=manifest_digest(manifest('2026-09-15','2026-09-21','SUSPENSION_CATCHUP')))
     p=policy(world);p['max_runs']=1;p['catchup_scope']=scope
     return p,scope
 
@@ -274,7 +275,9 @@ def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
         if fault=='live_mode':p['test_evidence']=False
         if fault=='too_long':scope['end']='2026-09-22'
         if fault=='unfinished_day':scope['end']=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat()
-        with pytest.raises(Exception,match='ADMIN_EFFECT_UNCERTAIN'):
+        expected=ValueError if fault in ('too_long','unfinished_day') else Exception
+        message='CATCHUP_SOURCE_PLAN_MISMATCH' if expected is ValueError else 'ADMIN_EFFECT_UNCERTAIN'
+        with pytest.raises(expected,match=message):
             _catchup_owner(world).register_intake_period(name,p,disposable_catchup=fault!='rolling_smuggle')
         assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1
         return
