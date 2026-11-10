@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import time
+from datetime import datetime, timezone
 from contextlib import contextmanager, nullcontext
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -18,6 +19,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.ingestion.ledger import Denied
+from app.ingestion.retention_dry_run import assess_unverified_storage_snapshot
 from tests.e2e_pg_world import disposable_world
 from verification.ingestion_storage.daily_intake_runtime import Runtime, stop_snapshot
 
@@ -88,6 +90,24 @@ def test_actual_restricted_sql_source_and_final_readback():
             sha256=hashlib.sha256(data).hexdigest(),
             bytes=len(data),readback_verified=True)
         assert len(transactions)==2
+        # REAL disposable-PostgreSQL metadata inventory: never read raw body
+        # into the retention preview. The table alone has no authenticated
+        # hold/resolution/prospective tag, so every row must remain preserved.
+        metadata=boot.execute('''SELECT period, run_id, name, sha256,
+                               encode(sha256(body),'hex'), octet_length(body),
+                               created_at FROM public.ingestion_run_evidence
+                               WHERE period=%s AND run_id=%s''',
+                              (PERIOD,RUN)).fetchall()
+        snapshot=[dict(period=p,run_id=r,name=n,stored_sha256=s,
+                       actual_sha256=digest,bytes=size,
+                       created_at=created.isoformat())
+                  for p,r,n,s,digest,size,created in metadata]
+        preservation=assess_unverified_storage_snapshot(
+            snapshot,as_of=datetime.now(timezone.utc).isoformat())
+        assert preservation['total']==1
+        assert preservation['items'][0]['disposition']=='PRESERVE_HISTORICAL_OR_UNTAGGED'
+        assert preservation['items'][0]['may_delete_now'] is False
+        assert preservation['sql_or_delete_operations']==0
         # Idempotent read/write ACK is permitted while SOURCE_INTENT is live,
         # but the SQL ACK remains unverified until separate readback.
         with world['connect']('ingestion_worker_login') as worker:
