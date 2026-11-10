@@ -171,6 +171,7 @@ def shutdown_gap_sql_readback(connection, as_of):
     """
     from datetime import date
     from app.ingestion.listing_screening import RULE_V3, ScreeningRule
+    from .scope_binding import binding_for
     from app.ingestion.ledger import bounded
     from verification.discovery.campaign_manifest import shutdown_gap_source_packages
     plan = shutdown_gap_source_packages(as_of)

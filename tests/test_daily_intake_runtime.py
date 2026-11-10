@@ -378,6 +378,22 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
     finally:
         world['boot'].execute('ROLLBACK')
     assert snapshot(world['boot'])==before
+    # An overlapping but non-identical retained root is an unresolved gap,
+    # not proof that the canonical seven-day window was fully covered.
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET subject = "
+            "jsonb_set(subject::jsonb, '{start}', to_jsonb('2026-09-16'::text))::json "
+            "WHERE task='DISCOVERY' AND subject->>'council'='tameside'")
+        overlapping=shutdown_gap_sql_readback(world['boot'],as_of)
+        changed=next(x for x in overlapping['entries'] if x['council']=='tameside' and x['start']=='2026-09-15')
+        assert changed['state']=='OVERLAP_OR_CONFLICT_REQUIRES_REVIEW'
+        assert changed['screened_sql_records'] is None
+        assert overlapping['sql_readback_scopes']==1
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot'])==before
 
 
 @pytest.mark.parametrize('fault',['rolling_smuggle','live_mode','too_long','unfinished_day','changed_capture'])
