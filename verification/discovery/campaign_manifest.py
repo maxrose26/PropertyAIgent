@@ -63,7 +63,7 @@ def input_from_manifest(value):
     return {k:value[k] for k in (INPUT_KEYS|{'collection_mode'} if 'collection_mode' in value else INPUT_KEYS)}
 
 
-INITIAL_TWO_SLOT_VERSION='NINE_COUNCIL_INITIAL_28D_TWO_SLOT_SOURCE_PROOF_V1'
+INITIAL_TWO_SLOT_VERSION='NINE_COUNCIL_INITIAL_28D_DAY_ALIGNED_SOURCE_PROOF_V1'
 
 
 def initial_two_slot_packages(plan, expected_sha256):
@@ -89,9 +89,17 @@ def initial_two_slot_packages(plan, expected_sha256):
     arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in finite.ARCUS]
     idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in finite.ARCUS]
     if len(arcus)!=12 or len(idox)!=24:raise ValueError('INITIAL_28_FAMILY_COUNTS')
-    groups=[[arcus[i],idox[i]] for i in range(12)]
-    groups += [idox[i:i+2] for i in range(12,24,2)]
-    if len(groups)!=18 or sorted(i for g in groups for i in g)!=list(range(36)):
+    # Connected intake finalisation binds ONE end date. Source-only packing
+    # across dates would falsely imply that the current SQL can finalise it.
+    groups=[]
+    for day in sorted({row['end'] for row in plan['rows']}):
+        week_arcus=[i for i in arcus if plan['rows'][i]['end']==day]
+        week_idox=[i for i in idox if plan['rows'][i]['end']==day]
+        if len(week_arcus)!=3 or len(week_idox)!=6:
+            raise ValueError('INITIAL_28_WEEK_PARTITION')
+        groups += [[week_arcus[i],week_idox[i]] for i in range(3)]
+        groups += [[week_idox[3],week_idox[4]],[week_idox[5]]]
+    if len(groups)!=20 or sorted(i for g in groups for i in g)!=list(range(36)):
         raise ValueError('INITIAL_28_PARTITION')
     packages=[]
     for ordinal,group in enumerate(groups,1):
@@ -99,7 +107,7 @@ def initial_two_slot_packages(plan, expected_sha256):
                      selected_ordinals=sorted(group),collection_mode='SCREENING_METADATA')
         rows=select(payload,profiled=True)
         reservation=capacity(rows,SUCCESSOR_V2_LIMITS,profiled=True)
-        if len(rows)!=2 or reservation['observations']!=2 or reservation['requests']>100:
+        if not 1<=len(rows)<=2 or reservation['observations']!=len(rows) or reservation['requests']>100 or len({r['end'] for r in rows})!=1 or len({r['council'] for r in rows})!=len(rows):
             raise ValueError('INITIAL_28_TWO_SOURCE_CAP')
         packages.append(dict(ordinal=ordinal,selected_ordinals=payload['selected_ordinals'],
                              reservation=reservation))

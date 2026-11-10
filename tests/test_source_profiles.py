@@ -321,15 +321,19 @@ def test_initial_two_slot_packages_cover_nine_councils_including_bolton_without_
     result=campaign.initial_two_slot_packages(plan,f.digest(plan))
     assert result['version']==campaign.INITIAL_TWO_SLOT_VERSION
     assert result['window']==['2026-10-01','2026-10-28']
-    assert len(result['packages'])==18
+    assert len(result['packages'])==20
+    assert sum(len(p['selected_ordinals'])==1 for p in result['packages'])==4
     assert all(result[k] is False for k in ('sql_issuer_qualified','source_qualified',
                                            'initial_capture_authorised','operationally_usable'))
     indexes=[i for pkg in result['packages'] for i in pkg['selected_ordinals']]
     assert sorted(indexes)==list(range(36)) and len(set(indexes))==36
     seen={c:0 for c in f.SEMANTICS}
     for pkg in result['packages']:
-        assert len(pkg['selected_ordinals'])==2
-        assert pkg['reservation']['observations']==2
+        assert 1<=len(pkg['selected_ordinals'])<=2
+        assert pkg['reservation']['observations']==len(pkg['selected_ordinals'])
+        rows=[plan['rows'][i] for i in pkg['selected_ordinals']]
+        assert len({row['end'] for row in rows})==1
+        assert len({row['council'] for row in rows})==len(rows)
         assert pkg['reservation']['requests']<=100
         for i in pkg['selected_ordinals']:
             row=plan['rows'][i]
