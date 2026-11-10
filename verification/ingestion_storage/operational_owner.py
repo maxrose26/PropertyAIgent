@@ -469,6 +469,18 @@ class Owner:
         Does not clear a stop, install SQL, provision a login or issue daily work.
         The SQL boundary verifies expiry, council list and expected stop snapshot.
         """
+        if disposable_catchup:
+            # The exact nine-source finite manifest must be canonical, not a
+            # caller-supplied plausible-looking SHA. This is a test-only
+            # compatibility contract, not Trafford qualification or authority.
+            from verification.discovery.finite_acceptance import manifest,digest as manifest_digest
+            try:
+                scope=policy['catchup_scope']
+                expected=manifest_digest(manifest(scope['start'],scope['end'],'SUSPENSION_CATCHUP'))
+                if scope['source_plan_sha256']!=expected:
+                    raise ValueError('CATCHUP_SOURCE_PLAN_MISMATCH')
+            except (TypeError,KeyError,ValueError):
+                raise ValueError('CATCHUP_SOURCE_PLAN_MISMATCH') from None
         self.permitted_policy_states={'DAILY_INTAKE_APPLIED'}
         self.expected_generation=policy['expected_stop']['hard_stop_generation']
         with self.connection() as c:

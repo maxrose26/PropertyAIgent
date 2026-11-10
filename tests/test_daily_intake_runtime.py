@@ -227,9 +227,17 @@ def _catchup_fixture(world):
     from zoneinfo import ZoneInfo
     scope=dict(start='2026-09-15',end='2026-09-21',
                execution_day=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat(),
-               source_plan_sha256='a'*64)
+               source_plan_sha256=__import__('verification.discovery.finite_acceptance',fromlist=['manifest','digest']).digest(__import__('verification.discovery.finite_acceptance',fromlist=['manifest']).manifest('2026-09-15','2026-09-21','SUSPENSION_CATCHUP')))
     p=policy(world);p['max_runs']=1;p['catchup_scope']=scope
     return p,scope
+
+
+def test_disposable_catchup_rejects_forged_source_manifest_before_issuer(world):
+    reset(world);p,_=_catchup_fixture(world)
+    p['catchup_scope']['source_plan_sha256']='f'*64
+    with pytest.raises(ValueError,match='CATCHUP_SOURCE_PLAN_MISMATCH'):
+        _catchup_owner(world).register_intake_period('forged-manifest',p,disposable_catchup=True)
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1
 
 
 def _catchup_owner(world):
