@@ -87,6 +87,53 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
     return Registration('CHAIN', authority_name(binding, 'CHAIN', revision), rows, [*batches, *facts.values()], grant, bindings, root['key'], contracts, batches, screens, facts)
 
 
+
+def persisted_council_capture_inventory(connection, council, *, max_roots=128):
+    """Owner-side READ-ONLY inventory of *stored* discovery roots in one SQL snapshot.
+
+    This is an offline preparation/readback aid, NOT a new restricted-worker
+    capability, source-completeness proof, permission to issue grants, or proof
+    that historical R0 receipts were persisted. The caller owns and independently
+    authenticates the existing connection; this helper neither obtains credentials
+    nor changes the database. Every known unfinished root refuses nomination,
+    rather than silently omitting a possibly conflicting observation.
+    """
+    from app.pipeline.discovery_contract import COUNCILS
+    if council not in COUNCILS or type(max_roots) is not int or not 1 <= max_roots <= 128:
+        raise Denied('CAPTURE_INVENTORY_SCOPE')
+    raw = connection.execute(
+        "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+        "WHERE w.task='DISCOVERY' AND w.subject->>'council'=%s "
+        "ORDER BY w.key LIMIT %s",
+        (council, max_roots + 1),
+    ).fetchall()
+    if not raw or len(raw) > max_roots:
+        raise Denied('CAPTURE_INVENTORY_EMPTY_OR_BOUND')
+    roots = [r[0] for r in raw]
+    if len({r.get('key') for r in roots}) != len(roots):
+        raise Denied('CAPTURE_INVENTORY_DUPLICATE')
+    for root in roots:
+        subject = root.get('subject')
+        receipt = root.get('checkpoint')
+        if (root.get('state') != 'COMPLETE' or not isinstance(subject, dict)
+                or not isinstance(receipt, dict)):
+            raise Denied('CAPTURE_INVENTORY_UNRESOLVED')
+        archive = receipt.get('durable_archive')
+        if (receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                or receipt.get('council') != council
+                or receipt.get('contract') != root.get('contract')
+                or receipt.get('interval') != [subject.get('start'), subject.get('end')]
+                or receipt.get('date_semantics') != subject.get('semantics')
+                or receipt.get('accounting_complete') is not True
+                or receipt.get('cleanup') != 'CLOSED'
+                or not isinstance(archive, dict)
+                or archive.get('readback_verified') is not True):
+            raise Denied('CAPTURE_INVENTORY_UNVERIFIED')
+    # DB membership alone does not prove independent historical/source coverage:
+    # use these receipts for overlap/conflict checks, never as a coverage gate.
+    return tuple(roots)
+
+
 def _capture_inputs(binding,contract,root,receipt,item_limits):
     scope = contract.scope()
     if (root.get('subject') != scope or root.get('task') != 'DISCOVERY' or root.get('contract') != contract.name or receipt.get('council') != binding.council
