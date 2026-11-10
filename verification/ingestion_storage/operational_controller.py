@@ -304,6 +304,7 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
     check()
     if (binding.reference,binding.source_url,binding.source_record_id)!=(envelope.reference,envelope.source_url,envelope.source_record_id):raise Denied('NOMINATED_IDENTITY_BINDING')
     root=l.get(binding.discovery_key)
+    plan={}  # Legacy direct discovery has no completed batch or bound plan.
     if root['state']=='COMPLETE':
         receipt=root['checkpoint']
         if not binding.retained_capture_sha256 or digest(receipt)!=binding.retained_capture_sha256:raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
@@ -345,9 +346,9 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
     expected=rule.screen(r)
     if not identity_admission_eligible(expected):return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')      # the ONE authoritative routing outcome decides (v1 dispositions, or v3 ADMIT_SCHEME / ADMIT_FOR_ASSESSMENT)
     want_revision=digest(r) if rule.rule_version==RULE_V1 else assessment_identity(r,rule)[3]
-    capture_bound=(bool(binding.screening_batch_key) and plan.get('capture_bound') is True)
-    if (binding.screening_batch_key and plan.get('capture_bound',False) not in (False,True)
-            or capture_bound and rule.rule_version==RULE_V1
+    mode=plan.get('capture_bound',False) if binding.screening_batch_key else False
+    capture_bound=(mode is True)
+    if (type(mode) is not bool or capture_bound and rule.rule_version==RULE_V1
             or capture_bound is not (coordinator.capture_bound_screening is True)):
         raise Denied('CONTROLLER_CAPTURE_BOUND_MODE')
     if rule.rule_version!=RULE_V1:

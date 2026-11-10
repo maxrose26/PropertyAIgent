@@ -106,8 +106,9 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
     # The current daily intake commits capture-specific v3 screen revisions;
     # historical v3 children remain unbound. The saved plan, not a caller
     # flag or a proposed fact, selects which exact identity is admissible.
-    capture_bound = plan.get('capture_bound') is True
-    if (plan.get('capture_bound', False) not in (False, True)
+    mode = plan.get('capture_bound', False)
+    capture_bound = mode is True
+    if (type(mode) is not bool
             or capture_bound is not (coordinator.capture_bound_screening is True)):
         raise Denied('V3_CAPTURE_BOUND_MODE')
     if capture_bound:
