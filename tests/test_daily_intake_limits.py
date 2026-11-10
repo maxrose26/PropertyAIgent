@@ -27,7 +27,7 @@ def test_remaining_limits_and_cancellation_cost_are_carried():
     x=caller();x.budgets=[prior(statements=950,attempts=34,returned=100,cancels=3)]
     b=x._budget()
     assert b.statement_cap==74 and b.connection_cap==4 and b.returned_cap==4*1024**2-100
-    assert b.cancel_used==3 and b.hard_stop_at==x.intake_started+270
+    assert b.cancel_used==3 and b.hard_stop_at == pytest.approx(x.intake_started+270, rel=0, abs=1e-9)
 
 
 def test_elapsed_time_cannot_restart_with_another_batch():
