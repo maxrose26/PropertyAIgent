@@ -500,6 +500,15 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     assert independently_derived.sha256 == candidates.sha256
     assert prepared.facts == registration.facts
     assert prepared.screens[nominee.reference]['key'] == screen['key']
+    from unittest.mock import patch
+    import verification.ingestion_storage.chain_registration as chain_module
+    with patch.object(chain_module, 'persisted_council_capture_inventory',
+                      side_effect=[roots, tuple()]):
+        with pytest.raises(Denied, match='PERSISTED_ADMISSION_INVENTORY_CHANGED'):
+            prepare_admission_from_persisted_captures(
+                world['boot'], owner, binding_for('tameside'), contract, root['key'],
+                RULE, {nominee.reference:target}, revision='offline-prepare-only',
+                item_limits=root['limits'], allow_test_evidence=True)
     assert snapshot(world['boot']) == before
     # Neither a caller's invented root nor a tampered persisted assessment
     # can be admitted through the owner-side inventory preparation.

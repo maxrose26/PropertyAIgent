@@ -161,7 +161,7 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
 def prepare_admission_from_persisted_captures(connection, owner, binding, contract, root_key,
                                                rule, detail_targets, *, revision, item_limits,
                                                allow_test_evidence=False):
-    """Owner-side read-only admission preparation from one SQL snapshot.
+    """Owner-side read-only admission preparation from persisted SQL history.
 
     The caller may choose a stored root, but CANNOT hand-pick the history or
     omit conflicting captures. Fetch all complete, verified persisted roots of
@@ -200,6 +200,12 @@ def prepare_admission_from_persisted_captures(connection, owner, binding, contra
         allow_test_evidence=allow_test_evidence, capture_bound=True,
         other_receipts=tuple(r['checkpoint'] for r in roots if r['key'] != root_key),
     )
+    # Do not claim a single snapshot from a caller-owned connection which may
+    # be autocommit/READ COMMITTED. An optimistic second independent read must
+    # agree before a preparation candidate is returned; the eventual issuer
+    # must still revalidate current durable state at its own execution fence.
+    if persisted_council_capture_inventory(connection, binding.council) != roots:
+        raise Denied('PERSISTED_ADMISSION_INVENTORY_CHANGED')
     return registration, nomination
 
 
