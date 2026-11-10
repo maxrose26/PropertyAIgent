@@ -7,6 +7,12 @@ def archive_capture(source,archive):
     raw=json.dumps(source,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
     if len(raw)>512*1024:raise Denied('SOURCE_AUDIT_BOUND')
     receipt=bounded(archive(raw),4096)
+    # The new private backend must never masquerade as a Git commit. Historical
+    # no-backend Git receipts continue down the exact original validation path.
+    from .private_evidence import BACKEND, require_private_receipt
+    if receipt.get('backend')==BACKEND:
+        return require_private_receipt(receipt,raw)
+    if 'backend' in receipt:raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
     if (receipt.get('sha256')!=digest(source) or receipt.get('bytes')!=len(raw)
         or receipt.get('readback_verified') is not True or not re.fullmatch('[a-f0-9]{40}',receipt.get('commit',''))
         or not receipt.get('path','').startswith('docs/design/') or '..' in receipt['path'].split('/')):raise Denied('DURABLE_ARCHIVE_NOT_VERIFIED')
