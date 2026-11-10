@@ -157,6 +157,52 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
     return tuple(roots)
 
 
+
+def prepare_admission_from_persisted_captures(connection, owner, binding, contract, root_key,
+                                               rule, detail_targets, *, revision, item_limits,
+                                               allow_test_evidence=False):
+    """Owner-side read-only admission preparation from one SQL snapshot.
+
+    The caller may choose a stored root, but CANNOT hand-pick the history or
+    omit conflicting captures. Fetch all complete, verified persisted roots of
+    that council and the exact saved screening children before deriving
+    nominees. No issuer/worker capability or factual write is provided.
+    SQL membership does not authenticate source enumeration or archive bytes.
+    """
+    roots = persisted_council_capture_inventory(connection, binding.council)
+    selected = [r for r in roots if r['key'] == root_key]
+    if len(selected) != 1:
+        raise Denied('PERSISTED_ADMISSION_ROOT_NOT_FOUND')
+    root = selected[0]
+    receipt = root['checkpoint']
+    receipts = tuple(r['checkpoint'] for r in roots)
+    nomination = derive_nominees(receipts, rule, allow_test_evidence=allow_test_evidence,
+                                  capture_bound=True)
+    nominees = tuple(n for n in nomination.nominees if n.capture_sha256 == digest(receipt))
+    screening = screening_registration(owner, binding, contract, root, receipt, rule,
+                                       revision=revision, item_limits=item_limits,
+                                       _completed=True, allow_test_evidence=allow_test_evidence,
+                                       capture_bound=True)
+    required = [r['key'] for r in [*screening.batches, *screening.screens.values()]]
+    if len(required) > 72:
+        raise Denied('PERSISTED_ADMISSION_SCREENING_BOUND')
+    saved = []
+    if required:
+        saved = [row[0] for row in connection.execute(
+            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w WHERE w.key = ANY(%s)",
+            (required,),
+        ).fetchall()]
+    from app.ingestion.ledger import bounded
+    bounded(saved, 2 * 1024 ** 2)
+    registration = admission_registration(
+        owner, binding, contract, root, receipt, nominees, rule, detail_targets,
+        revision=revision, item_limits=item_limits, screening_rows=saved,
+        allow_test_evidence=allow_test_evidence, capture_bound=True,
+        other_receipts=tuple(r['checkpoint'] for r in roots if r['key'] != root_key),
+    )
+    return registration, nomination
+
+
 def _capture_inputs(binding,contract,root,receipt,item_limits):
     scope = contract.scope()
     if (root.get('subject') != scope or root.get('task') != 'DISCOVERY' or root.get('contract') != contract.name or receipt.get('council') != binding.council

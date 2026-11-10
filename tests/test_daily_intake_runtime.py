@@ -492,6 +492,37 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     assert registration.screens[nominee.reference]['key']==screen['key']
     assert registration.facts[nominee.reference]['dependencies']==[screen['key']]
     assert registration.grant['source_calls']==1
+    from verification.ingestion_storage.chain_registration import prepare_admission_from_persisted_captures
+    prepared, independently_derived = prepare_admission_from_persisted_captures(
+        world['boot'], owner, binding_for('tameside'), contract, root['key'],
+        RULE, {nominee.reference:target}, revision='offline-prepare-only',
+        item_limits=root['limits'], allow_test_evidence=True)
+    assert independently_derived.sha256 == candidates.sha256
+    assert prepared.facts == registration.facts
+    assert prepared.screens[nominee.reference]['key'] == screen['key']
+    assert snapshot(world['boot']) == before
+    # Neither a caller's invented root nor a tampered persisted assessment
+    # can be admitted through the owner-side inventory preparation.
+    with pytest.raises(Denied, match='PERSISTED_ADMISSION_ROOT_NOT_FOUND'):
+        prepare_admission_from_persisted_captures(
+            world['boot'], owner, binding_for('tameside'), contract, 'f'*64, RULE,
+            {nominee.reference:target}, revision='offline-prepare-only',
+            item_limits=root['limits'], allow_test_evidence=True)
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET checkpoint = "
+            "jsonb_set(checkpoint::jsonb, '{capture_checkpoint_sha256}', "
+            "to_jsonb(repeat('0',64)))::json "
+            "WHERE task='SCREENING' AND subject->>'council'='tameside'")
+        with pytest.raises(Denied, match='STAGED_ASSESSMENT_CHECKPOINT'):
+            prepare_admission_from_persisted_captures(
+                world['boot'], owner, binding_for('tameside'), contract, root['key'],
+                RULE, {nominee.reference:target}, revision='offline-prepare-only',
+                item_limits=root['limits'], allow_test_evidence=True)
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot']) == before
     # A corrupt committed archive readback must not be accepted as a complete
     # candidate merely because the underlying root state still says COMPLETE.
     # Change only a disposable transaction and roll it back before exit.
