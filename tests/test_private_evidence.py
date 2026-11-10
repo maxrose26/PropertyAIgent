@@ -188,6 +188,8 @@ def test_runtime_archive_private_worker_receipt_is_verified_across_transactions(
              'p_period text, p_run text, p_name text, p_body bytea',True)]
         def execute(self,stmt,args=None):
             q=str(stmt)
+            if 'FROM pg_catalog.pg_class c' in q:
+                return SimpleNamespace(all=lambda:[('ingestion_storage_owner','r',False)])
             if 'FROM pg_catalog.pg_proc' in q:
                 events.append('inventory')
                 return SimpleNamespace(all=lambda:self.inventory)
@@ -380,6 +382,8 @@ def test_runtime_private_final_commits_and_reads_both_objects_separately():
     class SQL:
         def execute(self,statement,args=None):
             q=str(statement)
+            if 'FROM pg_catalog.pg_class c' in q:
+                return SimpleNamespace(all=lambda:[('ingestion_storage_owner','r',False)])
             if 'FROM pg_catalog.pg_proc' in q:
                 calls.append('inventory')
                 return SimpleNamespace(all=lambda:inventory)
