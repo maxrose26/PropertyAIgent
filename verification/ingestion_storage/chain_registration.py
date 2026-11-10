@@ -110,6 +110,10 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
     if not raw or len(raw) > max_roots:
         raise Denied('CAPTURE_INVENTORY_EMPTY_OR_BOUND')
     roots = [r[0] for r in raw]
+    # Reuse the existing 2 MiB readback ceiling; 128 small roots is not a
+    # licence to materialise unbounded private captures in this process.
+    from app.ingestion.ledger import bounded
+    bounded(roots, 2 * 1024 ** 2)
     if len({r.get('key') for r in roots}) != len(roots):
         raise Denied('CAPTURE_INVENTORY_DUPLICATE')
     for root in roots:
