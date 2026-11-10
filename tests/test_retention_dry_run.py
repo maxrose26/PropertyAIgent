@@ -1,7 +1,7 @@
 """Tests for the prospective policy assessment; NO SQL / deletion."""
 import copy
 import unittest
-from app.ingestion.retention_dry_run import assess_retention
+from app.ingestion.retention_dry_run import assess_retention, assess_unverified_storage_snapshot
 
 T0='2026-01-01T00:00:00+00:00'
 AS_OF='2026-11-09T19:00:00+00:00'
@@ -56,6 +56,31 @@ class RetentionSafety(unittest.TestCase):
             assess_retention([row(),row()],as_of=AS_OF)
         with self.assertRaises(ValueError):
             assess_retention([dict(row(),raw_source='SECRET')],as_of=AS_OF)
+
+    def test_unverified_storage_snapshot_is_preservation_only(self):
+        # Storage hash, byte size and capture timestamp do NOT authenticate
+        # prospective retention, hold releases or a resolved failure.
+        stored=dict(period='new-period',run_id='a'*32,
+                    name='capture-1/source.json',stored_sha256='b'*64,
+                    actual_sha256='b'*64,bytes=120,created_at=T0)
+        result=assess_unverified_storage_snapshot([stored],as_of=AS_OF)
+        self.assertTrue(result['dry_run_only'])
+        self.assertEqual(result['sql_or_delete_operations'],0)
+        self.assertEqual(result['total'],1)
+        self.assertEqual(result['items'][0]['disposition'],
+                         'PRESERVE_HISTORICAL_OR_UNTAGGED')
+        self.assertFalse(result['items'][0]['may_delete_now'])
+        self.assertNotIn('stored_sha256',result['items'][0])
+        self.assertNotIn('created_at',result['items'][0])
+        # Caller cannot smuggle trusted flags, raw bytes or a mismatched digest.
+        invalid=[dict(stored,body=b'private'),dict(stored,historical=False),
+                 dict(stored,actual_sha256='c'*64),dict(stored,bytes=0),
+                 dict(stored,created_at='2100-01-01T00:00:00Z')]
+        for case in invalid:
+            with self.subTest(case=case),self.assertRaises(ValueError):
+                assess_unverified_storage_snapshot([case],as_of=AS_OF)
+        with self.assertRaises(ValueError):
+            assess_unverified_storage_snapshot([stored,stored],as_of=AS_OF)
 
     def test_sorted_minimal_output_no_raw_fields(self):
         a=row(name='capture-2/source.json')
