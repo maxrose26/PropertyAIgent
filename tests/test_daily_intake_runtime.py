@@ -100,6 +100,24 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     assert result['coverage_advance'] is False and result['admission_connected'] is False
     assert len(result['backlog']['records'])==(1 if failed else 2)
     assert all(r['fields'] and r['source_url'] and r['source_record_id'] and r['archive']['readback_verified'] for r in result['backlog']['records'])
+    # Owner-side exact SQL inventory: one committed readback per council.
+    # Unknown/failed roots cannot be silently dropped before nomination.
+    from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
+    with world['connect']('provisioning_migrator') as inventory_db:
+        verified_m = persisted_council_capture_inventory(inventory_db, 'manchester')
+        assert len(verified_m) == 1 and verified_m[0]['checkpoint']['council'] == 'manchester'
+        if failed:
+            with pytest.raises(Denied, match='CAPTURE_INVENTORY_UNRESOLVED'):
+                persisted_council_capture_inventory(inventory_db, 'tameside')
+        else:
+            verified_t = persisted_council_capture_inventory(inventory_db, 'tameside')
+            assert len(verified_t) == 1 and verified_t[0]['checkpoint']['council'] == 'tameside'
+        with pytest.raises(Denied, match='CAPTURE_INVENTORY_SCOPE'):
+            persisted_council_capture_inventory(inventory_db, 'trafford')
+        with pytest.raises(Denied, match='CAPTURE_INVENTORY_EMPTY_OR_BOUND'):
+            persisted_council_capture_inventory(inventory_db, 'oldham')
+        with pytest.raises(Denied, match='CAPTURE_INVENTORY_SCOPE'):
+            persisted_council_capture_inventory(inventory_db, 'tameside', max_roots=0)
     assert changed_tables(before,snapshot(world['boot']))==[] and restricted_sessions(world['boot'])==0
     # Actual retained checkpoints supply nomination inputs. Do NOT run an
     # admission writer: its current validator still expects unbound revisions.
@@ -439,7 +457,9 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED'
     all_rows=[row[0] for row in world['boot'].execute(
         "SELECT row_to_json(w) FROM ingestion_work_items w WHERE key<>repeat('0',64)").fetchall()]
-    roots=[r for r in all_rows if r['task']=='DISCOVERY' and r['subject']['council']=='tameside']
+    from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
+    with world['connect']('provisioning_migrator') as inventory_db:
+        roots=persisted_council_capture_inventory(inventory_db,'tameside')
     assert len(roots)==1 and roots[0]['state']=='COMPLETE'
     root=roots[0]
     receipt=root['checkpoint']
@@ -462,7 +482,8 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     kwargs=dict(revision='offline-prepare-only',item_limits=root['limits'],
                 screening_rows=selected,allow_test_evidence=True,capture_bound=True)
     registration=admission_registration(owner,binding_for('tameside'),contract,
-        root,receipt,candidates.nominees,RULE,{nominee.reference:target},**kwargs)
+        root,receipt,candidates.nominees,RULE,{nominee.reference:target},
+        **dict(kwargs,other_receipts=tuple(r['checkpoint'] for r in roots if r['key']!=root['key'])))
     assert registration.kind=='ADMISSION' and len(registration.facts)==1
     assert registration.screens[nominee.reference]['key']==screen['key']
     assert registration.facts[nominee.reference]['dependencies']==[screen['key']]
