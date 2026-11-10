@@ -10,10 +10,16 @@ def row(**kwargs):
     result=dict(period='new-period',run_id='a'*32,name='capture-1/source.json',
                 sha256='b'*64,bytes=120,captured_at=T0,
                 retention_tag='PA_D002_PROSPECTIVE_V1',readback_verified=True,
-                resolution='VERIFIED',resolved_at=None,explicit_hold=False,
+                resolution='RECONCILED',resolved_at=T0,explicit_hold=False,
                 hold_history_verified=True,hold_released_at=None,
                 historical=False)
     result.update(kwargs)
+    # Optimistic policy fixtures represent a separately resolved old run.
+    # VERIFIED runs instead need both private final receipts, tested below.
+    if result['resolution'] == 'RECONCILED' and 'resolved_at' not in kwargs:
+        result['resolved_at'] = result['captured_at']
+    elif result['resolution'] in ('VERIFIED', 'UNRESOLVED') and 'resolved_at' not in kwargs:
+        result['resolved_at'] = None
     return result
 
 def verified_index(*records):
@@ -76,7 +82,7 @@ class RetentionSafety(unittest.TestCase):
 
     def test_malformed_uncertain_inventory_refused(self):
         invalid=[row(bytes=True),row(bytes=524289),row(name='capture-3/source.json'),
-                 row(resolution='RECONCILED'),row(resolution='VERIFIED',resolved_at='2026-08-01T00:00:00Z'),
+                 row(resolution='RECONCILED',resolved_at=None),row(resolution='VERIFIED',resolved_at='2026-08-01T00:00:00Z'),
                  row(captured_at='9999-01-01T00:00:00Z'),row(captured_at='2026-01-01'),
                  row(explicit_hold='false'),row(sha256='not-a-hash'),row(retention_tag=None),
                  row(hold_history_verified='yes'),
@@ -92,6 +98,44 @@ class RetentionSafety(unittest.TestCase):
             assess_retention([row(),row()],as_of=AS_OF)
         with self.assertRaises(ValueError):
             assess_retention([dict(row(),raw_source='SECRET')],as_of=AS_OF)
+
+    def test_verified_run_needs_both_private_finals_and_source(self):
+        # A structural manifest of a lone VERIFIED capture must preserve it,
+        # even when old, fully hashed and otherwise apparently eligible.
+        source = row(resolution='VERIFIED')
+        alone = assess_retention([source], as_of=AS_OF,
+                                 verified_run_index=verified_index(source))
+        self.assertEqual(alone['items'][0]['disposition'],
+                         'PRESERVE_RUN_FINAL_EVIDENCE_UNVERIFIED')
+        final_result = row(name='final/result-before-publication.json',
+                           sha256='c'*64, resolution='VERIFIED')
+        final_events = row(name='final/events-before-publication.json',
+                           sha256='d'*64, resolution='VERIFIED')
+        for truncated in ([source, final_result], [final_result, final_events]):
+            outcome = assess_retention(truncated, as_of=AS_OF,
+                                       verified_run_index=verified_index(*truncated))
+            self.assertEqual({i['disposition'] for i in outcome['items']},
+                             {'PRESERVE_RUN_FINAL_EVIDENCE_UNVERIFIED'})
+        complete = [source, final_result, final_events]
+        positive = assess_retention(complete, as_of=AS_OF,
+                                    verified_run_index=verified_index(*complete))
+        self.assertEqual({i['disposition'] for i in positive['items']},
+                         {'FUTURE_OWNER_REVIEW_CANDIDATE'})
+        self.assertTrue(all(i['may_delete_now'] is False for i in positive['items']))
+
+    def test_impossible_run_wide_storage_size_preserves(self):
+        # Per-item bounds alone cannot prove the existing aggregate 2 MiB cap.
+        source = row(resolution='VERIFIED', bytes=524288)
+        final_result = row(name='final/result-before-publication.json',
+                           sha256='c'*64, bytes=1400000, resolution='VERIFIED')
+        final_events = row(name='final/events-before-publication.json',
+                           sha256='d'*64, bytes=300000, resolution='VERIFIED')
+        items = [source, final_result, final_events]
+        observed = assess_retention(items, as_of=AS_OF,
+                                    verified_run_index=verified_index(*items))
+        self.assertEqual({i['disposition'] for i in observed['items']},
+                         {'PRESERVE_RUN_STORAGE_BOUND_UNVERIFIED'})
+        self.assertTrue(all(not i['may_delete_now'] for i in observed['items']))
 
     def test_unverified_storage_snapshot_is_preservation_only(self):
         # Storage hash, byte size and capture timestamp do NOT authenticate
