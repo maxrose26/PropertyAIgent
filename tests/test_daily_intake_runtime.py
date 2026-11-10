@@ -488,6 +488,21 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     assert registration.screens[nominee.reference]['key']==screen['key']
     assert registration.facts[nominee.reference]['dependencies']==[screen['key']]
     assert registration.grant['source_calls']==1
+    # A corrupt committed archive readback must not be accepted as a complete
+    # candidate merely because the underlying root state still says COMPLETE.
+    # Change only a disposable transaction and roll it back before exit.
+    with world['connect']('provisioning_migrator') as inventory_db:
+        inventory_db.execute('SAVEPOINT capture_inventory_negative')
+        try:
+            inventory_db.execute(
+                "UPDATE ingestion_work_items SET checkpoint = "
+                "jsonb_set(checkpoint::jsonb, '{durable_archive,readback_verified}', 'false'::jsonb)::json "
+                "WHERE task='DISCOVERY' AND subject->>'council'='tameside'"
+            )
+            with pytest.raises(Denied, match='CAPTURE_INVENTORY_UNVERIFIED'):
+                persisted_council_capture_inventory(inventory_db, 'tameside')
+        finally:
+            inventory_db.execute('ROLLBACK TO SAVEPOINT capture_inventory_negative')
     assert snapshot(world['boot'])==before  # no issuer/grant/work-item/learnt fact changed
     with pytest.raises(Denied):
         admission_registration(owner,binding_for('tameside'),contract,root,receipt,
