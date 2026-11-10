@@ -187,21 +187,28 @@ class RetentionSafety(unittest.TestCase):
                                 for item in candidate['items']))
 
     def test_latest_capture_or_hold_release_starts_run_wide_clock(self):
-        older = row(name='capture-1/source.json')
+        # VERIFIED-run fixtures include both required private final receipts.
+        older = row(name='capture-1/source.json', resolution='VERIFIED')
         recent = row(name='capture-2/source.json',
-                     captured_at='2026-10-15T00:00:00Z')
-        outcome = assess_retention([older, recent], as_of=AS_OF,
-                                   verified_run_index=verified_index(older, recent))
+                     captured_at='2026-10-15T00:00:00Z', resolution='VERIFIED')
+        final_result = row(name='final/result-before-publication.json',
+                           sha256='c'*64, resolution='VERIFIED')
+        final_events = row(name='final/events-before-publication.json',
+                           sha256='d'*64, resolution='VERIFIED')
+        records = [older, recent, final_result, final_events]
+        outcome = assess_retention(records, as_of=AS_OF,
+                                   verified_run_index=verified_index(*records))
         self.assertEqual({i['disposition'] for i in outcome['items']},
                          {'PRESERVE_WITHIN_RETENTION'})
         self.assertEqual({i['raw_not_before'] for i in outcome['items']},
                          {'2027-01-13T00:00:00+00:00'})
         self.assertEqual({i['index_keep_through_at_least']
                           for i in outcome['items']}, {'2027-10-15T00:00:00+00:00'})
-        release = row(name='capture-2/source.json',
+        release = row(name='capture-2/source.json', resolution='VERIFIED',
                       hold_released_at='2026-10-15T00:00:00Z')
-        outcome = assess_retention([older, release], as_of=AS_OF,
-                                   verified_run_index=verified_index(older, release))
+        records = [older, release, final_result, final_events]
+        outcome = assess_retention(records, as_of=AS_OF,
+                                   verified_run_index=verified_index(*records))
         self.assertEqual({i['disposition'] for i in outcome['items']},
                          {'PRESERVE_WITHIN_RETENTION'})
         self.assertEqual({i['raw_not_before'] for i in outcome['items']},
