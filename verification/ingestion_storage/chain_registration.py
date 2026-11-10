@@ -186,14 +186,18 @@ def prepare_admission_from_persisted_captures(connection, owner, binding, contra
     required = [r['key'] for r in [*screening.batches, *screening.screens.values()]]
     if len(required) > 72:
         raise Denied('PERSISTED_ADMISSION_SCREENING_BOUND')
-    saved = []
-    if required:
-        saved = [row[0] for row in connection.execute(
+    # Protect a candidate from a mutable saved screening row between its
+    # initial read and return. This is only an owner-side optimistic fence:
+    # a future issuer must still revalidate under its own execution lock.
+    from app.ingestion.ledger import bounded
+    def read_screening_children():
+        rows = ([row[0] for row in connection.execute(
             "SELECT row_to_json(w) FROM public.ingestion_work_items AS w WHERE w.key = ANY(%s)",
             (required,),
-        ).fetchall()]
-    from app.ingestion.ledger import bounded
-    bounded(saved, 2 * 1024 ** 2)
+        ).fetchall()] if required else [])
+        bounded(rows, 2 * 1024 ** 2)
+        return sorted(rows, key=lambda row: row['key'])
+    saved = read_screening_children()
     registration = admission_registration(
         owner, binding, contract, root, receipt, nominees, rule, detail_targets,
         revision=revision, item_limits=item_limits, screening_rows=saved,
@@ -206,6 +210,8 @@ def prepare_admission_from_persisted_captures(connection, owner, binding, contra
     # must still revalidate current durable state at its own execution fence.
     if persisted_council_capture_inventory(connection, binding.council) != roots:
         raise Denied('PERSISTED_ADMISSION_INVENTORY_CHANGED')
+    if read_screening_children() != saved:
+        raise Denied('PERSISTED_ADMISSION_SCREENING_CHANGED')
     return registration, nomination
 
 

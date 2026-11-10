@@ -532,6 +532,30 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     finally:
         world['boot'].execute('ROLLBACK')
     assert snapshot(world['boot']) == before
+    # A completed screening row may change after preparation's first read.
+    # Inject a real disposable-PG change inside a rolled-back transaction and
+    # require the optimistic saved-child fence to refuse the stale result.
+    world['boot'].execute('BEGIN')
+    try:
+        original_admission = chain_module.admission_registration
+        def concurrent_screen_change(*args, **kwargs):
+            candidate = original_admission(*args, **kwargs)
+            world['boot'].execute(
+                "UPDATE ingestion_work_items SET checkpoint = "
+                "jsonb_set(checkpoint::jsonb, '{source_sha256}', "
+                "to_jsonb(repeat('2',64)))::json "
+                "WHERE task='SCREENING' AND subject->>'council'='tameside'")
+            return candidate
+        with patch.object(chain_module, 'admission_registration',
+                          side_effect=concurrent_screen_change):
+            with pytest.raises(Denied, match='PERSISTED_ADMISSION_SCREENING_CHANGED'):
+                prepare_admission_from_persisted_captures(
+                    world['boot'], owner, binding_for('tameside'), contract, root['key'],
+                    RULE, {nominee.reference: target}, revision='offline-prepare-only',
+                    item_limits=root['limits'], allow_test_evidence=True)
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot']) == before
     # A corrupt committed archive readback must not be accepted as a complete
     # candidate merely because the underlying root state still says COMPLETE.
     # Change only a disposable transaction and roll it back before exit.
