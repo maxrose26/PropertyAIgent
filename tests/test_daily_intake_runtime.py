@@ -150,14 +150,15 @@ def test_disposable_backlog_refuses_corrupt_complete_capture_evidence(world,tmp_
     A COMPLETE flag is insufficient for an unverified archive or contradictory
     terminal receipt. This runs only against the existing disposable PG fixture.
     """
-    from sqlalchemy import create_engine,text
+    from sqlalchemy import text
     reset(world)
     name='backlog-durable-proof'
     authorise(world,name)
     run,result,_=invoke(world,tmp_path,name)
     assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED'
     before=snapshot(world['boot'])
-    engine=create_engine(world['urls']['provisioning_migrator'])
+    # Reuse the fixture's bootstrap engine; no new credentials or privileges.
+    engine=world['app']
     reader=SimpleNamespace(_limits=lambda _connection: None)
     def read(connection):
         return backlog_page(reader,['tameside'],['daily-intake-tameside'],RULE,connection=connection)
@@ -188,7 +189,7 @@ def test_disposable_backlog_refuses_corrupt_complete_capture_evidence(world,tmp_
                     transaction.rollback()
         assert snapshot(world['boot'])==before
     finally:
-        engine.dispose()
+        assert snapshot(world['boot'])==before
 
 
 def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation(world,tmp_path):
