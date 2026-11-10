@@ -418,3 +418,65 @@ def test_invalid_disposable_source_audit_never_reports_zero_requests_or_continue
     assert not (output/'manchester-source.json').exists()
     assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchone()[0]==0
     assert restricted_sessions(world['boot'])==0
+
+
+def test_persisted_capture_bound_screening_prepares_exact_offline_admission_without_effect(world,tmp_path):
+    """Actual disposable intake -> committed SQL readback -> exact bound admission preparation.
+
+    Preparation is pure: the existing worker has NO admission issuance or factual write
+    permission here. A successful metadata screening is not a verified buyer fact.
+    """
+    from app.ingestion.nomination import derive_nominees
+    from verification.ingestion_storage.chain_registration import admission_registration
+    from verification.ingestion_storage.scope_binding import binding_for
+    from tests.e2e_connection_support import idox_contract
+    from app.ingestion.observation_screening import observation_revision
+
+    reset(world)
+    name='handoff-capture-bound'
+    authorise(world,name)
+    run,result,_=invoke(world,tmp_path,name)
+    assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED'
+    all_rows=[row[0] for row in world['boot'].execute(
+        "SELECT row_to_json(w) FROM ingestion_work_items w WHERE key<>repeat('0',64)").fetchall()]
+    roots=[r for r in all_rows if r['task']=='DISCOVERY' and r['subject']['council']=='tameside']
+    assert len(roots)==1 and roots[0]['state']=='COMPLETE'
+    root=roots[0]
+    receipt=root['checkpoint']
+    selected=[r for r in all_rows if r['task'] in ('LISTING_METADATA','SCREENING') and r['subject']['council']=='tameside']
+    assert len(selected)==2 and all(r['state']=='COMPLETE' for r in selected)
+    screen=next(r for r in selected if r['task']=='SCREENING')
+    ordinary=derive_nominees([receipt],RULE,allow_test_evidence=True)
+    candidates=derive_nominees([receipt],RULE,allow_test_evidence=True,capture_bound=True)
+    assert len(candidates.nominees)==1 and candidates.sha256!=ordinary.sha256
+    nominee=candidates.nominees[0]
+    assert nominee.screening_revision==screen['revision']
+    assert screen['revision']==observation_revision(ordinary.nominees[0].screening_revision,digest(receipt))
+    target=dict(council='tameside',reference=nominee.reference,
+                source_url=nominee.source_url,source_identifier=nominee.source_record_id)
+    contract=idox_contract('tameside',date.fromisoformat(root['subject']['start']),
+                           date.fromisoformat(root['subject']['end']),name=root['contract'])
+    owner=Owner(None,lambda *_:None,lambda:None,
+                expiry=datetime.now(timezone.utc)+timedelta(minutes=25),bindings=execution_binding())
+    before=snapshot(world['boot'])
+    kwargs=dict(revision='offline-prepare-only',item_limits=root['limits'],
+                screening_rows=selected,allow_test_evidence=True,capture_bound=True)
+    registration=admission_registration(owner,binding_for('tameside'),contract,
+        root,receipt,candidates.nominees,RULE,{nominee.reference:target},**kwargs)
+    assert registration.kind=='ADMISSION' and len(registration.facts)==1
+    assert registration.screens[nominee.reference]['key']==screen['key']
+    assert registration.facts[nominee.reference]['dependencies']==[screen['key']]
+    assert registration.grant['source_calls']==1
+    assert snapshot(world['boot'])==before  # no issuer/grant/work-item/learnt fact changed
+    with pytest.raises(Denied):
+        admission_registration(owner,binding_for('tameside'),contract,root,receipt,
+            ordinary.nominees,RULE,{nominee.reference:target},
+            revision='offline-prepare-only',item_limits=root['limits'],
+            screening_rows=selected,allow_test_evidence=True)
+    damaged=copy.deepcopy(selected)
+    next(r for r in damaged if r['task']=='SCREENING')['checkpoint']['capture_checkpoint_sha256']='0'*64
+    with pytest.raises(Denied,match='STAGED_ASSESSMENT_CHECKPOINT'):
+        admission_registration(owner,binding_for('tameside'),contract,root,receipt,
+            candidates.nominees,RULE,{nominee.reference:target},
+            **dict(kwargs,screening_rows=damaged))
+    assert snapshot(world['boot'])==before

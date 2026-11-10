@@ -50,7 +50,7 @@ def capture_registration(owner, binding, contract, start, end, *, revision, item
     return Registration('CAPTURE', authority_name(binding, 'CAPTURE', revision), [root], [root], grant, bindings, root['key'])
 
 
-def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, allow_test_evidence=False, other_receipts=(), _pending_admission=False):
+def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, allow_test_evidence=False, other_receipts=(), _pending_admission=False,capture_bound=False):
     """The batch, screening and factual items and the one grant covering them, for exactly the nominees the receipt yields.
 
     `detail_targets` maps reference -> the fresh-detail case target; each must name exactly the nominated record (`check_detail_target`). Refuses before preparing anything when the
@@ -62,10 +62,10 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
     if binding.council in COUNCILS and detail_targets is not None and (not isinstance(detail_targets,dict) or set(detail_targets)!={n.reference for n in nominees}):raise Denied('CLOSED_IDOX_TARGET_SET')
     # `other_receipts` are further saved captures of the same council, supplied only so that a reference observed differently elsewhere is withheld; the nominees registered here are
     # exactly those the derivation binds to THIS capture.
-    derived = derive_nominees([receipt, *other_receipts], rule, allow_test_evidence=allow_test_evidence)
+    derived = derive_nominees([receipt, *other_receipts], rule, allow_test_evidence=allow_test_evidence,capture_bound=capture_bound)
     if tuple(nominees) != tuple(n for n in derived.nominees if n.capture_sha256 == digest(receipt)):
         raise Denied('CHAIN_NOMINEES_NOT_DERIVED')
-    batches,screens = _screen_items(binding,root,receipt,rule,item_limits)
+    batches,screens = _screen_items(binding,root,receipt,rule,item_limits,capture_bound=capture_bound)
     by_reference = {r['reference']: r for r in receipt['records']}
     from .idox_target import COUNCILS,derive
     factory = getattr(new_identity_contract, binding.detail_factory)
@@ -158,10 +158,10 @@ def completed_screening(registration,receipt,rule,rows):
     return digest(sorted(rows,key=lambda r:r['key']))
 
 
-def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False):
-    screen=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,_completed=True,allow_test_evidence=allow_test_evidence)
+def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False,capture_bound=False):
+    screen=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,_completed=True,allow_test_evidence=allow_test_evidence,capture_bound=capture_bound)
     seal=completed_screening(screen,receipt,rule,screening_rows)
-    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True)
+    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True,capture_bound=capture_bound)
     reg.kind='ADMISSION';reg.authority=authority_name(binding,'ADMISSION',revision)
     reg.insert=list(reg.facts.values());reg.screening_sha256=seal
     return reg
