@@ -165,7 +165,10 @@ def assess_retention(entries, *, as_of, verified_run_index=None):
             result['index_keep_through_at_least'] = index_until.isoformat()
             if reason is not None:
                 result['disposition'] = reason
-            elif now < raw_until:
+            # Age alone must never overwrite a historical, unverified,
+            # unresolved or held preservation reason (including one-row runs).
+            elif (now < raw_until and result['disposition'] in
+                  ('FUTURE_OWNER_REVIEW_CANDIDATE', 'PRESERVE_WITHIN_RETENTION')):
                 result['disposition'] = 'PRESERVE_WITHIN_RETENTION'
     results.sort(key=lambda r: (r['period'], r['run_id'], r['name']))
     return {'schema': 'PA_D002_RETENTION_DRY_RUN_V1', 'as_of': now.isoformat(),

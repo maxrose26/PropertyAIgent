@@ -34,6 +34,10 @@ class RetentionSafety(unittest.TestCase):
     def test_verified_old_prospective_only_candidate(self):
         self.assertEqual(self.find(row()),'FUTURE_OWNER_REVIEW_CANDIDATE')
         self.assertEqual(self.find(row(historical=True)),'PRESERVE_HISTORICAL_OR_UNTAGGED')
+        # Fresh historical evidence must keep its real provenance refusal.
+        self.assertEqual(self.find(row(historical=True,
+                                     captured_at='2026-11-01T00:00:00Z')),
+                         'PRESERVE_HISTORICAL_OR_UNTAGGED')
         self.assertEqual(self.find(row(retention_tag='UNKNOWN')),'PRESERVE_HISTORICAL_OR_UNTAGGED')
 
     def test_unresolved_and_hold_are_never_candidates(self):
