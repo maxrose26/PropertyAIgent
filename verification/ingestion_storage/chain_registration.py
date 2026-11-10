@@ -125,7 +125,24 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
                 or not isinstance(receipt, dict)):
             raise Denied('CAPTURE_INVENTORY_UNRESOLVED')
         archive = receipt.get('durable_archive')
-        if (receipt.get('kind') != 'LISTING_RECEIPT_V1'
+        outcome = root.get('outcome')
+        source_sha = receipt.get('source_sha256')
+        # A COMPLETE status and a claimed archive readback are not sufficient:
+        # tie the stored root's terminal outcome, retained receipt and archive
+        # to the SAME source digest. This does not independently fetch bytes or
+        # establish portal completeness, which remain separate review gates.
+        from re import fullmatch
+        digest_bound = (
+            isinstance(source_sha, str)
+            and fullmatch('[a-f0-9]{64}', source_sha) is not None
+            and isinstance(archive, dict)
+            and archive.get('sha256') == source_sha
+            and isinstance(outcome, dict)
+            and outcome.get('outcome') == 'ENUMERATED_METADATA_RETAINED'
+            and outcome.get('source_sha256') == source_sha
+        )
+        if (not digest_bound
+                or receipt.get('kind') != 'LISTING_RECEIPT_V1'
                 or receipt.get('council') != council
                 or receipt.get('contract') != root.get('contract')
                 or receipt.get('interval') != [subject.get('start'), subject.get('end')]

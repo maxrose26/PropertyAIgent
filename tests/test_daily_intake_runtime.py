@@ -509,6 +509,27 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
                 persisted_council_capture_inventory(inventory_db, 'tameside')
         finally:
             inventory_db.execute('ROLLBACK')
+    # The complete root's terminal source hash, receipt and durable archive
+    # must independently agree. Neither a COMPLETE flag nor a claimed readback
+    # can upgrade a conflicting persisted capture into admission evidence.
+    for sql in (
+        "UPDATE ingestion_work_items SET checkpoint = "
+        "jsonb_set(checkpoint::jsonb, '{durable_archive,sha256}', "
+        "to_jsonb(repeat('0',64)))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+        "UPDATE ingestion_work_items SET outcome = "
+        "jsonb_set(outcome::jsonb, '{source_sha256}', "
+        "to_jsonb(repeat('1',64)))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+    ):
+        world['boot'].execute('BEGIN')
+        try:
+            world['boot'].execute(sql)
+            with pytest.raises(Denied, match='CAPTURE_INVENTORY_UNVERIFIED'):
+                persisted_council_capture_inventory(world['boot'], 'tameside')
+        finally:
+            world['boot'].execute('ROLLBACK')
+        assert snapshot(world['boot'])==before
     assert snapshot(world['boot'])==before  # no issuer/grant/work-item/learnt fact changed
     with pytest.raises(Denied):
         admission_registration(owner,binding_for('tameside'),contract,root,receipt,
