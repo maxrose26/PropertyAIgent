@@ -98,8 +98,10 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
     nor changes the database. Every known unfinished root refuses nomination,
     rather than silently omitting a possibly conflicting observation.
     """
-    from app.pipeline.discovery_contract import COUNCILS
-    if council not in COUNCILS or type(max_roots) is not int or not 1 <= max_roots <= 128:
+    from app.config import load_councils
+    # Read-only inventory recognises all ten configured GM councils, including
+    # Trafford; configuration is NOT source qualification or an execution grant.
+    if council not in load_councils() or type(max_roots) is not int or not 1 <= max_roots <= 128:
         raise Denied('CAPTURE_INVENTORY_SCOPE')
     raw = connection.execute(
         "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
