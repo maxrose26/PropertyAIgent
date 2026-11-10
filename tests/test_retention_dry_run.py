@@ -11,6 +11,7 @@ def row(**kwargs):
                 sha256='b'*64,bytes=120,captured_at=T0,
                 retention_tag='PA_D002_PROSPECTIVE_V1',readback_verified=True,
                 resolution='VERIFIED',resolved_at=None,explicit_hold=False,
+                hold_history_verified=True,hold_released_at=None,
                 historical=False)
     result.update(kwargs)
     return result
@@ -33,6 +34,23 @@ class RetentionSafety(unittest.TestCase):
         self.assertEqual(self.find(row(explicit_hold=True)),'PRESERVE_EXPLICIT_HOLD')
         self.assertEqual(self.find(row(readback_verified=False)),'PRESERVE_UNVERIFIED')
 
+    def test_missing_trusted_hold_history_cannot_offer_owner_review(self):
+        self.assertEqual(self.find(row(hold_history_verified=False)),
+                         'PRESERVE_UNVERIFIED_HOLD_HISTORY')
+
+    def test_hold_release_restarts_raw_and_metadata_index_clocks(self):
+        # A hold lifted yesterday must not make old evidence a review candidate.
+        held = row(hold_released_at='2026-10-15T00:00:00Z')
+        result = assess_retention([held], as_of=AS_OF)['items'][0]
+        self.assertEqual(result['disposition'], 'PRESERVE_WITHIN_RETENTION')
+        self.assertEqual(result['raw_not_before'], '2027-01-13T00:00:00+00:00')
+        self.assertEqual(result['index_keep_through_at_least'],
+                         '2027-10-15T00:00:00+00:00')
+        old = row(hold_released_at='2026-02-01T00:00:00Z')
+        self.assertEqual(self.find(old), 'FUTURE_OWNER_REVIEW_CANDIDATE')
+        # An unresolved current hold always preserves, even after a year.
+        self.assertEqual(self.find(row(explicit_hold=True)), 'PRESERVE_EXPLICIT_HOLD')
+
     def test_resolution_restarts_full_90_day_clock(self):
         self.assertEqual(self.find(row(resolution='RECONCILED',resolved_at='2026-10-01T00:00:00Z')),
                          'PRESERVE_WITHIN_RETENTION')
@@ -48,7 +66,13 @@ class RetentionSafety(unittest.TestCase):
         invalid=[row(bytes=True),row(bytes=524289),row(name='capture-3/source.json'),
                  row(resolution='RECONCILED'),row(resolution='VERIFIED',resolved_at='2026-08-01T00:00:00Z'),
                  row(captured_at='9999-01-01T00:00:00Z'),row(captured_at='2026-01-01'),
-                 row(explicit_hold='false'),row(sha256='not-a-hash'),row(retention_tag=None)]
+                 row(explicit_hold='false'),row(sha256='not-a-hash'),row(retention_tag=None),
+                 row(hold_history_verified='yes'),
+                 row(hold_history_verified=False,hold_released_at='2026-08-01T00:00:00Z'),
+                 row(explicit_hold=True,hold_released_at='2026-08-01T00:00:00Z'),
+                 row(hold_released_at='2025-12-31T00:00:00Z'),
+                 row(hold_released_at='2026-12-01T00:00:00Z'),
+                 row(hold_released_at='not-a-date')]
         for case in invalid:
             with self.subTest(case=case),self.assertRaises(ValueError):
                 assess_retention([case],as_of=AS_OF)
