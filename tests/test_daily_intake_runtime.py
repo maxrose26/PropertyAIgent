@@ -143,6 +143,54 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     record_property('command',json.dumps(command));record_property('usage',json.dumps(result['usage'],sort_keys=True))
 
 
+
+def test_disposable_backlog_refuses_corrupt_complete_capture_evidence(world,tmp_path):
+    """Read the actual disposable saved backlog; roll back tampered evidence.
+
+    A COMPLETE flag is insufficient for an unverified archive or contradictory
+    terminal receipt. This runs only against the existing disposable PG fixture.
+    """
+    from sqlalchemy import create_engine,text
+    reset(world)
+    name='backlog-durable-proof'
+    authorise(world,name)
+    run,result,_=invoke(world,tmp_path,name)
+    assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED'
+    before=snapshot(world['boot'])
+    engine=create_engine(world['urls']['provisioning_migrator'])
+    reader=SimpleNamespace(_limits=lambda _connection: None)
+    def read(connection):
+        return backlog_page(reader,['tameside'],['daily-intake-tameside'],RULE,connection=connection)
+    alterations=(
+        "checkpoint=jsonb_set(checkpoint::jsonb,'{durable_archive,sha256}',to_jsonb(repeat('0',64)))::json",
+        "checkpoint=jsonb_set(checkpoint::jsonb,'{durable_archive,readback_verified}','false'::jsonb)::json",
+        "outcome=jsonb_set(outcome::jsonb,'{source_sha256}',to_jsonb(repeat('1',64)))::json",
+        "checkpoint=jsonb_set(checkpoint::jsonb,'{accounting_complete}','false'::jsonb)::json",
+        "checkpoint=jsonb_set(checkpoint::jsonb,'{date_semantics}',to_jsonb('VALIDATED'::text))::json",
+    )
+    try:
+        with engine.connect() as conn:
+            baseline=read(conn)
+            assert len(baseline['records'])==1 and baseline['records'][0]['council']=='tameside'
+            root_key=conn.execute(text(
+                "SELECT key FROM public.ingestion_work_items WHERE task='DISCOVERY' "
+                "AND subject->>'council'='tameside'")).scalar_one()
+            conn.rollback()
+        for clause in alterations:
+            with engine.connect() as conn:
+                transaction=conn.begin()
+                try:
+                    conn.execute(text("UPDATE public.ingestion_work_items SET "+clause+" WHERE key=:key"),
+                                 {'key':root_key})
+                    with pytest.raises(Denied,match='BACKLOG_CAPTURE_PROVENANCE'):
+                        read(conn)
+                finally:
+                    transaction.rollback()
+        assert snapshot(world['boot'])==before
+    finally:
+        engine.dispose()
+
+
 def test_supported_issuer_refuses_period_widening_and_runtime_self_authorisation(world,tmp_path):
     reset(world)
     p=policy(world);p['councils']['oldham']=p['councils']['tameside']

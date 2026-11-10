@@ -190,7 +190,24 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                                      reason=root['reason'],phase=root['phase'],attempt_count=root['attempt_count'],
                                      evidence=capture.get('durable_archive'),downstream_complete=False))
                 continue
-            if capture.get('council')!=root['subject']['council'] or not capture.get('durable_archive') or len(capture['records'])>60:
+            # COMPLETE alone is not proof of a usable listing: require the
+            # stored root, final receipt, and privately read-back archive to
+            # agree on the exact source evidence before exposing this backlog.
+            subject=root['subject'];archive=capture.get('durable_archive')
+            outcome=root['outcome'];source_sha=capture.get('source_sha256')
+            if (not isinstance(subject,dict) or not isinstance(archive,dict)
+                or not isinstance(outcome,dict) or not isinstance(source_sha,str)
+                or re.fullmatch('[a-f0-9]{64}',source_sha) is None
+                or archive.get('sha256')!=source_sha or archive.get('readback_verified') is not True
+                or outcome.get('outcome')!='ENUMERATED_METADATA_RETAINED'
+                or outcome.get('source_sha256')!=source_sha
+                or capture.get('accounting_complete') is not True
+                or capture.get('cleanup')!='CLOSED'
+                or capture.get('council')!=subject.get('council')
+                or capture.get('contract')!=root['contract']
+                or capture.get('interval')!=[subject.get('start'),subject.get('end')]
+                or capture.get('date_semantics')!=subject.get('semantics')
+                or not isinstance(capture.get('records'),list) or len(capture['records'])>60):
                 raise Denied('BACKLOG_CAPTURE_PROVENANCE')
             screens=[dict(r) for r in connection.execute(select(W).where(W.c.task=='SCREENING',
                 cast(W.c.dependencies,JSONB)==[root['key']]).order_by(W.c.key).limit(61)).mappings()]
