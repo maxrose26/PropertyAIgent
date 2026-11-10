@@ -83,8 +83,15 @@ def test_blocked_or_incomplete_never_promotes_coverage(status):
     lambda p: {**p, 'scopes': [*p['scopes']] * 3},
 ])
 def test_unknown_or_injected_metadata_is_refused(mutate):
-    with pytest.raises(Denied):
-        project_public_summary(mutate(PAYLOAD), original_raw=RAW, original_events=EVENT_RAW)
+    # Bind each invalid variant to its own genuine canonical private bytes:
+    # otherwise the new early digest check hides regressions in the scope and
+    # status allowlists and makes this negative-path suite vacuous.
+    altered = mutate(PAYLOAD)
+    altered_raw = json.dumps(altered, sort_keys=True, separators=(',', ':'),
+                             ensure_ascii=True, allow_nan=False).encode()
+    with pytest.raises(Denied, match=r'PUBLIC_SUMMARY_(INPUT|SCOPE)_BOUND'):
+        project_public_summary(altered, original_raw=altered_raw,
+                               original_events=EVENT_RAW)
 
 
 @pytest.mark.parametrize('raw,events', [
