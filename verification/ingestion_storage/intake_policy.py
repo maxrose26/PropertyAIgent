@@ -10,13 +10,13 @@ SNAPSHOT = "jsonb_build_object('global_stop',ctl->'global_stop','manual_stop',ct
 
 # Branch is inserted before the historical owner-only registration branch.
 REGISTRATION = r"""
- IF p->>'operation' IN ('intake_period','intake_capture','intake_screen','intake_close','intake_finish') THEN
+ IF p->>'operation' IN ('intake_period','intake_catchup_period','intake_capture','intake_screen','intake_close','intake_finish') THEN
   IF p IS NULL OR jsonb_typeof(p)<>'object' OR octet_length(p::text)>131072 THEN RAISE EXCEPTION 'INTAKE_ARGUMENT_BOUND'; END IF;
   SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
   t:=extract(epoch FROM clock_timestamp());
   a:=p->>'period';
   IF a IS NULL OR a !~ '^[A-Za-z0-9_-]{1,60}$' THEN RAISE EXCEPTION 'INTAKE_PERIOD_ID'; END IF;
-  IF p->>'operation'='intake_period' THEN
+  IF p->>'operation' IN ('intake_period','intake_catchup_period') THEN
    IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN RAISE EXCEPTION 'OWNER_DISPOSITION_REQUIRED' USING ERRCODE='42501'; END IF;
    e:=p->'policy';
    IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr','route']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
@@ -41,6 +41,27 @@ REGISTRATION = r"""
     OR (CASE WHEN e->'test_evidence'='true'::jsonb THEN e->'hostaddr' IS DISTINCT FROM 'null'::jsonb ELSE jsonb_typeof(e->'hostaddr') IS DISTINCT FROM 'string' OR family((e->>'hostaddr')::inet)<>4 OR masklen((e->>'hostaddr')::inet)<>32 END)
     OR e->>'screening_config' !~ '^[a-f0-9]{64}$'
    THEN RAISE EXCEPTION 'INTAKE_PERIOD_POLICY'; END IF;
+   -- Distinct disposable-only historical issuer. No live or rolling widening.
+   IF p->>'operation'='intake_catchup_period' THEN
+    IF e->'test_evidence' IS DISTINCT FROM 'true'::jsonb OR e->>'route' IS DISTINCT FROM 'DISPOSABLE'
+     OR e->'hostaddr' IS DISTINCT FROM 'null'::jsonb OR e->'max_runs' IS DISTINCT FROM '1'::jsonb
+     OR e ? 'mode' OR jsonb_typeof(e->'catchup_scope') IS DISTINCT FROM 'object'
+     OR (e->'catchup_scope')-ARRAY['start','end','execution_day','source_plan_sha256']<>'{}'::jsonb
+     OR NOT (e->'catchup_scope' ?& ARRAY['start','end','execution_day','source_plan_sha256'])
+     OR coalesce(e->'catchup_scope'->>'start','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'end','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'execution_day','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'source_plan_sha256','') !~ '^[a-f0-9]{64}$'
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_POLICY_BOUND'; END IF;
+    IF (e->'catchup_scope'->>'execution_day')::date IS DISTINCT FROM (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+     OR (e->'catchup_scope'->>'start')::date < DATE '2026-09-15'
+     OR (e->'catchup_scope'->>'end')::date >= (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+     OR (e->'catchup_scope'->>'end')::date-(e->'catchup_scope'->>'start')::date NOT BETWEEN 0 AND 6
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_WINDOW_BOUND'; END IF;
+    e:=e||jsonb_build_object('mode','DISPOSABLE_SHUTDOWN_GAP_V1');
+   ELSIF e ? 'catchup_scope' OR e ? 'mode' THEN
+    RAISE EXCEPTION 'INTAKE_ROLLING_SCOPE_ONLY';
+   END IF;
    FOR item IN SELECT value FROM jsonb_each(e->'councils') LOOP
     IF jsonb_typeof(item) IS DISTINCT FROM 'object' OR NOT (item ?& ARRAY['contract','qualification_sha256']) OR jsonb_typeof(item->'contract') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'qualification_sha256') IS DISTINCT FROM 'string' OR item->>'contract' !~ '^[A-Za-z0-9_-]{1,100}$'
      OR item->>'qualification_sha256' !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'INTAKE_QUALIFIED_CONTRACT'; END IF;
@@ -126,8 +147,12 @@ REGISTRATION = r"""
     OR jsonb_typeof(item->'subject'->'start') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'end') IS DISTINCT FROM 'string'
     OR jsonb_typeof(item->'subject'->'council') IS DISTINCT FROM 'string'
-    OR item->'subject'->>'end'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text
-    OR item->'subject'->>'start'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text
+    OR (CASE WHEN e->>'mode'='DISPOSABLE_SHUTDOWN_GAP_V1'
+        THEN (item->'subject'->>'start' IS DISTINCT FROM e->'catchup_scope'->>'start'
+          OR item->'subject'->>'end' IS DISTINCT FROM e->'catchup_scope'->>'end')
+        ELSE (item->'subject'->>'end'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text
+          OR item->'subject'->>'start'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text)
+        END)
     OR item->'subject'->>'semantics' IS DISTINCT FROM (CASE WHEN item->'subject'->>'council'='manchester' THEN 'VALIDATED' ELSE 'RECEIVED' END)
     OR NOT (e->'councils' ? (item->'subject'->>'council'))
     OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'

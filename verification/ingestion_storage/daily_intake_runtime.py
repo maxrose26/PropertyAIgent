@@ -269,7 +269,16 @@ class Runtime:
                     # must not restart source work or pretend pressure is gone.
                     if not self.run.closing:self.memory.check()
                 self.run.check=monitored_check
-            rows=current_windows(datetime.now(timezone.utc),sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c)))
+            councils=sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c))
+            if self.policy.get('mode')=='DISPOSABLE_SHUTDOWN_GAP_V1':
+                from zoneinfo import ZoneInfo
+                scope=self.policy['catchup_scope']
+                today=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date()
+                if not self.test or scope['execution_day']!=today.isoformat() or date.fromisoformat(scope['end'])>=today:
+                    raise Denied('INTAKE_CATCHUP_DISPOSABLE_BINDING')
+                rows=[dict(council=c,start=scope['start'],end=scope['end']) for c in councils]
+            else:
+                rows=current_windows(datetime.now(timezone.utc),councils)
             for row in rows:
                 self.run.before_scope(binding_for(row['council']).family)
                 if self.policy['expires_at']-time.time()<LIMITS['wall_seconds']-self.run.totals()['elapsed_seconds']:

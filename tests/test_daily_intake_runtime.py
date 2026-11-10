@@ -49,8 +49,10 @@ def authorise(world,name,p=None):
     return owner.register_intake_period(name,p or policy(world))
 
 
-def env_and_sources(world,tmp_path,*,failed=False,count=1):
-    rows=current_windows(datetime.now(timezone.utc),['tameside','manchester'])
+def env_and_sources(world,tmp_path,*,failed=False,count=1,catchup_window=None):
+    rows=([dict(council=c,start=catchup_window['start'],end=catchup_window['end'])
+           for c in ('tameside','manchester')] if catchup_window is not None
+          else current_windows(datetime.now(timezone.utc),['tameside','manchester']))
     directory=tmp_path/'sources';directory.mkdir()
     for row in rows:
         start,end=date.fromisoformat(row['start']),date.fromisoformat(row['end'])
@@ -78,8 +80,8 @@ def env_and_sources(world,tmp_path,*,failed=False,count=1):
     return env,directory
 
 
-def invoke(world,tmp_path,name,*,failed=False,count=1):
-    env,sources=env_and_sources(world,tmp_path,failed=failed,count=count)
+def invoke(world,tmp_path,name,*,failed=False,count=1,catchup_window=None):
+    env,sources=env_and_sources(world,tmp_path,failed=failed,count=count,catchup_window=catchup_window)
     output=tmp_path/'result'
     command=['timeout','--signal=INT','--kill-after=5s','960s',sys.executable,'-m','scripts.run_daily_councils','--period',name,'--output',str(output),
              '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
@@ -219,6 +221,66 @@ def test_initial_28_day_overlap_is_not_supported_by_current_rolling_issuer(world
         authorise(world,'initial-overlap-28',candidate)
     assert snapshot(world['boot'])==before
     assert restricted_sessions(world['boot'])==0
+
+
+def _catchup_fixture(world):
+    from zoneinfo import ZoneInfo
+    scope=dict(start='2026-09-15',end='2026-09-21',
+               execution_day=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat(),
+               source_plan_sha256='a'*64)
+    p=policy(world);p['max_runs']=1;p['catchup_scope']=scope
+    return p,scope
+
+
+def _catchup_owner(world):
+    return Owner(lambda:world['connect']('provisioning_migrator'),lambda *_:None,lambda:None,
+                 identity='provisioning_migrator',expiry=datetime.now(timezone.utc)+timedelta(hours=1),
+                 bindings=execution_binding())
+
+
+def test_disposable_historical_issuer_actual_daily_command_and_committed_readback(world,tmp_path):
+    reset(world);p,scope=_catchup_fixture(world);name='synthetic-catchup-window'
+    issued=_catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
+    assert issued['mode']=='DISPOSABLE_SHUTDOWN_GAP_V1'
+    run,result,_=invoke(world,tmp_path,name,catchup_window=scope)
+    assert run.returncode==0,(run.stderr,result)
+    assert result['status']=='RETAINED_AND_SCREENED'
+    assert result['coverage_advance'] is False and result['admission_connected'] is False
+    assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED'
+    assert len(result['scopes'])==2 and len(result['backlog']['records'])==2
+    assert {s['council'] for s in result['scopes']}=={'tameside','manchester'}
+    saved=world['boot'].execute("SELECT subject FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE'").fetchall()
+    assert len(saved)==2
+    assert all(s[0]['start']==scope['start'] and s[0]['end']==scope['end'] for s in saved)
+
+
+@pytest.mark.parametrize('fault',['rolling_smuggle','live_mode','too_long','unfinished_day','changed_capture'])
+def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
+    from zoneinfo import ZoneInfo
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from verification.ingestion_storage.chain_registration import capture_registration
+    from verification.ingestion_storage.scope_binding import binding_for
+    from tests.e2e_connection_support import idox_contract
+    reset(world);p,scope=_catchup_fixture(world);name='catchup-refuse-'+fault
+    if fault in ('rolling_smuggle','live_mode','too_long','unfinished_day'):
+        if fault=='live_mode':p['test_evidence']=False
+        if fault=='too_long':scope['end']='2026-09-22'
+        if fault=='unfinished_day':scope['end']=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat()
+        with pytest.raises(Exception,match='ADMIN_EFFECT_UNCERTAIN'):
+            _catchup_owner(world).register_intake_period(name,p,disposable_catchup=fault!='rolling_smuggle')
+        assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1
+        return
+    _catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
+    start,end=date(2026,9,16),date(2026,9,21)
+    contract=idox_contract('tameside',start,end,name=p['councils']['tameside']['contract'])
+    source_owner=Owner(None,lambda *_:None,lambda:None,expiry=datetime.now(timezone.utc)+timedelta(minutes=20),bindings=execution_binding())
+    reg=capture_registration(source_owner,binding_for('tameside'),contract,start.isoformat(),end.isoformat(),
+                             revision='catchup-refusal',item_limits=DEFAULT_LIMITS)
+    with world['connect']('ingestion_worker_login') as c:
+        with pytest.raises(Exception,match='INTAKE_ROLLING_SCOPE_OR_CONSUMED'):
+            c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
+                      (json.dumps(registration_payload(name,reg,execution_binding())),))
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1
 
 
 @pytest.mark.parametrize('fault',['date','initial_overlap_28','council','writes','expiry','run_limit','publication_path'])

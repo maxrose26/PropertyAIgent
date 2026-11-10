@@ -463,7 +463,7 @@ class Owner:
         worker={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(worker_text())}
         return {**cls.screening_v3_inventory(),**modified,'ingestion_worker_step':worker['ingestion_worker_step']}
 
-    def register_intake_period(self,name,policy):
+    def register_intake_period(self,name,policy,*,disposable_catchup=False):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
         Does not clear a stop, install SQL, provision a login or issue daily work.
@@ -477,7 +477,7 @@ class Owner:
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             result=self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
-                          (json.dumps(dict(operation='intake_period',period=name,policy=policy)),),effect=True)[0][0]
+                          (json.dumps(dict(operation='intake_catchup_period' if disposable_catchup else 'intake_period',period=name,policy=policy)),),effect=True)[0][0]
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)
             flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0]
