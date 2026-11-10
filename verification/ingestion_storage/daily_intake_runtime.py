@@ -276,7 +276,7 @@ class Runtime:
                 today=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date()
                 if not self.test or scope['execution_day']!=today.isoformat() or date.fromisoformat(scope['end'])>=today:
                     raise Denied('INTAKE_CATCHUP_DISPOSABLE_BINDING')
-                rows=[dict(council=c,start=scope['start'],end=scope['end']) for c in councils]
+                rows=[dict(council=c,start=scope['start'],end=scope['end'],semantics=binding_for(c).semantics) for c in councils]
             else:
                 rows=current_windows(datetime.now(timezone.utc),councils)
             for row in rows:
