@@ -61,3 +61,49 @@ def capacity(rows,limits, *, profiled=False):
 
 def input_from_manifest(value):
     return {k:value[k] for k in (INPUT_KEYS|{'collection_mode'} if 'collection_mode' in value else INPUT_KEYS)}
+
+
+INITIAL_TWO_SLOT_VERSION='NINE_COUNCIL_INITIAL_28D_TWO_SLOT_SOURCE_PROOF_V1'
+
+
+def initial_two_slot_packages(plan, expected_sha256):
+    """Pure, NON-AUTHORISING nine-council source-package compatibility proof.
+
+    No PostgreSQL issuance, collection permission, source qualification or
+    retention is established by this structural proof.
+    """
+    from .four_council_release import SUCCESSOR_V2_LIMITS
+    try:
+        if not isinstance(plan,dict) or set(plan)!={'purpose','start','end','rule','limits','rows'}:
+            raise ValueError()
+        first,last=date.fromisoformat(plan['start']),date.fromisoformat(plan['end'])
+        if (last-first).days!=27 or plan['purpose']!='PROSPECTIVE':raise ValueError()
+        canonical=finite.manifest(plan['start'],plan['end'],'PROSPECTIVE')
+        if plan!=canonical or expected_sha256!=finite.digest(canonical):raise ValueError()
+        if len(finite.SEMANTICS)!=9 or 'bolton' not in finite.SEMANTICS or len(plan['rows'])!=36:
+            raise ValueError()
+        if any(sum(row['council']==c for row in plan['rows'])!=4 for c in finite.SEMANTICS):
+            raise ValueError()
+    except (ValueError,KeyError,TypeError,OverflowError):
+        raise ValueError('INITIAL_28_MANIFEST_UNVERIFIED') from None
+    arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in finite.ARCUS]
+    idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in finite.ARCUS]
+    if len(arcus)!=12 or len(idox)!=24:raise ValueError('INITIAL_28_FAMILY_COUNTS')
+    groups=[[arcus[i],idox[i]] for i in range(12)]
+    groups += [idox[i:i+2] for i in range(12,24,2)]
+    if len(groups)!=18 or sorted(i for g in groups for i in g)!=list(range(36)):
+        raise ValueError('INITIAL_28_PARTITION')
+    packages=[]
+    for ordinal,group in enumerate(groups,1):
+        payload=dict(finite_manifest=plan,finite_manifest_sha256=expected_sha256,
+                     selected_ordinals=sorted(group),collection_mode='SCREENING_METADATA')
+        rows=select(payload,profiled=True)
+        reservation=capacity(rows,SUCCESSOR_V2_LIMITS,profiled=True)
+        if len(rows)!=2 or reservation['observations']!=2 or reservation['requests']>100:
+            raise ValueError('INITIAL_28_TWO_SOURCE_CAP')
+        packages.append(dict(ordinal=ordinal,selected_ordinals=payload['selected_ordinals'],
+                             reservation=reservation))
+    return dict(version=INITIAL_TWO_SLOT_VERSION,manifest_sha256=expected_sha256,
+                window=[plan['start'],plan['end']],packages=packages,
+                sql_issuer_qualified=False,source_qualified=False,
+                initial_capture_authorised=False,operationally_usable=False)

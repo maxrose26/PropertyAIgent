@@ -313,3 +313,44 @@ def test_28_day_nine_council_partition_fits_only_separate_source_only_packages()
               selected_ordinals=list(range(36)),collection_mode='SCREENING_METADATA')
     with pytest.raises(r.Stop,match='CAMPAIGN_MANIFEST_OR_CAPACITY'):
         registration(full)
+
+
+def test_initial_two_slot_packages_cover_nine_councils_including_bolton_without_authority():
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    result=campaign.initial_two_slot_packages(plan,f.digest(plan))
+    assert result['version']==campaign.INITIAL_TWO_SLOT_VERSION
+    assert result['window']==['2026-10-01','2026-10-28']
+    assert len(result['packages'])==18
+    assert all(result[k] is False for k in ('sql_issuer_qualified','source_qualified',
+                                           'initial_capture_authorised','operationally_usable'))
+    indexes=[i for pkg in result['packages'] for i in pkg['selected_ordinals']]
+    assert sorted(indexes)==list(range(36)) and len(set(indexes))==36
+    seen={c:0 for c in f.SEMANTICS}
+    for pkg in result['packages']:
+        assert len(pkg['selected_ordinals'])==2
+        assert pkg['reservation']['observations']==2
+        assert pkg['reservation']['requests']<=100
+        for i in pkg['selected_ordinals']:
+            row=plan['rows'][i]
+            assert (date.fromisoformat(row['end'])-date.fromisoformat(row['start'])).days==6
+            seen[row['council']]+=1
+    assert seen=={c:4 for c in f.SEMANTICS}
+    assert seen['bolton']==4 and 'trafford' not in seen
+
+
+@pytest.mark.parametrize('fault',['wrong_hash','missing_bolton','duplicate_scope',
+                                   'wrong_semantics','too_short','wrong_purpose','trafford'])
+def test_initial_two_slot_packages_fail_closed_on_unreviewed_manifest(fault):
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    expected=f.digest(plan)
+    if fault=='wrong_hash':expected='0'*64
+    elif fault=='missing_bolton':plan['rows']=[r for r in plan['rows'] if r['council']!='bolton']
+    elif fault=='duplicate_scope':plan['rows'][1]=dict(plan['rows'][0])
+    elif fault=='wrong_semantics':plan['rows'][0]['semantics']='INVALID'
+    elif fault=='too_short':plan=f.manifest('2026-10-02','2026-10-28','PROSPECTIVE')
+    elif fault=='wrong_purpose':plan=f.manifest('2026-10-01','2026-10-28','BACKFILL_AUDIT')
+    else:plan['rows'][0]['council']='trafford'
+    with pytest.raises(ValueError,match='INITIAL_28_MANIFEST_UNVERIFIED'):
+        campaign.initial_two_slot_packages(plan,expected)
