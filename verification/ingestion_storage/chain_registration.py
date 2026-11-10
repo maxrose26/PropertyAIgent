@@ -158,10 +158,10 @@ def completed_screening(registration,receipt,rule,rows):
     return digest(sorted(rows,key=lambda r:r['key']))
 
 
-def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False,capture_bound=False):
+def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False,capture_bound=False,other_receipts=()):
     screen=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,_completed=True,allow_test_evidence=allow_test_evidence,capture_bound=capture_bound)
     seal=completed_screening(screen,receipt,rule,screening_rows)
-    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True,capture_bound=capture_bound)
+    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True,capture_bound=capture_bound,other_receipts=other_receipts)
     reg.kind='ADMISSION';reg.authority=authority_name(binding,'ADMISSION',revision)
     reg.insert=list(reg.facts.values());reg.screening_sha256=seal
     return reg

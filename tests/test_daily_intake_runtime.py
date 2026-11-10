@@ -480,3 +480,15 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
             candidates.nominees,RULE,{nominee.reference:target},
             **dict(kwargs,screening_rows=damaged))
     assert snapshot(world['boot'])==before
+
+    # A later/overlapping retained observation that disagrees is never
+    # silently admitted when included in the bounded evidence candidate.
+    # The caller must independently supply complete relevant history;
+    # this guard cannot prove history enumeration.
+    conflicting=copy.deepcopy(receipt)
+    conflicting['records'][0]['source_record_id']+='-DIFFERENT'
+    with pytest.raises(Denied,match='CHAIN_NOMINEES_NOT_DERIVED'):
+        admission_registration(owner,binding_for('tameside'),contract,root,receipt,
+            candidates.nominees,RULE,{nominee.reference:target},
+            **dict(kwargs,other_receipts=(conflicting,)))
+    assert snapshot(world['boot'])==before
