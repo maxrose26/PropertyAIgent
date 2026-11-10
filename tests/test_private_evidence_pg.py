@@ -76,6 +76,24 @@ def test_actual_restricted_sql_source_and_final_readback():
         rt.test=True;rt.policy={'evidence_backend':'POSTGRES_PILOT_V1'}
         rt.args=SimpleNamespace(period=PERIOD);rt.run_id=RUN
         rt.archive_ordinal=0;rt.connection=restricted
+        # A direct raw-table or body-column grant would bypass the intended
+        # function-only evidence boundary. Physically falsify both in disposable
+        # PostgreSQL, and restore the original ACL before any archive writes.
+        with world['connect']('ingestion_worker_login') as worker:
+            rt.private_evidence_inventory(SQL(worker))
+        for grant,revoke in (
+            ('GRANT SELECT ON public.ingestion_run_evidence TO ingestion_worker',
+             'REVOKE SELECT ON public.ingestion_run_evidence FROM ingestion_worker'),
+            ('GRANT SELECT (body) ON public.ingestion_run_evidence TO ingestion_worker',
+             'REVOKE SELECT (body) ON public.ingestion_run_evidence FROM ingestion_worker'),
+        ):
+            boot.execute(grant)
+            try:
+                with world['connect']('ingestion_worker_login') as worker:
+                    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_RAW_TABLE_ACL'):
+                        rt.private_evidence_inventory(SQL(worker))
+            finally:
+                boot.execute(revoke)
         # The SQL function performs the real authority and expiry enforcement;
         # the full command's policy_read preflight is NOT covered by this test.
         rt.policy_read=lambda *_a,**_kw:None

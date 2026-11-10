@@ -178,6 +178,28 @@ class Runtime:
              'p_period text, p_run text, p_name text, p_body bytea',True)]
         if [tuple(r) for r in rows]!=expected:
             raise Denied('PRIVATE_EVIDENCE_FUNCTION_INVENTORY')
+        # Check direct table AND column permissions: an accidental grant to
+        # any nonowner role must stop the offline private-evidence path before
+        # it can claim that raw evidence is restricted to the storage owner.
+        # Also reject worker membership of the table-owner role.
+        table_acl=connection.execute(text(
+            "SELECT owner.rolname,c.relkind,"
+            "(EXISTS (SELECT 1 FROM pg_catalog.aclexplode("
+            "coalesce(c.relacl,pg_catalog.acldefault('r',c.relowner))) acl "
+            "WHERE acl.grantee<>c.relowner) OR "
+            "EXISTS (SELECT 1 FROM pg_catalog.pg_attribute att "
+            "CROSS JOIN LATERAL pg_catalog.aclexplode(att.attacl) acl "
+            "WHERE att.attrelid=c.oid AND att.attnum>0 "
+            "AND NOT att.attisdropped AND acl.grantee<>c.relowner) OR "
+            "pg_catalog.pg_has_role(c.relowner,'MEMBER')) "
+            "FROM pg_catalog.pg_class c "
+            "JOIN pg_catalog.pg_namespace ns ON ns.oid=c.relnamespace "
+            "JOIN pg_catalog.pg_roles owner ON owner.oid=c.relowner "
+            "WHERE ns.nspname='public' AND c.relname='ingestion_run_evidence'"
+        )).all()
+        if [tuple(row) for row in table_acl]!=[
+                ('ingestion_storage_owner','r',False)]:
+            raise Denied('PRIVATE_EVIDENCE_RAW_TABLE_ACL')
 
     def archive_private_source(self,raw):
         """Offline-only SOURCE_INTENT-bound SQL write plus separate committed read.
