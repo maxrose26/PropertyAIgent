@@ -16,9 +16,16 @@ def row(**kwargs):
     result.update(kwargs)
     return result
 
+def verified_index(*records):
+    # Synthetic *trusted* manifest for prospective policy unit tests only;
+    # not proof of an authenticated database inventory.
+    return {(records[0]['period'], records[0]['run_id']):
+            frozenset((r['name'], r['sha256']) for r in records)}
+
 class RetentionSafety(unittest.TestCase):
     def find(self,record,as_of=AS_OF):
-        outcome=assess_retention([record],as_of=as_of)
+        outcome=assess_retention([record],as_of=as_of,
+                                 verified_run_index=verified_index(record))
         self.assertTrue(outcome['dry_run_only'])
         self.assertEqual(outcome['sql_or_delete_operations'],0)
         self.assertFalse(outcome['items'][0]['may_delete_now'])
@@ -41,7 +48,8 @@ class RetentionSafety(unittest.TestCase):
     def test_hold_release_restarts_raw_and_metadata_index_clocks(self):
         # A hold lifted yesterday must not make old evidence a review candidate.
         held = row(hold_released_at='2026-10-15T00:00:00Z')
-        result = assess_retention([held], as_of=AS_OF)['items'][0]
+        result = assess_retention([held], as_of=AS_OF,
+                                  verified_run_index=verified_index(held))['items'][0]
         self.assertEqual(result['disposition'], 'PRESERVE_WITHIN_RETENTION')
         self.assertEqual(result['raw_not_before'], '2027-01-13T00:00:00+00:00')
         self.assertEqual(result['index_keep_through_at_least'],
@@ -109,7 +117,8 @@ class RetentionSafety(unittest.TestCase):
     def test_run_wide_uncertainty_and_owner_hold_cannot_release_sibling(self):
         a = row(name='capture-1/source.json')
         b = row(name='capture-2/source.json', resolution='UNRESOLVED')
-        outcome = assess_retention([a, b], as_of=AS_OF)
+        outcome = assess_retention([a, b], as_of=AS_OF,
+                                   verified_run_index=verified_index(a, b))
         self.assertEqual({item['disposition'] for item in outcome['items']},
                          {'PRESERVE_RUN_UNRESOLVED'})
         for override, expected in (
@@ -121,8 +130,9 @@ class RetentionSafety(unittest.TestCase):
               'resolved_at': '2026-05-01T00:00:00Z'},
              'PRESERVE_RUN_RESOLUTION_CONFLICT'),
         ):
-            candidate = assess_retention([a, row(name='capture-2/source.json',
-                                                 **override)], as_of=AS_OF)
+            second = row(name='capture-2/source.json', **override)
+            candidate = assess_retention([a, second], as_of=AS_OF,
+                                         verified_run_index=verified_index(a, second))
             self.assertEqual({item['disposition'] for item in candidate['items']},
                              {expected})
             self.assertTrue(all(not item['may_delete_now']
@@ -132,7 +142,8 @@ class RetentionSafety(unittest.TestCase):
         older = row(name='capture-1/source.json')
         recent = row(name='capture-2/source.json',
                      captured_at='2026-10-15T00:00:00Z')
-        outcome = assess_retention([older, recent], as_of=AS_OF)
+        outcome = assess_retention([older, recent], as_of=AS_OF,
+                                   verified_run_index=verified_index(older, recent))
         self.assertEqual({i['disposition'] for i in outcome['items']},
                          {'PRESERVE_WITHIN_RETENTION'})
         self.assertEqual({i['raw_not_before'] for i in outcome['items']},
@@ -141,16 +152,40 @@ class RetentionSafety(unittest.TestCase):
                           for i in outcome['items']}, {'2027-10-15T00:00:00+00:00'})
         release = row(name='capture-2/source.json',
                       hold_released_at='2026-10-15T00:00:00Z')
-        outcome = assess_retention([older, release], as_of=AS_OF)
+        outcome = assess_retention([older, release], as_of=AS_OF,
+                                   verified_run_index=verified_index(older, release))
         self.assertEqual({i['disposition'] for i in outcome['items']},
                          {'PRESERVE_WITHIN_RETENTION'})
         self.assertEqual({i['raw_not_before'] for i in outcome['items']},
                          {'2027-01-13T00:00:00+00:00'})
 
+    def test_missing_or_truncated_run_inventory_never_recommends_review(self):
+        original = row()
+        sibling = row(name='capture-2/source.json', sha256='c'*64)
+        no_index = assess_retention([original], as_of=AS_OF)
+        self.assertEqual(no_index['items'][0]['disposition'],
+                         'PRESERVE_RUN_INVENTORY_UNVERIFIED')
+        incomplete = assess_retention([original], as_of=AS_OF,
+                    verified_run_index=verified_index(original, sibling))
+        self.assertEqual(incomplete['items'][0]['disposition'],
+                         'PRESERVE_RUN_INVENTORY_UNVERIFIED')
+        mismatched = assess_retention([original], as_of=AS_OF,
+                    verified_run_index=verified_index(row(sha256='c'*64)))
+        self.assertEqual(mismatched['items'][0]['disposition'],
+                         'PRESERVE_RUN_INVENTORY_UNVERIFIED')
+        trusted = assess_retention([original, sibling], as_of=AS_OF,
+                    verified_run_index=verified_index(original, sibling))
+        self.assertEqual({i['disposition'] for i in trusted['items']},
+                         {'FUTURE_OWNER_REVIEW_CANDIDATE'})
+        self.assertTrue(all(not i['may_delete_now'] for i in trusted['items']))
+        with self.assertRaisesRegex(ValueError, 'RETENTION_RUN_INDEX_SHAPE'):
+            assess_retention([original], as_of=AS_OF, verified_run_index=[])
+
     def test_sorted_minimal_output_no_raw_fields(self):
         a=row(name='capture-2/source.json')
         b=row()
-        result=assess_retention([a,b],as_of=AS_OF)
+        result=assess_retention([a,b],as_of=AS_OF,
+                                verified_run_index=verified_index(a,b))
         self.assertEqual([e['name'] for e in result['items']],
                          ['capture-1/source.json','capture-2/source.json'])
         self.assertEqual(result['total'],2)

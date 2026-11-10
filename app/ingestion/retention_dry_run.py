@@ -33,7 +33,7 @@ def _utc(value):
     return parsed.astimezone(timezone.utc)
 
 
-def assess_retention(entries, *, as_of):
+def assess_retention(entries, *, as_of, verified_run_index=None):
     """Return NON-EXECUTABLE potential dispositions for future owner review.
 
     resolution: VERIFIED, UNRESOLVED, or RECONCILED. A reconciled failure
@@ -42,10 +42,19 @@ def assess_retention(entries, *, as_of):
     Unknown, historical, unread, held and unfinished cases NEVER qualify.
     Trusted inventory must independently prove the complete hold history;
     a self-declared 'no current hold' is insufficient. A released hold
-    restarts both retention clocks. No deletion is ever performed here.
+    restarts both retention clocks. `verified_run_index` must be produced from
+    a separately authenticated *complete* run inventory and contain an exact
+    frozenset of (name, sha256) pairs for each (period, run_id). It is a
+    structural cross-check, not proof of its own trustworthiness. No deletion
+    is ever performed here.
     The 365-day index is only an indicated minimum; no index deletion is planned.
     """
     now = _utc(as_of)
+    # This is a structural check against an independently obtained COMPLETE
+    # inventory. It does not authenticate the inventory's source or authorise
+    # deletion. Missing/mismatched evidence identities must preserve the run.
+    if verified_run_index is not None and type(verified_run_index) is not dict:
+        raise ValueError('RETENTION_RUN_INDEX_SHAPE')
     if type(entries) is not list or len(entries) > 10000:
         raise ValueError('RETENTION_INVENTORY_BOUND')
     seen = set()
@@ -117,13 +126,12 @@ def assess_retention(entries, *, as_of):
             'disposition': reason,
             'may_delete_now': False,
         })
-    # Prospective owner-review eligibility is conservative across all evidence
-    # rows supplied for the same run. This still requires a caller to supply a
-    # complete authenticated inventory: it does not prove missing siblings are
-    # absent, verify provenance, nor grant deletion authority.
+    # A truncated entry list must NEVER convert a single old capture into an
+    # owner-review candidate. Every run (even a one-file run) needs a separately
+    # supplied exact-identity manifest from a trusted complete inventory.
+    # The manifest itself is NOT an authority signature: source authentication,
+    # owner holds, resolution and any delete approval remain external gates.
     for siblings in run_groups.values():
-        if len(siblings) < 2:
-            continue
         latest = max(clock for _, clock, _ in siblings)
         metadata = [row for _, _, row in siblings]
         if any(row['historical'] or row['retention_tag'] != PROSPECTIVE_TAG
@@ -139,7 +147,15 @@ def assess_retention(entries, *, as_of):
             reason = 'PRESERVE_RUN_UNRESOLVED'
         elif len({(row['resolution'], row['resolved_at']) for row in metadata}) != 1:
             reason = 'PRESERVE_RUN_RESOLUTION_CONFLICT'
+        elif (verified_run_index is None or
+              verified_run_index.get((metadata[0]['period'], metadata[0]['run_id'])) !=
+              frozenset((row['name'], row['sha256']) for row in metadata)):
+            reason = 'PRESERVE_RUN_INVENTORY_UNVERIFIED'
         else:
+            reason = None
+        # Preserve the more specific single-row refusal reason; only the
+        # missing exact-run manifest must override a previously eligible row.
+        if len(siblings) == 1 and reason != 'PRESERVE_RUN_INVENTORY_UNVERIFIED':
             reason = None
         raw_until = latest + timedelta(days=RAW_DAYS)
         index_until = latest + timedelta(days=INDEX_DAYS)
