@@ -46,10 +46,10 @@ def test_public_summary_refuses_status_or_count_unbound_to_private_result():
 
 
 @pytest.mark.parametrize('bad_events', [
-    b'{"events":[]}', b'not json', EVENT_RAW + b' ', b'[{},{}]'])
+    b'{"events":[]}', b'not json', EVENT_RAW + b' ', b'[{}, {}]'])
 def test_public_summary_refuses_unknown_or_unbound_event_digest(bad_events):
-    # Final private event evidence must be a canonical list, never an
-    # arbitrary byte string given a convincing SHA-256 in the public proof.
+    # Refuse non-list, invalid JSON and noncanonical JSON bytes.
+    # A different but valid canonical list cannot be authenticated here alone.
     with pytest.raises(Denied, match='PUBLIC_SUMMARY_PRIVATE_BINDING'):
         project_public_summary(PAYLOAD, original_raw=RAW,
                                original_events=bad_events)
@@ -60,7 +60,12 @@ def test_public_summary_refuses_unknown_or_unbound_event_digest(bad_events):
 ])
 def test_blocked_or_incomplete_never_promotes_coverage(status):
     value = {**PAYLOAD, 'status': status, 'failure': SECRET}
-    result = project_public_summary(value, original_raw=RAW, original_events=EVENT_RAW)
+    # The summary must bind to the exact canonical bytes of this variant,
+    # rather than reusing the unmodified fixture's digest.
+    variant_raw = json.dumps(value, sort_keys=True, separators=(',', ':'),
+                             ensure_ascii=True, allow_nan=False).encode()
+    result = project_public_summary(value, original_raw=variant_raw,
+                                    original_events=EVENT_RAW)
     assert result['status'] == status and result['failure_present'] is True
     assert result['coverage_advance'] is False
 
