@@ -106,6 +106,47 @@ class RetentionSafety(unittest.TestCase):
         with self.assertRaises(ValueError):
             assess_unverified_storage_snapshot([stored,stored],as_of=AS_OF)
 
+    def test_run_wide_uncertainty_and_owner_hold_cannot_release_sibling(self):
+        a = row(name='capture-1/source.json')
+        b = row(name='capture-2/source.json', resolution='UNRESOLVED')
+        outcome = assess_retention([a, b], as_of=AS_OF)
+        self.assertEqual({item['disposition'] for item in outcome['items']},
+                         {'PRESERVE_RUN_UNRESOLVED'})
+        for override, expected in (
+            ({'explicit_hold': True}, 'PRESERVE_RUN_EXPLICIT_HOLD'),
+            ({'hold_history_verified': False}, 'PRESERVE_RUN_HOLD_HISTORY_UNVERIFIED'),
+            ({'readback_verified': False}, 'PRESERVE_RUN_READBACK_UNVERIFIED'),
+            ({'historical': True}, 'PRESERVE_RUN_PROVENANCE_UNVERIFIED'),
+            ({'resolution': 'RECONCILED',
+              'resolved_at': '2026-05-01T00:00:00Z'},
+             'PRESERVE_RUN_RESOLUTION_CONFLICT'),
+        ):
+            candidate = assess_retention([a, row(name='capture-2/source.json',
+                                                 **override)], as_of=AS_OF)
+            self.assertEqual({item['disposition'] for item in candidate['items']},
+                             {expected})
+            self.assertTrue(all(not item['may_delete_now']
+                                for item in candidate['items']))
+
+    def test_latest_capture_or_hold_release_starts_run_wide_clock(self):
+        older = row(name='capture-1/source.json')
+        recent = row(name='capture-2/source.json',
+                     captured_at='2026-10-15T00:00:00Z')
+        outcome = assess_retention([older, recent], as_of=AS_OF)
+        self.assertEqual({i['disposition'] for i in outcome['items']},
+                         {'PRESERVE_WITHIN_RETENTION'})
+        self.assertEqual({i['raw_not_before'] for i in outcome['items']},
+                         {'2027-01-13T00:00:00+00:00'})
+        self.assertEqual({i['index_keep_through_at_least']
+                          for i in outcome['items']}, {'2027-10-15T00:00:00+00:00'})
+        release = row(name='capture-2/source.json',
+                      hold_released_at='2026-10-15T00:00:00Z')
+        outcome = assess_retention([older, release], as_of=AS_OF)
+        self.assertEqual({i['disposition'] for i in outcome['items']},
+                         {'PRESERVE_WITHIN_RETENTION'})
+        self.assertEqual({i['raw_not_before'] for i in outcome['items']},
+                         {'2027-01-13T00:00:00+00:00'})
+
     def test_sorted_minimal_output_no_raw_fields(self):
         a=row(name='capture-2/source.json')
         b=row()

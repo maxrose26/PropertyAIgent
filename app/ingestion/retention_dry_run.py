@@ -50,6 +50,7 @@ def assess_retention(entries, *, as_of):
         raise ValueError('RETENTION_INVENTORY_BOUND')
     seen = set()
     results = []
+    run_groups = {}
     for row in entries:
         if type(row) is not dict or set(row) != SHAPE:
             raise ValueError('RETENTION_INVENTORY_SHAPE')
@@ -88,6 +89,10 @@ def assess_retention(entries, *, as_of):
         # historical/prospective provenance against trusted database records.
         prospective = row['retention_tag'] == PROSPECTIVE_TAG and not row['historical']
         last_event = max(captured, resolved or captured, hold_released or captured)
+        # An intake run is the recovery/stop boundary. A newer sibling,
+        # unresolved sibling, or unverified sibling cannot be hidden by an
+        # otherwise old and apparently eligible individual evidence row.
+        run_groups.setdefault((period, run), []).append((len(results), last_event, row))
         index_until = last_event + timedelta(days=INDEX_DAYS)
         raw_until = last_event + timedelta(days=RAW_DAYS)
         if not prospective:
@@ -112,6 +117,40 @@ def assess_retention(entries, *, as_of):
             'disposition': reason,
             'may_delete_now': False,
         })
+    # Prospective owner-review eligibility is conservative across all evidence
+    # rows supplied for the same run. This still requires a caller to supply a
+    # complete authenticated inventory: it does not prove missing siblings are
+    # absent, verify provenance, nor grant deletion authority.
+    for siblings in run_groups.values():
+        if len(siblings) < 2:
+            continue
+        latest = max(clock for _, clock, _ in siblings)
+        metadata = [row for _, _, row in siblings]
+        if any(row['historical'] or row['retention_tag'] != PROSPECTIVE_TAG
+               for row in metadata):
+            reason = 'PRESERVE_RUN_PROVENANCE_UNVERIFIED'
+        elif any(not row['readback_verified'] for row in metadata):
+            reason = 'PRESERVE_RUN_READBACK_UNVERIFIED'
+        elif any(not row['hold_history_verified'] for row in metadata):
+            reason = 'PRESERVE_RUN_HOLD_HISTORY_UNVERIFIED'
+        elif any(row['explicit_hold'] for row in metadata):
+            reason = 'PRESERVE_RUN_EXPLICIT_HOLD'
+        elif any(row['resolution'] == 'UNRESOLVED' for row in metadata):
+            reason = 'PRESERVE_RUN_UNRESOLVED'
+        elif len({(row['resolution'], row['resolved_at']) for row in metadata}) != 1:
+            reason = 'PRESERVE_RUN_RESOLUTION_CONFLICT'
+        else:
+            reason = None
+        raw_until = latest + timedelta(days=RAW_DAYS)
+        index_until = latest + timedelta(days=INDEX_DAYS)
+        for position, _, _ in siblings:
+            result = results[position]
+            result['raw_not_before'] = raw_until.isoformat()
+            result['index_keep_through_at_least'] = index_until.isoformat()
+            if reason is not None:
+                result['disposition'] = reason
+            elif now < raw_until:
+                result['disposition'] = 'PRESERVE_WITHIN_RETENTION'
     results.sort(key=lambda r: (r['period'], r['run_id'], r['name']))
     return {'schema': 'PA_D002_RETENTION_DRY_RUN_V1', 'as_of': now.isoformat(),
             'dry_run_only': True, 'sql_or_delete_operations': 0,
