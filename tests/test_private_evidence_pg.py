@@ -88,6 +88,14 @@ def test_actual_restricted_sql_source_and_final_readback():
             sha256=hashlib.sha256(data).hexdigest(),
             bytes=len(data),readback_verified=True)
         assert len(transactions)==2
+        # Idempotent read/write ACK is permitted while SOURCE_INTENT is live,
+        # but the SQL ACK remains unverified until separate readback.
+        with world['connect']('ingestion_worker_login') as worker:
+            live_repeat = worker.execute(
+                'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                (PERIOD, RUN, 'capture-1/source.json', data)).fetchone()[0]
+        assert live_repeat['sha256'] == receipt['sha256']
+        assert live_repeat['readback_verified'] is False
         # Physical lock-order falsification: after an owner stop-generation
         # change commits, a waiting worker cannot persist another source.
         stopped=copy.deepcopy(ctl)
@@ -184,6 +192,13 @@ def test_actual_restricted_sql_source_and_final_readback():
                 worker.execute(
                     'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
                     (PERIOD, RUN, 'capture-2/source.json', data))
+        # Expired period cannot revive an already-retained source by replaying
+        # identical bytes; reconciliation is READ ONLY through the SQL reader.
+        with pytest.raises(Exception, match='EVIDENCE_SOURCE_AUTHORITY'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-1/source.json', data))
         ctl['intake_periods'][PERIOD]['expires_at'] = original_expiry
         boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
                      "WHERE key=repeat('0',64)", (json.dumps(ctl),))
@@ -206,6 +221,12 @@ def test_actual_restricted_sql_source_and_final_readback():
         ctl['grants'][AUTH]['expires_at']=0
         boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
                      "WHERE key=repeat('0',64)",(json.dumps(ctl),))
+        # Closed SOURCE_INTENT also refuses the identical first capture.
+        with pytest.raises(Exception, match='EVIDENCE_SOURCE_AUTHORITY'):
+            with world['connect']('ingestion_worker_login') as worker:
+                worker.execute(
+                    'SELECT public.ingestion_intake_evidence_write(%s,%s,%s,%s)',
+                    (PERIOD, RUN, 'capture-1/source.json', data))
         rt.archive_ordinal=1
         with pytest.raises(Exception,match='EVIDENCE_SOURCE_AUTHORITY'):
             rt.archive(data)

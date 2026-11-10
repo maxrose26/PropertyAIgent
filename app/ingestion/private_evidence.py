@@ -17,7 +17,7 @@ BACKEND = 'PRIVATE_POSTGRES_V1'
 SQL_BACKEND = 'POSTGRES_PILOT_V1'
 # Offline candidate SQL fingerprint only (fixture; never installed in production).
 # Future operational migration requires distinct owner/provider approval.
-WRITE_FUNCTION_SHA256 = '9cfe2a19871e5498bd281012488e2febb5c7b9393f4c1800fcf3212a1a8e314d'
+WRITE_FUNCTION_SHA256 = '4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77'
 READ_FUNCTION_SHA256 = '8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a'
 CAPTURE_NAMES = frozenset(('capture-1/source.json', 'capture-2/source.json'))
 FINAL_NAMES = frozenset(('final/result-before-publication.json', 'final/events-before-publication.json'))

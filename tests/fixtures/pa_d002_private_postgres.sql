@@ -2,7 +2,7 @@
 -- Existing installed function bodies independently inspected SELECT-only 2026-11-09.
 -- read SHA256(prosrc) 8552e361065807eb428c15d95cbb7a5a81011f6c0ee08d8db5bd8cb572f94a8a
 -- installed baseline write SHA256(prosrc) 8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290
--- OFFLINE STOP-CAS candidate write SHA256(prosrc) 9cfe2a19871e5498bd281012488e2febb5c7b9393f4c1800fcf3212a1a8e314d
+-- OFFLINE STOP-CAS candidate write SHA256(prosrc) 4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77
 -- These operations execute ONLY in disposable_world() with fixed loopback host/DB.
 CREATE TABLE public.ingestion_run_evidence (
  period text NOT NULL, run_id text NOT NULL, name text NOT NULL,
@@ -59,15 +59,9 @@ BEGIN
    'last_hard_stop',ctl->'last_hard_stop',
    'hard_stop_generation',coalesce(ctl->'hard_stop_generation','0'::jsonb))
  ) THEN RAISE EXCEPTION 'EVIDENCE_STOP_CHANGED'; END IF;
- SELECT * INTO prior FROM public.ingestion_run_evidence WHERE period=p_period AND run_id=p_run AND name=p_name;
- IF FOUND THEN
-  IF prior.body IS DISTINCT FROM p_body THEN RAISE EXCEPTION 'EVIDENCE_CONFLICT_NO_OVERWRITE'; END IF;
-  RETURN jsonb_build_object('backend','POSTGRES_PILOT_V1','period',p_period,'run_id',p_run,'name',p_name,
-   'path','docs/design/ingestion-operational-execution-daily-intake/'||p_period||'/'||p_run||'/'||p_name,
-   'sha256',prior.sha256,'bytes',octet_length(prior.body),'readback_verified',false);
- END IF;
- IF run->>'state'<>'OPEN' OR t>(policy->>'expires_at')::double precision+185 THEN RAISE EXCEPTION 'EVIDENCE_RUN_CLOSED'; END IF;
- IF p_name LIKE 'capture-%' AND (t>(policy->>'expires_at')::double precision OR NOT EXISTS (
+ -- Validate live SOURCE_INTENT authority even for byte-identical stored evidence.
+ -- After grant/period closure, recover only by the separately bounded SQL reader.
+ IF p_name LIKE 'capture-%' AND (run->>'state' IS DISTINCT FROM 'OPEN' OR t>(policy->>'expires_at')::double precision OR NOT EXISTS (
  SELECT 1 FROM jsonb_each(ctl->'grants') g JOIN public.ingestion_work_items w ON w.key=g.value->>'capture_key'
  WHERE g.value->>'intake_period'=p_period AND g.value->>'intake_run'=p_run AND w.phase='SOURCE_INTENT'
  AND g.value->'execution_binding'=policy->'execution_binding' AND (g.value->>'expires_at')::double precision>t
@@ -76,6 +70,14 @@ BEGIN
  OR (p_period='b-bolton-20261103-1105-01' AND policy->'fixed_window'='{"end": "2026-11-05", "start": "2026-11-03"}'::jsonb AND w.subject::jsonb->>'council'='bolton' AND w.subject::jsonb->>'semantics'='RECEIVED' AND (convert_from(p_body,'UTF8')::jsonb)->>'council'='bolton' AND (convert_from(p_body,'UTF8')::jsonb)->>'date_semantics'='RECEIVED')
  OR (w.subject::jsonb->>'council'='manchester' AND w.subject::jsonb->>'semantics'='VALIDATED' AND (convert_from(p_body,'UTF8')::jsonb)->>'case'='discovery_manchester_ui_window'))
  )) THEN RAISE EXCEPTION 'EVIDENCE_SOURCE_AUTHORITY'; END IF;
+ SELECT * INTO prior FROM public.ingestion_run_evidence WHERE period=p_period AND run_id=p_run AND name=p_name;
+ IF FOUND THEN
+  IF prior.body IS DISTINCT FROM p_body THEN RAISE EXCEPTION 'EVIDENCE_CONFLICT_NO_OVERWRITE'; END IF;
+  RETURN jsonb_build_object('backend','POSTGRES_PILOT_V1','period',p_period,'run_id',p_run,'name',p_name,
+   'path','docs/design/ingestion-operational-execution-daily-intake/'||p_period||'/'||p_run||'/'||p_name,
+   'sha256',prior.sha256,'bytes',octet_length(prior.body),'readback_verified',false);
+ END IF;
+ IF run->>'state'<>'OPEN' OR t>(policy->>'expires_at')::double precision+185 THEN RAISE EXCEPTION 'EVIDENCE_RUN_CLOSED'; END IF;
  IF p_name LIKE 'final/%' AND EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') g WHERE g.value->>'intake_run'=p_run AND g.value->'expires_at' IS DISTINCT FROM '0'::jsonb) THEN RAISE EXCEPTION 'EVIDENCE_FINITE_AUTHORITIES_NOT_CLOSED'; END IF;
  -- Reject malformed/non-object exports without converting an arbitrary exception to success.
  IF jsonb_typeof(convert_from(p_body,'UTF8')::jsonb) IS DISTINCT FROM (CASE WHEN p_name='final/events-before-publication.json' THEN 'array' ELSE 'object' END) THEN RAISE EXCEPTION 'EVIDENCE_EXPORT_OBJECT'; END IF;
