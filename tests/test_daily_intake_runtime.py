@@ -112,8 +112,11 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
         else:
             verified_t = persisted_council_capture_inventory(inventory_db, 'tameside')
             assert len(verified_t) == 1 and verified_t[0]['checkpoint']['council'] == 'tameside'
-        with pytest.raises(Denied, match='CAPTURE_INVENTORY_SCOPE'):
+        # Trafford is a configured read-only inventory scope, not a qualified source.
+        with pytest.raises(Denied, match='CAPTURE_INVENTORY_EMPTY_OR_BOUND'):
             persisted_council_capture_inventory(inventory_db, 'trafford')
+        with pytest.raises(Denied, match='CAPTURE_INVENTORY_SCOPE'):
+            persisted_council_capture_inventory(inventory_db, 'not-a-council')
         with pytest.raises(Denied, match='CAPTURE_INVENTORY_EMPTY_OR_BOUND'):
             persisted_council_capture_inventory(inventory_db, 'oldham')
         with pytest.raises(Denied, match='CAPTURE_INVENTORY_SCOPE'):
