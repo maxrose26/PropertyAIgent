@@ -81,6 +81,12 @@ def pg():
                 c.execute(Path('docs/design/ingestion-operational-acceptance-20261016/runtime-mappings.sql').read_text())
                 # Existing reviewed v3 function, unchanged, installed as fixture only.
                 c.execute(screening_v3_worker_sql.installation_script())
+            # This disposable-only candidate needs the same existing opt-in
+            # complete-capture v3 SQL extension as daily-intake-PG tests.
+            # Installing it in the fixture proves the real worker's identity
+            # derivation without modifying any hosted or production function.
+            boot.execute(screening_v3_worker_sql.original_function(
+                screening_v3_worker_sql.capture_bound_text()))
             for role in names[1:]:
                 boot.execute(sql.SQL('ALTER ROLE {} PASSWORD {}').format(sql.Identifier(role), sql.Literal(passwords[role])))
             with connect('provisioning_migrator') as c:
