@@ -103,6 +103,16 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
             or progress.get('next') != plan.get('last') or b.screening_key not in progress.get('children', [])
             or record not in receipt['records'][plan.get('first', 0):plan.get('last', 0)]):
         raise Denied('V3_COMPLETED_BATCH_BINDING')
+    # The current daily intake commits capture-specific v3 screen revisions;
+    # historical v3 children remain unbound. The saved plan, not a caller
+    # flag or a proposed fact, selects which exact identity is admissible.
+    capture_bound = plan.get('capture_bound') is True
+    if (plan.get('capture_bound', False) not in (False, True)
+            or capture_bound is not (coordinator.capture_bound_screening is True)):
+        raise Denied('V3_CAPTURE_BOUND_MODE')
+    if capture_bound:
+        from app.ingestion.observation_screening import observation_revision
+        revision = observation_revision(revision, digest(receipt))
     screen = ledger.get(b.screening_key)
     subject = dict(kind='APPLICATION', council=binding.council, reference=b.reference)
     if (screen['state'] != 'COMPLETE' or screen['task'] != 'SCREENING'
@@ -111,7 +121,8 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
         raise Denied('V3_COMPLETED_SCREENING_BINDING')
     stored = screen['checkpoint'] or {}
     expected = rule.screen(record)
-    if (any(stored.get(k) != v for k, v in expected.items())
+    if ((stored.get('capture_bound') is True) is not capture_bound
+            or any(stored.get(k) != v for k, v in expected.items())
             or stored.get('record_sha256') != record_sha or stored.get('config') != config
             or stored.get('config_sha256') != config_sha or stored.get('assessment_revision') != revision):
         raise Denied('V3_ASSESSMENT_BINDING')

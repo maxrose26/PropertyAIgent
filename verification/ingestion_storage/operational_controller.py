@@ -345,15 +345,26 @@ def _execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council
     expected=rule.screen(r)
     if not identity_admission_eligible(expected):return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')      # the ONE authoritative routing outcome decides (v1 dispositions, or v3 ADMIT_SCHEME / ADMIT_FOR_ASSESSMENT)
     want_revision=digest(r) if rule.rule_version==RULE_V1 else assessment_identity(r,rule)[3]
+    capture_bound=(bool(binding.screening_batch_key) and plan.get('capture_bound') is True)
+    if (binding.screening_batch_key and plan.get('capture_bound',False) not in (False,True)
+            or capture_bound and rule.rule_version==RULE_V1
+            or capture_bound is not (coordinator.capture_bound_screening is True)):
+        raise Denied('CONTROLLER_CAPTURE_BOUND_MODE')
     if rule.rule_version!=RULE_V1:
         record_sha,config,config_sha,revision=assessment_identity(r,rule)
+        if capture_bound:
+            from app.ingestion.observation_screening import observation_revision
+            revision=observation_revision(revision,digest(receipt))
+            want_revision=revision
+            expected['capture_bound']=True
         expected=dict(expected,record_sha256=record_sha,config=config,config_sha256=config_sha,assessment_revision=revision,assessment_sha256=digest(expected['count_assessment']),qualifier_output_sha256=digest(qualifier_output_of(expected)))
     check();screen_task=l.get(binding.screening_key)
     if binding.screening_batch_key and (screen_task['state']!='COMPLETE' or screen_task['dependencies']!=[binding.discovery_key]
         or screen_task['revision']!=want_revision or screen_task['subject']!={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']}
         or screen_task['task']!='SCREENING' or screen_task['contract']!=coordinator.screening_contract):raise Denied('EXACT_COMPLETED_SCREENING_REQUIRED')
     sc=screen_task['checkpoint'] if screen_task['state']=='COMPLETE' else coordinator.screening(l.claim(binding.screening_key,lease_seconds=165))
-    if any(sc[k]!=v for k,v in expected.items()):raise Denied('FORGED_SCREENING_RECEIPT')
+    if ((sc.get('capture_bound') is True) is not capture_bound
+        or any(sc.get(k)!=v for k,v in expected.items())):raise Denied('FORGED_SCREENING_RECEIPT')
     if not identity_admission_eligible(sc,l.get(binding.screening_key)):raise Denied('FORGED_SCREENING_RECEIPT')      # the stored item must itself be the registered rule's eligible item
     from sqlalchemy import select
     from sqlalchemy.orm import Session

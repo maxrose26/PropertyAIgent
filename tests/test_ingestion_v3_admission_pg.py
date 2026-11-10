@@ -106,7 +106,7 @@ def pg():
                 boot.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(name)))
 
 
-def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
+def scenario(pg, tag, proposal='Erection of 20 residential dwellings', *, capture_bound=False):
     """Install synthetic saved capture; generate its assessment via real batch SQL."""
     boot = pg['boot']
     target, detail, _ = projected(summary('01780/26', status='Decided', decision='Approve', date='Mon 28 Sep 2026'))
@@ -127,10 +127,14 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
     record = capture['records'][0]
     root = item(dict(subject=dict(kind='DISCOVERY_SCOPE', council='bolton', start=cfg.start.isoformat(), end=cfg.end.isoformat(), semantics='RECEIVED'), task='DISCOVERY', contract=contract.name, revision=tag))
     root.update(state='COMPLETE', phase='FINISHED', checkpoint=capture, outcome=dict(children=[]))
-    plans = batch_plans(root['key'], capture, rule)
+    plans = batch_plans(root['key'], capture, rule, capture_bound=capture_bound)
     batch = item({k: plans[0][k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=plans[0]['dependencies'], checkpoint=plans[0]['checkpoint'])
     subject = dict(kind='APPLICATION', council='bolton', reference=record['reference'])
-    screen = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=assessment_identity(record, rule)[3]), dependencies=[root['key']])
+    screen_revision = assessment_identity(record, rule)[3]
+    if capture_bound:
+        from app.ingestion.observation_screening import observation_revision
+        screen_revision = observation_revision(screen_revision, digest(capture))
+    screen = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=screen_revision), dependencies=[root['key']])
     factual_contract = accepted_idox_new_identity('controller-fact', target)
     fact = item(dict(subject=subject, task='FACTUAL_REFRESH', contract=factual_contract.name, revision=tag), dependencies=[screen['key']])
     # Each scenario is an independent disposable world, not a recovery/retry.
@@ -151,7 +155,7 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
         budgets.append(budget)
         worker, broker, app = [budget.engine(pg['urls'][r]) for r in ['ingestion_worker_login', 'ingestion_effect_login', 'ingestion_application_login']]
         ledger = ControllerLedger(worker, budget=budget, owner='one', authority=authority, bindings=bindings, broker_engine=broker, application_engine=app)
-        return Coordinator(ledger, {contract.name: contract, factual_contract.name: factual_contract}, screening_rules={V3_CONTRACT: rule})
+        return Coordinator(ledger, {contract.name: contract, factual_contract.name: factual_contract}, screening_rules={V3_CONTRACT: rule}, capture_bound_screening=capture_bound)
     b0 = DatabaseBudget(slot_key=batch['key'])
     co = coordinator(b0)
     try:
@@ -354,3 +358,55 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
                         fixture_and_assertions={k: pg['fixture_costs'][k] - fixture_before[k] for k in fixture_before})
         record_property('measured', json.dumps(measured, sort_keys=True))
         print('V3_HANDOFF_MEASURED ' + json.dumps(measured, sort_keys=True))
+
+
+@pytest.mark.parametrize('forgery', ['NONE', 'MISSING_FLAG', 'ALTERED_SCREEN_REVISION'])
+def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
+    """Real disposable SQL: bound saved screen -> targeted fact -> committed Application.
+
+    No source request is made; a changed plan/screen must refuse before detail
+    or Application effects. The legacy unbound fixture above is unchanged.
+    """
+    from app.config import get_council
+    from verification.ingestion_storage.v3_admission import execute_retained_v3
+    sc = scenario(pg, 'capture-bound-' + forgery, capture_bound=True)
+    boot = pg['boot']
+    actual = boot.execute(
+        'SELECT revision,checkpoint FROM ingestion_work_items WHERE key=%s',
+        (sc['screen']['key'],)).fetchone()
+    assert actual[0] == sc['screen']['revision']
+    assert actual[1]['capture_bound'] is True
+    if forgery == 'MISSING_FLAG':
+        bad = dict(actual[1])
+        bad.pop('capture_bound')
+        boot.execute('UPDATE ingestion_work_items SET checkpoint=%s::json WHERE key=%s',
+                     (json.dumps(bad), sc['screen']['key']))
+    elif forgery == 'ALTERED_SCREEN_REVISION':
+        boot.execute('UPDATE ingestion_work_items SET revision=%s WHERE key=%s',
+                     ('0'*64, sc['screen']['key']))
+    calls = []
+    def detail(_):
+        calls.append(1)
+        return sc['detail'], outer()
+    try:
+        if forgery == 'NONE':
+            result = execute_retained_v3(
+                sc['co'], sc['binding'], detail_reader=detail, envelope=sc['envelope'],
+                council=get_council('bolton'), check=sc['budget'].check)
+            assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED'
+            assert calls == [1]
+            saved = boot.execute(
+                "SELECT reference,status,decision,site_id,estimated_unit_count "
+                "FROM applications WHERE council_code='bolton'").fetchall()
+            assert len(saved) == 1 and saved[0][0] == '01780/26'
+            assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
+            assert saved[0][3:] == (None, None)
+        else:
+            with pytest.raises(Denied):
+                execute_retained_v3(
+                    sc['co'], sc['binding'], detail_reader=detail, envelope=sc['envelope'],
+                    council=get_council('bolton'), check=sc['budget'].check)
+            assert calls == [] and boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 0
+    finally:
+        costs = sc['budget'].close([])
+        assert costs['cleanup'] == 'CLOSED' and costs['connections_closed']
