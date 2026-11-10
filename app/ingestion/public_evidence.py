@@ -6,6 +6,7 @@ It is a pure offline helper; Git-backed finalisation and private archival still
 require separate restricted runtime integration and exact readback.
 """
 import hashlib
+import json
 import re
 
 from .ledger import Denied
@@ -29,6 +30,21 @@ def project_public_summary(result, *, original_raw, original_events):
             or type(result.get('scopes')) is not list
             or len(result['scopes']) > 2):
         raise Denied('PUBLIC_SUMMARY_INPUT_BOUND')
+    # Bind published counts/status to the EXACT private bytes whose digest
+    # appears in the public proof. Without this, two unrelated objects could
+    # produce a plausible-looking yet irreconcilable public summary.
+    # The runtime produces both inputs using the same strict canonical JSON.
+    try:
+        expected_result = json.dumps(result, sort_keys=True, separators=(',', ':'),
+                                     ensure_ascii=True, allow_nan=False).encode()
+        event_list = json.loads(original_events)
+        expected_events = json.dumps(event_list, sort_keys=True, separators=(',', ':'),
+                                     ensure_ascii=True, allow_nan=False).encode()
+    except (TypeError, ValueError, UnicodeError):
+        raise Denied('PUBLIC_SUMMARY_PRIVATE_BINDING') from None
+    if (expected_result != original_raw or type(event_list) is not list
+            or expected_events != original_events):
+        raise Denied('PUBLIC_SUMMARY_PRIVATE_BINDING')
     scopes = []
     for scope in result['scopes']:
         if (type(scope) is not dict or type(scope.get('council')) is not str

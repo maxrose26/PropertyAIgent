@@ -16,8 +16,8 @@ PAYLOAD = {
     'failure': None, 'events': [{'full': SECRET}], 'path': SECRET,
 }
 EVENTS = [{'source_body': SECRET, 'path': SECRET, 'credentials': SECRET}]
-RAW = json.dumps(PAYLOAD).encode()
-EVENT_RAW = json.dumps(EVENTS).encode()
+RAW = json.dumps(PAYLOAD, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False).encode()
+EVENT_RAW = json.dumps(EVENTS, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False).encode()
 
 
 def test_summary_is_status_counts_digests_only_and_never_contains_private_fields():
@@ -30,6 +30,29 @@ def test_summary_is_status_counts_digests_only_and_never_contains_private_fields
     assert result['coverage_advance'] is False
     assert result['private_result_sha256'] and result['private_events_sha256']
     assert len(result['private_result_sha256']) == 64
+
+
+def test_public_summary_refuses_status_or_count_unbound_to_private_result():
+    # Correctly shaped but different private bytes MUST NOT get a digest
+    # falsely attributed to the caller's chosen visible status/count.
+    altered = {**PAYLOAD, 'scopes': [{**PAYLOAD['scopes'][0], 'records': 20}]}
+    with pytest.raises(Denied, match='PUBLIC_SUMMARY_PRIVATE_BINDING'):
+        project_public_summary(altered, original_raw=RAW, original_events=EVENT_RAW)
+    # Noncanonical private content (even equivalent JSON) is not an exact
+    # runtime receipt; it may hide ambiguous duplicate keys.
+    with pytest.raises(Denied, match='PUBLIC_SUMMARY_PRIVATE_BINDING'):
+        project_public_summary(PAYLOAD, original_raw=json.dumps(PAYLOAD).encode(),
+                               original_events=EVENT_RAW)
+
+
+@pytest.mark.parametrize('bad_events', [
+    b'{"events":[]}', b'not json', EVENT_RAW + b' ', b'[{},{}]'])
+def test_public_summary_refuses_unknown_or_unbound_event_digest(bad_events):
+    # Final private event evidence must be a canonical list, never an
+    # arbitrary byte string given a convincing SHA-256 in the public proof.
+    with pytest.raises(Denied, match='PUBLIC_SUMMARY_PRIVATE_BINDING'):
+        project_public_summary(PAYLOAD, original_raw=RAW,
+                               original_events=bad_events)
 
 
 @pytest.mark.parametrize('status', [
