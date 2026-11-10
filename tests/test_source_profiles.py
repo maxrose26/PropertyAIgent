@@ -358,3 +358,87 @@ def test_initial_two_slot_packages_fail_closed_on_unreviewed_manifest(fault):
     else:plan['rows'][0]['council']='trafford'
     with pytest.raises(ValueError,match='INITIAL_28_MANIFEST_UNVERIFIED'):
         campaign.initial_two_slot_packages(plan,expected)
+
+
+
+def test_shutdown_gap_offline_plan_all_ten_with_57_day_window_and_no_authority():
+    """Actual 10 Nov scope; shape proof is NOT a database/council outcome."""
+    from datetime import datetime,timezone,timedelta
+    from verification.discovery import campaign_manifest as campaign
+    value=campaign.shutdown_gap_source_packages(datetime(2026,11,10,12,4,tzinfo=timezone.utc))
+    assert value['version']==campaign.SHUTDOWN_GAP_SOURCE_VERSION
+    assert value['fallback_start']=='2026-09-15' and value['endpoint_date']=='2026-11-10'
+    assert value['total_date_scopes']==90 and value['nine_source_shape_scopes']==81
+    assert value['trafford_unqualified_scopes']==9 and len(value['windows'])==9
+    assert len(value['required_councils'])==10
+    assert sum(len(x['packages']) for x in value['windows'])==45
+    assert value['windows'][-1]['start']==value['windows'][-1]['end']=='2026-11-10'
+    assert sum(len(x['packages'][-1]['selected_ordinals'])==1 for x in value['windows'])==9
+    assert all(value[k] is False for k in ('fallback_is_verified_shutdown',
+        'earlier_proven_gaps_reconciled','sql_issuer_qualified','source_qualified',
+        'collection_authorised','stored_records_verified','entire_day_coverage_proven'))
+    previous=date(2026,9,14)
+    for window in value['windows']:
+        start,end=map(date.fromisoformat,(window['start'],window['end']))
+        assert start==previous+timedelta(days=1) and 0<=(end-start).days<=6
+        assert window['finite_manifest']['purpose']=='SUSPENSION_CATCHUP'
+        assert f.digest(window['finite_manifest'])==window['finite_manifest_sha256']
+        assert window['end_day_incomplete']==(end==date(2026,11,10))
+        seen=[]
+        for package in window['packages']:
+            payload=dict(finite_manifest=window['finite_manifest'],
+                finite_manifest_sha256=window['finite_manifest_sha256'],
+                selected_ordinals=package['selected_ordinals'],
+                collection_mode='SCREENING_METADATA')
+            rows=__import__('verification.discovery.campaign_manifest',fromlist=['select']).select(payload,profiled=True)
+            assert len(rows)<=2 and len({r['council'] for r in rows})==len(rows)
+            assert package['reservation']['requests']<=100
+            seen.extend(row['council'] for row in rows)
+        assert sorted(seen)==sorted(f.SEMANTICS)
+        tenth=window['unqualified_tenth']
+        assert tenth['council']=='trafford' and tenth['status']=='SOURCE_CONTRACT_AND_SQL_SCOPE_UNQUALIFIED'
+        assert (tenth['start'],tenth['end'])==(window['start'],window['end'])
+        previous=end
+    assert previous==date(2026,11,10)
+
+
+def test_shutdown_gap_rolls_endpoint_and_does_not_silently_advance_older_manifest():
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    a=campaign.shutdown_gap_source_packages(datetime(2026,11,10,12,tzinfo=timezone.utc))
+    b=campaign.shutdown_gap_source_packages(datetime(2026,11,11,12,tzinfo=timezone.utc))
+    assert a['windows'][:-1]==b['windows'][:-1]
+    assert a['windows'][-1]['end']=='2026-11-10' and b['windows'][-1]['end']=='2026-11-11'
+    assert a['windows'][-1]['finite_manifest_sha256']!=b['windows'][-1]['finite_manifest_sha256']
+    assert b['total_date_scopes']==a['total_date_scopes']
+    assert b['entire_day_coverage_proven'] is False
+
+
+@pytest.mark.parametrize('clock',[
+    None,'2026-11-10',date(2026,11,10)])
+def test_shutdown_gap_rejects_non_datetime_clock(clock):
+    from verification.discovery import campaign_manifest as campaign
+    with pytest.raises(ValueError,match='SHUTDOWN_AWARE_CLOCK_REQUIRED'):
+        campaign.shutdown_gap_source_packages(clock)
+
+
+def test_shutdown_gap_rejects_naive_and_earlier_clock_and_handles_london_date():
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    for clock,reason in [(datetime(2026,11,10), 'SHUTDOWN_AWARE_CLOCK_REQUIRED'),
+                         (datetime(2026,9,14,12,tzinfo=timezone.utc), 'SHUTDOWN_DATE_BEFORE_FALLBACK')]:
+        with pytest.raises(ValueError,match=reason):
+            campaign.shutdown_gap_source_packages(clock)
+    # UTC can still be 10 November while Europe/London has entered 11 Nov in summer.
+    summer=campaign.shutdown_gap_source_packages(datetime(2026,9,14,23,30,tzinfo=timezone.utc))
+    assert summer['endpoint_date']=='2026-09-15'
+    assert summer['total_date_scopes']==10 and summer['trafford_unqualified_scopes']==1
+
+
+def test_shutdown_gap_blocks_unreviewed_registry_expansion(monkeypatch):
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    with monkeypatch.context() as m:
+        m.setattr(f,'SEMANTICS',dict(f.SEMANTICS,trafford='RECEIVED'))
+        with pytest.raises(ValueError,match='SHUTDOWN_SOURCE_REGISTRY_CHANGED'):
+            campaign.shutdown_gap_source_packages(datetime(2026,11,10,tzinfo=timezone.utc))
