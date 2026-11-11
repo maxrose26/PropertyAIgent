@@ -1266,3 +1266,33 @@ def test_tameside_period_cannot_bypass_unrelated_shared_stop(world, stop_field, 
         authorise(world, 'tameside-only-after-bolton-'+stop_field, candidate)
     assert snapshot(world['boot']) == before
     assert restricted_sessions(world['boot']) == 0
+
+
+def test_unresolved_bolton_source_intent_blocks_new_tameside_period(world):
+    """A clear stop snapshot cannot make another council's uncertain effect safe.
+
+    The Bolton row is a disposable database fixture, not the historical run:
+    no source is contacted and this does not settle or clear real stops.
+    """
+    from verification.ingestion_storage.operational_owner import item
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    reset(world)
+    identity = dict(subject=dict(kind='DISCOVERY_SCOPE', council='bolton',
+                                 start='2026-11-03', end='2026-11-05',
+                                 semantics='RECEIVED'), task='DISCOVERY',
+                    contract='bolton-test-only', revision='unresolved-intent')
+    orphan = item(identity, limits=dict(DEFAULT_LIMITS))
+    orphan.update(state='CLAIMED', phase='SOURCE_INTENT', fence=1,
+                  attempt_count=1, owner='dead-fixture-worker', lease_until=0)
+    world['boot'].execute(
+        'INSERT INTO ingestion_work_items SELECT * FROM json_populate_record('
+        'NULL::ingestion_work_items,%s::json)', (json.dumps(orphan),),
+    )
+    candidate = policy(world)
+    assert candidate['expected_stop']['global_stop'] is None
+    assert candidate['expected_stop']['manual_stop'] is None
+    before = snapshot(world['boot'])
+    with pytest.raises(Exception, match='ADMIN_EFFECT_UNCERTAIN'):
+        authorise(world, 'tameside-after-unresolved-bolton', candidate)
+    assert snapshot(world['boot']) == before
+    assert restricted_sessions(world['boot']) == 0
