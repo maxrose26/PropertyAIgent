@@ -711,6 +711,36 @@ def test_paginated_cross_run_backlog_survives_period_expiry(world,tmp_path):
     assert all(r['screening_state']=='COMPLETE' and r['extraction_complete'] is None and r['downstream_state']=='NOT_TRACKED_BY_INTAKE' for r in seen)
 
 
+
+def test_backlog_rejects_cross_council_contract_pair_even_when_both_values_are_allowlisted(world,tmp_path):
+    """A council and another council's approved contract are not a valid pair.
+
+    The intentionally mismatched historical row is inserted by the disposable
+    fixture owner only; the restricted backlog command is still read-only.
+    """
+    reset(world);period='paired-backlog';authorise(world,period)
+    capture=tmp_path/'capture';capture.mkdir()
+    run,result,_=invoke(world,capture,period)
+    assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED',json.dumps(result)
+    initial=world['boot'].execute("SELECT subject->>'council',contract FROM ingestion_work_items WHERE task='DISCOVERY'").fetchall()
+    assert {tuple(r) for r in initial}=={('manchester','daily-intake-manchester'),('tameside','daily-intake-tameside')}
+    # Simulate a historical/misbound row whose contract name is otherwise on
+    # the allowed list. Old independent IN filters would silently include it.
+    world['boot'].execute("UPDATE ingestion_work_items SET contract='daily-intake-tameside' WHERE task='DISCOVERY' AND subject->>'council'='manchester'")
+    target=tmp_path/'reader';target.mkdir();env,sources=env_and_sources(world,target)
+    output=target/'page'
+    command=[sys.executable,'-m','scripts.run_daily_councils','--period',period,'--output',str(output),
+             '--backlog','--page-size','3','--disposable-sources',str(sources),'--disposable-archive',str(target/'archive')]
+    check=subprocess.run(command,env=env,capture_output=True,text=True,timeout=30)
+    assert check.returncode==0,check.stderr
+    page=json.loads((output/'backlog.json').read_bytes())
+    assert page['status']=='BACKLOG_READ' and not page['more'] and page['next_cursor'] is None
+    assert {x['council'] for x in page['captures']}=={'tameside'}
+    assert {x['council'] for x in page['records']}=={'tameside'}
+    assert len(page['records'])==1 and page['source_calls']==page['registrations']==0
+    assert restricted_sessions(world['boot'])==0
+
+
 def test_changed_stop_prevents_supported_registration_and_preserves_history(world,tmp_path):
     reset(world);authorise(world,'stop-guard')
     with world['connect']('ingestion_worker_login') as c:c.execute("SELECT public.ingestion_raise_stop('DISPOSABLE_NEW_STOP')")
