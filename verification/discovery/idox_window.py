@@ -59,8 +59,9 @@ class WindowConfig:
 
 
 class WindowBoundary(Boundary):
-    def __init__(self, dispatch, config=WindowConfig(), *, probe=False):
+    def __init__(self, dispatch, config=WindowConfig(), *, probe=False, response_evidence=None, calibration_navigation=False):
         self.config=config
+        self.calibration_navigation=calibration_navigation
         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
             config.base,config.form_url),
             (Budget(requests=1,per_reference=1,total_bytes=262_144,response_bytes=262_144,seconds=15) if probe else Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45)),dispatch,
@@ -72,6 +73,8 @@ class WindowBoundary(Boundary):
         self.response_provenance=[]
         self.last_response=None
         self.proof_log=None
+        if response_evidence is not None:
+            self.response_evidence=lambda body,sequence,complete:response_evidence(self.phase,sequence,body,complete=complete)
         physical=self.dispatch
         def recording(method,url,**kwargs):      # the shape of THIS request's response only (status, allow-listed media type, redirect disposition); nothing else is kept
             self.last_response=None
@@ -86,11 +89,12 @@ class WindowBoundary(Boundary):
         if self.closed: self.budget.reject('PARTIAL_RETRIEVAL','closed')
         allowed=((self.phase=='FORM' and method=='GET' and url==self.config.form_url and body is None)
             or (self.phase in {'SEARCH','SORT'} and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)
-            or (self.phase=='PAGE' and method=='GET' and url==self.next_url and self.next_url is not None and body is None)
+            or (self.phase=='PAGE' and ((method=='GET' and url==self.next_url and self.next_url is not None and body is None) or (self.calibration_navigation is True and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)))
             or (self.phase=='REFINE' and method=='GET' and url==self.policy.base_url+'/refineSearch.do?action=refine' and body is None))
         if not allowed: self.budget.reject('PARTIAL_RETRIEVAL','window request not admitted')
 
     def retrieve(self,method,url,body=None):
+        self.transport_failure=None
         self.last_response=None      # one logical request: a rejection before dispatch must not report an earlier request's response (a redirect's own response is kept for its target validation)
         status,headers,data=self.request(method,url,body=body,headers={'Content-Type':'application/x-www-form-urlencoded'} if body else {})
         if status!=200 or headers.get('Content-Type','').split(';')[0].lower() not in {'text/html','application/xhtml+xml'}:
@@ -111,14 +115,14 @@ class WindowBoundary(Boundary):
         return data
 
 
-def run(dispatch, config=WindowConfig(), *, retain_proof=False):
+def run(dispatch, config=WindowConfig(), *, retain_proof=False, response_evidence=None):
     proof=None
     if type(retain_proof) is not bool:raise ValueError('proof selection')
     if retain_proof:
         from .four_council_proof import ProofLog
         if config.max_transport_retries!=0:raise ValueError('proof requires zero retries')
         proof=ProofLog(config.council,config.semantics,config.start,config.end)
-    b=WindowBoundary(dispatch,config)
+    b=WindowBoundary(dispatch,config,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     b.proof_log=proof
     out={'council':config.council,'requested_interval':[config.start.isoformat(),config.end.isoformat()],
         'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
@@ -217,14 +221,14 @@ def run(dispatch, config=WindowConfig(), *, retain_proof=False):
                'ambiguous reference across pages':('ambiguous reference across pages','DUPLICATE_REFERENCE')}
         label,code=known.get(str(e),('SOURCE_CONTRACT_REJECTED','SOURCE_CONTRACT_REJECTED'))
         out['failure']=type(e).__name__+':'+label
-        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code,transport_facts(b.last_response,e))
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code,transport_facts(b.last_response,e,failure=b.transport_failure))
         out['completeness']='INCOMPLETE' if out['pages'] else 'FAILED'
     except Exception as exc:
         from .source_diagnostics import shape,transport_facts
         if proof is not None:
             from .four_council_proof import ProofError
             if isinstance(exc,ProofError):out['proof_retention_failure']='PROOF_RETENTION_FAILED'
-        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE',transport_facts(b.last_response,None))
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE',transport_facts(b.last_response,None,failure=b.transport_failure))
         out['failure']='UNCLASSIFIED_FAILURE';out['completeness']='FAILED'
     finally:
         b.admitted_body=None; b.close()
@@ -285,7 +289,8 @@ def form_probe(config=WindowConfig()):
     return result
 
 
-def live(config=WindowConfig(), *, retain_proof=False):
+def live(config=WindowConfig(), *, retain_proof=False, response_evidence=None, pagination_calibration=False, pagination_mode=None):
+    if pagination_mode not in (None,'TAMESIDE_FIVE_COUNT_V1'):raise ValueError('IDOX_PAGINATION_MODE')
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
@@ -297,7 +302,14 @@ def live(config=WindowConfig(), *, retain_proof=False):
             kwargs.pop('deadline',None)
             kwargs['timeout']=(3,8)
             return s.request(method,url,**kwargs)
-        result=run(dispatch,config,retain_proof=retain_proof)
+        if pagination_calibration:
+            from .pagination_calibration import run_calibration
+            result=run_calibration(dispatch,config,response_evidence=response_evidence)
+        elif pagination_mode=='TAMESIDE_FIVE_COUNT_V1':
+            from .pagination_calibration import run_counted_window
+            result=run_counted_window(dispatch,config,response_evidence=response_evidence)
+        else:
+            result=run(dispatch,config,retain_proof=retain_proof,**({'response_evidence':response_evidence} if response_evidence is not None else {}))
     result['cleanup']='SESSION_BOUNDARY_CLOSED'
     return result
 

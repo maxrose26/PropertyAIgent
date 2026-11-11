@@ -23,8 +23,14 @@ from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
-             'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','verification/discovery/finite_acceptance.py',
-             'verification/discovery/source_profiles.py','verification/discovery/idox_window.py','verification/discovery/arcus_ui_window.py',
+             'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
+             'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
+             'verification/discovery/finite_acceptance.py',
+             'verification/discovery/source_profiles.py','verification/discovery/campaign_manifest.py',
+             'verification/discovery/arcus_ui_config.py','verification/discovery/arcus_ui_audit.py',
+             'verification/discovery/idox_window.py','verification/discovery/idox_sort.py','verification/discovery/pagination_calibration.py',
+             'verification/discovery/source_diagnostics.py','verification/discovery/four_council_proof.py','app/scrapers/discovery_idox.py',
+             'docs/design/tameside-b-connection-20261101/tameside-qualification.json','verification/discovery/arcus_ui_window.py',
              'verification/ingestion_storage/daily_intake_runtime.py','verification/ingestion_storage/intake_policy.py',
              'verification/ingestion_storage/intake_budget.py','verification/ingestion_storage/render_intake.py','verification/direct_reference/instrumented_probe.py','verification/ingestion_storage/chain_caller.py',
              'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
@@ -333,6 +339,9 @@ class Runtime:
     def contract(self,row):
         config=self.policy['councils'][row['council']];b=binding_for(row['council'])
         if b.family=='idox':
+            if row['council']=='tameside' and not self.test:
+                qualification=hashlib.sha256(Path('docs/design/tameside-b-connection-20261101/tameside-qualification.json').read_bytes()).hexdigest()
+                if config!=dict(contract='tameside-screening-metadata-five-v1',qualification_sha256=qualification):raise Denied('TAMESIDE_REVIEWED_CONTRACT_BINDING')
             from app.ingestion.idox_adapter import IdoxListingContract
             from verification.discovery.idox_window import WindowConfig
             return IdoxListingContract(config['contract'],WindowConfig(row['council'],row['semantics'],date.fromisoformat(row['start']),date.fromisoformat(row['end']),0,60),config['qualification_sha256'])
@@ -610,7 +619,7 @@ def source_worker(args):
     else:
         from verification.discovery.source_profiles import profile
         from verification.discovery.finite_acceptance import read
-        p=profile(row,'SCREENING_METADATA')
+        p=profile(row,'SCREENING_METADATA',**({'idox_pagination':'TAMESIDE_FIVE_COUNT_V1'} if row['council']=='tameside' else {}))
         audit=read(row,no_transport_retry=True,retain_proof=True,fixed_four_rows=True,execution_budget=p['execution_budget'],
                    execution_mode=('render-intake-v1' if os.environ.get('INGESTION_RENDER_PROFILE') else 'four-council-owner-local') if p['family']=='ARCUS_UI' else None,campaign_scope=row,collection_profile=p)
         raw=canonical(audit)
