@@ -492,7 +492,9 @@ def policy_sql(*, disposable_catchup=False):
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_bolton_allowed(')
     end=text.index('$policy$;',start)+len('$policy$;')
     allowed=text[start:end]
-    if allowed.count(' SELECT coalesce(')!=1:
+    # Count the complete line anchor, not a substring inside extra leading
+    # whitespace: otherwise a shifted SQL body could bypass the guard.
+    if allowed.count('\n SELECT coalesce(')!=1:
         raise ValueError('INTAKE_SQL_ALLOWED_ANCHOR_DRIFT')
     rolling="""coalesce(ctl->'grants'->authority->>'intake_period' IS NOT NULL
  AND ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->'expected_stop'=__SNAPSHOT__
