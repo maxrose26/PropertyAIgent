@@ -390,6 +390,39 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
     finally:
         world['boot'].execute('ROLLBACK')
     assert snapshot(world['boot'])==before
+    # A saved readback flag and matching source hash cannot upgrade failed,
+    # incomplete, foreign-contract or wrong-date-basis source metadata.
+    for tamper_sql in (
+        "UPDATE ingestion_work_items SET outcome="
+        "jsonb_set(outcome::jsonb, '{outcome}', to_jsonb('RATE_LIMIT'::text))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+        "UPDATE ingestion_work_items SET checkpoint="
+        "jsonb_set(checkpoint::jsonb, '{accounting_complete}', 'false'::jsonb)::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+        "UPDATE ingestion_work_items SET checkpoint="
+        "jsonb_set(checkpoint::jsonb, '{cleanup}', to_jsonb('OPEN'::text))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+        "UPDATE ingestion_work_items SET checkpoint="
+        "jsonb_set(checkpoint::jsonb, '{contract}', to_jsonb('foreign-contract'::text))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+        "UPDATE ingestion_work_items SET checkpoint="
+        "jsonb_set(checkpoint::jsonb, '{date_semantics}', to_jsonb('UNKNOWN'::text))::json "
+        "WHERE task='DISCOVERY' AND subject->>'council'='tameside'",
+    ):
+        world['boot'].execute('BEGIN')
+        try:
+            world['boot'].execute(tamper_sql)
+            refused = shutdown_gap_sql_readback(world['boot'], as_of)
+            tameside = next(x for x in refused['persisted_receipt_inventory']
+                            if x['council'] == 'tameside')
+            assert tameside['state'] == 'SQL_RECEIPT_METADATA_UNVERIFIED'
+            assert tameside['distinct_references'] is None
+            assert tameside['receipt_rows'] is None
+            assert refused['sql_readback_scopes'] == 1
+        finally:
+            world['boot'].execute('ROLLBACK')
+        assert snapshot(world['boot']) == before
+
     # An overlapping but non-identical retained root is an unresolved gap,
     # not proof that the canonical seven-day window was fully covered.
     world['boot'].execute('BEGIN')

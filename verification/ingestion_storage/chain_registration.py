@@ -208,10 +208,27 @@ def shutdown_gap_sql_readback(connection, as_of):
                     break
                 archive, records = receipt.get('durable_archive'), receipt.get('records')
                 source_sha = receipt.get('source_sha256')
-                if (receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                # Digest agreement alone does not make incomplete source
+                # accounting, an unsuccessful terminal outcome, or a foreign
+                # contract an independently trusted retained identity.
+                legacy_received_basis = (
+                    root.get('contract') == 'bolton-received-idox-coordinator-v1'
+                    and council == 'bolton'
+                    and subject.get('semantics') == 'RECEIVED'
+                    and 'date_semantics' not in receipt
+                )
+                if (root.get('task') != 'DISCOVERY'
+                        or receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                        or subject.get('kind') != 'DISCOVERY_SCOPE'
                         or receipt.get('council') != council
                         or subject.get('council') != council
+                        or receipt.get('contract') != root.get('contract')
+                        or (receipt.get('date_semantics') != subject.get('semantics')
+                            and not legacy_received_basis)
                         or receipt.get('interval') != [subject.get('start'), subject.get('end')]
+                        or receipt.get('accounting_complete') is not True
+                        or receipt.get('cleanup') != 'CLOSED'
+                        or outcome.get('outcome') != 'ENUMERATED_METADATA_RETAINED'
                         or type(source_sha) is not str
                         or fullmatch(r'[a-f0-9]{64}', source_sha) is None
                         or not isinstance(archive, dict)
