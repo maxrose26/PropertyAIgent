@@ -357,6 +357,15 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
     assert ledger['required_date_scopes'] == 90 and len(ledger['entries']) == 90
     assert ledger['sql_readback_scopes'] == 2
     assert ledger['sql_readback_screened_records'] == 2
+    # A metadata-route census of two re-derived SQL scopes is not real
+    # ten-council qualification or a saved buyer opportunity count.
+    saved_routes = [row[0]['outcome'] for row in world['boot'].execute(
+        "SELECT outcome FROM ingestion_work_items "
+        "WHERE task='SCREENING' AND subject->>'council' IN ('tameside','manchester')"
+    ).fetchall()]
+    assert len(saved_routes) == 2
+    expected_routes = {route: saved_routes.count(route) for route in sorted(set(saved_routes))}
+    assert ledger['metadata_route_counts_for_readback_scopes'] == expected_routes
     inventory = {row['council']: row for row in ledger['persisted_receipt_inventory']}
     assert len(inventory) == 10
     for council in ('manchester','tameside'):
@@ -370,6 +379,11 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
     assert inventory['trafford']['distinct_references'] is None
     first = [x for x in ledger['entries'] if x['start']=='2026-09-15' and x['end']=='2026-09-21']
     assert {x['council'] for x in first if x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK'} == {'manchester','tameside'}
+    for entry in first:
+        if entry['council'] in ('manchester','tameside'):
+            assert sum(entry['metadata_route_counts'].values()) == 1
+        else:
+            assert entry['metadata_route_counts'] is None
     assert next(x for x in first if x['council']=='trafford')['state'] == 'NO_EXACT_PERSISTED_SQL_CAPTURE'
     assert all(x['source_coverage']=='UNKNOWN' and x['source_qualified'] is False and
                x['factual_qualifications'] is None and x['newly_added'] is None and
@@ -386,7 +400,24 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
         changed=next(x for x in altered['entries'] if x['council']=='tameside' and x['start']=='2026-09-15')
         assert changed['state']=='SQL_CAPTURE_SCREENING_UNVERIFIED'
         assert changed['screened_sql_records'] is None
+        assert changed['metadata_route_counts'] is None
         assert altered['sql_readback_scopes']==1
+        assert sum(altered['metadata_route_counts_for_readback_scopes'].values()) == 1
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot'])==before
+    # A forged route must be rejected even when the row remains COMPLETE.
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET outcome = "
+            "jsonb_set(outcome::jsonb, '{outcome}', to_jsonb('FORGED_ADMISSION'::text))::json "
+            "WHERE task='SCREENING' AND subject->>'council'='tameside'")
+        forged = shutdown_gap_sql_readback(world['boot'], as_of)
+        tameside = next(x for x in forged['entries']
+                        if x['council']=='tameside' and x['start']=='2026-09-15')
+        assert tameside['state']=='SQL_CAPTURE_SCREENING_UNVERIFIED'
+        assert tameside['metadata_route_counts'] is None
     finally:
         world['boot'].execute('ROLLBACK')
     assert snapshot(world['boot'])==before

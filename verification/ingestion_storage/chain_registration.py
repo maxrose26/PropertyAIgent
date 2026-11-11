@@ -292,7 +292,8 @@ def shutdown_gap_sql_readback(connection, as_of):
                          source_coverage='UNKNOWN', source_qualified=False,
                          retained_sql_records=None, screened_sql_records=None,
                          factual_qualifications=None, newly_added=None,
-                         saved_key_facts=None, buyer_backlog=None)
+                         saved_key_facts=None, buyer_backlog=None,
+                         metadata_route_counts=None)
             if other_overlap or len(exact) > 1:
                 entry['state'] = 'OVERLAP_OR_CONFLICT_REQUIRES_REVIEW'
             elif not exact:
@@ -326,8 +327,19 @@ def shutdown_gap_sql_readback(connection, as_of):
                             'SCREENING', '', [], [], {}, {}, root['key'],
                             batches=batches, screens=screens)
                         completed_screening(registration, receipt, rule, saved)
+                        # Only fully re-derived capture-bound SQL screenings
+                        # enter this metadata routing census. No factual,
+                        # Application, or buyer-opportunity claim follows.
+                        route_counts = {}
+                        for saved_row in saved:
+                            if saved_row['task'] == 'SCREENING':
+                                route = saved_row['outcome']['outcome']
+                                route_counts[route] = route_counts.get(route, 0) + 1
+                        if sum(route_counts.values()) != len(screens):
+                            raise Denied('SHUTDOWN_SQL_SCREENING_ROUTING_SET')
                         entry['state'] = 'SQL_CAPTURE_AND_SCREENING_READBACK'
                         entry['screened_sql_records'] = len(screens)
+                        entry['metadata_route_counts'] = dict(sorted(route_counts.items()))
                     except (Denied, KeyError, TypeError, ValueError, IndexError):
                         # Unqualified source contracts and inconsistent saved
                         # children must never be counted as screened evidence.
@@ -335,7 +347,17 @@ def shutdown_gap_sql_readback(connection, as_of):
             entries.append(entry)
     if len(entries) != plan['total_date_scopes']:
         raise Denied('SHUTDOWN_SQL_READBACK_LEDGER_BOUND')
+    # Summarise only exact persisted, validated screening windows.
+    # Unknown/absent council counts remain UNKNOWN rather than fake zeroes.
+    completed_routes = [e['metadata_route_counts'] for e in entries
+                        if e['state'] == 'SQL_CAPTURE_AND_SCREENING_READBACK']
+    combined_routes = {}
+    for counts in completed_routes:
+        for route, count in counts.items():
+            combined_routes[route] = combined_routes.get(route, 0) + count
     return dict(as_of_london=plan['as_of_london'],
+                metadata_route_counts_for_readback_scopes=(
+                    dict(sorted(combined_routes.items())) if completed_routes else None),
                 fallback_is_verified_shutdown=False,
                 persisted_receipt_inventory=persisted_receipt_inventory,
                 required_date_scopes=plan['total_date_scopes'],
