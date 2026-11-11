@@ -366,7 +366,7 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
         print('V3_HANDOFF_MEASURED ' + json.dumps(measured, sort_keys=True))
 
 
-@pytest.mark.parametrize('forgery', ['NONE', 'MISSING_FLAG', 'ALTERED_SCREEN_REVISION'])
+@pytest.mark.parametrize('forgery', ['NONE', 'MISSING_FLAG', 'ALTERED_SCREEN_REVISION', 'EXISTING_APPLICATION'])
 def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
     """Real disposable SQL: bound saved screen -> targeted fact -> committed Application.
 
@@ -382,6 +382,14 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
         (sc['screen']['key'],)).fetchone()
     assert actual[0] == sc['screen']['revision']
     assert actual[1]['capture_bound'] is True
+    # This matches the real-world situation where a stored, screened
+    # candidate already has a legacy Application. Stage 4 must not duplicate
+    # its identity or overwrite previously saved facts to increase counts.
+    if forgery == 'EXISTING_APPLICATION':
+        with Session(pg['app']) as session:
+            session.add(Application(council_code='bolton', reference='01780/26',
+                                    status='Deposited', proposal='Previously saved legacy fact'))
+            session.commit()
     if forgery == 'MISSING_FLAG':
         bad = dict(actual[1])
         bad.pop('capture_bound')
@@ -395,18 +403,27 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
         calls.append(1)
         return sc['detail'], outer()
     try:
-        if forgery == 'NONE':
+        if forgery in ('NONE', 'EXISTING_APPLICATION'):
             result = execute_retained_v3(
                 sc['co'], sc['binding'], detail_reader=detail, envelope=sc['envelope'],
                 council=get_council('bolton'), check=sc['budget'].check)
-            assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED'
-            assert calls == [1]
-            saved = boot.execute(
-                "SELECT reference,status,decision,site_id,estimated_unit_count "
-                "FROM applications WHERE council_code='bolton'").fetchall()
-            assert len(saved) == 1 and saved[0][0] == '01780/26'
-            assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
-            assert saved[0][3:] == (None, None)
+            if forgery == 'NONE':
+                assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED'
+                assert calls == [1]
+                saved = boot.execute(
+                    "SELECT reference,status,decision,site_id,estimated_unit_count "
+                    "FROM applications WHERE council_code='bolton'").fetchall()
+                assert len(saved) == 1 and saved[0][0] == '01780/26'
+                assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
+                assert saved[0][3:] == (None, None)
+            else:
+                assert result['admission'] == 'EXISTING_IDENTITY_PRESERVED'
+                assert calls == []
+                saved = boot.execute(
+                    "SELECT reference,status,proposal,site_id,estimated_unit_count "
+                    "FROM applications WHERE council_code='bolton'").fetchall()
+                assert saved == [('01780/26', 'Deposited',
+                                  'Previously saved legacy fact', None, None)]
         else:
             with pytest.raises(Denied):
                 execute_retained_v3(
