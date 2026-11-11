@@ -510,8 +510,9 @@ def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
         if fault=='live_mode':p['test_evidence']=False
         if fault=='too_long':scope['end']='2026-09-22'
         if fault=='unfinished_day':scope['end']=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat()
-        expected=ValueError if fault in ('too_long','unfinished_day') else Exception
-        message='CATCHUP_SOURCE_PLAN_MISMATCH' if expected is ValueError else 'ADMIN_EFFECT_UNCERTAIN'
+        expected=ValueError if fault in ('too_long','unfinished_day','rolling_smuggle') else Exception
+        message=('INTAKE_ROLLING_SCOPE_ONLY' if fault=='rolling_smuggle' else
+                 'CATCHUP_SOURCE_PLAN_MISMATCH' if expected is ValueError else 'ADMIN_EFFECT_UNCERTAIN')
         with pytest.raises(expected,match=message):
             _catchup_owner(world).register_intake_period(name,p,disposable_catchup=fault!='rolling_smuggle')
         assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1

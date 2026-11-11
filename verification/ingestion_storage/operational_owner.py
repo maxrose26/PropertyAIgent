@@ -469,6 +469,10 @@ class Owner:
         Does not clear a stop, install SQL, provision a login or issue daily work.
         The SQL boundary verifies expiry, council list and expected stop snapshot.
         """
+        if not disposable_catchup and any(k in policy for k in ('catchup_scope','mode')):
+            # The frozen rolling issuer has no catch-up interpretation. Reject
+            # foreign metadata at the owner seam without altering its SQL body.
+            raise ValueError('INTAKE_ROLLING_SCOPE_ONLY')
         if disposable_catchup:
             # The exact nine-source finite manifest must be canonical, not a
             # caller-supplied plausible-looking SHA. This is a test-only

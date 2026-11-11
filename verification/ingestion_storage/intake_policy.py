@@ -505,7 +505,8 @@ def policy_sql(*, disposable_catchup=False):
         if disposable_register==original_register:raise ValueError('DISPOSABLE_ISSUER_INJECTION')
         disposable_sql=('\n'+disposable_register+
            '\nREVOKE ALL ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) FROM PUBLIC;'+
-           '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_worker;\n')
+           '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_worker;'+
+           '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_barrier_releaser;\n')
     return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
 
 
