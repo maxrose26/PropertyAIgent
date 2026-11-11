@@ -81,6 +81,25 @@ def test_actual_restricted_sql_source_and_final_readback():
         # PostgreSQL, and restore the original ACL before any archive writes.
         with world['connect']('ingestion_worker_login') as worker:
             rt.private_evidence_inventory(SQL(worker))
+        # Production read-only inspection on 11 Nov found neither function
+        # executable by the restricted login. Prove the physical negative
+        # path for each missing grant; the candidate must never silently
+        # bypass its function-only evidence boundary or grant permissions.
+        for signature in (
+            'ingestion_intake_evidence_read(text,text,text)',
+            'ingestion_intake_evidence_write(text,text,text,bytea)',
+        ):
+            boot.execute('REVOKE EXECUTE ON FUNCTION public.' + signature +
+                         ' FROM ingestion_worker')
+            try:
+                with world['connect']('ingestion_worker_login') as worker:
+                    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_FUNCTION_INVENTORY'):
+                        rt.private_evidence_inventory(SQL(worker))
+            finally:
+                boot.execute('GRANT EXECUTE ON FUNCTION public.' + signature +
+                             ' TO ingestion_worker')
+            with world['connect']('ingestion_worker_login') as worker:
+                rt.private_evidence_inventory(SQL(worker))
         for grant,revoke in (
             ('GRANT SELECT ON public.ingestion_run_evidence TO ingestion_worker',
              'REVOKE SELECT ON public.ingestion_run_evidence FROM ingestion_worker'),
