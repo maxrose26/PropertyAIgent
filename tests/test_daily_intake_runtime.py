@@ -357,6 +357,17 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
     assert ledger['required_date_scopes'] == 90 and len(ledger['entries']) == 90
     assert ledger['sql_readback_scopes'] == 2
     assert ledger['sql_readback_screened_records'] == 2
+    inventory = {row['council']: row for row in ledger['persisted_receipt_inventory']}
+    assert len(inventory) == 10
+    for council in ('manchester','tameside'):
+        assert inventory[council]['state'] == 'SQL_RECEIPT_METADATA_READBACK_ONLY'
+        assert inventory[council]['distinct_references'] == 1
+        assert inventory[council]['receipt_rows'] == 1
+        assert inventory[council]['duplicate_reference_rows'] == 0
+    assert inventory['bolton']['state'] == 'NO_COMPLETE_SQL_CAPTURE'
+    assert inventory['bolton']['distinct_references'] is None
+    assert inventory['trafford']['state'] == 'NO_COMPLETE_SQL_CAPTURE'
+    assert inventory['trafford']['distinct_references'] is None
     first = [x for x in ledger['entries'] if x['start']=='2026-09-15' and x['end']=='2026-09-21']
     assert {x['council'] for x in first if x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK'} == {'manchester','tameside'}
     assert next(x for x in first if x['council']=='trafford')['state'] == 'NO_EXACT_PERSISTED_SQL_CAPTURE'
@@ -392,6 +403,29 @@ def test_shutdown_gap_sql_ledger_reads_exact_retained_screening_without_claiming
         assert changed['state']=='OVERLAP_OR_CONFLICT_REQUIRES_REVIEW'
         assert changed['screened_sql_records'] is None
         assert overlapping['sql_readback_scopes']==1
+        # A contradictory receipt interval must not create a usable count.
+        tameside = next(x for x in overlapping['persisted_receipt_inventory']
+                        if x['council']=='tameside')
+        assert tameside['state']=='SQL_RECEIPT_METADATA_UNVERIFIED'
+        assert tameside['distinct_references'] is None
+    finally:
+        world['boot'].execute('ROLLBACK')
+    assert snapshot(world['boot'])==before
+    # A stored readback flag alone does not overcome a conflicting archive
+    # digest. Refuse the retained-count claim; leave all original rows intact.
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            "UPDATE ingestion_work_items SET checkpoint = "
+            "jsonb_set(checkpoint::jsonb, '{durable_archive,sha256}', "
+            "to_jsonb(repeat('f',64)))::json "
+            "WHERE task='DISCOVERY' AND subject->>'council'='tameside'")
+        inconsistent=shutdown_gap_sql_readback(world['boot'],as_of)
+        value=next(x for x in inconsistent['persisted_receipt_inventory']
+                   if x['council']=='tameside')
+        assert value['state']=='SQL_RECEIPT_METADATA_UNVERIFIED'
+        assert value['distinct_references'] is None
+        assert inconsistent['sql_readback_scopes']==1
     finally:
         world['boot'].execute('ROLLBACK')
     assert snapshot(world['boot'])==before

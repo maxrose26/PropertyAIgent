@@ -177,6 +177,7 @@ def shutdown_gap_sql_readback(connection, as_of):
     plan = shutdown_gap_source_packages(as_of)
     rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
     entries = []
+    persisted_receipt_inventory = []
     for council in plan['required_councils']:
         raw = connection.execute(
             "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
@@ -187,6 +188,49 @@ def shutdown_gap_sql_readback(connection, as_of):
             raise Denied('SHUTDOWN_SQL_READBACK_ROOT_BOUND')
         roots = [row[0] for row in raw]
         bounded(roots, 2 * 1024 ** 2)
+        # Independently show what was saved in SQL, even if an overlapping,
+        # blocked or unknown capture prevents claiming complete coverage.
+        # This does NOT re-fetch the private archive or qualify a source.
+        from re import fullmatch
+        complete = [row for row in roots if row.get('state') == 'COMPLETE']
+        observed = dict(council=council, complete_capture_roots=len(complete),
+                        other_capture_roots=len(roots)-len(complete),
+                        distinct_references=None, receipt_rows=None,
+                        duplicate_reference_rows=None,
+                        state='NO_COMPLETE_SQL_CAPTURE')
+        if complete:
+            references = []
+            for root in complete:
+                receipt, outcome = root.get('checkpoint'), root.get('outcome')
+                subject = root.get('subject')
+                if not isinstance(receipt, dict) or not isinstance(outcome, dict) or not isinstance(subject, dict):
+                    observed['state'] = 'SQL_RECEIPT_METADATA_UNVERIFIED'
+                    break
+                archive, records = receipt.get('durable_archive'), receipt.get('records')
+                source_sha = receipt.get('source_sha256')
+                if (receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                        or receipt.get('council') != council
+                        or subject.get('council') != council
+                        or receipt.get('interval') != [subject.get('start'), subject.get('end')]
+                        or type(source_sha) is not str
+                        or fullmatch(r'[a-f0-9]{64}', source_sha) is None
+                        or not isinstance(archive, dict)
+                        or archive.get('sha256') != source_sha
+                        or archive.get('readback_verified') is not True
+                        or outcome.get('source_sha256') != source_sha
+                        or not isinstance(records, list) or len(records) > 60
+                        or any(not isinstance(record, dict)
+                               or type(record.get('reference')) is not str
+                               or not record['reference'].strip() for record in records)):
+                    observed['state'] = 'SQL_RECEIPT_METADATA_UNVERIFIED'
+                    break
+                references.extend(record['reference'] for record in records)
+            else:
+                observed.update(state='SQL_RECEIPT_METADATA_READBACK_ONLY',
+                                distinct_references=len(set(references)),
+                                receipt_rows=len(references),
+                                duplicate_reference_rows=len(references)-len(set(references)))
+        persisted_receipt_inventory.append(observed)
         verified = ()
         if roots:
             try:
@@ -264,6 +308,7 @@ def shutdown_gap_sql_readback(connection, as_of):
         raise Denied('SHUTDOWN_SQL_READBACK_LEDGER_BOUND')
     return dict(as_of_london=plan['as_of_london'],
                 fallback_is_verified_shutdown=False,
+                persisted_receipt_inventory=persisted_receipt_inventory,
                 required_date_scopes=plan['total_date_scopes'],
                 entries=entries,
                 sql_readback_scopes=sum(x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK' for x in entries),
