@@ -470,7 +470,12 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                             'checkpoint=%s::json,outcome=%s::json WHERE key=%s',
                             (changed['revision'], json.dumps(changed['checkpoint']),
                              json.dumps(changed['outcome']), sc['screen']['key']))
-                        with pytest.raises(Denied, match='FACT_READBACK_SCREEN_RECOMPUTED'):
+                        # SOURCE_DIGEST is already rejected by the earlier
+                        # immutable-capture guard; other forgeries must be
+                        # rejected by independent v3 recomputation.
+                        rejection = ('FACT_READBACK_CAPTURE' if tamper == 'SOURCE_DIGEST'
+                                     else 'FACT_READBACK_SCREEN_RECOMPUTED')
+                        with pytest.raises(Denied, match=rejection):
                             readback_committed_v3_facts(
                                 boot, pg['app'], sc['fact']['key'],
                                 council='bolton', reference='01780/26')
