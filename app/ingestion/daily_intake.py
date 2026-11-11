@@ -194,6 +194,14 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
             # stored root, final receipt, and privately read-back archive to
             # agree on the exact source evidence before exposing this backlog.
             subject=root['subject'];archive=capture.get('durable_archive')
+            # Historical Bolton RECEIVED-v1 receipts omit date_semantics.
+            # Only this exact legacy contract can inherit its bound scope basis;
+            # explicit contradictory source evidence must still be rejected.
+            legacy_received_basis=(isinstance(subject,dict)
+                and subject.get('council')=='bolton'
+                and root['contract']=='bolton-received-idox-coordinator-v1'
+                and subject.get('semantics')=='RECEIVED'
+                and 'date_semantics' not in capture)
             outcome=root['outcome'];source_sha=capture.get('source_sha256')
             if (not isinstance(subject,dict) or not isinstance(archive,dict)
                 or not isinstance(outcome,dict) or not isinstance(source_sha,str)
@@ -206,7 +214,7 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                 or capture.get('council')!=subject.get('council')
                 or capture.get('contract')!=root['contract']
                 or capture.get('interval')!=[subject.get('start'),subject.get('end')]
-                or capture.get('date_semantics')!=subject.get('semantics')
+                or (capture.get('date_semantics')!=subject.get('semantics') and not legacy_received_basis)
                 or not isinstance(capture.get('records'),list) or len(capture['records'])>60):
                 raise Denied('BACKLOG_CAPTURE_PROVENANCE')
             screens=[dict(r) for r in connection.execute(select(W).where(W.c.task=='SCREENING',

@@ -170,6 +170,7 @@ def test_disposable_backlog_refuses_corrupt_complete_capture_evidence(world,tmp_
         "outcome=jsonb_set(outcome::jsonb,'{source_sha256}',to_jsonb(repeat('1',64)))::json",
         "checkpoint=jsonb_set(checkpoint::jsonb,'{accounting_complete}','false'::jsonb)::json",
         "checkpoint=jsonb_set(checkpoint::jsonb,'{date_semantics}',to_jsonb('VALIDATED'::text))::json",
+        "checkpoint=(checkpoint::jsonb-'date_semantics')::json",
     )
     try:
         with engine.connect() as conn:
@@ -969,6 +970,7 @@ def test_pinned_bolton_dual_screenings_remain_unqualified_discoverable_backlog(w
     _,_,v3=v3_items(receipt,RULE)
     assert len(receipt['records'])==len(v1)==len(v3)==24
     assert receipt['source_sha256']=='5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a'
+    assert 'date_semantics' not in receipt  # immutable RECEIVED-v1 legacy shape
     root.update(state='COMPLETE',phase='FINISHED',checkpoint=receipt,
                 outcome=dict(outcome='ENUMERATED_METADATA_RETAINED',
                              source_sha256=receipt['source_sha256']))
