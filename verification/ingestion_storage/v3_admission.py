@@ -286,6 +286,11 @@ def readback_committed_v3_facts(work_connection, application_engine, factual_key
             or not actual.get('status_verified_at')
             or not actual.get('status')):
         raise Denied('FACT_READBACK_APPLICATION_CHANGED')
+    # An optimistic read-only fence against a work-ledger mutation between
+    # source/screen/fact inspection and the separate Application readback.
+    # Not an atomic cross-connection snapshot or a future-write lock.
+    if (one(factual_key) != fact or one(screen['key']) != screen or one(capture['key']) != capture):
+        raise Denied('FACT_READBACK_LEDGER_CHANGED')
     return dict(council=council, reference=reference,
                 application_id=outcome['application_id'], factual_key=factual_key,
                 state='COMMITTED_B2_FACTS_READ_BACK',

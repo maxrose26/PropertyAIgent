@@ -501,6 +501,35 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                     assert boot.execute(
                         'SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',
                         (sc['screen']['key'],)).fetchone()[0] == original_screen
+                # Simulate work-ledger drift after the separate B2 read,
+                # before emitting a saved-facts proof. Test-only SQL change.
+                class DriftAfterApplicationRead:
+                    def __init__(self, raw):
+                        self.raw = raw
+                        self.reads = 0
+
+                    def execute(self, statement, params):
+                        if statement.startswith("SELECT row_to_json(w)"):
+                            self.reads += 1
+                            if self.reads == 4:
+                                self.raw.execute(
+                                    'UPDATE ingestion_work_items SET reason=%s WHERE key=%s',
+                                    ('TEST_READBACK_CONCURRENT_DRIFT', sc['fact']['key']))
+                        return self.raw.execute(statement, params)
+
+                boot.execute('BEGIN')
+                try:
+                    drift = DriftAfterApplicationRead(boot)
+                    with pytest.raises(Denied, match='FACT_READBACK_LEDGER_CHANGED'):
+                        readback_committed_v3_facts(
+                            drift, pg['app'], sc['fact']['key'],
+                            council='bolton', reference='01780/26')
+                    assert drift.reads == 4
+                finally:
+                    boot.execute('ROLLBACK')
+                assert boot.execute(
+                    'SELECT reason FROM ingestion_work_items WHERE key=%s',
+                    (sc['fact']['key'],)).fetchone()[0] != 'TEST_READBACK_CONCURRENT_DRIFT'
                 # A changed committed B2 fact must be refused, not reported
                 # as though the first successful readback still applied.
                 with pg['app'].begin() as conn:
