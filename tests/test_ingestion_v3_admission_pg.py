@@ -416,6 +416,44 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                 assert len(saved) == 1 and saved[0][0] == '01780/26'
                 assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
                 assert saved[0][3:] == (None, None)
+                # Independent persisted work-item -> saved Application readback,
+                # distinct from the writer's in-memory success return.
+                from verification.ingestion_storage.v3_admission import readback_committed_v3_facts
+                proof = readback_committed_v3_facts(
+                    boot, pg['app'], sc['fact']['key'],
+                    council='bolton', reference='01780/26')
+                assert proof['state'] == 'COMMITTED_B2_FACTS_READ_BACK'
+                assert proof['saved_key_facts']['status'] == 'Decided'
+                assert proof['saved_key_facts']['decision'] == 'Approve'
+                assert proof['verification_scope'] == 'COUPLED'
+                assert proof['unit_count_verified'] is False
+                assert proof['source_completeness'] == 'UNKNOWN'
+                assert proof['buyer_opportunity_qualified'] is False
+                # A forged ledger outcome cannot turn a saved identity into
+                # a verified fact; always roll back the disposable mutation.
+                boot.execute('BEGIN')
+                try:
+                    boot.execute(
+                        "UPDATE ingestion_work_items SET outcome="
+                        "jsonb_set(outcome::jsonb, '{verification_scope}', "
+                        "to_jsonb('INITIAL_STATUS_ONLY'::text))::json "
+                        "WHERE key=%s", (sc['fact']['key'],))
+                    with pytest.raises(Denied, match='FACT_READBACK_OUTCOME'):
+                        readback_committed_v3_facts(
+                            boot, pg['app'], sc['fact']['key'],
+                            council='bolton', reference='01780/26')
+                finally:
+                    boot.execute('ROLLBACK')
+                # A changed committed B2 fact must be refused, not reported
+                # as though the first successful readback still applied.
+                with pg['app'].begin() as conn:
+                    conn.execute(text(
+                        "UPDATE applications SET status='Tampered' "
+                        "WHERE council_code='bolton' AND reference='01780/26'"))
+                with pytest.raises(Denied, match='FACT_READBACK_APPLICATION_CHANGED'):
+                    readback_committed_v3_facts(
+                        boot, pg['app'], sc['fact']['key'],
+                        council='bolton', reference='01780/26')
             else:
                 # A legacy Application is preserved and no factual task runs.
                 # This is NOT_ATTEMPTED, not a new admitted identity.
