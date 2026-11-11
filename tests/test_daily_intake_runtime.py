@@ -1238,3 +1238,31 @@ def test_pinned_bolton_triple_screen_history_bounded_without_factual_promotion(w
         finally:tx.rollback()
     assert world['boot'].execute(
         "SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING'").fetchone()[0]==72
+
+
+@pytest.mark.parametrize('stop_field,stop_value', [
+    ('global_stop', {'reason': 'BOLTON_SOURCE_EFFECT_UNKNOWN', 'run': 'test-only-bolton'}),
+    ('manual_stop', 'BOLTON_SOURCE_EFFECT_UNKNOWN'),
+])
+def test_tameside_period_cannot_bypass_unrelated_shared_stop(world, stop_field, stop_value):
+    """First-batch safety: matching a stopped snapshot cannot isolate a council.
+
+    The test modifies only disposable PostgreSQL fixture control. No council
+    request, live stop clearance, production grant or recovery is exercised.
+    """
+    reset(world)
+    control = copy.deepcopy(world['boot'].execute(
+        "SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)"
+    ).fetchone()[0])
+    control[stop_field] = stop_value
+    world['boot'].execute(
+        "UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",
+        (json.dumps(control),),
+    )
+    before = snapshot(world['boot'])
+    candidate = policy(world)
+    assert candidate['expected_stop'][stop_field] == stop_value
+    with pytest.raises(Exception, match='ADMIN_EFFECT_UNCERTAIN'):
+        authorise(world, 'tameside-only-after-bolton-'+stop_field, candidate)
+    assert snapshot(world['boot']) == before
+    assert restricted_sessions(world['boot']) == 0
