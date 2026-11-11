@@ -952,3 +952,54 @@ def test_backlog_does_not_duplicate_or_promote_historical_v1_v3_screenings(world
         finally:
             trans.rollback()
 
+def test_pinned_bolton_dual_screenings_remain_unqualified_discoverable_backlog(world):
+    """Read-only backlog over 24 pinned Bolton listing receipts and 48 v1/v3 rows.
+
+    Pinned source/archive proof is reproduced from the existing reviewed
+    historical fixture; test inserts are disposable only. Neither the legacy
+    v1 nor its unbound v3 successor is allowed to claim a current screening
+    or create an Application, even where v3 routes ADMIT_SCHEME.
+    """
+    from verification.ingestion_storage.retained_world import retained,identities,v3_items
+    from app.ingestion.listing_screening import ScreeningRule,RULE_V1
+
+    reset(world)
+    _,receipt=retained()
+    root,v1,_,_,_=identities(receipt)
+    _,_,v3=v3_items(receipt,RULE)
+    assert len(receipt['records'])==len(v1)==len(v3)==24
+    assert receipt['source_sha256']=='5525be5a6b5fc3fdfac43849bc502cd05c0c9023da1440627b975672fe55013a'
+    root.update(state='COMPLETE',phase='FINISHED',checkpoint=receipt,
+                outcome=dict(outcome='ENUMERATED_METADATA_RETAINED',
+                             source_sha256=receipt['source_sha256']))
+    v1_rule=ScreeningRule(RULE_V1)
+    for record,old,new in zip(receipt['records'],v1,v3):
+        old_checkpoint=v1_rule.screen(record)
+        new_checkpoint=RULE.screen(record)
+        old.update(state='COMPLETE',phase='FINISHED',checkpoint=old_checkpoint,
+                   outcome=dict(outcome=old_checkpoint['disposition']))
+        new.update(state='COMPLETE',phase='FINISHED',checkpoint=new_checkpoint,
+                   outcome=dict(outcome=new_checkpoint['count_assessment']['admission']))
+    assert sum(x['outcome']['outcome']=='ADMIT_SCHEME' for x in v3)==1
+    for item_record in (root,*v1,*v3):
+        world['boot'].execute(
+            'INSERT INTO ingestion_work_items SELECT * FROM '
+            'json_populate_record(NULL::ingestion_work_items,%s::json)',
+            (json.dumps(item_record),))
+    reader=SimpleNamespace(_limits=lambda _connection:None)
+    with world['app'].connect() as conn:
+        observed=backlog_page(reader,['bolton'],[root['contract']],RULE,connection=conn)
+        conn.rollback()
+    assert len(observed['captures'])==1 and observed['captures'][0]['record_count']==24
+    assert len(observed['records'])==24
+    assert len({r['reference'] for r in observed['records']})==24
+    assert all(r['historical_screening_items']==2
+               and r['screening_state']=='HISTORICAL_UNBOUND_REQUIRES_RESCREENING'
+               and r['screening_outcome'] is None
+               and r['application_admitted'] is None
+               and r['processing_state']=='HISTORICAL_RESCREENING_REQUIRED'
+               and r['source_sha256']==receipt['source_sha256']
+               for r in observed['records'])
+    assert not observed['coverage_advance'] and not observed['extraction_consumer_connected']
+    assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+
