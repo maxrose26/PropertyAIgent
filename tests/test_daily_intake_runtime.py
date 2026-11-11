@@ -940,14 +940,15 @@ def test_backlog_does_not_duplicate_or_promote_historical_v1_v3_screenings(world
                dependencies=actual['dependencies'])
     other.update(state='COMPLETE',phase='FINISHED',checkpoint=dict(
         outcome='UNKNOWN'),outcome=dict(outcome='UNKNOWN'))
-    world['boot'].execute('BEGIN')
-    try:
-        world['boot'].execute(
-            'INSERT INTO ingestion_work_items SELECT * FROM '
-            'json_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(other),))
-        with world['app'].connect() as conn:
+    with world['app'].connect() as conn:
+        trans=conn.begin()
+        try:
+            conn.execute(text(
+                'INSERT INTO ingestion_work_items SELECT * FROM '
+                'json_populate_record(NULL::ingestion_work_items,CAST(:payload AS json))'),
+                dict(payload=json.dumps(other)))
             with pytest.raises(Denied,match='BACKLOG_UNKNOWN_ASSESSMENT_CONTRACT'):
                 read(conn)
-    finally:
-        world['boot'].execute('ROLLBACK')
+        finally:
+            trans.rollback()
 
