@@ -220,6 +220,39 @@ def readback_committed_v3_facts(work_connection, application_engine, factual_key
             or screen_state.get('source_url') != candidate.get('source_url')
             or screen_state.get('source_record_id') != candidate.get('source_record_id')):
         raise Denied('FACT_READBACK_SOURCE_BINDING')
+    # The stored screen label alone is insufficient proof of admission.
+    # Recompute the exact capture-bound v3 assessment and its code/config
+    # identity before independently reporting saved B2 facts.
+    from app.ingestion.listing_screening import (
+        ScreeningRule, RULE_V3, council_unit_threshold, assessment_identity,
+        qualifier_output_of, routing_of)
+    from app.ingestion.observation_screening import observation_revision
+    try:
+        rule = ScreeningRule(RULE_V3, unit_threshold=council_unit_threshold(council),
+                             link_related=False)
+        record_sha, config, config_sha, base_revision = assessment_identity(candidate, rule)
+        revision = observation_revision(base_revision, digest(receipt))
+        expected = rule.screen(candidate)
+        route = routing_of(expected)[1]
+        assessment_sha = digest(expected['count_assessment'])
+        qualifier_sha = digest(qualifier_output_of(expected))
+    except (KeyError, TypeError, ValueError, Denied):
+        raise Denied('FACT_READBACK_SCREEN_RECOMPUTED') from None
+    if (route not in ('ADMIT_SCHEME', 'ADMIT_FOR_ASSESSMENT')
+            or screen.get('phase') != 'FINISHED'
+            or screen.get('revision') != revision
+            or screen_outcome != dict(outcome=route, retained=True)
+            or any(screen_state.get(k) != v for k, v in expected.items())
+            or screen_state.get('record_sha256') != record_sha
+            or screen_state.get('config') != config
+            or screen_state.get('config_sha256') != config_sha
+            or screen_state.get('assessment_revision') != revision
+            or screen_state.get('assessment_sha256') != assessment_sha
+            or screen_state.get('qualifier_output_sha256') != qualifier_sha
+            or screen_state.get('capture_key') != capture['key']
+            or screen_state.get('capture_sha256') != receipt.get('source_sha256')
+            or screen_state.get('source_sha256') != receipt.get('source_sha256')):
+        raise Denied('FACT_READBACK_SCREEN_RECOMPUTED')
     outcome, saved = fact.get('outcome'), fact.get('checkpoint')
     if (not isinstance(outcome, dict) or not isinstance(saved, dict)
             or outcome != saved

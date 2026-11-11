@@ -444,6 +444,41 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                             council='bolton', reference='01780/26')
                 finally:
                     boot.execute('ROLLBACK')
+                # A saved screening label is not evidence by itself:
+                # recompute its outcome, count assessment, exact code/config,
+                # capture-bound revision and retained source SHA.
+                original_screen = boot.execute(
+                    'SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',
+                    (sc['screen']['key'],)).fetchone()[0]
+                for tamper in ('ROUTE', 'COUNT_ASSESSMENT', 'RULE_CONFIG',
+                               'TASK_REVISION', 'SOURCE_DIGEST'):
+                    boot.execute('BEGIN')
+                    try:
+                        changed = copy.deepcopy(original_screen)
+                        if tamper == 'ROUTE':
+                            changed['outcome']['outcome'] = 'ADMIT_FOR_ASSESSMENT'
+                        elif tamper == 'COUNT_ASSESSMENT':
+                            changed['checkpoint']['count_assessment']['admission'] = 'RETAIN_BELOW_THRESHOLD'
+                        elif tamper == 'RULE_CONFIG':
+                            changed['checkpoint']['config']['unit_threshold'] = 999
+                        elif tamper == 'TASK_REVISION':
+                            changed['revision'] = '0' * 64
+                        else:
+                            changed['checkpoint']['source_sha256'] = '0' * 64
+                        boot.execute(
+                            'UPDATE ingestion_work_items SET revision=%s,'
+                            'checkpoint=%s::json,outcome=%s::json WHERE key=%s',
+                            (changed['revision'], json.dumps(changed['checkpoint']),
+                             json.dumps(changed['outcome']), sc['screen']['key']))
+                        with pytest.raises(Denied, match='FACT_READBACK_SCREEN_RECOMPUTED'):
+                            readback_committed_v3_facts(
+                                boot, pg['app'], sc['fact']['key'],
+                                council='bolton', reference='01780/26')
+                    finally:
+                        boot.execute('ROLLBACK')
+                    assert boot.execute(
+                        'SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',
+                        (sc['screen']['key'],)).fetchone()[0] == original_screen
                 # A changed committed B2 fact must be refused, not reported
                 # as though the first successful readback still applied.
                 with pg['app'].begin() as conn:
