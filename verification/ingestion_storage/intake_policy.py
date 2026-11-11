@@ -483,10 +483,17 @@ def policy_sql(*, disposable_catchup=False):
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(')
     end=text.index('$register$;',start)+len('$register$;')
     original_register=text[start:end]
-    register=original_register.replace("BEGIN\n IF NOT pg_has_role", "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
+    # The original is a pinned reviewed SQL function: never silently emit an
+    # unguarded fallback if its insertion point changes.
+    register_anchor="BEGIN\n IF NOT pg_has_role"
+    if original_register.count(register_anchor)!=1:
+        raise ValueError('INTAKE_SQL_ISSUER_ANCHOR_DRIFT')
+    register=original_register.replace(register_anchor, "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_bolton_allowed(')
     end=text.index('$policy$;',start)+len('$policy$;')
     allowed=text[start:end]
+    if allowed.count(' SELECT coalesce(')!=1:
+        raise ValueError('INTAKE_SQL_ALLOWED_ANCHOR_DRIFT')
     rolling="""coalesce(ctl->'grants'->authority->>'intake_period' IS NOT NULL
  AND ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->'expected_stop'=__SNAPSHOT__
  AND (ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->>'expires_at')::double precision>extract(epoch FROM statement_timestamp())
@@ -501,7 +508,7 @@ def policy_sql(*, disposable_catchup=False):
             'CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(',
             'CREATE OR REPLACE FUNCTION public.ingestion_register_disposable_catchup(', 1)
         disposable_register=disposable_register.replace(
-            "BEGIN\n IF NOT pg_has_role", "BEGIN\n"+DISPOSABLE_CATCHUP_REGISTRATION+"\n IF NOT pg_has_role", 1)
+            register_anchor, "BEGIN\n"+DISPOSABLE_CATCHUP_REGISTRATION+"\n IF NOT pg_has_role", 1)
         if disposable_register==original_register:raise ValueError('DISPOSABLE_ISSUER_INJECTION')
         disposable_sql=('\n'+disposable_register+
            '\nREVOKE ALL ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) FROM PUBLIC;'+

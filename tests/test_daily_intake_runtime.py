@@ -728,6 +728,29 @@ def test_policy_preserves_historical_registration_branch_text():
     assert old[start:finish] in intake_policy.policy_sql()
 
 
+@pytest.mark.parametrize('anchor',['register','allowed'])
+@pytest.mark.parametrize('disposable_catchup',[False,True])
+def test_sql_issuer_rejects_reviewed_template_anchor_drift(monkeypatch,tmp_path,anchor,disposable_catchup):
+    """A changed reviewed insertion point must never emit a fallback issuer.
+
+    This tests refusal without contacting a database or enabling a grant.
+    """
+    from verification.ingestion_storage import operational_owner
+    source=operational_owner.GENERATION3_SCREENING_V3_POLICY.read_text()
+    if anchor=='register':
+        original="BEGIN\n IF NOT pg_has_role"
+        expected='INTAKE_SQL_ISSUER_ANCHOR_DRIFT'
+    else:
+        original=' SELECT coalesce('
+        expected='INTAKE_SQL_ALLOWED_ANCHOR_DRIFT'
+    assert source.count(original)==1
+    candidate=tmp_path/'policy-with-anchor-drift.sql'
+    candidate.write_text(source.replace(original,original.replace(' ', '  ', 1),1))
+    monkeypatch.setattr(operational_owner,'GENERATION3_SCREENING_V3_POLICY',candidate)
+    with pytest.raises(ValueError,match=expected):
+        intake_policy.policy_sql(disposable_catchup=disposable_catchup)
+
+
 def test_cumulative_intake_lifetime_keeps_historical_batch_reservation():
     from verification.ingestion_storage.limit_reconciliation import pending_grant_problems
     assert pending_grant_problems(1500,phase='SCREENING',batches=12)
