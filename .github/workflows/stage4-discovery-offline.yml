@@ -145,7 +145,7 @@ jobs:
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/render-a-venv"
       - name: Install disposable test browser only
-        run: timeout --kill-after=5s 180s "$RUNNER_TEMP/render-a-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+        run: timeout --kill-after=5s 180s "$RUNNER_TEMP/render-a-venv/bin/python" -m playwright install chromium --only-shell
       - name: Offline browser and controller interruption, synthetic runtime allocation
         run: |
           A_TEST_BROWSER_PATH="$HOME/.cache/ms-playwright" timeout --kill-after=5s 220s "$RUNNER_TEMP/render-a-venv/bin/python" -m pytest tests/test_render_acceptance_a.py -q --basetemp="$RUNNER_TEMP/render-a-proof" --junitxml="$RUNNER_TEMP/render-a.xml"
