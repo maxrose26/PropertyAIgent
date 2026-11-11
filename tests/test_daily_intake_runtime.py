@@ -1005,3 +1005,87 @@ def test_pinned_bolton_dual_screenings_remain_unqualified_discoverable_backlog(w
     assert not observed['coverage_advance'] and not observed['extraction_consumer_connected']
     assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
 
+
+
+def test_pinned_bolton_triple_screen_history_bounded_without_factual_promotion(world):
+    """72 persisted screening versions, 24 identities, zero factual admissions."""
+    from sqlalchemy import text
+    from app.ingestion.listing_screening import RULE_V1,assessment_identity
+    from app.ingestion.observation_screening import observation_revision
+    from verification.ingestion_storage.retained_world import retained,identities,v3_items,item
+    reset(world)
+    _,receipt=retained()
+    root,v1,_,_,_=identities(receipt)
+    _,_,v3=v3_items(receipt,RULE)
+    root.update(state='COMPLETE',phase='FINISHED',checkpoint=receipt,
+                outcome=dict(outcome='ENUMERATED_METADATA_RETAINED',
+                             source_sha256=receipt['source_sha256']))
+    rows=[root];legacy_rule=ScreeningRule(RULE_V1);first=None
+    for record,old,unbound in zip(receipt['records'],v1,v3):
+        legacy=legacy_rule.screen(record);prior=RULE.screen(record)
+        old.update(state='COMPLETE',phase='FINISHED',checkpoint=legacy,
+                   outcome=dict(outcome=legacy['disposition']))
+        unbound.update(state='COMPLETE',phase='FINISHED',checkpoint=prior,
+                       outcome=dict(outcome=prior['count_assessment']['admission']))
+        record_sha,config,config_sha,base=assessment_identity(record,RULE)
+        revision=observation_revision(base,digest(receipt))
+        checked=dict(prior,record_sha256=record_sha,config=config,
+                     config_sha256=config_sha,capture_bound=True,
+                     capture_checkpoint_sha256=digest(receipt),
+                     assessment_revision=revision,
+                     source_sha256=receipt['source_sha256'])
+        bound=item(dict(subject=old['subject'],task='SCREENING',
+                        contract='listing-screen-v3',revision=revision),
+                   dependencies=[root['key']])
+        bound.update(state='COMPLETE',phase='FINISHED',checkpoint=checked,
+                     outcome=dict(outcome=prior['count_assessment']['admission']))
+        if first is None:first=bound
+        rows.extend((old,unbound,bound))
+    assert len(rows)==73
+    for row in rows:
+        world['boot'].execute(
+            'INSERT INTO ingestion_work_items SELECT * FROM '
+            'json_populate_record(NULL::ingestion_work_items,%s::json)',
+            (json.dumps(row),))
+    reader=SimpleNamespace(_limits=lambda _conn:None)
+    def read(conn):
+        return backlog_page(reader,['bolton'],[root['contract']],RULE,connection=conn)
+    with world['app'].connect() as conn:
+        result=read(conn);conn.rollback()
+    assert len(result['records'])==24 and len(result['captures'])==1
+    assert len({r['reference'] for r in result['records']})==24
+    assert all(r['historical_screening_items']==3
+               and r['screening_state']=='COMPLETE'
+               and r['screening_matches_current_rule'] is True
+               and r['application_admitted'] is None
+               and r['extraction_complete'] is None for r in result['records'])
+    assert result['coverage_advance'] is False
+    assert result['extraction_consumer_connected'] is False
+    assert world['boot'].execute('SELECT count(*) FROM applications').fetchone()[0]==0
+    assert world['boot'].execute(
+        "SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING'").fetchone()[0]==72
+    conflicting=item(dict(subject=first['subject'],task='SCREENING',
+                          contract='listing-screen-v3',revision='contradictory-bound-v3'),
+                     dependencies=[root['key']])
+    conflicting.update(state='COMPLETE',phase='FINISHED',
+                       checkpoint=first['checkpoint'],outcome=first['outcome'])
+    with world['app'].connect() as conn:
+        tx=conn.begin()
+        try:
+            conn.execute(text('INSERT INTO ingestion_work_items SELECT * FROM '
+                'json_populate_record(NULL::ingestion_work_items,CAST(:payload AS json))'),
+                dict(payload=json.dumps(conflicting)))
+            with pytest.raises(Denied,match='BACKLOG_MULTIPLE_ASSESSMENTS'):read(conn)
+        finally:tx.rollback()
+    with world['app'].connect() as conn:
+        tx=conn.begin()
+        try:
+            conn.execute(text(
+                "UPDATE ingestion_work_items SET checkpoint="
+                "jsonb_set(checkpoint::jsonb,'{source_sha256}',"
+                "to_jsonb(repeat('0',64)))::json WHERE key=:key"),
+                dict(key=first['key']))
+            with pytest.raises(Denied,match='BACKLOG_SCREENING_PROVENANCE'):read(conn)
+        finally:tx.rollback()
+    assert world['boot'].execute(
+        "SELECT count(*) FROM ingestion_work_items WHERE task='SCREENING'").fetchone()[0]==72

@@ -217,31 +217,71 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                 or (capture.get('date_semantics')!=subject.get('semantics') and not legacy_received_basis)
                 or not isinstance(capture.get('records'),list) or len(capture['records'])>60):
                 raise Denied('BACKLOG_CAPTURE_PROVENANCE')
-            screens=[dict(r) for r in connection.execute(select(W).where(W.c.task=='SCREENING',
-                cast(W.c.dependencies,JSONB)==[root['key']]).order_by(W.c.key).limit(61)).mappings()]
-            if len(screens)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
-            for record in capture['records']:
-                matches=[s for s in screens if s['subject']==dict(kind='APPLICATION',council=capture['council'],reference=record['reference'])]
-                # Historic Bolton receipts legitimately have BOTH a completed
-                # v1 screening and a later, unbound v3 screening for the same
-                # retained reference. These are NOT two unique applications.
-                # Only a complete capture-bound v3 assessment may be projected
-                # as screened; older assessments remain evidence, not a fresh
-                # qualification or a reason to hide the retained listing.
-                if any(m['contract'] not in ('listing-screen-v1','listing-screen-v3') for m in matches):
+            # Preserve historical v1/unbound v3 alongside an eventual bound
+            # v3 WITHOUT raising the 60-row SQL read or returned-item bound.
+            # Summarise all versions server-side; fetch only actionable rows.
+            from sqlalchemy import func,and_,or_
+            subject_json=cast(W.c.subject,JSONB)
+            scope=(W.c.task=='SCREENING',cast(W.c.dependencies,JSONB)==[root['key']])
+            bound_v3=and_(W.c.contract=='listing-screen-v3',
+                         W.c.checkpoint['capture_bound'].as_string()=='true')
+            selected=or_(W.c.state!='COMPLETE',bound_v3)
+            summaries=[dict(g) for g in connection.execute(
+                select(subject_json.label('subject'),
+                       func.count().label('total'),
+                       func.count().filter(W.c.contract=='listing-screen-v1').label('v1'),
+                       func.count().filter(W.c.contract=='listing-screen-v3').label('v3'),
+                       func.count().filter(bound_v3).label('bound'),
+                       func.count().filter(W.c.state!='COMPLETE').label('unfinished'),
+                       func.count().filter(selected).label('selected'))
+                .where(*scope).group_by(subject_json)
+                .order_by(subject_json).limit(61)).mappings()]
+            if len(summaries)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
+            expected_refs={r['reference'] for r in capture['records']}
+            if len(expected_refs)!=len(capture['records']):raise Denied('BACKLOG_DUPLICATE_CAPTURE_REFERENCE')
+            grouped={}
+            for g in summaries:
+                subject=g['subject']
+                if (not isinstance(subject,dict) or subject.get('reference') not in expected_refs
+                    or subject!=dict(kind='APPLICATION',council=capture['council'],
+                                     reference=subject.get('reference'))):
+                    raise Denied('BACKLOG_SCREENING_IDENTITY')
+                if g['total']!=g['v1']+g['v3']:
                     raise Denied('BACKLOG_UNKNOWN_ASSESSMENT_CONTRACT')
-                if len(matches)>1 and (len({m['contract'] for m in matches})!=len(matches)
-                                       or any(m['state']!='COMPLETE' for m in matches)):
+                if (g['v1']>1 or g['v3']>2 or g['bound']>1
+                    or g['v3']==2 and g['bound']!=1
+                    or g['unfinished'] and g['total']>1):
                     raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                grouped[subject['reference']]=g
+            active=[dict(s) for s in connection.execute(
+                select(W).where(*scope,selected)
+                .order_by(W.c.key).limit(61)).mappings()]
+            if len(active)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
+            active_by_ref={}
+            for s in active:
+                sub=s['subject']
+                if (not isinstance(sub,dict) or sub.get('reference') not in grouped
+                    or sub!=dict(kind='APPLICATION',council=capture['council'],
+                                 reference=sub.get('reference'))):
+                    raise Denied('BACKLOG_SCREENING_IDENTITY')
+                active_by_ref.setdefault(sub['reference'],[]).append(s)
+            if any(len(active_by_ref.get(ref,[]))!=g['selected']
+                   for ref,g in grouped.items()):
+                raise Denied('BACKLOG_SCREENING_IDENTITY')
+            for record in capture['records']:
+                group=grouped.get(record['reference'])
+                matches=active_by_ref.get(record['reference'],[])
                 current=[m for m in matches if (m['contract']=='listing-screen-v3'
                          and m['state']=='COMPLETE'
                          and isinstance(m['checkpoint'],dict)
                          and m['checkpoint'].get('capture_bound') is True)]
-                if len(current)>1:raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                if len(current)!=(group['bound'] if group else 0):
+                    raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
                 s=(current[0] if current else
-                   matches[0] if len(matches)==1 and matches[0]['state']!='COMPLETE' else None)
+                   matches[0] if group and group['total']==1 and len(matches)==1
+                   and matches[0]['state']!='COMPLETE' else None)
                 result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
-                unbound_legacy=bool(matches) and not current and s is None
+                unbound_legacy=bool(group) and not current and s is None
                 if result:
                     from .observation_screening import observation_revision
                     config=result.get('config')
@@ -260,7 +300,7 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                     screening_key=s['key'] if s else None,
                     screening_state=('HISTORICAL_UNBOUND_REQUIRES_RESCREENING' if unbound_legacy else
                                      s['state'] if s else 'NOT_PREPARED'),
-                    historical_screening_items=len(matches),
+                    historical_screening_items=group['total'] if group else 0,
                     screening_outcome=routing_of(result)[1] if result else None,
                     screening_config_sha256=result.get('config_sha256') if result else None,
                     screening_matches_current_rule=result.get('config_sha256')==digest(rule.config()) if result else None,
