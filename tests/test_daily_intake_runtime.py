@@ -26,7 +26,7 @@ RULE=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
 @pytest.fixture(scope='module')
 def world():
     for world in disposable_world():
-        with world['connect']('provisioning_migrator') as c:c.execute(intake_policy.installation_script())
+        with world['connect']('provisioning_migrator') as c:c.execute(intake_policy.installation_script(disposable_catchup=True))
         yield world
 
 
@@ -258,7 +258,7 @@ def test_disposable_catchup_installed_sql_refuses_other_database_identity(world)
     with world['connect']('provisioning_migrator') as c:
         db,host,body=c.execute(
             "SELECT current_database(),inet_server_addr()::text,prosrc "
-            "FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure"
+            "FROM pg_proc WHERE oid='public.ingestion_register_disposable_catchup(jsonb)'::regprocedure"
         ).fetchone()
     assert db=='ingestion_provisioning_test'
     # The server container reports its own bridge address; the client uses the
@@ -266,6 +266,9 @@ def test_disposable_catchup_installed_sql_refuses_other_database_identity(world)
     assert host is not None
     assert "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'" in body
     assert "INTAKE_CATCHUP_DISPOSABLE_ONLY" in body
+    assert "intake_catchup_period" in body
+    frozen=world['boot'].execute("SELECT prosrc FROM pg_proc WHERE oid='public.ingestion_register_bolton_exception(jsonb)'::regprocedure").fetchone()[0]
+    assert "intake_catchup_period" not in frozen
 
 
 def test_disposable_historical_issuer_actual_daily_command_and_committed_readback(world,tmp_path):
@@ -521,7 +524,7 @@ def test_disposable_historical_issuer_refuses_unapproved_scope(world,fault):
                              revision='catchup-refusal',item_limits=DEFAULT_LIMITS)
     with world['connect']('ingestion_worker_login') as c:
         with pytest.raises(Exception,match='INTAKE_ROLLING_SCOPE_OR_CONSUMED'):
-            c.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
+            c.execute('SELECT public.ingestion_register_disposable_catchup(%s::jsonb)',
                       (json.dumps(registration_payload(name,reg,execution_binding())),))
     assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items").fetchone()[0]==1
 

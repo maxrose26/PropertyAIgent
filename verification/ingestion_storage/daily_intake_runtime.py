@@ -133,12 +133,19 @@ class Runtime:
         self.durable_run=row.intake_run
         return row.policy
 
+    def intake_issuer(self):
+        if self.policy and self.policy.get('mode')=='DISPOSABLE_SHUTDOWN_GAP_V1':
+            if not self.test or self.route_name!='DISPOSABLE':
+                raise Denied('INTAKE_CATCHUP_DISPOSABLE_BINDING')
+            return 'public.ingestion_register_disposable_catchup'
+        return 'public.ingestion_register_bolton_exception'
+
     def issue(self,reg):
         payload=registration_payload(self.args.period,reg,self.binding,run_id=self.run_id)
         self.authorities.append(reg.authority)  # intent precedes a possibly lost acknowledgement
         # One transaction at the actual supported issuer, no INSERT stand-in.
         with self.connection() as (c,_):
-            got=c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:payload AS jsonb))'),dict(payload=json.dumps(payload))).scalar_one()
+            got=c.execute(text('SELECT '+self.intake_issuer()+'(CAST(:payload AS jsonb))'),dict(payload=json.dumps(payload))).scalar_one()
         if got.get('already_consumed') is True:
             self.authorities.remove(reg.authority)
             self.emit('already_consumed_no_source',got)
@@ -336,7 +343,7 @@ class Runtime:
                 if self.authorities:
                     payload=dict(operation='intake_close',period=self.args.period,execution_binding=self.binding,authorities=self.authorities)
                     with self.connection() as (c,_):
-                        closed=c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
+                        closed=c.execute(text('SELECT '+self.intake_issuer()+'(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
                     if closed.get('authorities_invalidated') is not True:raise Denied('INTAKE_AUTHORITY_CLOSURE')
                     with self.connection() as (c,_):
                         actual=c.execute(text("SELECT outcome::jsonb->'grants' FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
@@ -370,7 +377,7 @@ class Runtime:
                     payload=dict(operation='intake_finish',period=self.args.period,run_id=self.run_id,
                                  execution_binding=self.binding,status=result['status'],publication=publication)
                     with self.connection() as (c,_):
-                        c.execute(text('SELECT public.ingestion_register_bolton_exception(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
+                        c.execute(text('SELECT '+self.intake_issuer()+'(CAST(:p AS jsonb))'),dict(p=json.dumps(payload))).scalar_one()
                     with self.connection() as (c,_):
                         actual=c.execute(text("SELECT outcome::jsonb->'intake_run' FROM public.ingestion_work_items WHERE key=repeat('0',64)")).scalar_one()
                     if actual.get('id')!=self.run_id or actual.get('state')!='VERIFIED' or actual.get('publication')!=publication:

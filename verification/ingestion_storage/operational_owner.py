@@ -485,10 +485,18 @@ class Owner:
         self.expected_generation=policy['expected_stop']['hard_stop_generation']
         with self.connection() as c:
             self.verify_installed(c)
+            if disposable_catchup:
+                from .intake_policy import policy_sql
+                versioned={m[1]:m[3] for m in self.FUNCTION_PATTERN.finditer(policy_sql(disposable_catchup=True))}
+                expected_sha=hashlib.sha256(versioned['ingestion_register_disposable_catchup'].encode()).hexdigest()
+                actual=self.q(c,"SELECT current_database(),encode(sha256(convert_to(prosrc,'UTF8')),'hex'),pg_get_userbyid(proowner),prosecdef FROM pg_proc WHERE oid='public.ingestion_register_disposable_catchup(jsonb)'::regprocedure")[0]
+                if actual!=('ingestion_provisioning_test',expected_sha,'ingestion_storage_owner',True):
+                    raise Uncertain('INTAKE_CATCHUP_ISSUER_IDENTITY')
             self.expected_generation=policy['expected_stop']['hard_stop_generation']
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            result=self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
+            issuer='ingestion_register_disposable_catchup' if disposable_catchup else 'ingestion_register_bolton_exception'
+            result=self.q(c,'SELECT public.'+issuer+'(%s::jsonb)',
                           (json.dumps(dict(operation='intake_catchup_period' if disposable_catchup else 'intake_period',period=name,policy=policy)),),effect=True)[0][0]
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)
