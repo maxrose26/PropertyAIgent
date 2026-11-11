@@ -1055,6 +1055,30 @@ def test_pinned_bolton_dual_screenings_remain_unqualified_discoverable_backlog(w
             'INSERT INTO ingestion_work_items SELECT * FROM '
             'json_populate_record(NULL::ingestion_work_items,%s::json)',
             (json.dumps(item_record),))
+    # The same pinned Bolton RECEIVED-v1 root must be inventory-readable
+    # by the owner-side admission-preparation path, not only backlog_page.
+    # This does NOT make either unbound historical assessment admissible.
+    from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
+    baseline = snapshot(world['boot'])
+    inventory = persisted_council_capture_inventory(world['boot'], 'bolton')
+    assert len(inventory) == 1 and inventory[0]['key'] == root['key']
+    assert inventory[0]['checkpoint']['source_sha256'] == receipt['source_sha256']
+    for tamper_sql in (
+        "UPDATE ingestion_work_items SET checkpoint="
+        "jsonb_set(checkpoint::jsonb,'{date_semantics}',"
+        "to_jsonb('VALIDATED'::text))::json WHERE key=%s",
+        "UPDATE ingestion_work_items SET subject="
+        "jsonb_set(subject::jsonb,'{semantics}',"
+        "to_jsonb('VALIDATED'::text))::json WHERE key=%s",
+    ):
+        world['boot'].execute('BEGIN')
+        try:
+            world['boot'].execute(tamper_sql, (root['key'],))
+            with pytest.raises(Denied, match='CAPTURE_INVENTORY_UNVERIFIED'):
+                persisted_council_capture_inventory(world['boot'], 'bolton')
+        finally:
+            world['boot'].execute('ROLLBACK')
+        assert snapshot(world['boot']) == baseline
     reader=SimpleNamespace(_limits=lambda _connection:None)
     with world['app'].connect() as conn:
         observed=backlog_page(reader,['bolton'],[root['contract']],RULE,connection=conn)

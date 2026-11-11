@@ -141,12 +141,24 @@ def persisted_council_capture_inventory(connection, council, *, max_roots=128):
             and outcome.get('outcome') == 'ENUMERATED_METADATA_RETAINED'
             and outcome.get('source_sha256') == source_sha
         )
+        # The immutable Bolton RECEIVED-v1 contract predates the explicit
+        # date_semantics receipt field. The stored root must itself bind
+        # RECEIVED; any explicit contradictory value remains a hard refusal.
+        # This exception is read-only historical compatibility, not source
+        # completeness or permission to re-screen/admit the old observations.
+        legacy_received_basis = (
+            council == 'bolton'
+            and root.get('contract') == 'bolton-received-idox-coordinator-v1'
+            and subject.get('semantics') == 'RECEIVED'
+            and 'date_semantics' not in receipt
+        )
         if (not digest_bound
                 or receipt.get('kind') != 'LISTING_RECEIPT_V1'
                 or receipt.get('council') != council
                 or receipt.get('contract') != root.get('contract')
                 or receipt.get('interval') != [subject.get('start'), subject.get('end')]
-                or receipt.get('date_semantics') != subject.get('semantics')
+                or (receipt.get('date_semantics') != subject.get('semantics')
+                    and not legacy_received_basis)
                 or receipt.get('accounting_complete') is not True
                 or receipt.get('cleanup') != 'CLOSED'
                 or not isinstance(archive, dict)
