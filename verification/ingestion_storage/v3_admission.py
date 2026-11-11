@@ -293,3 +293,53 @@ def readback_committed_v3_facts(work_connection, application_engine, factual_key
                                  ('status', 'decision', 'decision_issued_date')},
                 verification_scope='COUPLED', unit_count_verified=False,
                 source_completeness='UNKNOWN', buyer_opportunity_qualified=False)
+
+
+def readback_committed_v3_facts_page(work_connection, application_engine, *, council, after=None, limit=5):
+    """Bounded, owner-only discovery of SAVED factual work in one council.
+
+    This is a read-only factual task page, not an admission/qualification or a
+    statement of full council coverage. Every COMPLETE candidate must pass the
+    existing independent capture -> screen -> B2 readback; one contradictory
+    row fails the whole page rather than being silently skipped. Incomplete
+    tasks are visible as pending, never saved facts. No source, issuer, grant,
+    mutable database operation or buyer opportunity is exposed here.
+    """
+    import re
+    from app.config import load_councils
+    from app.ingestion.ledger import bounded
+    if (type(council) is not str or council not in load_councils()
+            or type(limit) is not int or not 1 <= limit <= 10
+            or (after is not None and
+                (type(after) is not str or re.fullmatch(r'[a-f0-9]{64}', after) is None))):
+        raise Denied('FACT_BACKLOG_PARAMS')
+    rows = work_connection.execute(
+        "SELECT key,subject,state FROM public.ingestion_work_items "
+        "WHERE task='FACTUAL_REFRESH' AND subject->>'council'=%s "
+        "AND key>%s ORDER BY key LIMIT %s",
+        (council, after or '', limit + 1)).fetchall()
+    more = len(rows) > limit
+    records = []
+    for key, subject, state in rows[:limit]:
+        if (type(key) is not str or re.fullmatch(r'[a-f0-9]{64}', key) is None
+                or not isinstance(subject, dict)
+                or subject.get('kind') != 'APPLICATION'
+                or subject.get('council') != council
+                or type(subject.get('reference')) is not str
+                or not 1 <= len(subject['reference']) <= 100
+                or subject['reference'] != subject['reference'].strip()):
+            raise Denied('FACT_BACKLOG_SAVED_ROW')
+        if state == 'COMPLETE':
+            records.append(readback_committed_v3_facts(
+                work_connection, application_engine, key,
+                council=council, reference=subject['reference']))
+        else:
+            records.append(dict(council=council, reference=subject['reference'],
+                                factual_key=key, state='FACTUAL_TASK_NOT_VERIFIED',
+                                saved_key_facts=None))
+    result = dict(council=council, records=records, more=more,
+                  next_cursor=rows[limit-1][0] if more else None,
+                  page_only=True, source_coverage='UNKNOWN',
+                  unit_counts_verified=False, buyer_opportunities_proven=False)
+    bounded(result, 128 * 1024)
+    return result

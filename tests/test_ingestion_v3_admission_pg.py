@@ -429,6 +429,20 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                 assert proof['unit_count_verified'] is False
                 assert proof['source_completeness'] == 'UNKNOWN'
                 assert proof['buyer_opportunity_qualified'] is False
+                # A consumer can now discover the committed fact without
+                # already knowing its 64-character factual task key.
+                from verification.ingestion_storage.v3_admission import readback_committed_v3_facts_page
+                page = readback_committed_v3_facts_page(
+                    boot, pg['app'], council='bolton', limit=1)
+                assert page['page_only'] is True and page['source_coverage'] == 'UNKNOWN'
+                assert page['buyer_opportunities_proven'] is False
+                assert page['more'] is False and page['next_cursor'] is None
+                assert page['records'] == [proof]
+                assert readback_committed_v3_facts_page(
+                    boot, pg['app'], council='bolton', after=sc['fact']['key'])['records'] == []
+                with pytest.raises(Denied, match='FACT_BACKLOG_PARAMS'):
+                    readback_committed_v3_facts_page(
+                        boot, pg['app'], council='bolton', after='untrusted')
                 # A forged ledger outcome cannot turn a saved identity into
                 # a verified fact; always roll back the disposable mutation.
                 boot.execute('BEGIN')
@@ -442,6 +456,9 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                         readback_committed_v3_facts(
                             boot, pg['app'], sc['fact']['key'],
                             council='bolton', reference='01780/26')
+                    with pytest.raises(Denied, match='FACT_READBACK_OUTCOME'):
+                        readback_committed_v3_facts_page(
+                            boot, pg['app'], council='bolton')
                 finally:
                     boot.execute('ROLLBACK')
                 # A saved screening label is not evidence by itself:
@@ -494,6 +511,9 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                     readback_committed_v3_facts(
                         boot, pg['app'], sc['fact']['key'],
                         council='bolton', reference='01780/26')
+                with pytest.raises(Denied, match='FACT_READBACK_APPLICATION_CHANGED'):
+                    readback_committed_v3_facts_page(
+                        boot, pg['app'], council='bolton')
             else:
                 # A legacy Application is preserved and no factual task runs.
                 # This is NOT_ATTEMPTED, not a new admitted identity.
