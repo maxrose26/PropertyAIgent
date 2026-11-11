@@ -758,3 +758,76 @@ def test_shutdown_gap_blocks_unreviewed_registry_expansion(monkeypatch):
         m.setattr(f,'SEMANTICS',dict(f.SEMANTICS,trafford='RECEIVED'))
         with pytest.raises(ValueError,match='SHUTDOWN_SOURCE_REGISTRY_CHANGED'):
             campaign.shutdown_gap_source_packages(datetime(2026,11,10,tzinfo=timezone.utc))
+
+
+def test_archived_rochdale_original_zip_is_readback_only():
+    """S4-03: verify the recovered *real* R0 source artifact, without source requests
+    or classifying historical candidates as screened/complete/qualified records.
+
+    This is archive compatibility evidence, NOT a live-source or SQL replay.
+    """
+    import hashlib
+    from zipfile import ZipFile
+
+    root = (Path(__file__).resolve().parents[1] /
+            'docs/design/stage4-r0-execution/exact20-results-20261015')
+    archive_path = root / 'artifact-11997283579.zip'
+    assert hashlib.sha256(archive_path.read_bytes()).hexdigest() == (
+        '24c6fcf10ef3d6eaafffc29dea6b36043bb604b2242c45ba1c5bd1673f59869c'
+    )
+    expected = {'execution.json', 'result.json'} | {
+        f'checkpoints/{i:03}.json' for i in range(4)
+    }
+    with ZipFile(archive_path) as archive:
+        assert set(archive.namelist()) == expected
+        assert archive.testzip() is None
+        assert sum(z.file_size for z in archive.infolist()) < 20_000_000
+        originals = {name: archive.read(name) for name in expected}
+    execution = json.loads(originals['execution.json'])
+    result = json.loads(originals['result.json'])
+    assert (execution['sha'], execution['run_id'], execution['run_number'],
+            execution['attempt']) == (
+        '0eec734da0cc1a7580385003a7dc9ed797f74bd2', '38786550045', 1, 1
+    )
+    assert all(execution[name] == 0 for name in (
+        'production_database_connections', 'production_reads', 'production_writes'
+    ))
+    assert sum(map(len, originals.values())) == execution['aggregate_audit_bytes']
+    assert len(result['results']) == len(result['checkpoint_sha256']) == 4
+    assert sum(len(originals[f'checkpoints/{i:03}.json']) for i in range(4)) == result['checkpoint_bytes']
+    for i, observed in enumerate(result['results']):
+        raw = originals[f'checkpoints/{i:03}.json']
+        assert hashlib.sha256(raw).hexdigest() == result['checkpoint_sha256'][i]
+        assert json.loads(raw) == observed
+
+    windows = json.loads((root / 'all20-window-reconciliation.json').read_text())
+    candidates = json.loads((root / 'candidate-ledger.json').read_text())
+    assert len(windows) == 20 and len(candidates) == 46
+    assert len({(c['council'], c['reference']) for c in candidates}) == 46
+    assert all(c['source_run'] == 38786550045 and
+               c['source_date_semantics'] == 'VALIDATED' and
+               c['exact_record_identity'] == 'NOT_QUALIFIED' and
+               c['database_presence'] == 'UNKNOWN_NOT_QUERIED' and
+               c['admission'] == 'NOT_AUTHORISED_NOT_ATTEMPTED'
+               for c in candidates)
+
+    complete = [o for o in result['results'] if o['enumeration_completeness'] == 'COMPLETE']
+    failed = [o for o in result['results'] if o['enumeration_completeness'] == 'FAILED']
+    assert len(complete) == 3 and len(failed) == 1
+    source_references = set()
+    for observed, count in zip(complete, (13, 15, 18)):
+        source = observed['source']
+        assert len(source['listing_records']) == count
+        assert source['requested_interval'] == source['applied_interval']
+        assert source['completeness'] == 'UNKNOWN'
+        assert len(source['listing_segments']) == 2
+        source_references.update(('rochdale', row['reference'])
+                                 for row in source['listing_records'])
+    assert source_references == {(c['council'], c['reference']) for c in candidates}
+    assert failed[0]['source'].get('applied_interval') is None
+    assert not failed[0]['source'].get('listing_records')
+    assert sum(w['primary_enumeration'] == 'NOT_ATTEMPTED' for w in windows) == 16
+    assert all(w['coverage'] != 'COMPLETE' for w in windows)
+    # A complete enumeration over a VALIDATED date is not evidence of
+    # published-date recall, current source contract, durable SQL screening,
+    # identified planning Applications or an admitted buyer opportunity.
