@@ -417,7 +417,9 @@ def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
                 assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
                 assert saved[0][3:] == (None, None)
             else:
-                assert result['admission'] == 'EXISTING_IDENTITY_PRESERVED'
+                # A legacy Application is preserved and no factual task runs.
+                # This is NOT_ATTEMPTED, not a new admitted identity.
+                assert result['admission'] == 'NOT_ATTEMPTED'
                 assert calls == []
                 saved = boot.execute(
                     "SELECT reference,status,proposal,site_id,estimated_unit_count "
