@@ -214,8 +214,26 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
             if len(screens)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
             for record in capture['records']:
                 matches=[s for s in screens if s['subject']==dict(kind='APPLICATION',council=capture['council'],reference=record['reference'])]
-                if len(matches)>1:raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
-                s=matches[0] if matches else None;result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
+                # Historic Bolton receipts legitimately have BOTH a completed
+                # v1 screening and a later, unbound v3 screening for the same
+                # retained reference. These are NOT two unique applications.
+                # Only a complete capture-bound v3 assessment may be projected
+                # as screened; older assessments remain evidence, not a fresh
+                # qualification or a reason to hide the retained listing.
+                if any(m['contract'] not in ('listing-screen-v1','listing-screen-v3') for m in matches):
+                    raise Denied('BACKLOG_UNKNOWN_ASSESSMENT_CONTRACT')
+                if len(matches)>1 and (len({m['contract'] for m in matches})!=len(matches)
+                                       or any(m['state']!='COMPLETE' for m in matches)):
+                    raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                current=[m for m in matches if (m['contract']=='listing-screen-v3'
+                         and m['state']=='COMPLETE'
+                         and isinstance(m['checkpoint'],dict)
+                         and m['checkpoint'].get('capture_bound') is True)]
+                if len(current)>1:raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                s=(current[0] if current else
+                   matches[0] if len(matches)==1 and matches[0]['state']!='COMPLETE' else None)
+                result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
+                unbound_legacy=bool(matches) and not current and s is None
                 if result:
                     from .observation_screening import observation_revision
                     config=result.get('config')
@@ -231,11 +249,15 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                 records.append(dict(council=capture['council'],reference=record['reference'],source_record_id=record['source_record_id'],
                     source_url=record['source_url'],fields=record['fields'],observed_at=capture.get('observed_at'),
                     capture_key=root['key'],capture_sha256=digest(capture),source_sha256=capture['source_sha256'],archive=capture['durable_archive'],
-                    screening_key=s['key'] if s else None,screening_state=s['state'] if s else 'NOT_PREPARED',
+                    screening_key=s['key'] if s else None,
+                    screening_state=('HISTORICAL_UNBOUND_REQUIRES_RESCREENING' if unbound_legacy else
+                                     s['state'] if s else 'NOT_PREPARED'),
+                    historical_screening_items=len(matches),
                     screening_outcome=routing_of(result)[1] if result else None,
                     screening_config_sha256=result.get('config_sha256') if result else None,
                     screening_matches_current_rule=result.get('config_sha256')==digest(rule.config()) if result else None,
-                    processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
+                    processing_state=('HISTORICAL_RESCREENING_REQUIRED' if unbound_legacy else
+                                      'AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING'),
                     application_admitted=None,extraction_complete=None,downstream_state='NOT_TRACKED_BY_INTAKE'))
     captures=[dict(capture_key=r['key'],council=r['subject']['council'],scope=r['subject'],
                    record_count=len((r['checkpoint'] or {}).get('records',[])),

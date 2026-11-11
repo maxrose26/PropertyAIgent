@@ -874,3 +874,80 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
             candidates.nominees,RULE,{nominee.reference:target},
             **dict(kwargs,other_receipts=(conflicting,)))
     assert snapshot(world['boot'])==before
+
+def test_backlog_does_not_duplicate_or_promote_historical_v1_v3_screenings(world,tmp_path):
+    """Disposable SQL regression for actual Bolton-style dual history.
+
+    A v1 receipt plus one capture-bound v3 receipt is one unique listing. If
+    the v3 is unbound, keep the listing discoverable but do not claim a verified
+    screening outcome. Unknown/competing contracts remain fail-closed.
+    """
+    from sqlalchemy import text
+    from verification.ingestion_storage.retained_world import item
+
+    reset(world)
+    authorise(world,'dual-historical-screening')
+    run,result,_=invoke(world,tmp_path,'dual-historical-screening')
+    assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED'
+    actual=world['boot'].execute(
+        "SELECT row_to_json(w) FROM ingestion_work_items w "
+        "WHERE task='SCREENING' AND subject->>'council'='tameside'").fetchone()[0]
+    assert actual['contract']=='listing-screen-v3'
+    assert actual['state']=='COMPLETE' and actual['checkpoint']['capture_bound'] is True
+    legacy=item(dict(subject=actual['subject'],task='SCREENING',
+                     contract='listing-screen-v1',revision='historical-unbound-v1'),
+                dependencies=actual['dependencies'])
+    legacy.update(state='COMPLETE',phase='FINISHED',checkpoint=dict(
+        outcome='INSUFFICIENT_EVIDENCE'),outcome=dict(outcome='LEGACY_EVIDENCE_ONLY'))
+    world['boot'].execute(
+        'INSERT INTO ingestion_work_items SELECT * FROM '
+        'json_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(legacy),))
+
+    reader=SimpleNamespace(_limits=lambda _connection:None)
+    def read(conn):
+        return backlog_page(reader,['tameside'],['daily-intake-tameside'],RULE,connection=conn)
+
+    with world['app'].connect() as conn:
+        modern=read(conn)['records']
+        assert len(modern)==1
+        assert modern[0]['screening_key']==actual['key']
+        assert modern[0]['screening_state']=='COMPLETE'
+        assert modern[0]['historical_screening_items']==2
+        assert modern[0]['screening_outcome'] is not None
+        conn.rollback()
+    # Retain old screening rows, but do not silently qualify unbound results.
+    with world['app'].connect() as conn:
+        trans=conn.begin()
+        try:
+            conn.execute(text(
+                "UPDATE ingestion_work_items SET checkpoint="
+                "(checkpoint::jsonb-'capture_bound')::json WHERE key=:key"),
+                dict(key=actual['key']))
+            historical=read(conn)['records']
+            assert len(historical)==1
+            assert historical[0]['screening_state']=='HISTORICAL_UNBOUND_REQUIRES_RESCREENING'
+            assert historical[0]['historical_screening_items']==2
+            assert historical[0]['screening_key'] is None
+            assert historical[0]['screening_outcome'] is None
+            assert historical[0]['processing_state']=='HISTORICAL_RESCREENING_REQUIRED'
+            assert historical[0]['application_admitted'] is None
+        finally:
+            trans.rollback()
+    # A third unknown assessment type cannot be silently dropped to make a
+    # backlog look available. Everything in this block rolls back.
+    other=item(dict(subject=actual['subject'],task='SCREENING',
+                    contract='unreviewed-screen-v999',revision='not-qualified'),
+               dependencies=actual['dependencies'])
+    other.update(state='COMPLETE',phase='FINISHED',checkpoint=dict(
+        outcome='UNKNOWN'),outcome=dict(outcome='UNKNOWN'))
+    world['boot'].execute('BEGIN')
+    try:
+        world['boot'].execute(
+            'INSERT INTO ingestion_work_items SELECT * FROM '
+            'json_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(other),))
+        with world['app'].connect() as conn:
+            with pytest.raises(Denied,match='BACKLOG_UNKNOWN_ASSESSMENT_CONTRACT'):
+                read(conn)
+    finally:
+        world['boot'].execute('ROLLBACK')
+
