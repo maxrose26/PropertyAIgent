@@ -431,7 +431,17 @@ class Runtime:
         result=dict(status='STOP_RECONCILE_NO_RETRY',scopes=[],coverage_advance=False,admission_connected=False,extraction_connected=False)
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
-            with self.connection() as (c,_):self.policy=self.policy_read(c)
+            with self.connection() as (c,_):
+                self.policy=self.policy_read(c)
+                if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and self.test:
+                    # Check the pinned SQL writer, reader, EXECUTE capability and
+                    # restricted table ACL before *any* SOURCE_INTENT issuance.
+                    # The per-write check remains: this preflight is not a grant
+                    # or proof that the functions cannot change later.
+                    try:self.private_evidence_inventory(c)
+                    except Denied:
+                        result['status']='REFUSED_PRIVATE_EVIDENCE_PREFLIGHT'
+                        raise
             # Private retention is deliberately disposable-only in this code.
             # Refuse before an issuer grant or council request; an archive-only
             # refusal would leave SOURCE_INTENT after consuming source budgets.
