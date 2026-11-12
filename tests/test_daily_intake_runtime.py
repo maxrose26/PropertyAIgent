@@ -303,8 +303,10 @@ def test_disposable_historical_issuer_actual_daily_command_and_committed_readbac
                             capture_bound=True)
     assert len(derived.nominees)==1
     nominee=derived.nominees[0]
-    target=dict(council='tameside',reference=nominee.reference,
-                source_url=nominee.source_url,source_identifier=nominee.source_record_id)
+    from tests.e2e_connection_support import idox_detail_target
+    record=next(r for r in root['checkpoint']['records'] if r['reference']==nominee.reference)
+    target=idox_detail_target('tameside',record,
+                             case='chain_idox_tameside_'+digest(record))
     contract=idox_contract('tameside',date.fromisoformat(scope['start']),
                            date.fromisoformat(scope['end']),name=root['contract'])
     owner=Owner(None,lambda *_:None,lambda:None,
@@ -1062,8 +1064,10 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     nominee=candidates.nominees[0]
     assert nominee.screening_revision==screen['revision']
     assert screen['revision']==observation_revision(ordinary.nominees[0].screening_revision,digest(receipt))
-    target=dict(council='tameside',reference=nominee.reference,
-                source_url=nominee.source_url,source_identifier=nominee.source_record_id)
+    from tests.e2e_connection_support import idox_detail_target
+    record=next(r for r in root['checkpoint']['records'] if r['reference']==nominee.reference)
+    target=idox_detail_target('tameside',record,
+                             case='chain_idox_tameside_'+digest(record))
     contract=idox_contract('tameside',date.fromisoformat(root['subject']['start']),
                            date.fromisoformat(root['subject']['end']),name=root['contract'])
     owner=Owner(None,lambda *_:None,lambda:None,
@@ -1071,6 +1075,15 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     before=snapshot(world['boot'])
     kwargs=dict(revision='offline-prepare-only',item_limits=root['limits'],
                 screening_rows=selected,allow_test_evidence=True,capture_bound=True)
+    # Source reference and URL alone are insufficient to prepare a usable
+    # official-summary detail read. This must fail before any owner issuance.
+    with pytest.raises(Denied,match='SCOPE_DETAIL_TARGET_MISMATCH'):
+        admission_registration(owner,binding_for('tameside'),contract,
+            root,receipt,candidates.nominees,RULE,
+            {nominee.reference:dict(council='tameside',reference=nominee.reference,
+                                    source_url=nominee.source_url,
+                                    source_identifier=nominee.source_record_id)},
+            **dict(kwargs,other_receipts=tuple(r['checkpoint'] for r in roots if r['key']!=root['key'])))
     registration=admission_registration(owner,binding_for('tameside'),contract,
         root,receipt,candidates.nominees,RULE,{nominee.reference:target},
         **dict(kwargs,other_receipts=tuple(r['checkpoint'] for r in roots if r['key']!=root['key'])))
