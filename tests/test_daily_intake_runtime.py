@@ -1099,6 +1099,21 @@ def test_persisted_capture_bound_screening_prepares_exact_offline_admission_with
     assert independently_derived.sha256 == candidates.sha256
     assert prepared.facts == registration.facts
     assert prepared.screens[nominee.reference]['key'] == screen['key']
+    # Execute the EXISTING Idox detail parser and projector with an injected
+    # synthetic response using the very target saved by owner preparation.
+    # This demonstrates an actual compatible detail contract, not a B2 write,
+    # live source qualification, or an approved factual task.
+    from tests.e2e_connection_support import idox_detail
+    from verification.direct_reference.fixtures import summary
+    from verification.discovery.material_qualification import project_idox
+    from verification.ingestion_storage.new_identity_contract import qualified_coupled_observation
+    source=idox_detail(target,summary(nominee.reference,status='Decided',
+                                     decision='Approve',date='Mon 28 Sep 2026'))
+    detail=project_idox(target,source)
+    assert detail['failure'] is None
+    assert detail['observation'].verification_scope=='COUPLED'
+    assert qualified_coupled_observation(detail['observation'],target)
+    assert snapshot(world['boot']) == before  # no task or B2 effect
     from unittest.mock import patch
     import verification.ingestion_storage.chain_registration as chain_module
     with patch.object(chain_module, 'persisted_council_capture_inventory',
