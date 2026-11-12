@@ -602,7 +602,9 @@ def policy_sql(*, disposable_catchup=False):
            '\nREVOKE ALL ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) FROM PUBLIC;'+
            '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_worker;'+
            '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_barrier_releaser;\n')
-    if disposable_catchup:\n        disposable_sql += DISPOSABLE_SHARED_STOP_RELEASE\n    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
+    if disposable_catchup:
+        disposable_sql += DISPOSABLE_SHARED_STOP_RELEASE
+    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
 
 
 def installation_script(*, disposable_catchup=False):
