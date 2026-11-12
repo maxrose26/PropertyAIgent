@@ -22,6 +22,12 @@ from .chain_registration import capture_registration,screening_registration
 from .chain_caller import ChainCaller,WORKER
 from .intake_budget import IntakeRun,LIMITS
 
+# Explicitly FALSE in every distributed candidate. No environment variable or
+# SQL policy alone can enable live private source collection. A future release
+# must change this code constant in a separately reviewed and owner-approved
+# commit, with matching installed STOP-CAS writer, role and source binding.
+LIVE_PRIVATE_EVIDENCE_RELEASE = False
+
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
              'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
@@ -208,14 +214,44 @@ class Runtime:
                 ('ingestion_storage_owner','r',False)]:
             raise Denied('PRIVATE_EVIDENCE_RAW_TABLE_ACL')
 
+    def private_evidence_allowed(self):
+        """Staged live-private transition; hard disabled until separate release.
+
+        The *registered* SQL policy must pin this exact executable revision and
+        one finite Tameside RECEIVED batch. Runtime environment flags cannot
+        activate this path. The existing issuer, shared-stop and SQL function
+        fingerprint/ACL checks remain mandatory even after later approval.
+        """
+        if self.test:
+            return True
+        if LIVE_PRIVATE_EVIDENCE_RELEASE is not True:
+            return False
+        policy=self.policy or {}
+        binding=getattr(self,'binding',None)
+        return (
+            getattr(self,'route_name',None) in ('POOLER','DIRECT')
+            and type(binding) is dict
+            and type(binding.get('revision')) is str
+            and policy.get('evidence_backend')=='POSTGRES_PILOT_V1'
+            and policy.get('test_evidence') is False
+            and policy.get('max_runs')==1
+            and set(policy.get('councils',{}))=={'tameside'}
+            and policy.get('private_release')=={
+                'schema':'PA_D002_LIVE_PRIVATE_V1',
+                'revision':binding['revision'],
+                'councils':['tameside'],
+                'semantics':'RECEIVED',
+            }
+        )
+
     def archive_private_source(self,raw):
-        """Offline-only SOURCE_INTENT-bound SQL write plus separate committed read.
+        """Pinned SOURCE_INTENT-bound SQL write plus separate committed read.
 
         The installed writer also enforces the exact current grant, run, source
         council/date, quota and expiry. Never retry a write on uncertain effect.
         """
         from app.ingestion.private_evidence import verified_private_capture,SQL_BACKEND
-        if (not self.test or self.policy is None
+        if (not self.private_evidence_allowed() or self.policy is None
                 or self.policy.get('evidence_backend')!=SQL_BACKEND):
             raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
         if self.archive_ordinal not in (1,2):
@@ -243,13 +279,13 @@ class Runtime:
             name=name,write=write,readback=readback)
 
     def archive_private_final(self, raw, events):
-        """Preserve detailed finals privately after grant closure (offline only).
+        """Preserve detailed finals privately after grant closure.
 
         Each installed restricted SQL write is followed by a separate committed
         reader transaction. Uncertain effects remain STOP/RECONCILE, no replay.
         """
         from app.ingestion.private_evidence import verified_private_final,SQL_BACKEND
-        if (not self.test or self.policy is None
+        if (not self.private_evidence_allowed() or self.policy is None
                 or self.policy.get('evidence_backend')!=SQL_BACKEND):
             raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
         receipts={}
@@ -288,7 +324,7 @@ class Runtime:
         source replay, or coverage promotion is permitted.
         """
         from app.ingestion.coordinator import validate_outer
-        if (not self.test or self.policy is None
+        if (not self.private_evidence_allowed() or self.policy is None
                 or self.policy.get('evidence_backend')!='POSTGRES_PILOT_V1'):
             raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
         if (type(source) is not dict or type(source.get('failure')) is not str
@@ -315,7 +351,7 @@ class Runtime:
         backend=(self.policy or {}).get('evidence_backend')
         if backend not in (None,'POSTGRES_PILOT_V1'):
             raise Denied('PRIVATE_EVIDENCE_BACKEND_UNKNOWN')
-        if backend=='POSTGRES_PILOT_V1' and not self.test:
+        if backend=='POSTGRES_PILOT_V1' and not self.private_evidence_allowed():
             # No live activation. Never fall back to publishing private source.
             raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
         self.run.publication(len(raw),10)
@@ -433,7 +469,7 @@ class Runtime:
         try:
             with self.connection() as (c,_):
                 self.policy=self.policy_read(c)
-                if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and self.test:
+                if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and self.private_evidence_allowed():
                     # Check the pinned SQL writer, reader, EXECUTE capability and
                     # restricted table ACL before *any* SOURCE_INTENT issuance.
                     # The per-write check remains: this preflight is not a grant
@@ -442,10 +478,10 @@ class Runtime:
                     except Denied:
                         result['status']='REFUSED_PRIVATE_EVIDENCE_PREFLIGHT'
                         raise
-            # Private retention is deliberately disposable-only in this code.
+            # Private live retention remains compile-time disabled without release.
             # Refuse before an issuer grant or council request; an archive-only
             # refusal would leave SOURCE_INTENT after consuming source budgets.
-            if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and not self.test:
+            if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and not self.private_evidence_allowed():
                 result['status']='REFUSED_PRIVATE_EVIDENCE_OFFLINE_ONLY'
                 raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')

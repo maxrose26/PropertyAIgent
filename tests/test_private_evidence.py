@@ -585,3 +585,92 @@ def test_disposable_private_writer_inventory_refused_before_source_authority(tmp
     assert result['scopes']==[] and result['coverage_advance'] is False
     assert rt.authorities==[]
     assert (tmp_path/'events.json').read_bytes()==b'[]'
+
+
+def test_live_private_transition_requires_code_and_exact_owner_policy(monkeypatch):
+    """No env/config toggles or loose policy may silently turn on live source."""
+    from types import SimpleNamespace
+    import verification.ingestion_storage.daily_intake_runtime as m
+    rt=m.Runtime.__new__(m.Runtime)
+    rt.test=False;rt.route_name='POOLER';rt.binding={'revision':'a'*40}
+    rt.policy=dict(evidence_backend='POSTGRES_PILOT_V1',
+        test_evidence=False,max_runs=1,councils={'tameside':{}},
+        private_release=dict(schema='PA_D002_LIVE_PRIVATE_V1',
+            revision='a'*40,councils=['tameside'],semantics='RECEIVED'))
+    monkeypatch.setenv('PROPERTYAIGENT_LIVE_PRIVATE_RELEASE','true')
+    assert m.LIVE_PRIVATE_EVIDENCE_RELEASE is False
+    assert rt.private_evidence_allowed() is False
+    # A *future* reviewed code change is modelled only inside this isolated test.
+    # It is not persisted to the application or any environment.
+    monkeypatch.setattr(m,'LIVE_PRIVATE_EVIDENCE_RELEASE',True)
+    assert rt.private_evidence_allowed() is True
+    for key,value in [('route_name','DISPOSABLE'),('route_name','UNREVIEWED')]:
+        rt.route_name=value
+        assert rt.private_evidence_allowed() is False
+    rt.route_name='POOLER'
+    for attr,value in [('revision','b'*40)]:
+        rt.binding[attr]=value
+        assert rt.private_evidence_allowed() is False
+    rt.binding['revision']='a'*40
+    for tamper in (
+        {'councils':['manchester']},
+        {'semantics':'VALIDATED'},
+        {'schema':'UNKNOWN'},
+        {'revision':'b'*40},
+    ):
+        original=rt.policy['private_release']
+        rt.policy['private_release']={**original,**tamper}
+        assert rt.private_evidence_allowed() is False
+        rt.policy['private_release']=original
+    rt.policy['councils']={'tameside':{},'manchester':{}}
+    assert rt.private_evidence_allowed() is False
+    rt.policy['councils']={'tameside':{}}
+    rt.policy['max_runs']=2
+    assert rt.private_evidence_allowed() is False
+    rt.policy['max_runs']=1
+    rt.policy['test_evidence']=True
+    assert rt.private_evidence_allowed() is False
+
+
+def test_future_live_private_path_still_refuses_stale_sql_before_source(tmp_path,monkeypatch):
+    """Synthetic future code-enabled branch: no issuer on SQL fingerprint drift."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    import verification.ingestion_storage.daily_intake_runtime as m
+    from app.ingestion.ledger import Denied
+    monkeypatch.setattr(m,'LIVE_PRIVATE_EVIDENCE_RELEASE',True)
+    seen=[]
+    @contextmanager
+    def connection(*args,**kwargs):
+        seen.append('policy_read')
+        yield object(),None
+    def reject_inventory(c):
+        seen.append('inventory')
+        raise Denied('PRIVATE_EVIDENCE_FUNCTION_INVENTORY')
+    def forbidden(*args,**kwargs):
+        pytest.fail('no issuer, source, SQL evidence write, stop or publication')
+    rt=m.Runtime.__new__(m.Runtime)
+    rt.test=False;rt.route_name='POOLER';rt.binding={'revision':'a'*40}
+    rt.policy=None;rt.durable_run=None;rt.authorities=[]
+    rt.memory=None;rt.events=[];rt.github=None
+    rt.args=SimpleNamespace(period='test-live-private-not-activated')
+    rt.root=tmp_path;rt.connection=connection
+    policy=dict(evidence_backend='POSTGRES_PILOT_V1',test_evidence=False,
+        max_runs=1,councils={'tameside':{}},
+        private_release={'schema':'PA_D002_LIVE_PRIVATE_V1',
+            'revision':'a'*40,'councils':['tameside'],'semantics':'RECEIVED'})
+    rt.policy_read=lambda _:policy
+    rt.private_evidence_inventory=reject_inventory
+    rt.issue=forbidden;rt.collect=forbidden;rt.archive=forbidden
+    rt.stop_run=forbidden
+    rt.run=SimpleNamespace(closing=False,totals=lambda:{
+        'all_connections_closed':True},publication=forbidden)
+    result=rt.execute()
+    assert seen==['policy_read','inventory']
+    assert result['status']=='REFUSED_PRIVATE_EVIDENCE_PREFLIGHT'
+    assert result['reason']=='PRIVATE_EVIDENCE_FUNCTION_INVENTORY'
+    assert result['authority_closure']=='NOT_ISSUED'
+    assert result['publication']=='NOT_REQUIRED_NO_NEW_WORK'
+    assert result['cleanup']=='CLOSED'
+    assert result['scopes']==[] and result['coverage_advance'] is False
+    assert rt.authorities==[]
