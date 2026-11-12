@@ -177,7 +177,12 @@ class Runtime:
             "SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),"
             "r.rolname,p.prosecdef,p.proconfig,"
             "pg_catalog.pg_get_function_identity_arguments(p.oid),"
-            "pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE') "
+            "pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE'), "
+            "coalesce((SELECT bool_and(acl.grantee='ingestion_worker'::regrole "
+            "AND acl.privilege_type='EXECUTE' AND NOT acl.is_grantable) "
+            "FROM pg_catalog.aclexplode(coalesce(p.proacl, "
+            "pg_catalog.acldefault('f',p.proowner))) acl "
+            "WHERE acl.grantee<>p.proowner),false) "
             "FROM pg_catalog.pg_proc p "
             "JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace "
             "JOIN pg_catalog.pg_roles r ON r.oid=p.proowner "
@@ -185,10 +190,10 @@ class Runtime:
             "ORDER BY p.proname"),dict(names=names)).all()
         expected=[
             (names[0],READ_FUNCTION_SHA256,'ingestion_storage_owner',True,
-             ['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True),
+             ['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True,True),
             (names[1],WRITE_FUNCTION_SHA256,'ingestion_storage_owner',True,
              ['search_path=pg_catalog'],
-             'p_period text, p_run text, p_name text, p_body bytea',True)]
+             'p_period text, p_run text, p_name text, p_body bytea',True,True)]
         if [tuple(r) for r in rows]!=expected:
             raise Denied('PRIVATE_EVIDENCE_FUNCTION_INVENTORY')
         # Check direct table AND column permissions: an accidental grant to
