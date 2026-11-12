@@ -1901,6 +1901,55 @@ def test_shared_stop_recovery_refuses_unresolved_effects_atomically(world,drift)
     assert _recovery_control(world)==before
 
 
+@pytest.mark.parametrize('number_of_other_intents',[6,7])
+def test_shared_stop_recovery_refuses_other_abandoned_source_intents_without_disposition(
+        world,number_of_other_intents):
+    # Synthetic analogue of the six historical Bolton/Manchester/Tameside
+    # effect markers. The seventh marker proves no fixed-count bypass exists.
+    from verification.ingestion_storage.operational_owner import item
+    ctl=_settled_fixture(world)
+    c=world['boot']
+    other_keys=[]
+    councils=('bolton','bolton','manchester','manchester','tameside','tameside','rochdale')
+    for i,council in enumerate(councils[:number_of_other_intents]):
+        scope=dict(kind='DISCOVERY_SCOPE',council=council,semantics='RECEIVED',
+                   start='2026-09-15',end=f'2026-09-{16+i:02d}')
+        identity=dict(subject=scope,task='DISCOVERY',contract='synthetic-abandoned-v1',
+                      revision=f'disposable-unresolved-{i}')
+        row=item(identity)
+        row.update(state='SAFETY_BLOCKED',phase='RECOVERED',fence=2,attempt_count=1,
+                   owner=None,lease_until=None,checkpoint=None,
+                   reason='ABANDONED_SOURCE_INTENT',next_action='RECONCILE',
+                   outcome=dict(outcome='ABANDONED_SOURCE_INTENT',
+                                source_or_write_replay_authorised=False))
+        other_keys.append(row['key'])
+        c.execute('INSERT INTO public.ingestion_work_items SELECT * FROM '
+                  'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+                  (json.dumps(row),))
+        c.execute("""INSERT INTO public.ingestion_work_attempts
+          (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
+          VALUES (%s,1,'required_once',0,100,'SYNTHETIC_NO_LIVE_AUTHORITY',
+                  'RECOVERED',NULL,NULL)""",(row['key'],))
+    before=_recovery_control(world)
+    assert before==ctl
+    assert c.execute("SELECT count(*) FROM ingestion_work_items WHERE key=ANY(%s)",
+                     (other_keys,)).fetchone()[0]==number_of_other_intents
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+        _disposable_release(world,payload)
+    # The failed SQL call rolls back, retaining all original markers/attempts
+    # and both hard stops; expiration or mere RECOVERED state is not clearance.
+    assert _recovery_control(world)==before
+    assert c.execute("SELECT count(*) FROM ingestion_work_items WHERE key=ANY(%s) "
+                     "AND state='SAFETY_BLOCKED' AND phase='RECOVERED' "
+                     "AND reason='ABANDONED_SOURCE_INTENT' AND next_action='RECONCILE'",
+                     (other_keys,)).fetchone()[0]==number_of_other_intents
+    assert c.execute("SELECT count(*) FROM ingestion_work_attempts "
+                     "WHERE work_key=ANY(%s) AND phase='RECOVERED'",
+                     (other_keys,)).fetchone()[0]==number_of_other_intents
+
+
 def test_shared_stop_worker_cannot_call_owner_recovery(world):
     import psycopg
     ctl=_settled_fixture(world)

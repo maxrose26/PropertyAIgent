@@ -541,6 +541,12 @@ BEGIN
  IF EXISTS (SELECT 1 FROM public.ingestion_work_items x
     WHERE x.state='CLAIMED' OR x.phase IN ('SOURCE_INTENT','WRITE_INTENT')
       OR x.state='PERSISTENCE_UNCERTAIN')
+  -- Unrelated recovered/abandoned effects remain unresolved until each has a
+  -- separately reviewed disposition. A settled Bolton receipt is not sufficient.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_items x
+     WHERE x.key<>w.key
+       AND (x.state='SAFETY_BLOCKED' OR x.phase='RECOVERED'
+            OR x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE'))
   OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'grants','{}'::jsonb)) g
      WHERE jsonb_typeof(g.value->'expires_at') IS DISTINCT FROM 'number'
        OR (g.value->>'expires_at')::double precision>t)
