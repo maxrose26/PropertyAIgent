@@ -1661,10 +1661,14 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
             council=get_council('tameside'),check=budget.check,allow_test_evidence=True)
         assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
         assert calls==[nominee.reference]
-        with world['connect']('provisioning_migrator') as independent:
-            proof=readback_committed_v3_facts(
-                independent,world['app'],fact['key'],council='tameside',
-                reference=nominee.reference)
+        # The disposable provisioning migrator intentionally has NO table
+        # SELECT. Independently verify through the fixture's pre-existing
+        # bootstrap read connection, separate from every restricted writer;
+        # never expand migrator/worker privileges for a readback test.
+        assert world['boot'].info.user=='provisioning_bootstrap'
+        proof=readback_committed_v3_facts(
+            world['boot'],world['app'],fact['key'],council='tameside',
+            reference=nominee.reference)
         assert proof['state']=='COMMITTED_B2_FACTS_READ_BACK'
         assert proof['verification_scope']=='COUPLED'
         assert proof['saved_key_facts']['status']=='Decided'
