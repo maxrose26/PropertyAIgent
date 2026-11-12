@@ -1529,3 +1529,158 @@ def test_unresolved_bolton_source_intent_blocks_new_tameside_period(world):
         authorise(world, 'tameside-after-unresolved-bolton', candidate)
     assert snapshot(world['boot']) == before
     assert restricted_sessions(world['boot']) == 0
+
+
+def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_readback(world,tmp_path):
+    """S4-03 offline: the actual daily command's saved screen can feed a DIFFERENT owner.
+
+    The live collector remains screening-only. Only the disposable bootstrap
+    inserts the separately prepared owner grant/fact item; production has no
+    such Tameside issuer. The accepted factual projector, restricted roles,
+    ledger and Application writer do the real disposable execution/readback.
+    """
+    from dataclasses import replace
+    from app.config import get_council
+    from app.ingestion.coordinator import Coordinator
+    from app.ingestion.listing_screening import V3_CONTRACT,code_binding
+    from app.ingestion.nomination import derive_nominees
+    from app.pipeline.discovery_contract import DiscoveryEnvelope,WindowEvidence
+    from tests.e2e_connection_support import idox_contract,idox_detail_target,idox_detail,outer
+    from verification.direct_reference.fixtures import summary
+    from verification.ingestion_storage.chain_caller import WORKER
+    from verification.ingestion_storage.chain_registration import (
+        persisted_council_capture_inventory,prepare_admission_from_persisted_captures)
+    from verification.ingestion_storage.operational_controller import (
+        AcceptanceBinding,ControllerLedger,DatabaseBudget)
+    from verification.ingestion_storage.scope_binding import binding_for
+    from verification.ingestion_storage.v3_admission import (
+        V3AdmissionBinding,execute_retained_v3,factual_binding,readback_committed_v3_facts)
+
+    reset(world)
+    name='daily-separate-factual-owner'
+    authorise(world,name)
+    run,result,_=invoke(world,tmp_path,name)
+    assert run.returncode==0 and result['status']=='RETAINED_AND_SCREENED',(run.stderr,result)
+    assert result['admission_connected'] is False and result['coverage_advance'] is False
+    assert world['boot'].execute("SELECT count(*) FROM applications").fetchone()[0]==0
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='FACTUAL_REFRESH'").fetchone()[0]==0
+
+    roots=persisted_council_capture_inventory(world['boot'],'tameside')
+    assert len(roots)==1
+    root=roots[0];receipt=root['checkpoint'];record=receipt['records'][0]
+    nomination=derive_nominees([receipt],RULE,allow_test_evidence=True,capture_bound=True)
+    assert len(nomination.nominees)==1
+    nominee=nomination.nominees[0]
+    assert nominee.reference==record['reference']
+    target=idox_detail_target('tameside',record,case='chain_idox_tameside_'+digest(record))
+    contract=idox_contract('tameside',date.fromisoformat(root['subject']['start']),
+                           date.fromisoformat(root['subject']['end']),name=root['contract'])
+    owner=Owner(None,lambda *_:None,lambda:None,
+                expiry=datetime.now(timezone.utc)+timedelta(minutes=25),
+                bindings=execution_binding())
+    registration,saved_nominees=prepare_admission_from_persisted_captures(
+        world['boot'],owner,binding_for('tameside'),contract,root['key'],
+        RULE,{nominee.reference:target},revision='disposable-separate-owner-facts',
+        item_limits=root['limits'],allow_test_evidence=True)
+    assert registration.kind=='ADMISSION' and len(registration.insert)==1
+    assert saved_nominees.sha256==nomination.sha256
+    assert registration.grant['writes']==2 and registration.grant['source_calls']==1
+    assert registration.grant['detail_source_keys']==[registration.facts[nominee.reference]['key']]
+    assert world['boot'].execute("SELECT count(*) FROM ingestion_work_items WHERE task='FACTUAL_REFRESH'").fetchone()[0]==0
+
+    # The production owner registration policy has no live Tameside admission
+    # exception. This ONE disposable fixture simulates only its insertion:
+    # it does not change the daily runtime, its expired grant, or SQL privileges.
+    control=world['boot'].execute("SELECT outcome FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+    assert control['global_stop'] is None and control['manual_stop'] is None
+    assert registration.authority not in control['grants']
+    assert all(g['expires_at']==0 for g in control['grants'].values())
+    control['grants'][registration.authority]=registration.grant
+    for row in registration.insert:
+        world['boot'].execute(
+            'INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)',
+            (json.dumps(row),))
+    world['boot'].execute(
+        "UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(control),))
+
+    worker_url=world['urls']['ingestion_worker_login']
+    effect_url=world['urls']['ingestion_effect_login']
+    application_url=world['urls']['ingestion_application_login']
+    def controller(budget):
+        worker=budget.engine(worker_url)
+        broker=budget.engine(effect_url)
+        application=budget.engine(application_url)
+        ledger=ControllerLedger(
+            worker,budget=budget,owner=WORKER,authority=registration.authority,
+            bindings=registration.bindings,broker_engine=broker,application_engine=application)
+        fact_contract=registration.factual_contracts[nominee.reference]
+        return Coordinator(ledger,{contract.name:contract,fact_contract.name:fact_contract},
+                           screening_rules={V3_CONTRACT:RULE},capture_bound_screening=True)
+
+    first=DatabaseBudget()
+    try:
+        independently_saved=controller(first).ledger.get(root['key'])['checkpoint']
+        assert independently_saved==receipt
+        first.capture_checkpoint_sha256=digest(independently_saved)
+    finally:
+        prior=first.close([])
+    budget=DatabaseBudget(previous=prior)
+    coordinator=controller(budget)
+    fact=registration.facts[nominee.reference]
+    screen=registration.screens[nominee.reference]
+    batch=registration.batches[0]
+    fc=registration.factual_contracts[nominee.reference]
+    nominated=AcceptanceBinding(
+        root['key'],screen['key'],fact['key'],record['reference'],record['source_url'],
+        record['source_record_id'],digest(record),digest(receipt),digest(prior),batch['key'])
+    binding=V3AdmissionBinding(
+        nominated,'tameside',contract.name,root['revision'],digest(RULE.config()),
+        digest(code_binding()),fc.name,fact['revision'],factual_binding(fc))
+    start=date.fromisoformat(root['subject']['start'])
+    end=date.fromisoformat(root['subject']['end'])
+    placeholder=WindowEvidence('tameside','offline',start,end,start,end,'RECEIVED',
+                               'disposable','date-labels','terminal-count',1,1,2,2000,1)
+    envelope=DiscoveryEnvelope(
+        'tameside',nominee.reference,record['source_url'],record['source_record_id'],
+        datetime.now(timezone.utc),placeholder,(nominee.reference,),'a'*64,())
+    calls=[]
+    def detail(_):
+        calls.append(nominee.reference)
+        return idox_detail(target,summary(nominee.reference,status='Decided',
+                                          decision='Approve',date='Mon 28 Sep 2026')),outer()
+    try:
+        with pytest.raises(Denied,match='V3_CONFIGURATION_OR_CAPTURE_BINDING'):
+            execute_retained_v3(
+                coordinator,replace(binding,screening_config_sha256='0'*64),
+                detail_reader=detail,envelope=envelope,council=get_council('tameside'),
+                check=budget.check,allow_test_evidence=True)
+        assert calls==[]
+        assert world['boot'].execute("SELECT count(*) FROM applications").fetchone()[0]==0
+        result=execute_retained_v3(
+            coordinator,binding,detail_reader=detail,envelope=envelope,
+            council=get_council('tameside'),check=budget.check,allow_test_evidence=True)
+        assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
+        assert calls==[nominee.reference]
+        with world['connect']('provisioning_migrator') as independent:
+            proof=readback_committed_v3_facts(
+                independent,world['app'],fact['key'],council='tameside',
+                reference=nominee.reference)
+        assert proof['state']=='COMMITTED_B2_FACTS_READ_BACK'
+        assert proof['verification_scope']=='COUPLED'
+        assert proof['saved_key_facts']['status']=='Decided'
+        assert proof['saved_key_facts']['decision']=='Approve'
+        assert proof['unit_count_verified'] is False
+        assert proof['buyer_opportunity_qualified'] is False
+        assert proof['source_completeness']=='UNKNOWN'
+        assert world['boot'].execute(
+            "SELECT count(*) FROM applications WHERE council_code='tameside' AND reference=%s",
+            (nominee.reference,)).fetchone()[0]==1
+        assert world['boot'].execute(
+            "SELECT count(*) FROM applications WHERE site_id IS NOT NULL OR estimated_unit_count IS NOT NULL "
+            "OR opportunity_classification IS NOT NULL").fetchone()[0]==0
+    finally:
+        costs=budget.close([])
+        assert costs['cleanup']=='CLOSED' and costs['connections_opened']==costs['connections_closed_count']
+        # Module-scoped disposable fixture must leave no Application for other
+        # daily-intake scenarios; this cleanup touches only disposable PG17.
+        world['boot'].execute('TRUNCATE applications CASCADE')
