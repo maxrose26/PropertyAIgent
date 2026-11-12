@@ -146,7 +146,7 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
                    envelope=envelope, council=council, check=check)
 
 
-def readback_committed_v3_facts(work_connection, application_engine, factual_key, *, council, reference):
+def readback_committed_v3_facts(work_connection, application_engine, factual_key, *, council, reference, allow_test_evidence=False):
     """Bounded Stage 4 read-only proof: saved v3 fact and independently saved B2 row.
 
     A returned match is a factual/status readback, NOT a source-completeness,
@@ -215,6 +215,10 @@ def readback_committed_v3_facts(work_connection, application_engine, factual_key
             or sum(r.get('reference') == reference for r in receipt['records']
                    if isinstance(r, dict)) != 1):
         raise Denied('FACT_READBACK_CAPTURE')
+    # A disposable source must never appear as real owner-verified facts.
+    # Tests may opt in explicitly, without weakening the normal read path.
+    if receipt.get('evidence_label') is not None and not allow_test_evidence:
+        raise Denied('FACT_READBACK_TEST_EVIDENCE')
     candidate = next(r for r in receipt['records'] if r['reference'] == reference)
     if (screen_state.get('record_sha256') != digest(candidate)
             or screen_state.get('source_url') != candidate.get('source_url')
@@ -300,7 +304,7 @@ def readback_committed_v3_facts(work_connection, application_engine, factual_key
                 source_completeness='UNKNOWN', buyer_opportunity_qualified=False)
 
 
-def readback_committed_v3_facts_page(work_connection, application_engine, *, council, after=None, limit=5):
+def readback_committed_v3_facts_page(work_connection, application_engine, *, council, after=None, limit=5, allow_test_evidence=False):
     """Bounded, owner-only discovery of SAVED factual work in one council.
 
     This is a read-only factual task page, not an admission/qualification or a
@@ -337,7 +341,8 @@ def readback_committed_v3_facts_page(work_connection, application_engine, *, cou
         if state == 'COMPLETE':
             records.append(readback_committed_v3_facts(
                 work_connection, application_engine, key,
-                council=council, reference=subject['reference']))
+                council=council, reference=subject['reference'],
+                allow_test_evidence=allow_test_evidence))
         else:
             # "Not complete" is not synonymous with pending: a blocked or
             # uncertain owner task must not be presented as waiting for ordinary

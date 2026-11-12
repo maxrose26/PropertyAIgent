@@ -1721,9 +1721,17 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
         # bootstrap read connection, separate from every restricted writer;
         # never expand migrator/worker privileges for a readback test.
         assert world['boot'].info.user=='provisioning_bootstrap'
+        # Default owner reads refuse test-labelled evidence, even where an
+        # isolated fixture has committed an authentic B2-shaped database row.
+        with pytest.raises(Denied,match='FACT_READBACK_TEST_EVIDENCE'):
+            readback_committed_v3_facts(
+                world['boot'],world['app'],fact['key'],council='tameside',
+                reference=nominee.reference)
+        with pytest.raises(Denied,match='FACT_READBACK_TEST_EVIDENCE'):
+            readback_committed_v3_facts_page(world['boot'],world['app'],council='tameside')
         proof=readback_committed_v3_facts(
             world['boot'],world['app'],fact['key'],council='tameside',
-            reference=nominee.reference)
+            reference=nominee.reference,allow_test_evidence=True)
         assert proof['state']=='COMMITTED_B2_FACTS_READ_BACK'
         assert proof['verification_scope']=='COUPLED'
         assert proof['saved_key_facts']['status']=='Decided'
@@ -1735,7 +1743,7 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
         # The page independently revalidates capture, screening and B2;
         # neither readback certifies a qualified buyer site.
         saved_page=readback_committed_v3_facts_page(
-            world['boot'],world['app'],council='tameside')
+            world['boot'],world['app'],council='tameside',allow_test_evidence=True)
         assert saved_page['records']==[proof]
         assert saved_page['more'] is False and saved_page['next_cursor'] is None
         assert saved_page['source_coverage']=='UNKNOWN'
