@@ -490,3 +490,46 @@ def test_private_finalisation_exports_only_allowlisted_local_summary(tmp_path,mo
     assert summary['private_events_sha256']==hashlib.sha256(stored['events']).hexdigest()
     assert published['sha256']==hashlib.sha256(public).hexdigest()
     assert published['readback_verified'] is True
+
+
+def test_live_private_backend_refused_before_issuer_source_or_stop(tmp_path):
+    """Offline-only private retention must refuse before SOURCE_INTENT/requests.
+
+    Injected live-mode controller; no real DB, network, credentials or writes.
+    The archive() refusal remains a second independent safety boundary.
+    """
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+
+    seen=[]
+    @contextmanager
+    def connection(*args,**kwargs):
+        seen.append('policy_read')
+        yield object(),None
+    def forbidden(*args,**kwargs):
+        pytest.fail('no issuer, source, archive, stop or publication permitted')
+    rt=Runtime.__new__(Runtime)
+    rt.test=False;rt.policy=None;rt.durable_run=None
+    rt.authorities=[];rt.memory=None;rt.events=[]
+    rt.github=None;rt.binding={'offline_test':'untrusted'}
+    rt.args=SimpleNamespace(period='test-preflight')
+    rt.root=tmp_path;rt.connection=connection
+    rt.policy_read=lambda conn:dict(evidence_backend='POSTGRES_PILOT_V1')
+    rt.issue=forbidden;rt.collect=forbidden;rt.archive=forbidden
+    rt.stop_run=forbidden
+    rt.run=SimpleNamespace(closing=False,totals=lambda:{
+        'all_connections_closed':True},publication=forbidden)
+
+    result=rt.execute()
+    assert seen==['policy_read']
+    assert result['status']=='REFUSED_PRIVATE_EVIDENCE_OFFLINE_ONLY'
+    assert result['reason']=='PRIVATE_EVIDENCE_OFFLINE_ONLY'
+    assert result['authority_closure']=='NOT_ISSUED'
+    assert result['publication']=='NOT_REQUIRED_NO_NEW_WORK'
+    assert result['cleanup']=='CLOSED'
+    assert result['effect_reconciliation_required'] is False
+    assert result['scopes']==[] and result['coverage_advance'] is False
+    assert rt.authorities==[]
+    assert (tmp_path/'events.json').read_bytes()==b'[]'
+    assert b'PRIVATE_EVIDENCE_OFFLINE_ONLY' in (tmp_path/'final-result.json').read_bytes()

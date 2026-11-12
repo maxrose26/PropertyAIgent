@@ -432,6 +432,12 @@ class Runtime:
         rule=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
         try:
             with self.connection() as (c,_):self.policy=self.policy_read(c)
+            # Private retention is deliberately disposable-only in this code.
+            # Refuse before an issuer grant or council request; an archive-only
+            # refusal would leave SOURCE_INTENT after consuming source budgets.
+            if self.policy.get('evidence_backend')=='POSTGRES_PILOT_V1' and not self.test:
+                result['status']='REFUSED_PRIVATE_EVIDENCE_OFFLINE_ONLY'
+                raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
             if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
             self.memory=require_source_context(self.policy['councils'],disposable=self.test,profile=self.policy.get('render_profile'),binding=self.binding)
