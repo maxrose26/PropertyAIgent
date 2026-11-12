@@ -1554,7 +1554,8 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
         AcceptanceBinding,ControllerLedger,DatabaseBudget)
     from verification.ingestion_storage.scope_binding import binding_for
     from verification.ingestion_storage.v3_admission import (
-        V3AdmissionBinding,execute_retained_v3,factual_binding,readback_committed_v3_facts)
+        V3AdmissionBinding,execute_retained_v3,factual_binding,readback_committed_v3_facts,
+        readback_committed_v3_facts_page)
 
     reset(world)
     name='daily-separate-factual-owner'
@@ -1602,6 +1603,18 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
             (json.dumps(row),))
     world['boot'].execute(
         "UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(control),))
+
+    # The owner-only page must show a registered FACTUAL_REFRESH as pending,
+    # NOT as saved facts or a buyer opportunity before factual execution.
+    pending_page=readback_committed_v3_facts_page(
+        world['boot'],world['app'],council='tameside')
+    assert pending_page['records']==[dict(
+        council='tameside',reference=nominee.reference,
+        factual_key=registration.facts[nominee.reference]['key'],
+        state='FACTUAL_TASK_NOT_VERIFIED',saved_key_facts=None)]
+    assert pending_page['more'] is False and pending_page['next_cursor'] is None
+    assert pending_page['source_coverage']=='UNKNOWN'
+    assert pending_page['buyer_opportunities_proven'] is False
 
     worker_url=world['urls']['ingestion_worker_login']
     effect_url=world['urls']['ingestion_effect_login']
@@ -1676,6 +1689,16 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
         assert proof['unit_count_verified'] is False
         assert proof['buyer_opportunity_qualified'] is False
         assert proof['source_completeness']=='UNKNOWN'
+        # Discover committed facts without knowing their task key.
+        # The page independently revalidates capture, screening and B2;
+        # neither readback certifies a qualified buyer site.
+        saved_page=readback_committed_v3_facts_page(
+            world['boot'],world['app'],council='tameside')
+        assert saved_page['records']==[proof]
+        assert saved_page['more'] is False and saved_page['next_cursor'] is None
+        assert saved_page['source_coverage']=='UNKNOWN'
+        assert saved_page['unit_counts_verified'] is False
+        assert saved_page['buyer_opportunities_proven'] is False
         assert world['boot'].execute(
             "SELECT count(*) FROM applications WHERE council_code='tameside' AND reference=%s",
             (nominee.reference,)).fetchone()[0]==1
