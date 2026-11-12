@@ -821,6 +821,18 @@ def test_archived_rochdale_original_zip_is_readback_only():
         assert source['requested_interval'] == source['applied_interval']
         assert source['completeness'] == 'UNKNOWN'
         assert len(source['listing_segments']) == 2
+        # The original archive has only identity/date, no proposal/address,
+        # planning type, counts or verified planning facts. It may seed a
+        # source-only reconciliation queue, NEVER a retained metadata-screen,
+        # factual admission or buyer opportunity. Archive identity alone does
+        # not turn this historic observation into a new collection grant.
+        assert all(set(row) == {
+            'field_capture_scope', 'materiality', 'reference',
+            'relationship', 'source_record_id', 'source_url',
+            'validated_date'
+        } for row in source['listing_records'])
+        assert all(row['field_capture_scope'] == ['reference', 'validated_date']
+                   for row in source['listing_records'])
         source_references.update(('rochdale', row['reference'])
                                  for row in source['listing_records'])
     assert source_references == {(c['council'], c['reference']) for c in candidates}
