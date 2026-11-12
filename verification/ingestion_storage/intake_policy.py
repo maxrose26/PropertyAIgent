@@ -477,6 +477,92 @@ def worker_text():
     return text
 
 
+
+# Demonstration of the *post-settlement* shared-stop preconditions ONLY.
+# Never emitted by the normal policy_sql() or production installation_script().
+# This does not qualify Bolton coverage, touch production, or grant a source run.
+DISPOSABLE_SHARED_STOP_RELEASE = r"""
+CREATE OR REPLACE FUNCTION public.ingestion_disposable_shared_stop_release(p jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $release$
+DECLARE ctl jsonb; r jsonb; w public.ingestion_work_items%ROWTYPE; t double precision; before_stop jsonb;
+BEGIN
+ IF current_database() IS DISTINCT FROM 'ingestion_provisioning_test' THEN RAISE EXCEPTION 'DISPOSABLE_STOP_ONLY'; END IF;
+ IF session_user IS DISTINCT FROM 'provisioning_migrator'
+  OR NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE')
+ THEN RAISE EXCEPTION 'DISPOSABLE_OWNER_ONLY' USING ERRCODE='42501'; END IF;
+ IF p IS NULL OR jsonb_typeof(p) IS DISTINCT FROM 'object' OR octet_length(p::text)>4096
+  OR NOT (p ?& ARRAY['operation','expected_stop'])
+  OR (p-ARRAY['operation','expected_stop'])<>'{}'::jsonb
+  OR p->>'operation' IS DISTINCT FROM 'S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1'
+ THEN RAISE EXCEPTION 'DISPOSABLE_STOP_ARGUMENT'; END IF;
+ SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items
+ WHERE key=repeat('0',64) FOR UPDATE;
+ before_stop:=jsonb_build_object('global_stop',ctl->'global_stop',
+  'manual_stop',ctl->'manual_stop','last_hard_stop',ctl->'last_hard_stop',
+  'hard_stop_generation',coalesce(ctl->'hard_stop_generation','0'::jsonb));
+ IF p->'expected_stop' IS DISTINCT FROM before_stop
+  OR ctl->'global_stop' IS DISTINCT FROM '{"reason":"DAILY_INTAKE_SHARED_FAILURE"}'::jsonb
+  OR ctl->>'manual_stop' IS DISTINCT FROM 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+  OR ctl->>'last_hard_stop' IS DISTINCT FROM 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+  OR (ctl->>'hard_stop_generation')::integer IS DISTINCT FROM 15
+  OR ctl ? 'intake_run' OR ctl ? 'disposable_shared_stop_release'
+ THEN RAISE EXCEPTION 'DISPOSABLE_STOP_GENERATION_OR_MARKER'; END IF;
+ r:=ctl->'intake_periods'->'b-bolton-20261103-1105-01'->'failed_runs'->'ee7cf0d9bc714f56951527b940937054';
+ IF jsonb_typeof(r) IS DISTINCT FROM 'object'
+  OR r->>'version' IS DISTINCT FROM 'BOLTON01_FAILED_RECOVERY_V1'
+  OR r->>'status' IS DISTINCT FROM 'FAILED_RECONCILED'
+  OR r->>'coverage' IS DISTINCT FROM 'UNKNOWN'
+  OR r->>'period' IS DISTINCT FROM 'b-bolton-20261103-1105-01'
+  OR r->>'run_id' IS DISTINCT FROM 'ee7cf0d9bc714f56951527b940937054'
+  OR r->>'recovered_key' IS DISTINCT FROM 'd9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252'
+  OR r->'recovered_fence' IS DISTINCT FROM '2'::jsonb
+  OR r->'source_or_write_replay_authorised' IS DISTINCT FROM 'false'::jsonb
+  OR r->'stop_after' IS DISTINCT FROM before_stop
+  OR r->'original_marker'->>'state' IS DISTINCT FROM 'OPEN'
+  OR r->'original_marker'->>'id' IS DISTINCT FROM 'ee7cf0d9bc714f56951527b940937054'
+  OR r->'original_marker'->>'period' IS DISTINCT FROM 'b-bolton-20261103-1105-01'
+ THEN RAISE EXCEPTION 'DISPOSABLE_SETTLEMENT_EVIDENCE'; END IF;
+ SELECT * INTO w FROM public.ingestion_work_items
+ WHERE key='d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252' FOR UPDATE;
+ IF w.key IS NULL OR w.task IS DISTINCT FROM 'DISCOVERY'
+  OR w.contract IS DISTINCT FROM 'bolton-received-intake-v1'
+  OR w.subject::jsonb IS DISTINCT FROM '{"kind":"DISCOVERY_SCOPE","council":"bolton","semantics":"RECEIVED","start":"2026-11-03","end":"2026-11-05"}'::jsonb
+  OR w.state IS DISTINCT FROM 'SAFETY_BLOCKED' OR w.phase IS DISTINCT FROM 'RECOVERED'
+  OR w.fence IS DISTINCT FROM 2 OR w.attempt_count IS DISTINCT FROM 1
+  OR w.owner IS NOT NULL OR w.lease_until IS NOT NULL OR w.checkpoint IS NOT NULL
+  OR w.reason IS DISTINCT FROM 'ABANDONED_SOURCE_INTENT'
+  OR w.next_action IS DISTINCT FROM 'RECONCILE'
+  OR w.outcome::jsonb IS DISTINCT FROM '{"outcome":"ABANDONED_SOURCE_INTENT","source_or_write_replay_authorised":false}'::jsonb
+  OR (SELECT count(*) FROM public.ingestion_work_attempts
+      WHERE work_key=w.key AND fence=1 AND phase='RECOVERED'
+       AND finished_at IS NOT NULL AND checkpoint IS NULL)<>1
+ THEN RAISE EXCEPTION 'DISPOSABLE_BOLTON_EFFECT_UNRESOLVED'; END IF;
+ t:=extract(epoch FROM clock_timestamp());
+ IF EXISTS (SELECT 1 FROM public.ingestion_work_items x
+    WHERE x.state='CLAIMED' OR x.phase IN ('SOURCE_INTENT','WRITE_INTENT')
+      OR x.state='PERSISTENCE_UNCERTAIN')
+  OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'grants','{}'::jsonb)) g
+     WHERE jsonb_typeof(g.value->'expires_at') IS DISTINCT FROM 'number'
+       OR (g.value->>'expires_at')::double precision>t)
+  OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'intake_periods','{}'::jsonb)) e
+     WHERE jsonb_typeof(e.value->'expires_at') IS DISTINCT FROM 'number'
+       OR (e.value->>'expires_at')::double precision>t)
+ THEN RAISE EXCEPTION 'DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'; END IF;
+ -- Does NOT reset last_hard_stop, delete Bolton receipts, grant work or issue a period.
+ -- The exact generation is consumed once; a changed concurrent stop fails under the lock.
+ ctl:=ctl||jsonb_build_object('global_stop',null,'manual_stop',null,
+  'hard_stop_generation',16,'disposable_shared_stop_release',
+  jsonb_build_object('test_only',true,'source_stop_generation',15,
+   'outcome','DISPOSABLE_ONLY_REVIEW_PROOF','original_bolton_key',w.key));
+ UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+ RETURN jsonb_build_object('status','DISPOSABLE_ONLY_STOP_RELEASED',
+   'hard_stop_generation',16,'work_key',w.key,'no_work_issued',true);
+END $release$;
+REVOKE ALL ON FUNCTION public.ingestion_disposable_shared_stop_release(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ingestion_disposable_shared_stop_release(jsonb) TO ingestion_barrier_releaser;
+"""
+
+
 def policy_sql(*, disposable_catchup=False):
     from .operational_owner import GENERATION3_SCREENING_V3_POLICY
     text=GENERATION3_SCREENING_V3_POLICY.read_text()
@@ -516,7 +602,7 @@ def policy_sql(*, disposable_catchup=False):
            '\nREVOKE ALL ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) FROM PUBLIC;'+
            '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_worker;'+
            '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_barrier_releaser;\n')
-    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
+    if disposable_catchup:\n        disposable_sql += DISPOSABLE_SHARED_STOP_RELEASE\n    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
 
 
 def installation_script(*, disposable_catchup=False):

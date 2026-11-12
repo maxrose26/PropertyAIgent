@@ -1761,3 +1761,153 @@ def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_re
         # Module-scoped disposable fixture must leave no Application for other
         # daily-intake scenarios; this cleanup touches only disposable PG17.
         world['boot'].execute('TRUNCATE applications CASCADE')
+
+
+# S4-04: DISPOSABLE ONLY proof of a generation-bound successor AFTER the distinct
+# Bolton settlement. This does not install a live clearance path or authorise a
+# source request. A real independent release review is still mandatory.
+_RECOVERY_KEY='d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252'
+_RECOVERY_RUN='ee7cf0d9bc714f56951527b940937054'
+_RECOVERY_PERIOD='b-bolton-20261103-1105-01'
+
+
+def _settled_fixture(world):
+    from verification.ingestion_storage.operational_owner import item
+    reset(world)
+    scope=dict(kind='DISCOVERY_SCOPE',council='bolton',semantics='RECEIVED',
+               start='2026-11-03',end='2026-11-05')
+    identity=dict(subject=scope,task='DISCOVERY',contract='bolton-received-intake-v1',
+                  revision=_RECOVERY_PERIOD+'-2026-11-05-bolton')
+    root=item(identity)
+    assert root['key']==_RECOVERY_KEY
+    root.update(state='SAFETY_BLOCKED',phase='RECOVERED',fence=2,attempt_count=1,
+                owner=None,lease_until=None,checkpoint=None,reason='ABANDONED_SOURCE_INTENT',
+                next_action='RECONCILE',
+                outcome=dict(outcome='ABANDONED_SOURCE_INTENT',source_or_write_replay_authorised=False))
+    c=world['boot']
+    c.execute('INSERT INTO public.ingestion_work_items SELECT * FROM json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+              (json.dumps(root),))
+    c.execute("""INSERT INTO public.ingestion_work_attempts
+      (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
+      VALUES (%s,1,'required_once',0,100,'INGESTION_CHAIN_BOLTON_CAPTURE_34518B29848D','RECOVERED',NULL,NULL)""",
+              (_RECOVERY_KEY,))
+    ctl=copy.deepcopy(world['control'])
+    ctl.update(global_stop=dict(reason='DAILY_INTAKE_SHARED_FAILURE'),
+               manual_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',
+               last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',hard_stop_generation=15,
+               grants={})
+    ctl.pop('intake_run',None)
+    marker=dict(id=_RECOVERY_RUN,period=_RECOVERY_PERIOD,state='OPEN')
+    receipt=dict(version='BOLTON01_FAILED_RECOVERY_V1',status='FAILED_RECONCILED',
+                 coverage='UNKNOWN',period=_RECOVERY_PERIOD,run_id=_RECOVERY_RUN,
+                 original_marker=marker,recovered_key=_RECOVERY_KEY,recovered_fence=2,
+                 source_or_write_replay_authorised=False,stop_after=stop_snapshot(ctl))
+    ctl['intake_periods']={_RECOVERY_PERIOD:dict(expires_at=0,failed_runs={_RECOVERY_RUN:receipt})}
+    c.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",
+              (json.dumps(ctl),))
+    return ctl
+
+
+def _disposable_release(world,payload,*,rollback=False):
+    # Mimics the existing owner period issuer's TRANSACTIONAL temporary role.
+    with world['connect']('provisioning_migrator') as c:
+        c.execute('BEGIN')
+        try:
+            c.execute('GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE')
+            result=c.execute('SELECT public.ingestion_disposable_shared_stop_release(%s::jsonb)',
+                             (json.dumps(payload),)).fetchone()[0]
+            c.execute('REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER')
+            c.execute('ROLLBACK' if rollback else 'COMMIT')
+            return result
+        except BaseException:
+            c.execute('ROLLBACK')
+            raise
+
+
+def _recovery_control(world):
+    return world['boot'].execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+
+
+def test_shared_stop_successor_is_disposable_only_and_has_no_live_issuer():
+    normal=intake_policy.policy_sql()
+    test_sql=intake_policy.policy_sql(disposable_catchup=True)
+    assert 'ingestion_disposable_shared_stop_release' not in normal
+    assert 'ingestion_disposable_shared_stop_release' in test_sql
+    assert 'current_database() IS DISTINCT FROM' in test_sql
+
+
+def test_shared_stop_recovery_exact_settlement_rollback_and_period_registration(world):
+    ctl=_settled_fixture(world)
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    assert _disposable_release(world,payload,rollback=True)['no_work_issued'] is True
+    assert _recovery_control(world)==ctl
+    result=_disposable_release(world,payload)
+    assert result==dict(status='DISPOSABLE_ONLY_STOP_RELEASED',hard_stop_generation=16,
+                        work_key=_RECOVERY_KEY,no_work_issued=True)
+    after=_recovery_control(world)
+    assert after['global_stop'] is None and after['manual_stop'] is None
+    assert after['hard_stop_generation']==16
+    assert after['last_hard_stop']=='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+    assert after['intake_periods']==ctl['intake_periods']
+    assert after['disposable_shared_stop_release']['test_only'] is True
+    assert world['boot'].execute("SELECT state,phase,fence,checkpoint FROM ingestion_work_items WHERE key=%s",
+                                 (_RECOVERY_KEY,)).fetchone()==('SAFETY_BLOCKED','RECOVERED',2,None)
+    with pytest.raises(Exception,match='DISPOSABLE_STOP_GENERATION_OR_MARKER'):
+        _disposable_release(world,payload)
+    assert _recovery_control(world)==after
+    # A separate existing period-registration operation is possible ONLY after
+    # the test release, with a newly bound exact current generation-16 snapshot.
+    registered=authorise(world,'after-test-stop-recovery')
+    assert registered['expected_stop']['hard_stop_generation']==16
+    assert _recovery_control(world)['global_stop'] is None
+
+
+@pytest.mark.parametrize('drift',[
+    'unsettled_generation','wrong_stop','missing_receipt','false_coverage',
+    'open_run','active_claim','unrecovered_attempt','other_grant',
+    'other_active_period','bad_expected_snapshot'
+])
+def test_shared_stop_recovery_refuses_unresolved_effects_atomically(world,drift):
+    ctl=_settled_fixture(world)
+    c=world['boot']
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    if drift=='unsettled_generation':
+        ctl['hard_stop_generation']=14
+    elif drift=='wrong_stop':
+        ctl['manual_stop']='DAILY_INTAKE_SHARED_FAILURE'
+    elif drift=='missing_receipt':
+        ctl['intake_periods'][_RECOVERY_PERIOD]['failed_runs']={}
+    elif drift=='false_coverage':
+        ctl['intake_periods'][_RECOVERY_PERIOD]['failed_runs'][_RECOVERY_RUN]['coverage']='COMPLETE'
+    elif drift=='open_run':
+        ctl['intake_run']=dict(state='OPEN',id=_RECOVERY_RUN)
+    elif drift=='active_claim':
+        c.execute("UPDATE ingestion_work_items SET state='CLAIMED',phase='SOURCE_INTENT' WHERE key=%s",(_RECOVERY_KEY,))
+    elif drift=='unrecovered_attempt':
+        c.execute("UPDATE ingestion_work_attempts SET phase='SOURCE_INTENT' WHERE work_key=%s",(_RECOVERY_KEY,))
+    elif drift=='other_grant':
+        ctl['grants']={'other':dict(expires_at=time.time()+3600)}
+    elif drift=='other_active_period':
+        ctl['intake_periods']['other']=dict(expires_at=time.time()+3600)
+    elif drift=='bad_expected_snapshot':
+        payload['expected_stop']['hard_stop_generation']=11
+    c.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",
+              (json.dumps(ctl),))
+    before=_recovery_control(world)
+    with pytest.raises(Exception,match='DISPOSABLE_'):
+        _disposable_release(world,payload)
+    assert _recovery_control(world)==before
+
+
+def test_shared_stop_worker_cannot_call_owner_recovery(world):
+    import psycopg
+    ctl=_settled_fixture(world)
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    with world['connect']('ingestion_worker_login') as c:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute('SELECT public.ingestion_disposable_shared_stop_release(%s::jsonb)',
+                      (json.dumps(payload),))
+    assert _recovery_control(world)==ctl
