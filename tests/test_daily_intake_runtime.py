@@ -23,6 +23,26 @@ from verification.ingestion_storage.operational_owner import Owner
 
 RULE=ScreeningRule(RULE_V3,unit_threshold=10,link_related=False)
 
+
+def test_screening_only_owner_projection_preserves_every_authoritative_route():
+    """A retained screening route is not a verified scheme or buyer opportunity."""
+    from app.ingestion.daily_intake import _screening_only_state
+    from app.ingestion.listing_screening import ROUTING_VOCABULARY
+    for version,outcomes in ROUTING_VOCABULARY.items():
+        for route in outcomes:
+            result=dict(rule_version=version)
+            if version==RULE_V3:
+                result.update(routing_authority='count_assessment',
+                              count_assessment=dict(admission=route))
+            else:
+                result['disposition']=route
+            assert _screening_only_state(result)=='SCREENING_ONLY_'+route
+    with pytest.raises(ValueError,match='ROUTING_OUTCOME_NOT_IN_VOCABULARY'):
+        _screening_only_state(dict(rule_version=RULE_V3,routing_authority='count_assessment',
+                                   count_assessment=dict(admission='VERIFIED_BUYER_OPPORTUNITY')))
+
+
+
 @pytest.fixture(scope='module')
 def world():
     for world in disposable_world():
@@ -1273,6 +1293,9 @@ def test_backlog_does_not_duplicate_or_promote_historical_v1_v3_screenings(world
         assert modern[0]['screening_state']=='COMPLETE'
         assert modern[0]['historical_screening_items']==2
         assert modern[0]['screening_outcome'] is not None
+        assert modern[0]['processing_state']==('SCREENING_ONLY_'+modern[0]['screening_outcome'])
+        assert modern[0]['application_admitted'] is None
+        assert modern[0]['extraction_complete'] is None
         conn.rollback()
     # Retain old screening rows, but do not silently qualify unbound results.
     with world['app'].connect() as conn:

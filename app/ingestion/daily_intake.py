@@ -168,6 +168,15 @@ def backlog(caller):
     return bounded(dict(records=out,tasks=tasks,coverage_advance=False,window_claim='NONE',extraction_consumer_connected=False),2*1024**2)
 
 
+
+def _screening_only_state(result):
+    """Expose the authoritative screening route, never factual admission.
+
+    This projection cannot prove an Application, verified units, coverage,
+    buyer qualification or downstream extraction. Unknown routes refuse.
+    """
+    return 'SCREENING_ONLY_'+routing_of(result)[1]
+
 def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=None):
     """Paginated restricted read across runs, no historical key inventory.
 
@@ -317,7 +326,7 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                     screening_config_sha256=result.get('config_sha256') if result else None,
                     screening_matches_current_rule=result.get('config_sha256')==digest(rule.config()) if result else None,
                     processing_state=('HISTORICAL_RESCREENING_REQUIRED' if unbound_legacy else
-                                      'AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING'),
+                                      _screening_only_state(result) if result else 'AWAITING_SCREENING'),
                     application_admitted=None,extraction_complete=None,downstream_state='NOT_TRACKED_BY_INTAKE'))
     captures=[dict(capture_key=r['key'],council=r['subject']['council'],scope=r['subject'],
                    record_count=len((r['checkpoint'] or {}).get('records',[])),
