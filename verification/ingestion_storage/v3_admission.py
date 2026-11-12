@@ -339,9 +339,25 @@ def readback_committed_v3_facts_page(work_connection, application_engine, *, cou
                 work_connection, application_engine, key,
                 council=council, reference=subject['reference']))
         else:
-            records.append(dict(council=council, reference=subject['reference'],
-                                factual_key=key, state='FACTUAL_TASK_NOT_VERIFIED',
-                                saved_key_facts=None))
+            # "Not complete" is not synonymous with pending: a blocked or
+            # uncertain owner task must not be presented as waiting for ordinary
+            # work. Never infer freshness, retry permission or saved facts.
+            unverified = {
+                'QUEUED': 'FACTUAL_TASK_NOT_VERIFIED',
+                'DEFERRED': 'FACTUAL_TASK_DEFERRED',
+                'CLAIMED': 'FACTUAL_TASK_CLAIM_UNVERIFIED',
+                'UNSUPPORTED_CONTRACT': 'FACTUAL_TASK_BLOCKED',
+                'SAFETY_BLOCKED': 'FACTUAL_TASK_BLOCKED',
+                'PERSISTENCE_UNCERTAIN': 'FACTUAL_TASK_UNCERTAIN',
+            }
+            if state not in unverified:
+                raise Denied('FACT_BACKLOG_WORK_STATE')
+            item = dict(council=council, reference=subject['reference'],
+                        factual_key=key, state=unverified[state],
+                        saved_key_facts=None)
+            if state != 'QUEUED':
+                item['work_state'] = state
+            records.append(item)
     result = dict(council=council, records=records, more=more,
                   next_cursor=rows[limit-1][0] if more else None,
                   page_only=True, source_coverage='UNKNOWN',

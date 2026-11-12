@@ -1531,6 +1531,48 @@ def test_unresolved_bolton_source_intent_blocks_new_tameside_period(world):
     assert restricted_sessions(world['boot']) == 0
 
 
+def test_factual_backlog_distinguishes_blocked_uncertain_and_deferred_work_from_pending():
+    """S4-03: an unresolved owner task is not an executable pending admission."""
+    from app.ingestion.ledger import Denied
+    from verification.ingestion_storage.v3_admission import readback_committed_v3_facts_page
+
+    names = ('QUEUED', 'DEFERRED', 'CLAIMED', 'UNSUPPORTED_CONTRACT',
+             'SAFETY_BLOCKED', 'PERSISTENCE_UNCERTAIN')
+    keys = [f'{n:064x}' for n in range(1, 7)]
+    rows = [(key, dict(kind='APPLICATION', council='tameside',
+                       reference=f'TAM/26/{i}'), state)
+            for i, (key, state) in enumerate(zip(keys, names), 1)]
+
+    class Cursor:
+        def __init__(self, result): self.result = result
+        def fetchall(self): return self.result
+
+    class Reader:
+        def __init__(self, result): self.result = result
+        def execute(self, sql, params):
+            assert "task='FACTUAL_REFRESH'" in sql
+            assert params == ('tameside', '', 11)
+            return Cursor(self.result)
+
+    result = readback_committed_v3_facts_page(
+        Reader(rows), object(), council='tameside', limit=10)
+    assert [x['state'] for x in result['records']] == [
+        'FACTUAL_TASK_NOT_VERIFIED', 'FACTUAL_TASK_DEFERRED',
+        'FACTUAL_TASK_CLAIM_UNVERIFIED', 'FACTUAL_TASK_BLOCKED',
+        'FACTUAL_TASK_BLOCKED', 'FACTUAL_TASK_UNCERTAIN']
+    assert 'work_state' not in result['records'][0]
+    assert [x['work_state'] for x in result['records'][1:]] == list(names[1:])
+    assert all(x['saved_key_facts'] is None for x in result['records'])
+    assert result['buyer_opportunities_proven'] is False
+    assert result['source_coverage'] == 'UNKNOWN'
+    assert result['more'] is False and result['next_cursor'] is None
+    # No invented/novel ledger state can silently become "pending".
+    with pytest.raises(Denied, match='FACT_BACKLOG_WORK_STATE'):
+        readback_committed_v3_facts_page(
+            Reader([(keys[0], rows[0][1], 'INVENTED_STATE')]),
+            object(), council='tameside', limit=10)
+
+
 def test_disposable_daily_capture_owner_fenced_admission_and_independent_fact_readback(world,tmp_path):
     """S4-03 offline: the actual daily command's saved screen can feed a DIFFERENT owner.
 
