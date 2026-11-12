@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-from app.ingestion.ledger import Denied
+from app.ingestion.ledger import Denied, digest
 
 MAX_WINDOW_DAYS = 7      # the finite acceptance manifest's own window length (`verification.discovery.finite_acceptance.manifest`)
 
