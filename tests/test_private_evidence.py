@@ -182,10 +182,10 @@ def test_runtime_archive_private_worker_receipt_is_verified_across_transactions(
         inventory=[
             ('ingestion_intake_evidence_read',READ_FUNCTION_SHA256,
              'ingestion_storage_owner',True,['search_path=pg_catalog'],
-             'p_period text, p_run text, p_name text',True),
+             'p_period text, p_run text, p_name text',True,True),
             ('ingestion_intake_evidence_write',WRITE_FUNCTION_SHA256,
              'ingestion_storage_owner',True,['search_path=pg_catalog'],
-             'p_period text, p_run text, p_name text, p_body bytea',True)]
+             'p_period text, p_run text, p_name text, p_body bytea',True,True)]
         def execute(self,stmt,args=None):
             q=str(stmt)
             if 'FROM pg_catalog.pg_class c' in q:
@@ -375,10 +375,10 @@ def test_runtime_private_final_commits_and_reads_both_objects_separately():
     period='test-final';run='a'*32;saved={};calls=[]
     inventory=[
         ('ingestion_intake_evidence_read',READ_FUNCTION_SHA256,'ingestion_storage_owner',
-         True,['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True),
+         True,['search_path=pg_catalog'],'p_period text, p_run text, p_name text',True,True),
         ('ingestion_intake_evidence_write',WRITE_FUNCTION_SHA256,'ingestion_storage_owner',
          True,['search_path=pg_catalog'],
-         'p_period text, p_run text, p_name text, p_body bytea',True)]
+         'p_period text, p_run text, p_name text, p_body bytea',True,True)]
     class SQL:
         def execute(self,statement,args=None):
             q=str(statement)
