@@ -474,6 +474,9 @@ def test_private_finalisation_exports_only_allowlisted_local_summary(tmp_path,mo
     rt.durable_run=None;rt.test=True;rt.memory=None;rt.authorities=['test-authority']
     rt.events=[{'raw':private}];rt.github=None;rt.head=None
     rt.connection=connection
+    # SQL inventory is checked before any source claim; this existing test
+    # isolates finalisation and supplies an already-validated inventory.
+    rt.private_evidence_inventory=lambda c:None
     rt.run=SimpleNamespace(closing=False,check=lambda:None,
         totals=lambda:{'all_connections_closed':True},
         publication=lambda *args:None)
@@ -533,3 +536,52 @@ def test_live_private_backend_refused_before_issuer_source_or_stop(tmp_path):
     assert rt.authorities==[]
     assert (tmp_path/'events.json').read_bytes()==b'[]'
     assert b'PRIVATE_EVIDENCE_OFFLINE_ONLY' in (tmp_path/'final-result.json').read_bytes()
+
+
+def test_disposable_private_writer_inventory_refused_before_source_authority(tmp_path):
+    """A stale/missing private writer must not strand SOURCE_INTENT.
+
+    Offline injected controller only; no database writes or council requests.
+    The writer-body/ACL check remains mandatory again at each actual write.
+    """
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+
+    seen=[]
+    @contextmanager
+    def connection(*args,**kwargs):
+        seen.append('connection')
+        yield object(),None
+    def policy_read(conn):
+        seen.append('policy')
+        return {'evidence_backend':'POSTGRES_PILOT_V1'}
+    def inventory(conn):
+        seen.append('inventory')
+        raise Denied('PRIVATE_EVIDENCE_FUNCTION_INVENTORY')
+    def forbidden(*args,**kwargs):
+        pytest.fail('no issuer, source, archive, stop, or publication permitted')
+    rt=Runtime.__new__(Runtime)
+    rt.test=True;rt.policy=None;rt.durable_run=None
+    rt.authorities=[];rt.memory=None;rt.events=[]
+    rt.github=None;rt.binding={'test':'disposable'}
+    rt.args=SimpleNamespace(period='test-private-inventory-preflight',
+                            disposable_archive=str(tmp_path))
+    rt.root=tmp_path;rt.connection=connection
+    rt.policy_read=policy_read;rt.private_evidence_inventory=inventory
+    rt.issue=forbidden;rt.collect=forbidden;rt.archive=forbidden
+    rt.stop_run=forbidden
+    rt.run=SimpleNamespace(closing=False,totals=lambda:{
+        'all_connections_closed':True},publication=forbidden)
+
+    result=rt.execute()
+    assert seen==['connection','policy','inventory']
+    assert result['status']=='REFUSED_PRIVATE_EVIDENCE_PREFLIGHT'
+    assert result['reason']=='PRIVATE_EVIDENCE_FUNCTION_INVENTORY'
+    assert result['authority_closure']=='NOT_ISSUED'
+    assert result['publication']=='NOT_REQUIRED_NO_NEW_WORK'
+    assert result['cleanup']=='CLOSED'
+    assert result['effect_reconciliation_required'] is False
+    assert result['scopes']==[] and result['coverage_advance'] is False
+    assert rt.authorities==[]
+    assert (tmp_path/'events.json').read_bytes()==b'[]'
