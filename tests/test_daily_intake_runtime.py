@@ -1964,24 +1964,69 @@ def test_shared_stop_recovery_refuses_unresolved_effects_atomically(world,drift)
     assert _recovery_control(world)==before
 
 
+# Exact six unresolved identity keys independently read from production (13 Nov).
+# A reproduced key is NOT a reviewed effect disposition or a release permission.
+_HISTORICAL_ABANDONED_IDENTITIES=(
+    ('3f0dba235de9b9efcd52ef3b281ba8c967491f57824404c695ed2b32fae4c045',
+     'bolton','RECEIVED','2026-10-16','2026-10-16',
+     'bolton-received-idox-coordinator-v1',
+     '4a75a7a47aab3a524e5567ac9cb11d38ac4b1918d246a129248de88f90c1f157',
+     'AUTHORISE_INGESTION_BOLTON_CAPTURE_ACCEPTANCE_ONCE_20261022_CAPTURE'),
+    ('e92a8e220bbbbcefb2425d6f97a60920bc447bc1fe097d600ea28e3e9d87588e',
+     'bolton','RECEIVED','2026-10-16','2026-10-16',
+     'bolton-received-idox-coordinator-v1',
+     'f151f45e1178bcab3c4e798846c292855acd6dc5ddb5da49e9b56ebf8959ecf0',
+     'AUTHORISE_INGESTION_STABLE_PIPELINE_AUTHORITY_ONCE_20261020_CAPTURE'),
+    ('a22bac9985d0141d82a4adceaba2354eb3808280413bf7c3aad44d34de8515ad',
+     'manchester','VALIDATED','2026-10-27','2026-11-02',
+     'manchester-screening-metadata-v1',
+     'b-dbpilot-20261027-1102-08-2026-11-02-manchester',
+     'INGESTION_CHAIN_MANCHESTER_CAPTURE_28383FD729DE'),
+    ('21330c060171f6f95286a8f31131bda00fa3c081a21ebfc0f418b10706e510e4',
+     'manchester','VALIDATED','2026-10-27','2026-11-02',
+     'manchester-screening-metadata-v1',
+     'b-dbpilot-20261027-1102-09-2026-11-02-manchester',
+     'INGESTION_CHAIN_MANCHESTER_CAPTURE_BD391719411D'),
+    ('dc8ae276a9c3f697b9905adf0ec8835398009769b69e788e4fd70e13216ee6fc',
+     'tameside','RECEIVED','2026-10-27','2026-11-02',
+     'tameside-screening-metadata-five-v1',
+     'b-dbpilot-20261027-1102-06-2026-11-02-tameside',
+     'INGESTION_CHAIN_TAMESIDE_CAPTURE_6111B8A8125C'),
+    ('ef5afe887f3e5162212fc33f2cf4429d5cbb19cf11bede34e2d1156b09741bc5',
+     'tameside','RECEIVED','2026-10-27','2026-11-02',
+     'tameside-screening-metadata-five-v1',
+     'b-dbpilot-20261027-1102-07-2026-11-02-tameside',
+     'INGESTION_CHAIN_TAMESIDE_CAPTURE_C4DCC4619ADA'),
+)
+
+
 @pytest.mark.parametrize('number_of_other_intents',[6,7])
 def test_shared_stop_recovery_refuses_other_abandoned_source_intents_without_disposition(
         world,number_of_other_intents):
-    # Synthetic analogue of the six historical Bolton/Manchester/Tameside
-    # effect markers. The seventh marker proves no fixed-count bypass exists.
+    """Actual six production key identities -> disposable refusal, then unknown 7th.
+
+    This reproduces identity, terminal marker and attempt shape, not the full
+    historical source/cleanup evidence. The settled Bolton fixture remains a
+    simulated prior settlement. A positive real-state successor is still gated.
+    """
     from verification.ingestion_storage.operational_owner import item
     ctl=_settled_fixture(world)
     c=world['boot']
     other_keys=[]
-    councils=('bolton','bolton','manchester','manchester','tameside','tameside','rochdale')
-    for i,council in enumerate(councils[:number_of_other_intents]):
-        scope=dict(kind='DISCOVERY_SCOPE',council=council,semantics='RECEIVED',
-                   start='2026-09-15',end=f'2026-09-{16+i:02d}')
-        identity=dict(subject=scope,task='DISCOVERY',contract='synthetic-abandoned-v1',
-                      revision=f'disposable-unresolved-{i}')
-        row=item(identity)
+    historical=list(_HISTORICAL_ABANDONED_IDENTITIES)
+    if number_of_other_intents==7:
+        historical.append((None,'rochdale','RECEIVED','2026-09-15','2026-09-16',
+                           'synthetic-abandoned-v1','unreviewed-seventh-marker',
+                           'SYNTHETIC_NO_LIVE_AUTHORITY'))
+    for expected_key,council,semantics,start,end,contract,revision,authority in historical:
+        identity=dict(subject=dict(kind='DISCOVERY_SCOPE',council=council,
+                                   semantics=semantics,start=start,end=end),
+                      task='DISCOVERY',contract=contract,revision=revision)
+        row=item(identity,max_attempts=1 if council=='bolton' else 2)
+        if expected_key is not None:
+            assert row['key']==expected_key  # production readback key, not a guess
         row.update(state='SAFETY_BLOCKED',phase='RECOVERED',fence=2,attempt_count=1,
-                   owner=None,lease_until=None,checkpoint=None,
+                   owner=None,lease_until=None,checkpoint=None,authority=authority,
                    reason='ABANDONED_SOURCE_INTENT',next_action='RECONCILE',
                    outcome=dict(outcome='ABANDONED_SOURCE_INTENT',
                                 source_or_write_replay_authorised=False))
@@ -1991,18 +2036,20 @@ def test_shared_stop_recovery_refuses_other_abandoned_source_intents_without_dis
                   (json.dumps(row),))
         c.execute("""INSERT INTO public.ingestion_work_attempts
           (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
-          VALUES (%s,1,'required_once',0,100,'SYNTHETIC_NO_LIVE_AUTHORITY',
-                  'RECOVERED',NULL,NULL)""",(row['key'],))
+          VALUES (%s,1,'required_once',0,100,%s,
+                  'RECOVERED',%s::json,NULL)""",
+          (row['key'],authority,json.dumps(dict(outcome='ABANDONED_SOURCE_INTENT',
+                        source_or_write_replay_authorised=False))))
     before=_recovery_control(world)
     assert before==ctl
+    assert len(set(other_keys))==number_of_other_intents
     assert c.execute("SELECT count(*) FROM ingestion_work_items WHERE key=ANY(%s)",
                      (other_keys,)).fetchone()[0]==number_of_other_intents
     payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
                  expected_stop=stop_snapshot(ctl))
     with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
         _disposable_release(world,payload)
-    # The failed SQL call rolls back, retaining all original markers/attempts
-    # and both hard stops; expiration or mere RECOVERED state is not clearance.
+    # A false-success attempt cannot rewrite any original stop or past evidence.
     assert _recovery_control(world)==before
     assert c.execute("SELECT count(*) FROM ingestion_work_items WHERE key=ANY(%s) "
                      "AND state='SAFETY_BLOCKED' AND phase='RECOVERED' "
