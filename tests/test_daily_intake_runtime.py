@@ -123,6 +123,14 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
     assert result['coverage_advance'] is False and result['admission_connected'] is False
     assert len(result['backlog']['records'])==(1 if failed else 2)
     assert all(r['fields'] and r['source_url'] and r['source_record_id'] and r['archive']['readback_verified'] for r in result['backlog']['records'])
+    # The immediate collector output and persisted owner page describe the same
+    # screening-only route; neither is a verified scheme or factual admission.
+    for item in result['backlog']['records']:
+        if item['screening_state']=='COMPLETE':
+            assert item['processing_state']=='SCREENING_ONLY_'+item['screening_outcome']
+        else:
+            assert item['processing_state']=='AWAITING_SCREENING'
+        assert item['application_admitted'] is False and item['extraction_complete'] is False
     # Owner-side exact SQL inventory: one committed readback per council.
     # Unknown/failed roots cannot be silently dropped before nomination.
     from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
@@ -1043,6 +1051,10 @@ def test_owned_tameside_child_audit_reaches_disposable_pg_intake_without_false_c
         assert result['authority_closure']=='INVALIDATED'
         assert result['publication']=='TEST_LOCAL_ARCHIVE'
         assert len(result['backlog']['records'])==count+1
+        assert all(item['processing_state']=='SCREENING_ONLY_'+item['screening_outcome']
+                   and item['application_admitted'] is False
+                   and item['extraction_complete'] is False
+                   for item in result['backlog']['records'])
         checkpoint=world['boot'].execute(
             "SELECT checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
         ).fetchone()[0]

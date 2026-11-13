@@ -161,7 +161,7 @@ def backlog(caller):
                         archive=capture['durable_archive'],screening_key=descriptor['key'] if descriptor else None,
                         screening_outcome=outcome,screening_state=row['state'] if row else 'NOT_PREPARED',
                         failure_reason=row['reason'] if row else None,
-                        processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
+                        processing_state=_screening_only_state(result) if result else 'AWAITING_SCREENING',
                         admission_eligible=identity_admission_eligible(result) if result else False,
                         application_admitted=False,extraction_complete=False))
     tasks=[{k:r[k] for k in ('key','task','state','phase','reason','attempt_count','next_action')} for r in rows.values()]
