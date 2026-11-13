@@ -1811,6 +1811,23 @@ _RECOVERY_RUN='ee7cf0d9bc714f56951527b940937054'
 _RECOVERY_PERIOD='b-bolton-20261103-1105-01'
 
 
+
+def _historical_salford_seed():
+    """Reuse the original immutable audited migration row, never a mock subset."""
+    source=(Path(__file__).resolve().parents[1] /
+            'docs/design/ingestion-readiness-20261016/migration.sql').read_text()
+    marker='"key":"c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3"'
+    location=source.index(marker)
+    start=source.rindex("expected := '",0,location)+len("expected := '")
+    finish=source.index("'::jsonb;",location)
+    seed=json.loads(source[start:finish])
+    assert seed['key']=='c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
+    assert seed['state']=='SAFETY_BLOCKED' and seed['phase']=='IDLE'
+    assert seed['authority'] is None and seed['attempt_count']==0
+    assert seed['checkpoint']['live_allowance']==dict(source_calls=0,writes=0)
+    return seed
+
+
 def _settled_fixture(world):
     from verification.ingestion_storage.operational_owner import item
     reset(world)
@@ -1837,6 +1854,12 @@ def _settled_fixture(world):
                last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',hard_stop_generation=15,
                grants={})
     ctl.pop('intake_run',None)
+    # Exact seed from the reviewed 16 Oct migration; preserve this
+    # historical audit marker unchanged during every recovery test.
+    salford=_historical_salford_seed()
+    c.execute('INSERT INTO public.ingestion_work_items SELECT * FROM '
+              'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+              (json.dumps(salford),))
     marker=dict(id=_RECOVERY_RUN,period=_RECOVERY_PERIOD,state='OPEN')
     receipt=dict(version='BOLTON01_FAILED_RECOVERY_V1',status='FAILED_RECONCILED',
                  coverage='UNKNOWN',period=_RECOVERY_PERIOD,run_id=_RECOVERY_RUN,
@@ -2000,3 +2023,52 @@ def test_shared_stop_worker_cannot_call_owner_recovery(world):
             c.execute('SELECT public.ingestion_disposable_shared_stop_release(%s::jsonb)',
                       (json.dumps(payload),))
     assert _recovery_control(world)==ctl
+
+
+@pytest.mark.parametrize('drift',[
+    'salford_absent','salford_checkpoint_changed',
+    'salford_authority_changed','salford_attempt_created',
+])
+def test_shared_stop_release_requires_exact_preserved_salford_audit(world,drift):
+    """No changed/missing historical audit marker may become an implicit bypass."""
+    ctl=_settled_fixture(world)
+    key=_historical_salford_seed()['key']
+    c=world['boot']
+    before=copy.deepcopy(ctl)
+    if drift=='salford_absent':
+        c.execute("DELETE FROM public.ingestion_work_items WHERE key=%s",(key,))
+    elif drift=='salford_checkpoint_changed':
+        c.execute("UPDATE public.ingestion_work_items SET checkpoint = "
+                  "jsonb_set(checkpoint::jsonb,'{live_allowance,source_calls}','1'::jsonb)::json "
+                  "WHERE key=%s",(key,))
+    elif drift=='salford_authority_changed':
+        c.execute("UPDATE public.ingestion_work_items SET authority='FORGED_REPLAY' WHERE key=%s",(key,))
+    else:
+        c.execute("""INSERT INTO public.ingestion_work_attempts
+          (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
+          VALUES (%s,1,'forged-fixture',0,1,'FORGED_REPLAY','RECOVERED',NULL,NULL)""",(key,))
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+        _disposable_release(world,payload)
+    assert _recovery_control(world)==before
+    # Neither refusal nor rollback rewrites the altered source fixture.
+    assert c.execute("SELECT count(*) FROM public.ingestion_work_items WHERE key=%s",(key,)).fetchone()[0]==(0 if drift=='salford_absent' else 1)
+
+
+def test_shared_stop_release_preserves_exact_salford_after_rollback_and_success(world):
+    """The independent historical classification has no source/replay authority."""
+    ctl=_settled_fixture(world)
+    key=_historical_salford_seed()['key']
+    c=world['boot']
+    before=c.execute("SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s",(key,)).fetchone()[0]
+    assert before==_historical_salford_seed()
+    assert c.execute("SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=%s",(key,)).fetchone()[0]==0
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    _disposable_release(world,payload,rollback=True)
+    assert _recovery_control(world)==ctl
+    result=_disposable_release(world,payload)
+    assert result['no_work_issued'] is True
+    assert c.execute("SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s",(key,)).fetchone()[0]==before
+    assert c.execute("SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=%s",(key,)).fetchone()[0]==0

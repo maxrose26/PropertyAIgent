@@ -541,10 +541,19 @@ BEGIN
  IF EXISTS (SELECT 1 FROM public.ingestion_work_items x
     WHERE x.state='CLAIMED' OR x.phase IN ('SOURCE_INTENT','WRITE_INTENT')
       OR x.state='PERSISTENCE_UNCERTAIN')
-  -- Unrelated recovered/abandoned effects remain unresolved until each has a
-  -- separately reviewed disposition. A settled Bolton receipt is not sufficient.
+  -- The historical Salford audit seed is a zero-attempt, non-executable
+  -- REVIEW_ONLY preservation record, not another abandoned source effect.
+  -- Require its complete immutable identity and zero attempts. Missing,
+  -- altered or replayed audit evidence refuses clearance atomically.
+  OR NOT EXISTS (SELECT 1 FROM public.ingestion_work_items audit
+      WHERE audit.key='c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
+        AND to_jsonb(audit) IS NOT DISTINCT FROM '{"attempt_count":0,"authority":null,"checkpoint":{"evidence_commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","live_allowance":{"source_calls":0,"writes":0},"retained_evidence":{"checkpoint_sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e","durable_reference":{"bytes":4298,"commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","path":"docs/design/stage4-r0-execution/metadata-rollout-result-20261016/scopes/00/artifact/checkpoints/000.json","sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"},"run":"38884069913"}},"contract":"storage-acceptance-blocked-v1","dependencies":[],"eligible_at":0,"fence":0,"key":"c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3","lease_until":null,"limits":{"aggregate_rss":1610612736,"audit_bytes":2097152,"bytes":20971520,"outer_seconds":60,"pages":6,"requests":80,"rows":60,"source_rss":1073741824,"worker_seconds":45},"max_attempts":1,"next_action":"REVIEW_ONLY","outcome":null,"owner":null,"phase":"IDLE","priority":0,"reason":"CONSUMED_SALFORD_GLOBAL_STOP","revision":"20261016","state":"SAFETY_BLOCKED","subject":{"council":"salford","end":"2026-10-14","kind":"DISCOVERY_SCOPE","semantics":"VALIDATED","start":"2026-10-08"},"task":"LISTING_METADATA"}'::jsonb
+        AND NOT EXISTS (SELECT 1 FROM public.ingestion_work_attempts aa
+                        WHERE aa.work_key=audit.key))
+  -- Every other blocked/recovered/abandoned effect must have an independently
+  -- evidenced disposition. The legacy Salford marker is NOT a generic bypass.
   OR EXISTS (SELECT 1 FROM public.ingestion_work_items x
-     WHERE x.key<>w.key
+     WHERE x.key<>w.key AND x.key<>'c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
        AND (x.state='SAFETY_BLOCKED' OR x.phase='RECOVERED'
             OR x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE'))
   OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'grants','{}'::jsonb)) g
