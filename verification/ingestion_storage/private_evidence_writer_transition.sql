@@ -42,7 +42,7 @@ BEGIN
   WHERE key=repeat('0',64) FOR SHARE;
  now_epoch=extract(epoch FROM clock_timestamp());
  IF ctl->'global_stop' IS DISTINCT FROM '{"reason":"DAILY_INTAKE_SHARED_FAILURE"}'::jsonb
-  OR ctl->>'manual_stop' NOT IN ('DAILY_INTAKE_SHARED_FAILURE',
+  OR coalesce(ctl->>'manual_stop','') NOT IN ('DAILY_INTAKE_SHARED_FAILURE',
                                 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP')
   OR coalesce((ctl->>'hard_stop_generation')::int,-1) NOT IN (14,15)
   OR EXISTS (SELECT 1 FROM public.ingestion_work_items w
