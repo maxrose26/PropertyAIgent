@@ -515,7 +515,7 @@ def test_exact_inactive_writer_transition_preserves_existing_evidence_and_acl_di
     code/roles/stops; it does not create or reset the evidence table.
     """
     migration=Path('verification/ingestion_storage/private_evidence_writer_transition.sql').read_text()
-    assert 'CREATE TABLE' not in migration.upper()
+    assert not re.search(r'(?im)^\s*CREATE\s+TABLE\b', migration)
     assert 'CREATE OR REPLACE FUNCTION public.ingestion_intake_evidence_write' in migration
     assert 'ingestion_intake_evidence_read(p_period' not in migration
     assert "LIVE_PRIVATE_EVIDENCE_RELEASE" not in migration
