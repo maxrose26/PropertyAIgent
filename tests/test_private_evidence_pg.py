@@ -525,46 +525,55 @@ def test_exact_inactive_writer_transition_preserves_existing_evidence_and_acl_di
         # Match the independently read existing table ACL/RLS and reader ACL.
         boot.execute('ALTER TABLE public.ingestion_run_evidence ENABLE ROW LEVEL SECURITY')
         boot.execute('ALTER TABLE public.ingestion_run_evidence FORCE ROW LEVEL SECURITY')
-        boot.execute('GRANT EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(text,text,text) TO postgres')
-        # This is an immutable read-only capture of the installed pre-upgrade
-        # function, not another migration or a production change.
-        boot.execute(Path('tests/fixtures/pa_d002_installed_writer.sql').read_text())
-        old=boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
-                 FROM pg_proc WHERE oid=
-                'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]
-        assert old=='8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
-        payload=b'{"historical":"preserve-exactly"}'
-        boot.execute("""INSERT INTO public.ingestion_run_evidence
-          (period,run_id,name,body,sha256)
-          VALUES ('historical-private','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                  'final/result-before-publication.json',%s,
-                  encode(sha256(%s),'hex'))""",(payload,payload))
-        before=boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
-                 created_at FROM public.ingestion_run_evidence""").fetchall()
-        ctl=copy.deepcopy(world['control'])
-        ctl.update(global_stop=dict(reason='DAILY_INTAKE_SHARED_FAILURE'),
-                   manual_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',
-                   last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',
-                   hard_stop_generation=15)
-        boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",
-                     (json.dumps(ctl),))
-        boot.execute(migration)
-        updated=boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
-                 FROM pg_proc WHERE oid=
-                'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]
-        assert updated=='4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77'
-        after=boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
-                 created_at FROM public.ingestion_run_evidence""").fetchall()
-        assert before==after
-        # Post-commit readback proves no issuer, grant, stop or period changed.
-        control=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
-        assert control==ctl
-        # Stale/duplicate migration refuses instead of reapplying its function.
-        with pytest.raises(Exception,match='PRIVATE_WRITER_TRANSITION_EXPECTED_OLD'):
+        # Disposable DB has provisioning_bootstrap but no postgres role.
+        # Construct only the historical ACL grantee in the disposable fixture.
+        # The inactive migration itself creates no role or privileges.
+        boot.execute('CREATE ROLE postgres NOLOGIN')
+        try:
+            boot.execute('GRANT EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(text,text,text) TO postgres')
+            # This is an immutable read-only capture of the installed pre-upgrade
+            # function, not another migration or a production change.
+            boot.execute(Path('tests/fixtures/pa_d002_installed_writer.sql').read_text())
+            old=boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
+                     FROM pg_proc WHERE oid=
+                    'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]
+            assert old=='8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
+            payload=b'{"historical":"preserve-exactly"}'
+            boot.execute("""INSERT INTO public.ingestion_run_evidence
+              (period,run_id,name,body,sha256)
+              VALUES ('historical-private','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                      'final/result-before-publication.json',%s,
+                      encode(sha256(%s),'hex'))""",(payload,payload))
+            before=boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
+                     created_at FROM public.ingestion_run_evidence""").fetchall()
+            ctl=copy.deepcopy(world['control'])
+            ctl.update(global_stop=dict(reason='DAILY_INTAKE_SHARED_FAILURE'),
+                       manual_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',
+                       last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',
+                       hard_stop_generation=15)
+            boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",
+                         (json.dumps(ctl),))
             boot.execute(migration)
-        boot.execute('ROLLBACK')
-        assert boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
-                 FROM pg_proc WHERE oid=
-                'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]==updated
-        assert boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
-                 created_at FROM public.ingestion_run_evidence""").fetchall()==before
+            updated=boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
+                     FROM pg_proc WHERE oid=
+                    'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]
+            assert updated=='4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77'
+            after=boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
+                     created_at FROM public.ingestion_run_evidence""").fetchall()
+            assert before==after
+            # Post-commit readback proves no issuer, grant, stop or period changed.
+            control=boot.execute("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
+            assert control==ctl
+            # Stale/duplicate migration refuses instead of reapplying its function.
+            with pytest.raises(Exception,match='PRIVATE_WRITER_TRANSITION_EXPECTED_OLD'):
+                boot.execute(migration)
+            boot.execute('ROLLBACK')
+            assert boot.execute("""SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex')
+                     FROM pg_proc WHERE oid=
+                    'public.ingestion_intake_evidence_write(text,text,text,bytea)'::regprocedure""").fetchone()[0]==updated
+            assert boot.execute("""SELECT period,run_id,name,encode(body,'hex'),sha256,
+                     created_at FROM public.ingestion_run_evidence""").fetchall()==before
+
+        finally:
+            boot.execute('REVOKE EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(text,text,text) FROM postgres')
+            boot.execute('DROP ROLE postgres')
