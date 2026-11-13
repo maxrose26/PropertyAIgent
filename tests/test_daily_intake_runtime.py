@@ -2060,6 +2060,112 @@ def test_shared_stop_recovery_refuses_other_abandoned_source_intents_without_dis
                      (other_keys,)).fetchone()[0]==number_of_other_intents
 
 
+
+def test_full_historical_six_requires_every_individual_disposition_before_test_release(world):
+    """Conditional reachability only: NOT genuine source-effect disposition.
+
+    Reproduce the six exact historical identities and preserved fence-1 attempts
+    beside the already simulated Bolton settlement and exact Salford audit.
+    Each synthetic, clearly test-labelled disposition is a hypothetical input,
+    NOT review evidence, an owner approval, or a production write procedure.
+    It demonstrates why the real missing evidence must be closed individually,
+    and that the unchanged restricted issuer can accept Tameside afterwards.
+    """
+    from verification.ingestion_storage.operational_owner import item
+    ctl = _settled_fixture(world)  # hypothetical #213 settlement, NOT executed
+    c = world['boot']
+    keys = []
+    for expected_key,council,semantics,start,end,contract,revision,authority in _HISTORICAL_ABANDONED_IDENTITIES:
+        identity = dict(subject=dict(kind='DISCOVERY_SCOPE', council=council,
+                                     semantics=semantics, start=start, end=end),
+                        task='DISCOVERY', contract=contract, revision=revision)
+        row = item(identity, max_attempts=1 if council=='bolton' else 2)
+        assert row['key'] == expected_key
+        row.update(state='SAFETY_BLOCKED', phase='RECOVERED', fence=2,
+                   attempt_count=1, owner=None, lease_until=None,
+                   checkpoint=None, authority=authority,
+                   reason='ABANDONED_SOURCE_INTENT', next_action='RECONCILE',
+                   outcome=dict(outcome='ABANDONED_SOURCE_INTENT',
+                                source_or_write_replay_authorised=False))
+        keys.append(expected_key)
+        c.execute('INSERT INTO public.ingestion_work_items SELECT * FROM '
+                  'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+                  (json.dumps(row),))
+        c.execute("""INSERT INTO public.ingestion_work_attempts
+          (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
+          VALUES (%s,1,'required_once',0,100,%s,'RECOVERED',%s::json,NULL)""",
+                  (expected_key,authority,json.dumps(row['outcome'])))
+    assert len(set(keys)) == 6
+    original_attempts = c.execute(
+        'SELECT row_to_json(a) FROM public.ingestion_work_attempts a '
+        'WHERE work_key=ANY(%s) ORDER BY work_key,fence',(keys,)).fetchall()
+    assert len(original_attempts)==6
+    salford_key=_historical_salford_seed()['key']
+    salford_before=c.execute('SELECT to_jsonb(w) FROM public.ingestion_work_items w '
+                             'WHERE key=%s',(salford_key,)).fetchone()[0]
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+        _disposable_release(world,payload)
+    assert _recovery_control(world)==ctl
+
+    # These six test-only metadata edits deliberately stand in for review.
+    # They do NOT certify original requests/cleanup, and cannot be proposed
+    # as a production disposition recipe without separately authenticated,
+    # independently read-back source/effect evidence for every historical key.
+    for index,key in enumerate(keys):
+        c.execute("""UPDATE public.ingestion_work_items SET
+          state='DEFERRED',phase='FINISHED',
+          reason='SYNTHETIC_DISPOSITION_NOT_AUTHORISED',
+          next_action='PRESERVE_HISTORY_NO_REPLAY',
+          checkpoint=%s::json, outcome=%s::json
+          WHERE key=%s AND state='SAFETY_BLOCKED' AND phase='RECOVERED'""",
+          (json.dumps(dict(test_only=True,source_effect_status='UNKNOWN',
+                           reviewer_evidence='NOT_SUPPLIED',coverage='UNKNOWN')),
+           json.dumps(dict(outcome='TEST_ONLY_ASSUMED_DISPOSITION',
+                           source_or_write_replay_authorised=False,
+                           coverage='UNKNOWN')),key))
+        if index != len(keys)-1:
+            with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+                _disposable_release(world,payload)
+            assert _recovery_control(world)==ctl
+
+    after_assumptions=c.execute(
+        'SELECT row_to_json(w) FROM public.ingestion_work_items w '
+        'WHERE key=ANY(%s) ORDER BY key',(keys,)).fetchall()
+    assert len(after_assumptions)==6
+    assert all(x[0]['checkpoint']['reviewer_evidence']=='NOT_SUPPLIED'
+               and x[0]['outcome']['coverage']=='UNKNOWN'
+               and x[0]['outcome']['source_or_write_replay_authorised'] is False
+               for x in after_assumptions)
+    assert _disposable_release(world,payload,rollback=True)['no_work_issued'] is True
+    assert _recovery_control(world)==ctl
+    released=_disposable_release(world,payload)
+    assert released['status']=='DISPOSABLE_ONLY_STOP_RELEASED'
+    assert released['hard_stop_generation']==16
+    assert released['no_work_issued'] is True
+    assert c.execute('SELECT row_to_json(a) FROM public.ingestion_work_attempts a '
+                     'WHERE work_key=ANY(%s) ORDER BY work_key,fence',
+                     (keys,)).fetchall()==original_attempts
+    assert c.execute('SELECT row_to_json(w) FROM public.ingestion_work_items w '
+                     'WHERE key=ANY(%s) ORDER BY key',(keys,)).fetchall()==after_assumptions
+    assert c.execute('SELECT to_jsonb(w) FROM public.ingestion_work_items w '
+                     'WHERE key=%s',(salford_key,)).fetchone()[0]==salford_before
+    # A fresh, single-council, seven-day Tameside registration can use the
+    # NEW exact stop generation. It remains a disposable test period ONLY.
+    tameside=policy(world)
+    tameside['councils']={'tameside':tameside['councils']['tameside']}
+    issued=authorise(world,'conditional-tameside-post-review',tameside)
+    assert issued['overlap_days']==7 and set(issued['councils'])=={'tameside'}
+    assert issued['expected_stop']['hard_stop_generation']==16
+    assert issued['test_evidence'] is True
+    assert _recovery_control(world)['global_stop'] is None
+    assert c.execute('SELECT count(*) FROM public.ingestion_work_items '
+                     "WHERE task='DISCOVERY' AND subject->>'council'='tameside' "
+                     "AND subject->>'start' > '2026-11-02'").fetchone()[0]==0
+
+
+
 @pytest.mark.parametrize('hidden',['unsettled_attempt','unfinished_attempt','relabelled_abandoned'])
 def test_shared_stop_disposable_release_refuses_hidden_historical_effects(world, hidden):
     """Full SQL refusal despite a terminal-looking OTHER work row.
