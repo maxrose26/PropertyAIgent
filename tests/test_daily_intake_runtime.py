@@ -130,7 +130,11 @@ def test_invoked_command_supported_issuer_collect_capture_screen_backlog_close(w
             assert item['processing_state']=='SCREENING_ONLY_'+item['screening_outcome']
         else:
             assert item['processing_state']=='AWAITING_SCREENING'
-        assert item['application_admitted'] is False and item['extraction_complete'] is False
+        # This final command emits the cross-run owner page, which cannot
+        # independently observe the downstream Application/extraction system.
+        # Null is intentional: do not turn 'not tracked' into verified False.
+        assert item['application_admitted'] is None and item['extraction_complete'] is None
+        assert item['downstream_state']=='NOT_TRACKED_BY_INTAKE'
     # Owner-side exact SQL inventory: one committed readback per council.
     # Unknown/failed roots cannot be silently dropped before nomination.
     from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
@@ -1052,8 +1056,9 @@ def test_owned_tameside_child_audit_reaches_disposable_pg_intake_without_false_c
         assert result['publication']=='TEST_LOCAL_ARCHIVE'
         assert len(result['backlog']['records'])==count+1
         assert all(item['processing_state']=='SCREENING_ONLY_'+item['screening_outcome']
-                   and item['application_admitted'] is False
-                   and item['extraction_complete'] is False
+                   and item['application_admitted'] is None
+                   and item['extraction_complete'] is None
+                   and item['downstream_state']=='NOT_TRACKED_BY_INTAKE'
                    for item in result['backlog']['records'])
         checkpoint=world['boot'].execute(
             "SELECT checkpoint FROM ingestion_work_items WHERE task='DISCOVERY' AND state='COMPLETE' AND subject->>'council'='tameside'"
