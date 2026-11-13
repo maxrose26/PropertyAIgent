@@ -556,6 +556,18 @@ BEGIN
      WHERE x.key<>w.key AND x.key<>'c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
        AND (x.state='SAFETY_BLOCKED' OR x.phase='RECOVERED'
             OR x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE'))
+  -- A terminal-looking work row cannot conceal an unresolved earlier attempt.
+  -- Inspect attempts separately, not just the mutable work state/phase.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_attempts aa
+     JOIN public.ingestion_work_items xx ON xx.key=aa.work_key
+     WHERE aa.work_key<>w.key
+       AND (aa.phase IN ('SOURCE_INTENT','WRITE_INTENT')
+            OR aa.finished_at IS NULL))
+  -- Reclassifying an abandoned source row as DEFERRED is NOT its disposition.
+  -- Its original unresolved outcome must receive an evidence-backed review.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_items xx
+     WHERE xx.key<>w.key
+       AND xx.outcome::jsonb->>'outcome'='ABANDONED_SOURCE_INTENT')
   OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'grants','{}'::jsonb)) g
      WHERE jsonb_typeof(g.value->'expires_at') IS DISTINCT FROM 'number'
        OR (g.value->>'expires_at')::double precision>t)
