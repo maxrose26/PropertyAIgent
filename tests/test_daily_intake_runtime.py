@@ -2013,6 +2013,50 @@ def test_shared_stop_recovery_refuses_other_abandoned_source_intents_without_dis
                      (other_keys,)).fetchone()[0]==number_of_other_intents
 
 
+@pytest.mark.parametrize('hidden',['unsettled_attempt','unfinished_attempt','relabelled_abandoned'])
+def test_shared_stop_disposable_release_refuses_hidden_historical_effects(world, hidden):
+    """Full SQL refusal despite a terminal-looking OTHER work row.
+
+    A future reviewed disposition needs independent attempt and source-effect
+    evidence. This fixture does not endorse any real historical disposal.
+    """
+    from verification.ingestion_storage.operational_owner import item
+    ctl=_settled_fixture(world)
+    c=world['boot']
+    identity=dict(subject=dict(kind='DISCOVERY_SCOPE',council='manchester',
+                               semantics='VALIDATED',start='2026-10-27',
+                               end='2026-11-02'),task='DISCOVERY',
+                  contract='offline-hidden-effect-v1',revision='unreviewed')
+    row=item(identity)
+    row.update(state='DEFERRED',phase='FINISHED',fence=2,attempt_count=1,
+               owner=None,lease_until=None,checkpoint=None,
+               reason='HISTORICAL_REVIEW_NOT_PROVEN',next_action='REVIEW_ONLY',
+               outcome=dict(outcome='ABANDONED_SOURCE_INTENT'
+                            if hidden=='relabelled_abandoned' else
+                            'SYNTHETIC_NOT_DISPOSED',
+                            source_or_write_replay_authorised=False))
+    c.execute('INSERT INTO public.ingestion_work_items SELECT * FROM '
+              'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+              (json.dumps(row),))
+    phase=('SOURCE_INTENT' if hidden=='unsettled_attempt' else 'FINISHED')
+    finished=(None if hidden=='unfinished_attempt' else 100)
+    c.execute("""INSERT INTO public.ingestion_work_attempts
+      (work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint)
+      VALUES (%s,1,'required_once',0,%s,'SYNTHETIC_NO_LIVE_AUTHORITY',%s,NULL,NULL)""",
+      (row['key'],finished,phase))
+    before=_recovery_control(world)
+    assert before==ctl
+    payload=dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                 expected_stop=stop_snapshot(ctl))
+    with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+        _disposable_release(world,payload)
+    assert _recovery_control(world)==before
+    assert c.execute('SELECT state,phase FROM public.ingestion_work_items WHERE key=%s',
+                     (row['key'],)).fetchone()==('DEFERRED','FINISHED')
+    assert c.execute('SELECT phase,finished_at FROM public.ingestion_work_attempts WHERE work_key=%s',
+                     (row['key'],)).fetchone()[0]==phase
+
+
 def test_shared_stop_worker_cannot_call_owner_recovery(world):
     import psycopg
     ctl=_settled_fixture(world)
