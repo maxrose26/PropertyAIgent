@@ -81,6 +81,31 @@ def test_actual_restricted_sql_source_and_final_readback():
         # PostgreSQL, and restore the original ACL before any archive writes.
         with world['connect']('ingestion_worker_login') as worker:
             rt.private_evidence_inventory(SQL(worker))
+        # The real installed reader has a separate postgres EXECUTE grant.
+        # Reproduce it: legitimate owner readback must not be blocked before
+        # a source request, but the same grantee on the WRITER is forbidden.
+        # This role exists only inside disposable PostgreSQL.
+        boot.execute('CREATE ROLE postgres NOLOGIN')
+        try:
+            boot.execute('GRANT EXECUTE ON FUNCTION public.'
+                         'ingestion_intake_evidence_read(text,text,text) TO postgres')
+            with world['connect']('ingestion_worker_login') as worker:
+                rt.private_evidence_inventory(SQL(worker))
+            boot.execute('GRANT EXECUTE ON FUNCTION public.'
+                         'ingestion_intake_evidence_write(text,text,text,bytea) TO postgres')
+            try:
+                with world['connect']('ingestion_worker_login') as worker:
+                    with pytest.raises(Denied,match='PRIVATE_EVIDENCE_FUNCTION_INVENTORY'):
+                        rt.private_evidence_inventory(SQL(worker))
+            finally:
+                boot.execute('REVOKE EXECUTE ON FUNCTION public.'
+                             'ingestion_intake_evidence_write(text,text,text,bytea) FROM postgres')
+            with world['connect']('ingestion_worker_login') as worker:
+                rt.private_evidence_inventory(SQL(worker))
+        finally:
+            boot.execute('REVOKE EXECUTE ON FUNCTION public.'
+                         'ingestion_intake_evidence_read(text,text,text) FROM postgres')
+            boot.execute('DROP ROLE postgres')
         # Production read-only inspection on 11 Nov found neither function
         # executable by the restricted login. Prove the physical negative
         # path for each missing grant; the candidate must never silently
