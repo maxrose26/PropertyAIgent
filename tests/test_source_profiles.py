@@ -288,3 +288,558 @@ def test_unsupported_idox_metadata_shape_refuses_parent(kind,tmp_path):
     else:record['source_key']='OTHER'
     with pytest.raises((r.Stop,ValueError,KeyError)):
         r.Launcher(registration(selection(('bolton',))),tmp_path,github=None,memory=None,source=None).accept(0,value)
+
+def test_28_day_nine_council_partition_fits_only_separate_source_only_packages():
+    """Prove bounded reuse, not operational 28-day collection or SQL authority."""
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in f.ARCUS]
+    idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in f.ARCUS]
+    assert len(plan['rows'])==36 and len(arcus)==12 and len(idox)==24
+    checked=set()
+    for index in range(12):
+        ordinals=sorted([arcus[index],*idox[2*index:2*index+2]])
+        payload=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+                     selected_ordinals=ordinals,collection_mode='SCREENING_METADATA')
+        rows=campaign.select(payload,profiled=True)
+        assert len(rows)==3 and sum(row['council'] in f.ARCUS for row in rows)==1
+        limits=campaign.capacity(rows,r.SUCCESSOR_V2_LIMITS,profiled=True)
+        assert limits['requests']==100 and limits['observations']==3
+        reg=registration(payload)
+        assert reg['manifest']['rows']==rows and reg['manifest']['persistence'] is False
+        checked.update(ordinals)
+    assert checked==set(range(36))
+    full=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+              selected_ordinals=list(range(36)),collection_mode='SCREENING_METADATA')
+    with pytest.raises(r.Stop,match='CAMPAIGN_MANIFEST_OR_CAPACITY'):
+        registration(full)
+
+
+def test_tameside_counted_profile_is_explicit_and_hash_bound():
+    """Only the reviewed seven-day Tameside screening scope selects counted pages."""
+    row=next(x for x in ROWS if x['council']=='tameside')
+    old=p.profile(row,'SCREENING_METADATA')
+    counted=p.profile(row,'SCREENING_METADATA',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    assert old.get('idox_pagination') is None
+    assert counted['page_size']==5 and counted['idox_pagination']=='TAMESIDE_FIVE_COUNT_V1'
+    assert counted['sha256']!=old['sha256']
+    assert p.validate(counted,row)==counted
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(row,'IDENTITY_ONLY',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(ROWS[2],'SCREENING_METADATA',idox_pagination='TAMESIDE_FIVE_COUNT_V1')
+    with pytest.raises(ValueError,match='IDOX_PAGINATION_PROFILE'):
+        p.profile(row,'SCREENING_METADATA',idox_pagination='UNREVIEWED_MODE')
+    mutated=dict(counted,idox_pagination='UNREVIEWED_MODE')
+    with pytest.raises(ValueError):
+        p.validate(mutated,row)
+
+
+def test_tameside_five_row_sort_requires_boolean_opt_in():
+    """The existing ten-row form stays the default; no source route is enabled."""
+    from verification.discovery.idox_sort import sort_payload
+    from app.scrapers.discovery_idox import ListingError
+    base='https://publicaccess.tameside.gov.uk'
+    body=b'''<html><form action="pagedSearchResults.do" method="POST">
+    <input type="hidden" name="_csrf" value="TEST_ONLY"/>
+    <input type="hidden" name="searchCriteria.page" value="1"/>
+    <input type="hidden" name="action" value="page"/>
+    <select name="orderBy"><option value="Reference">Reference</option></select>
+    <select name="orderByDirection"><option value="Descending">Descending</option></select>
+    <select name="searchCriteria.resultsPerPage"><option value="5">5</option>
+    <option value="10">10</option></select></form></html>'''
+    assert sort_payload(body,base)[1]['searchCriteria.resultsPerPage']=='10'
+    assert sort_payload(body,base,calibration_five=True)[1]['searchCriteria.resultsPerPage']=='5'
+    with pytest.raises(ListingError,match='calibration selection'):
+        sort_payload(body,base,calibration_five='true')
+
+
+def test_reviewed_counted_receipt_requires_source_mode():
+    """A five-row contract must reject an uncounted or claimed-only source audit."""
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from verification.discovery.idox_window import WindowConfig
+    row=next(x for x in ROWS if x['council']=='tameside')
+    start,end=map(date.fromisoformat,(row['start'],row['end']))
+    counted=IdoxListingContract('tameside-screening-metadata-five-v1',
+        WindowConfig('tameside','RECEIVED',start,end,max_transport_retries=0,max_rows=60),
+        'a'*64)
+    source=audit(row,'SCREENING_METADATA')
+    for mode in (None,'TAMESIDE_FIVE_COUNT_V1'):
+        candidate=deepcopy(source)
+        if mode is not None:candidate['pagination_mode']=mode
+        with pytest.raises(Denied,match='IDOX_PAGINATION_PROFILE_BINDING'):
+            counted.project(candidate,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=524288)
+
+# Synthetic transport only: this test must never perform source/network or DB calls.
+@pytest.mark.parametrize("rows", [22, 30, 31])
+def test_tameside_counted_finite_engine_is_bounded_and_adapter_fails_closed(rows, monkeypatch):
+    import os, socket, requests, hashlib
+    from tests.test_discovery_idox_window import page as original_page, Response
+    from verification.bolton_recon.fixtures import FORM
+    from verification.discovery.pagination_calibration import run_counted_window, COUNTED_MODE
+    from verification.discovery.idox_window import WindowConfig
+    from verification.discovery.four_council_proof import manifest_scope
+    from verification.discovery.source_profiles import profile, bind_audit
+    from app.ingestion.idox_adapter import IdoxListingContract
+    from tests.e2e_connection_support import outer
+    from app.ingestion.ledger import DEFAULT_LIMITS
+    from datetime import date
+
+    def forbidden(*a, **kw): raise AssertionError("NETWORK_FORBIDDEN")
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setattr(requests.sessions.Session, "request", forbidden)
+    row = dict(council="tameside", semantics="RECEIVED", start="2026-10-24", end="2026-10-30")
+    c = WindowConfig("tameside", "RECEIVED", date(2026, 10, 24), date(2026, 10, 30), 0, 60)
+    p = profile(row, "SCREENING_METADATA", idox_pagination=COUNTED_MODE)
+    echo = FORM.replace(b'name="date(applicationReceivedStart)" value=""', b'name="date(applicationReceivedStart)" value="24/10/2026"').replace(b'name="date(applicationReceivedEnd)" value=""', b'name="date(applicationReceivedEnd)" value="30/10/2026"')
+    def page(n, count, total):
+        refs = tuple(f"{(n-1)*5+i+1:03}/26" for i in range(count))
+        b = original_page(refs=refs, pager=False).replace(b"Mon 28 Sep 2026", b"Tue 27 Oct 2026")
+        for i in reversed(range(count)):
+            b = b.replace(f"keyVal=K{i}".encode(), f"keyVal=P{n}K{i}".encode())
+        b = b.replace(b'value="10" selected>10', b'value="5" selected>5')
+        b = b.replace(b'name="action" value="order"', b'name="action" value="page"')
+        b = b.replace(b'name="searchCriteria.page" value="1"', f'name="searchCriteria.page" value="{n}"'.encode())
+        nav = f'<div class="pagination"><span class="current">{n}</span><p class="pager">Showing {(n-1)*5+1}-{(n-1)*5+count} of {total}</p>'
+        if n * 5 < total:
+            nav += f'<a rel="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={n+1}">Next</a>'
+        return b.replace(b"</html>", (nav+"</div></html>").encode())
+    first = page(1, 5, rows)
+    search = first.replace(b'<option value="5" selected>5</option>', b'<option value="5">5</option><option value="10" selected>10</option>')
+    bodies = [FORM, search]
+    for n in range(1, min((rows+4)//5, 6)+1):
+        bodies.append(page(n, min(5, max(0, rows-5*(n-1))), rows))
+    if rows<=30: bodies.append(echo)
+    calls = []
+    def dispatch(method, url, **kwargs):
+        calls.append((method,url,kwargs))
+        assert len(calls)<=len(bodies), "NO_EXTRA_REQUEST"
+        return Response(bodies[len(calls)-1])
+    with manifest_scope(row, p):
+        source = run_counted_window(dispatch, c)
+    source = bind_audit(p, source)
+    assert source["cleanup"]=="BOUNDARY_CLOSED"
+    assert source["resource"]["requests_attempted"]==len(calls)
+    assert source["pagination_mode"]==COUNTED_MODE
+    assert len(source["records"])==min(rows,30)
+    contract = IdoxListingContract("tameside-screening-metadata-five-v1",c,"a"*64)
+    if rows>30:
+        assert source["failure"]=="CALIBRATION_PAGE_CAP"
+        assert source["enumeration_evidence"]!="COUNT_RECONCILED"
+        assert len(calls)==8  # no seventh page or criteria-refine
+        with pytest.raises(Denied):
+            contract.project(source,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=512*1024)
+    else:
+        assert source["failure"] is None
+        assert source["enumeration_evidence"]=="COUNT_RECONCILED"
+        assert len(calls)==3+(rows+4)//5
+        receipt = contract.project(source,outer(),dict(DEFAULT_LIMITS,worker_seconds=75),source_bytes_limit=512*1024)
+        assert len(receipt["records"])==rows
+        assert receipt["pagination_mode"]==COUNTED_MODE
+
+
+def synthetic_tameside_source_from_owned_child(tmp_path,count,*,row=None):
+    """Source worker -> finite Idox child -> counted HTML, with absolutely no network.
+
+    The two OS subprocesses and existing supervisors genuinely execute. A
+    test-only command shim substitutes in-memory HTTP responses in the *inner*
+    subprocess, not a source audit supplied to the daily intake fixture.
+    Disposable PostgreSQL and installed production policy are not exercised.
+    """
+    import base64
+    import sys
+    from datetime import date,timedelta
+    from verification.bolton_recon.fixtures import FORM
+    from tests.test_discovery_idox_window import page as old_page
+    from verification.ingestion_storage.operational_supervisor import supervise as owned_supervise
+
+    if row is None:
+        row=dict(council='tameside',semantics='RECEIVED',start='2026-10-24',end='2026-10-30')
+    start,end=map(date.fromisoformat,(row['start'],row['end']))
+    literal=(start+timedelta(days=3)).strftime('%a %d %b %Y').encode()
+    begin=start.strftime('%d/%m/%Y').encode()
+    finish=end.strftime('%d/%m/%Y').encode()
+    echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',
+                      b'name="date(applicationReceivedStart)" value="'+begin+b'"').replace(
+                      b'name="date(applicationReceivedEnd)" value=""',
+                      b'name="date(applicationReceivedEnd)" value="'+finish+b'"')
+
+    def page_number(number,take):
+        refs=tuple(f'{(number-1)*5+i+1:03}/26' for i in range(take))
+        body=old_page(refs=refs,pager=False).replace(b'Mon 28 Sep 2026',literal)
+        for i in reversed(range(take)):
+            body=body.replace(f'keyVal=K{i}'.encode(),f'keyVal=P{number}K{i}'.encode())
+        body=body.replace(b'value="10" selected>10',b'value="5" selected>5')
+        body=body.replace(b'name="action" value="order"',b'name="action" value="page"')
+        body=body.replace(b'name="searchCriteria.page" value="1"',
+                          f'name="searchCriteria.page" value="{number}"'.encode())
+        first=(number-1)*5+1
+        nav=f'<div class="pagination"><span class="current">{number}</span><p class="pager">Showing {first}-{first+take-1} of {count}</p>'
+        if number*5<count:
+            nav+=f'<a rel="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page={number+1}">Next</a>'
+        return body.replace(b'</html>',(nav+'</div></html>').encode())
+
+    first=page_number(1,5)
+    search=first.replace(b'<option value="5" selected>5</option>',
+                         b'<option value="5">5</option><option value="10" selected>10</option>')
+    bodies=[FORM,search,*[page_number(n,min(5,count-5*(n-1)))
+                           for n in range(1,min((count+4)//5,6)+1)]]
+    if count<=30:bodies.append(echo)
+    bodies_file=tmp_path/'synthetic-http.json'
+    bodies_file.write_text(json.dumps([base64.b64encode(x).decode() for x in bodies]))
+    observed=tmp_path/'child-call-count.txt'
+    plan=tmp_path/'source-plan.json'
+    output=tmp_path/'source-audit.json'
+    plan.write_text(json.dumps(dict(row=row,fixture=None)))
+
+    # This runs only in the inner disposable Python subprocess. Even an
+    # unexpected request is refused; socket.connect is denied as a fallback.
+    finite_child_code="""
+import base64,json,socket,sys
+from pathlib import Path
+from unittest.mock import patch
+import requests
+from tests.test_discovery_idox_window import Response
+from verification.discovery import finite_acceptance as finite
+bodies=[base64.b64decode(x) for x in json.loads(Path(sys.argv[1]).read_text())]
+marker=Path(sys.argv[2]);real_argv=sys.argv[3:];calls=[]
+def forbidden_connect(*args,**kwargs):
+    raise AssertionError('NETWORK_DISALLOWED')
+def fake_request(self,method,url,**kwargs):
+    calls.append((method,url))
+    if len(calls)>len(bodies):raise AssertionError('UNEXPECTED_SOURCE_REQUEST')
+    return Response(bodies[len(calls)-1])
+try:
+    with patch.object(requests.Session,'request',fake_request),patch.object(socket.socket,'connect',forbidden_connect):
+        sys.argv=['finite_acceptance',*real_argv]
+        finite.main()
+finally:
+    marker.write_text(str(len(calls)))
+"""
+    # The owned source process executes the genuine source_worker + finite.read.
+    # Only the nested child command is wrapped to install fake HTTP transport;
+    # the original bounded actions supervisor still owns that child.
+    source_code=(
+        "import sys\n"
+        "from argparse import Namespace\n"
+        "from verification.discovery import finite_acceptance as finite\n"
+        "from verification.stage26b_l1.actions_runner import supervise as genuine\n"
+        f"child_code={finite_child_code!r}\n"
+        f"responses={str(bodies_file)!r}\n"
+        f"marker={str(observed)!r}\n"
+        "def source_only(command,*,env,deadline):\n"
+        "    assert command[1:3]==['-m','verification.discovery.finite_acceptance']\n"
+        "    return genuine([command[0],'-c',child_code,responses,marker,*command[3:]],env=env,deadline=deadline)\n"
+        "finite.supervise=source_only\n"
+        "from verification.ingestion_storage.daily_intake_runtime import source_worker\n"
+        f"source_worker(Namespace(plan={str(plan)!r},output={str(output)!r}))\n"
+    )
+    outer=owned_supervise([sys.executable,'-c',source_code],
+                          environment={'INGESTION_SOURCE_PRIVATE':'ONCE'},
+                          root=tmp_path/'owned',seconds=45,source=True)
+    assert outer['cleanup']=='CLOSED' and outer['live_owned_survivors']==0,outer
+    assert observed.exists(),outer
+    assert int(observed.read_text())==3+(count+4)//5 if count<=30 else int(observed.read_text())==8
+    # A cap refusal is not sufficient if its bounded source audit is lost.
+    # Require the source worker to return a retained, inspectable audit.
+    assert outer['exit_code']==0,outer
+    assert output.is_file(),outer
+    source=json.loads(output.read_bytes())
+    assert source['pagination_mode']=='TAMESIDE_FIVE_COUNT_V1'
+    assert source['collection_profile']['council']=='tameside'
+    if count==31:
+        assert source['failure']=='CALIBRATION_PAGE_CAP'
+        assert source['completeness']=='FAILED' and len(source['records'])==30
+        assert source['enumeration_evidence']!='COUNT_RECONCILED'
+    else:
+        assert source['failure'] is None
+        assert source['enumeration_evidence']=='COUNT_RECONCILED'
+        assert len(source['records'])==22
+    return source
+
+
+@pytest.mark.parametrize('count',[22,31])
+def test_tameside_credential_free_finite_child_through_owned_source_supervisor(tmp_path,count):
+    synthetic_tameside_source_from_owned_child(tmp_path,count)
+
+
+def test_real_historical_bury_complete_shape_is_not_a_current_screening_receipt():
+    """The source-date COMPLETE decision is not a durable, screened intake receipt.
+
+    Reuse the *actual retained 28 Sep–4 Oct Bury audit*, not a synthetic
+    Idox page. This offline check does not contact Bury or alter issuer policy.
+    """
+    from verification.discovery.idox_window import WindowConfig
+    from app.ingestion.idox_adapter import validate_listing_record
+
+    evidence = Path('docs/design/stage4-discovery/evidence/remaining-primary1-bury.json')
+    source = json.loads(evidence.read_bytes())
+    start, end = date(2026, 9, 28), date(2026, 10, 4)
+    assert source['council'] == 'bury'
+    assert source['requested_interval'] == [start.isoformat(), end.isoformat()]
+    assert source['applied_interval'] == source['requested_interval']
+    assert source['date_semantics'] == 'RECEIVED'
+    assert source['enumeration_evidence'] == 'COUNT_RECONCILED'
+    assert source['completeness'] == 'UNKNOWN'  # historical selected-window decision is separate
+    assert source['failure'] is None and source['capped'] is False
+    assert len(source['pages']) == 2 and len(source['records']) == 18
+    assert source['pages'][-1]['terminal'] == 'EXPLICIT_LAST_EQUALS_TOTAL'
+
+    config = WindowConfig('bury', 'RECEIVED', start, end, max_transport_retries=0)
+    keys, refs = set(), set()
+    for row in source['records']:
+        _, _, fields = validate_listing_record(config, row, keys, refs)
+        # The old, count-qualified audit retained identities and dates, but
+        # not proposal/address evidence needed for useful Stage 4 screening.
+        assert fields['proposal']['state'] == 'UNKNOWN'
+        assert fields['address']['state'] == 'UNKNOWN'
+    assert len(keys) == len(refs) == 18
+
+    # No response-provenance or same-session criteria-result receipt existed in
+    # that historical audit. It must not be retroactively promoted by the
+    # current intake contract without a new, separately qualified collection.
+    assert 'response_provenance' not in source
+    assert 'criteria_result_binding' not in source
+    assert 'collection_profile' not in source
+    with pytest.raises(Denied, match='IDOX_RESPONSE_ACCOUNTING'):
+        idox_contract('bury', start, end).project(source, outer(), DEFAULT_LIMITS)
+
+def test_28_day_nine_council_partition_fits_only_separate_source_only_packages():
+    """Prove bounded reuse, not operational 28-day collection or SQL authority."""
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in f.ARCUS]
+    idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in f.ARCUS]
+    assert len(plan['rows'])==36 and len(arcus)==12 and len(idox)==24
+    checked=set()
+    for index in range(12):
+        ordinals=sorted([arcus[index],*idox[2*index:2*index+2]])
+        payload=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+                     selected_ordinals=ordinals,collection_mode='SCREENING_METADATA')
+        rows=campaign.select(payload,profiled=True)
+        assert len(rows)==3 and sum(row['council'] in f.ARCUS for row in rows)==1
+        limits=campaign.capacity(rows,r.SUCCESSOR_V2_LIMITS,profiled=True)
+        assert limits['requests']==100 and limits['observations']==3
+        reg=registration(payload)
+        assert reg['manifest']['rows']==rows and reg['manifest']['persistence'] is False
+        checked.update(ordinals)
+    assert checked==set(range(36))
+    full=dict(finite_manifest=plan,finite_manifest_sha256=f.digest(plan),
+              selected_ordinals=list(range(36)),collection_mode='SCREENING_METADATA')
+    with pytest.raises(r.Stop,match='CAMPAIGN_MANIFEST_OR_CAPACITY'):
+        registration(full)
+
+
+def test_initial_two_slot_packages_cover_nine_councils_including_bolton_without_authority():
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    result=campaign.initial_two_slot_packages(plan,f.digest(plan))
+    assert result['version']==campaign.INITIAL_TWO_SLOT_VERSION
+    assert result['window']==['2026-10-01','2026-10-28']
+    assert len(result['packages'])==20
+    assert sum(len(p['selected_ordinals'])==1 for p in result['packages'])==4
+    assert all(result[k] is False for k in ('sql_issuer_qualified','source_qualified',
+                                           'initial_capture_authorised','operationally_usable'))
+    indexes=[i for pkg in result['packages'] for i in pkg['selected_ordinals']]
+    assert sorted(indexes)==list(range(36)) and len(set(indexes))==36
+    seen={c:0 for c in f.SEMANTICS}
+    for pkg in result['packages']:
+        assert 1<=len(pkg['selected_ordinals'])<=2
+        assert pkg['reservation']['observations']==len(pkg['selected_ordinals'])
+        rows=[plan['rows'][i] for i in pkg['selected_ordinals']]
+        assert len({row['end'] for row in rows})==1
+        assert len({row['council'] for row in rows})==len(rows)
+        assert pkg['reservation']['requests']<=100
+        for i in pkg['selected_ordinals']:
+            row=plan['rows'][i]
+            assert (date.fromisoformat(row['end'])-date.fromisoformat(row['start'])).days==6
+            seen[row['council']]+=1
+    assert seen=={c:4 for c in f.SEMANTICS}
+    assert seen['bolton']==4 and 'trafford' not in seen
+
+
+@pytest.mark.parametrize('fault',['wrong_hash','missing_bolton','duplicate_scope',
+                                   'wrong_semantics','too_short','wrong_purpose','trafford'])
+def test_initial_two_slot_packages_fail_closed_on_unreviewed_manifest(fault):
+    from verification.discovery import campaign_manifest as campaign
+    plan=f.manifest('2026-10-01','2026-10-28','PROSPECTIVE')
+    expected=f.digest(plan)
+    if fault=='wrong_hash':expected='0'*64
+    elif fault=='missing_bolton':plan['rows']=[r for r in plan['rows'] if r['council']!='bolton']
+    elif fault=='duplicate_scope':plan['rows'][1]=dict(plan['rows'][0])
+    elif fault=='wrong_semantics':plan['rows'][0]['semantics']='INVALID'
+    elif fault=='too_short':plan=f.manifest('2026-10-02','2026-10-28','PROSPECTIVE')
+    elif fault=='wrong_purpose':plan=f.manifest('2026-10-01','2026-10-28','BACKFILL_AUDIT')
+    else:plan['rows'][0]['council']='trafford'
+    with pytest.raises(ValueError,match='INITIAL_28_MANIFEST_UNVERIFIED'):
+        campaign.initial_two_slot_packages(plan,expected)
+
+
+
+def test_shutdown_gap_offline_plan_all_ten_with_57_day_window_and_no_authority():
+    """Actual 10 Nov scope; shape proof is NOT a database/council outcome."""
+    from datetime import datetime,timezone,timedelta
+    from verification.discovery import campaign_manifest as campaign
+    value=campaign.shutdown_gap_source_packages(datetime(2026,11,10,12,4,tzinfo=timezone.utc))
+    assert value['version']==campaign.SHUTDOWN_GAP_SOURCE_VERSION
+    assert value['fallback_start']=='2026-09-15' and value['endpoint_date']=='2026-11-10'
+    assert value['total_date_scopes']==90 and value['nine_source_shape_scopes']==81
+    assert value['trafford_unqualified_scopes']==9 and len(value['windows'])==9
+    assert len(value['required_councils'])==10
+    assert sum(len(x['packages']) for x in value['windows'])==45
+    assert value['windows'][-1]['start']==value['windows'][-1]['end']=='2026-11-10'
+    assert sum(len(x['packages'][-1]['selected_ordinals'])==1 for x in value['windows'])==9
+    assert all(value[k] is False for k in ('fallback_is_verified_shutdown',
+        'earlier_proven_gaps_reconciled','sql_issuer_qualified','source_qualified',
+        'collection_authorised','stored_records_verified','entire_day_coverage_proven'))
+    previous=date(2026,9,14)
+    for window in value['windows']:
+        start,end=map(date.fromisoformat,(window['start'],window['end']))
+        assert start==previous+timedelta(days=1) and 0<=(end-start).days<=6
+        assert window['finite_manifest']['purpose']=='SUSPENSION_CATCHUP'
+        assert f.digest(window['finite_manifest'])==window['finite_manifest_sha256']
+        assert window['end_day_incomplete']==(end==date(2026,11,10))
+        seen=[]
+        for package in window['packages']:
+            payload=dict(finite_manifest=window['finite_manifest'],
+                finite_manifest_sha256=window['finite_manifest_sha256'],
+                selected_ordinals=package['selected_ordinals'],
+                collection_mode='SCREENING_METADATA')
+            rows=__import__('verification.discovery.campaign_manifest',fromlist=['select']).select(payload,profiled=True)
+            assert len(rows)<=2 and len({r['council'] for r in rows})==len(rows)
+            assert package['reservation']['requests']<=100
+            seen.extend(row['council'] for row in rows)
+        assert sorted(seen)==sorted(f.SEMANTICS)
+        tenth=window['unqualified_tenth']
+        assert tenth['council']=='trafford' and tenth['status']=='SOURCE_CONTRACT_AND_SQL_SCOPE_UNQUALIFIED'
+        assert (tenth['start'],tenth['end'])==(window['start'],window['end'])
+        previous=end
+    assert previous==date(2026,11,10)
+
+
+def test_shutdown_gap_rolls_endpoint_and_does_not_silently_advance_older_manifest():
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    a=campaign.shutdown_gap_source_packages(datetime(2026,11,10,12,tzinfo=timezone.utc))
+    b=campaign.shutdown_gap_source_packages(datetime(2026,11,11,12,tzinfo=timezone.utc))
+    assert a['windows'][:-1]==b['windows'][:-1]
+    assert a['windows'][-1]['end']=='2026-11-10' and b['windows'][-1]['end']=='2026-11-11'
+    assert a['windows'][-1]['finite_manifest_sha256']!=b['windows'][-1]['finite_manifest_sha256']
+    assert b['total_date_scopes']==a['total_date_scopes']
+    assert b['entire_day_coverage_proven'] is False
+
+
+@pytest.mark.parametrize('clock',[
+    None,'2026-11-10',date(2026,11,10)])
+def test_shutdown_gap_rejects_non_datetime_clock(clock):
+    from verification.discovery import campaign_manifest as campaign
+    with pytest.raises(ValueError,match='SHUTDOWN_AWARE_CLOCK_REQUIRED'):
+        campaign.shutdown_gap_source_packages(clock)
+
+
+def test_shutdown_gap_rejects_naive_and_earlier_clock_and_handles_london_date():
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    for clock,reason in [(datetime(2026,11,10), 'SHUTDOWN_AWARE_CLOCK_REQUIRED'),
+                         (datetime(2026,9,14,12,tzinfo=timezone.utc), 'SHUTDOWN_DATE_BEFORE_FALLBACK')]:
+        with pytest.raises(ValueError,match=reason):
+            campaign.shutdown_gap_source_packages(clock)
+    # UTC can still be 10 November while Europe/London has entered 11 Nov in summer.
+    summer=campaign.shutdown_gap_source_packages(datetime(2026,9,14,23,30,tzinfo=timezone.utc))
+    assert summer['endpoint_date']=='2026-09-15'
+    assert summer['total_date_scopes']==10 and summer['trafford_unqualified_scopes']==1
+
+
+def test_shutdown_gap_blocks_unreviewed_registry_expansion(monkeypatch):
+    from datetime import datetime,timezone
+    from verification.discovery import campaign_manifest as campaign
+    with monkeypatch.context() as m:
+        m.setattr(f,'SEMANTICS',dict(f.SEMANTICS,trafford='RECEIVED'))
+        with pytest.raises(ValueError,match='SHUTDOWN_SOURCE_REGISTRY_CHANGED'):
+            campaign.shutdown_gap_source_packages(datetime(2026,11,10,tzinfo=timezone.utc))
+
+
+def test_archived_rochdale_original_zip_is_readback_only():
+    """S4-03: verify the recovered *real* R0 source artifact, without source requests
+    or classifying historical candidates as screened/complete/qualified records.
+
+    This is archive compatibility evidence, NOT a live-source or SQL replay.
+    """
+    import hashlib
+    from zipfile import ZipFile
+
+    root = (Path(__file__).resolve().parents[1] /
+            'docs/design/stage4-r0-execution/exact20-results-20261015')
+    archive_path = root / 'artifact-11997283579.zip'
+    assert hashlib.sha256(archive_path.read_bytes()).hexdigest() == (
+        '24c6fcf10ef3d6eaafffc29dea6b36043bb604b2242c45ba1c5bd1673f59869c'
+    )
+    expected = {'execution.json', 'result.json'} | {
+        f'checkpoints/{i:03}.json' for i in range(4)
+    }
+    with ZipFile(archive_path) as archive:
+        assert set(archive.namelist()) == expected
+        assert archive.testzip() is None
+        assert sum(z.file_size for z in archive.infolist()) < 20_000_000
+        originals = {name: archive.read(name) for name in expected}
+    execution = json.loads(originals['execution.json'])
+    result = json.loads(originals['result.json'])
+    assert (execution['sha'], execution['run_id'], execution['run_number'],
+            execution['attempt']) == (
+        '0eec734da0cc1a7580385003a7dc9ed797f74bd2', '38786550045', 1, 1
+    )
+    assert all(execution[name] == 0 for name in (
+        'production_database_connections', 'production_reads', 'production_writes'
+    ))
+    assert sum(map(len, originals.values())) == execution['aggregate_audit_bytes']
+    assert len(result['results']) == len(result['checkpoint_sha256']) == 4
+    assert sum(len(originals[f'checkpoints/{i:03}.json']) for i in range(4)) == result['checkpoint_bytes']
+    for i, observed in enumerate(result['results']):
+        raw = originals[f'checkpoints/{i:03}.json']
+        assert hashlib.sha256(raw).hexdigest() == result['checkpoint_sha256'][i]
+        assert json.loads(raw) == observed
+
+    windows = json.loads((root / 'all20-window-reconciliation.json').read_text())
+    candidates = json.loads((root / 'candidate-ledger.json').read_text())
+    assert len(windows) == 20 and len(candidates) == 46
+    assert len({(c['council'], c['reference']) for c in candidates}) == 46
+    assert all(c['source_run'] == 38786550045 and
+               c['source_date_semantics'] == 'VALIDATED' and
+               c['exact_record_identity'] == 'NOT_QUALIFIED' and
+               c['database_presence'] == 'UNKNOWN_NOT_QUERIED' and
+               c['admission'] == 'NOT_AUTHORISED_NOT_ATTEMPTED'
+               for c in candidates)
+
+    complete = [o for o in result['results'] if o['enumeration_completeness'] == 'COMPLETE']
+    failed = [o for o in result['results'] if o['enumeration_completeness'] == 'FAILED']
+    assert len(complete) == 3 and len(failed) == 1
+    source_references = set()
+    for observed, count in zip(complete, (13, 15, 18)):
+        source = observed['source']
+        assert len(source['listing_records']) == count
+        assert source['requested_interval'] == source['applied_interval']
+        assert source['completeness'] == 'UNKNOWN'
+        assert len(source['listing_segments']) == 2
+        # The original archive has only identity/date, no proposal/address,
+        # planning type, counts or verified planning facts. It may seed a
+        # source-only reconciliation queue, NEVER a retained metadata-screen,
+        # factual admission or buyer opportunity. Archive identity alone does
+        # not turn this historic observation into a new collection grant.
+        assert all(set(row) == {
+            'field_capture_scope', 'materiality', 'reference',
+            'relationship', 'source_record_id', 'source_url',
+            'validated_date'
+        } for row in source['listing_records'])
+        assert all(row['field_capture_scope'] == ['reference', 'validated_date']
+                   for row in source['listing_records'])
+        source_references.update(('rochdale', row['reference'])
+                                 for row in source['listing_records'])
+    assert source_references == {(c['council'], c['reference']) for c in candidates}
+    assert failed[0]['source'].get('applied_interval') is None
+    assert not failed[0]['source'].get('listing_records')
+    assert sum(w['primary_enumeration'] == 'NOT_ATTEMPTED' for w in windows) == 16
+    assert all(w['coverage'] != 'COMPLETE' for w in windows)
+    # A complete enumeration over a VALIDATED date is not evidence of
+    # published-date recall, current source contract, durable SQL screening,
+    # identified planning Applications or an admitted buyer opportunity.

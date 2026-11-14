@@ -206,6 +206,235 @@ REGISTRATION = r"""
  END IF;
 """.replace('__SNAPSHOT__', SNAPSHOT)
 
+DISPOSABLE_CATCHUP_REGISTRATION = r"""
+ IF current_database() IS DISTINCT FROM 'ingestion_provisioning_test' THEN RAISE EXCEPTION 'INTAKE_CATCHUP_DISPOSABLE_ONLY'; END IF;
+ IF p->>'operation' IN ('intake_period','intake_catchup_period','intake_capture','intake_screen','intake_close','intake_finish') THEN
+  IF p IS NULL OR jsonb_typeof(p)<>'object' OR octet_length(p::text)>131072 THEN RAISE EXCEPTION 'INTAKE_ARGUMENT_BOUND'; END IF;
+  SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
+  t:=extract(epoch FROM clock_timestamp());
+  a:=p->>'period';
+  IF a IS NULL OR a !~ '^[A-Za-z0-9_-]{1,60}$' THEN RAISE EXCEPTION 'INTAKE_PERIOD_ID'; END IF;
+  IF p->>'operation' IN ('intake_period','intake_catchup_period') THEN
+   IF NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE') THEN RAISE EXCEPTION 'OWNER_DISPOSITION_REQUIRED' USING ERRCODE='42501'; END IF;
+   e:=p->'policy';
+   IF jsonb_typeof(e) IS DISTINCT FROM 'object' OR NOT (e ?& ARRAY['expires_at','max_runs','overlap_days','councils','expected_stop','execution_binding','test_evidence','screening_config','hostaddr','route']) OR NOT (e->'execution_binding' ?& ARRAY['revision','workflow_sha256','manifest_sha256']) OR ctl->'intake_periods' ? a
+    OR jsonb_typeof(e->'expires_at') IS DISTINCT FROM 'number'
+    OR (e->>'expires_at')::double precision<=t OR (e->>'expires_at')::double precision>t+604800
+    OR jsonb_typeof(e->'max_runs') IS DISTINCT FROM 'number' OR (e->>'max_runs')::numeric NOT BETWEEN 1 AND 7 OR (e->>'max_runs')::numeric<>trunc((e->>'max_runs')::numeric) OR e->'overlap_days' IS DISTINCT FROM '7'::jsonb
+    OR jsonb_typeof(e->'councils') IS DISTINCT FROM 'object' OR (SELECT count(*) FROM jsonb_each(e->'councils')) NOT BETWEEN 1 AND 2
+    OR (e->'councils')-ARRAY['tameside','manchester']<>'{}'::jsonb
+    OR e->'expected_stop' IS DISTINCT FROM __SNAPSHOT__
+    OR ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb OR ctl->>'manual_stop' IS NOT NULL
+    OR (ctl ? 'intake_run' AND ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED')
+    OR EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN')
+    OR jsonb_typeof(e->'screening_config') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e->'execution_binding'->'revision') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e->'execution_binding'->'workflow_sha256') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(e->'execution_binding'->'manifest_sha256') IS DISTINCT FROM 'string'
+    OR e->'execution_binding'->>'revision' !~ '^[a-f0-9]{40}$'
+    OR e->'execution_binding'->>'workflow_sha256' !~ '^[a-f0-9]{64}$'
+    OR e->'execution_binding'->>'manifest_sha256' !~ '^[a-f0-9]{64}$'
+    OR jsonb_typeof(e->'test_evidence') IS DISTINCT FROM 'boolean'
+    OR (CASE WHEN e->'test_evidence'='true'::jsonb THEN e->>'route' IS DISTINCT FROM 'DISPOSABLE' ELSE coalesce(e->>'route','') NOT IN ('POOLER','DIRECT') END)
+    OR (CASE WHEN e->'test_evidence'='true'::jsonb THEN e->'hostaddr' IS DISTINCT FROM 'null'::jsonb ELSE jsonb_typeof(e->'hostaddr') IS DISTINCT FROM 'string' OR family((e->>'hostaddr')::inet)<>4 OR masklen((e->>'hostaddr')::inet)<>32 END)
+    OR e->>'screening_config' !~ '^[a-f0-9]{64}$'
+   THEN RAISE EXCEPTION 'INTAKE_PERIOD_POLICY'; END IF;
+   -- Distinct disposable-only historical issuer. No live or rolling widening.
+   IF p->>'operation'='intake_catchup_period' THEN
+    -- The SQL issuer refuses any database other than the fixed disposable
+    -- test database. The existing Runtime independently requires the actual
+    -- client transport to the fixed loopback host/port and test credentials;
+    -- the server's address can be a Docker bridge, not client loopback.
+    IF current_database() IS DISTINCT FROM 'ingestion_provisioning_test'
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_DISPOSABLE_ONLY'; END IF;
+    IF e->'test_evidence' IS DISTINCT FROM 'true'::jsonb OR e->>'route' IS DISTINCT FROM 'DISPOSABLE'
+     OR e->'hostaddr' IS DISTINCT FROM 'null'::jsonb OR e->'max_runs' IS DISTINCT FROM '1'::jsonb
+     OR e ? 'mode' OR jsonb_typeof(e->'catchup_scope') IS DISTINCT FROM 'object'
+     OR (e->'catchup_scope')-ARRAY['start','end','execution_day','source_plan_sha256']<>'{}'::jsonb
+     OR NOT (e->'catchup_scope' ?& ARRAY['start','end','execution_day','source_plan_sha256'])
+     OR coalesce(e->'catchup_scope'->>'start','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'end','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'execution_day','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     OR coalesce(e->'catchup_scope'->>'source_plan_sha256','') !~ '^[a-f0-9]{64}$'
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_POLICY_BOUND'; END IF;
+    IF (e->'catchup_scope'->>'execution_day')::date IS DISTINCT FROM (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+     OR (e->'catchup_scope'->>'start')::date < DATE '2026-09-15'
+     OR (e->'catchup_scope'->>'end')::date >= (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+     OR (e->'catchup_scope'->>'end')::date-(e->'catchup_scope'->>'start')::date NOT BETWEEN 0 AND 6
+    THEN RAISE EXCEPTION 'INTAKE_CATCHUP_WINDOW_BOUND'; END IF;
+    e:=e||jsonb_build_object('mode','DISPOSABLE_SHUTDOWN_GAP_V1');
+   ELSIF e ? 'catchup_scope' OR e ? 'mode' THEN
+    RAISE EXCEPTION 'INTAKE_ROLLING_SCOPE_ONLY';
+   END IF;
+   FOR item IN SELECT value FROM jsonb_each(e->'councils') LOOP
+    IF jsonb_typeof(item) IS DISTINCT FROM 'object' OR NOT (item ?& ARRAY['contract','qualification_sha256']) OR jsonb_typeof(item->'contract') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'qualification_sha256') IS DISTINCT FROM 'string' OR item->>'contract' !~ '^[A-Za-z0-9_-]{1,100}$'
+     OR item->>'qualification_sha256' !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'INTAKE_QUALIFIED_CONTRACT'; END IF;
+   END LOOP;
+   e:=e||jsonb_build_object('registered_at',t,'days','{}'::jsonb);
+   ctl:=jsonb_set(ctl,'{intake_periods}',coalesce(ctl->'intake_periods','{}'::jsonb)||jsonb_build_object(a,e));
+   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+   RETURN e;
+  END IF;
+  IF session_user<>'ingestion_worker_login' OR NOT pg_has_role(session_user,'ingestion_worker','USAGE') THEN RAISE EXCEPTION 'INTAKE_WORKER_ONLY' USING ERRCODE='42501'; END IF;
+  e:=ctl->'intake_periods'->a;
+  IF e IS NULL OR p->'execution_binding' IS DISTINCT FROM e->'execution_binding'
+   OR (p->>'operation'<>'intake_close' AND ((e->>'expires_at')::double precision<=t OR e->'expected_stop' IS DISTINCT FROM __SNAPSHOT__)) THEN RAISE EXCEPTION 'INTAKE_PERIOD_EXPIRED_OR_STOP_CHANGED'; END IF;
+  IF p->>'operation'='intake_close' THEN
+   IF jsonb_typeof(p->'authorities') IS DISTINCT FROM 'array' OR jsonb_array_length(p->'authorities')>4 THEN RAISE EXCEPTION 'INTAKE_CLOSE_BOUND'; END IF;
+   FOR item IN SELECT value FROM jsonb_array_elements(p->'authorities') LOOP
+    IF ctl->'grants'->(item#>>'{}')->>'intake_period' IS DISTINCT FROM a THEN RAISE EXCEPTION 'INTAKE_CLOSE_IDENTITY'; END IF;
+    ctl:=jsonb_set(ctl,ARRAY['grants',item#>>'{}','expires_at'],'0'::jsonb);
+   END LOOP;
+   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+   RETURN jsonb_build_object('authorities_invalidated',true,'stop_preserved',true);
+  END IF;
+  -- Single bounded unresolved-run marker in the EXISTING control record. No
+  -- expiry-based unlock, automatic retry, or worker reconciliation operation.
+  IF p->>'operation'='intake_finish' THEN
+   IF ctl->'intake_run'->>'state' IS DISTINCT FROM 'OPEN'
+    OR ctl->'intake_run'->>'id' IS DISTINCT FROM p->>'run_id'
+    OR ctl->'intake_run'->>'period' IS DISTINCT FROM a
+    OR coalesce(p->>'status','') NOT IN ('RETAINED_AND_SCREENED','INCOMPLETE')
+    OR p->'publication'->>'readback_verified' IS DISTINCT FROM 'true'
+    OR coalesce(p->'publication'->>'commit','') !~ '^[a-f0-9]{40}$'
+    OR coalesce(p->'publication'->>'sha256','') !~ '^[a-f0-9]{64}$'
+    OR p->'publication'->>'path' IS DISTINCT FROM ctl->'intake_run'->>'publication_path'
+    OR EXISTS(SELECT 1 FROM jsonb_each(ctl->'grants') x WHERE x.value->>'intake_run'=p->>'run_id' AND x.value->'expires_at' IS DISTINCT FROM '0'::jsonb)
+    OR (SELECT count(*) FROM jsonb_each(e->'days'->(ctl->'intake_run'->>'day')))<>(SELECT count(*) FROM jsonb_each(e->'councils'))
+    OR EXISTS(SELECT 1 FROM jsonb_each(e->'days'->(ctl->'intake_run'->>'day')) x
+      LEFT JOIN public.ingestion_work_items w ON w.key=x.value#>>'{}'
+      WHERE w.state IS NULL OR w.state NOT IN ('COMPLETE','DEFERRED')
+       OR (w.state='DEFERRED' AND p->>'status'<>'INCOMPLETE')
+       OR (w.state='COMPLETE' AND (
+        (SELECT count(*) FROM public.ingestion_work_items s WHERE s.task='SCREENING' AND s.dependencies::jsonb=jsonb_build_array(w.key) AND s.state='COMPLETE')<>jsonb_array_length(w.checkpoint::jsonb->'records')
+        OR (SELECT count(*) FROM public.ingestion_work_items b WHERE b.task='LISTING_METADATA' AND b.checkpoint::jsonb->'plan'->>'capture_key'=w.key AND b.state='COMPLETE')<>(jsonb_array_length(w.checkpoint::jsonb->'records')+4)/5)))
+   THEN RAISE EXCEPTION 'INTAKE_FINALISATION_UNVERIFIED'; END IF;
+   g:=ctl->'intake_run'||jsonb_build_object('state','VERIFIED','status',p->>'status','publication',p->'publication','verified_at',t);
+   ctl:=jsonb_set(ctl,'{intake_run}',g);
+   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+   RETURN g;
+  END IF;
+  IF ctl ? 'intake_run' AND ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED'
+   AND (ctl->'intake_run'->>'id' IS DISTINCT FROM p->>'run_id' OR ctl->'intake_run'->>'period' IS DISTINCT FROM a)
+   THEN RAISE EXCEPTION 'INTAKE_UNFINISHED_RUN_RECONCILE'; END IF;
+  IF p->>'operation'='intake_capture' AND ctl->'grants' ? (p->>'authority') THEN
+   SELECT * INTO STRICT root FROM public.ingestion_work_items WHERE key=p->'grant'->>'capture_key';
+   IF ctl->'grants'->(p->>'authority')->>'intake_period' IS DISTINCT FROM a
+    OR root.subject::jsonb IS DISTINCT FROM p->'rows'->0->'subject'
+    OR e->'days'->(root.subject->>'end')->>(root.subject->>'council') IS DISTINCT FROM root.key
+    OR root.state NOT IN ('COMPLETE','DEFERRED','UNSUPPORTED_CONTRACT')
+   THEN RAISE EXCEPTION 'INTAKE_CONSUMED_RECONCILE_NO_REPLAY'; END IF;
+   IF ctl->'intake_run'->>'state' IS DISTINCT FROM 'VERIFIED' OR ctl->'intake_run'->>'period' IS DISTINCT FROM a OR ctl->'intake_run'->>'day' IS DISTINCT FROM root.subject->>'end' THEN RAISE EXCEPTION 'INTAKE_UNFINISHED_RUN_RECONCILE'; END IF;
+   RETURN jsonb_build_object('already_consumed',true,'capture_key',root.key,'state',root.state);
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.ingestion_work_items x WHERE x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR x.state='PERSISTENCE_UNCERTAIN') THEN RAISE EXCEPTION 'INTAKE_UNRESOLVED_EFFECT_BARRIER'; END IF;
+  g:=p->'grant';
+  IF jsonb_typeof(g) IS DISTINCT FROM 'object' OR NOT (g ?& ARRAY['login','effect_login','workers','writes','detail_source_keys','capture_only','execution_binding','expires_at','bindings','keys','contracts','source_calls','capture_key','completion_outcomes']) OR jsonb_typeof(p->'authority') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'rows') IS DISTINCT FROM 'array'
+   OR jsonb_array_length(p->'rows') NOT BETWEEN 1 AND 73
+   OR g->'login' IS DISTINCT FROM '"ingestion_worker_login"'::jsonb
+   OR g->'effect_login' IS DISTINCT FROM '"ingestion_effect_login"'::jsonb
+   OR g->'workers' IS DISTINCT FROM '["required_once"]'::jsonb OR g->'writes' IS DISTINCT FROM '0'::jsonb
+   OR g->'detail_source_keys' IS DISTINCT FROM '[]'::jsonb OR g->'capture_only' IS DISTINCT FROM 'false'::jsonb
+   OR g->'execution_binding' IS DISTINCT FROM e->'execution_binding'
+   OR jsonb_typeof(g->'expires_at') IS DISTINCT FROM 'number' OR (g->>'expires_at')::double precision<=t
+   OR (g->>'expires_at')::double precision>least(t+1800,(e->>'expires_at')::double precision)
+   OR jsonb_typeof(g->'bindings') IS DISTINCT FROM 'object' OR jsonb_typeof(g->'keys') IS DISTINCT FROM 'array'
+   OR jsonb_typeof(p->'identity_json') IS DISTINCT FROM 'object'
+   OR p->>'authority' !~ '^INGESTION_CHAIN_[A-Z0-9_]{1,80}$'
+   OR ctl->'grants' ? (p->>'authority')
+  THEN RAISE EXCEPTION 'INTAKE_GRANT_BOUND'; END IF;
+  IF p->>'operation'='intake_capture' THEN
+   IF jsonb_array_length(p->'rows')<>1 OR g->'source_calls' IS DISTINCT FROM '1'::jsonb THEN RAISE EXCEPTION 'INTAKE_CAPTURE_ONLY'; END IF;
+   item:=p->'rows'->0;
+   IF item->>'task' IS DISTINCT FROM 'DISCOVERY' OR item->'subject'->>'kind' IS DISTINCT FROM 'DISCOVERY_SCOPE'
+    OR NOT (item->'subject' ?& ARRAY['start','end','semantics','council'])
+    OR jsonb_typeof(item->'subject'->'start') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(item->'subject'->'end') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(item->'subject'->'council') IS DISTINCT FROM 'string'
+    OR (CASE WHEN e->>'mode'='DISPOSABLE_SHUTDOWN_GAP_V1'
+        THEN (item->'subject'->>'start' IS DISTINCT FROM e->'catchup_scope'->>'start'
+          OR item->'subject'->>'end' IS DISTINCT FROM e->'catchup_scope'->>'end')
+        ELSE (item->'subject'->>'end'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-1)::text
+          OR item->'subject'->>'start'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text)
+        END)
+    OR item->'subject'->>'semantics' IS DISTINCT FROM (CASE WHEN item->'subject'->>'council'='manchester' THEN 'VALIDATED' ELSE 'RECEIVED' END)
+    OR NOT (e->'councils' ? (item->'subject'->>'council'))
+    OR item->>'contract' IS DISTINCT FROM e->'councils'->(item->'subject'->>'council')->>'contract'
+    OR g->>'capture_key' IS DISTINCT FROM item->>'key' OR item->'dependencies'<>'[]'::jsonb
+    OR (SELECT count(*) FROM jsonb_each(coalesce(e->'days','{}'::jsonb))) >= (e->>'max_runs')::int AND NOT (e->'days' ? (item->'subject'->>'end'))
+    OR e->'days'->(item->'subject'->>'end') ? (item->'subject'->>'council')
+   THEN RAISE EXCEPTION 'INTAKE_ROLLING_SCOPE_OR_CONSUMED'; END IF;
+   e:=jsonb_set(e,ARRAY['days',item->'subject'->>'end'],coalesce(e->'days'->(item->'subject'->>'end'),'{}'::jsonb)||jsonb_build_object(item->'subject'->>'council',item->>'key'));
+   -- jsonb_set cannot create a missing intermediate path; days exists from issuance.
+   ctl:=jsonb_set(ctl,ARRAY['intake_periods',a],e);
+  ELSE
+   SELECT * INTO STRICT root FROM public.ingestion_work_items WHERE key=g->>'capture_key' FOR SHARE;
+   IF root.state<>'COMPLETE' OR root.task<>'DISCOVERY' OR root.checkpoint::jsonb->>'kind'<>'LISTING_RECEIPT_V1'
+    OR NOT (e->'councils' ? (root.subject->>'council'))
+    OR e->'days'->(root.subject->>'end')->>(root.subject->>'council') IS DISTINCT FROM root.key
+    OR g->'source_calls' IS DISTINCT FROM '0'::jsonb
+    OR g->'screening_configs' IS DISTINCT FROM jsonb_build_array(e->>'screening_config')
+   THEN RAISE EXCEPTION 'INTAKE_SCREEN_PARENT'; END IF;
+  END IF;
+  IF (SELECT count(*) FROM public.ingestion_work_items)+jsonb_array_length(p->'rows')>4096 THEN RAISE EXCEPTION 'ITEM_BOUND'; END IF;
+  FOR item IN SELECT value FROM jsonb_array_elements(p->'rows') LOOP
+   IF NOT (item ?& ARRAY['key','subject','task','contract','revision','dependencies','priority','eligible_at','state','reason','next_action','limits','authority','attempt_count','max_attempts','fence','owner','lease_until','phase','checkpoint','outcome']) OR jsonb_typeof(item->'key') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'subject') IS DISTINCT FROM 'object' OR NOT (item->'subject' ?& ARRAY['kind','council']) OR jsonb_typeof(item->'subject'->'council') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'task') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'contract') IS DISTINCT FROM 'string' OR jsonb_typeof(item->'revision') IS DISTINCT FROM 'string' OR item->>'key' !~ '^[a-f0-9]{64}$' OR item->>'state' IS DISTINCT FROM 'QUEUED' OR item->>'phase' IS DISTINCT FROM 'IDLE'
+    OR item->'attempt_count'<>'0'::jsonb OR item->'fence'<>'0'::jsonb OR item->'max_attempts'<>'2'::jsonb
+    OR item->'owner'<>'null'::jsonb OR item->'authority'<>'null'::jsonb OR item->'lease_until'<>'null'::jsonb
+    OR item->'outcome'<>'null'::jsonb OR item->'eligible_at'<>'0'::jsonb
+    OR (p->'identity_json'->>(item->>'key'))::jsonb IS DISTINCT FROM jsonb_build_object('subject',item->'subject','task',item->'task','contract',item->'contract','revision',item->'revision')
+    OR encode(sha256(convert_to(p->'identity_json'->>(item->>'key'),'UTF8')),'hex') IS DISTINCT FROM item->>'key'
+    OR g->'bindings'->(item->>'key') IS DISTINCT FROM (p->'identity_json'->>(item->>'key'))::jsonb
+   THEN RAISE EXCEPTION 'INTAKE_ITEM_BINDING'; END IF;
+   IF p->>'operation'='intake_screen' THEN
+    IF item->>'key'=root.key THEN
+     IF item IS DISTINCT FROM to_jsonb(root) THEN RAISE EXCEPTION 'INTAKE_ROOT_IMMUTABLE'; END IF;
+    ELSIF item->>'task'='LISTING_METADATA' THEN
+     IF item->>'contract'<>'listing-batch-v1' OR item->'subject' IS DISTINCT FROM root.subject::jsonb
+      OR item->'checkpoint'->'plan'->>'capture_key'<>root.key
+      OR item->'checkpoint'->'plan'->'capture_bound' IS DISTINCT FROM 'true'::jsonb
+      OR item->'checkpoint'->'plan'->'screening'->>'config_sha256' IS DISTINCT FROM e->>'screening_config'
+     THEN RAISE EXCEPTION 'INTAKE_BATCH_SCOPE'; END IF;
+    ELSIF item->>'task'='SCREENING' THEN
+     IF item->>'contract'<>'listing-screen-v3' OR item->'subject'->>'council' IS DISTINCT FROM root.subject->>'council'
+      OR item->'dependencies' IS DISTINCT FROM jsonb_build_array(root.key)
+      OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(root.checkpoint::jsonb->'records') r WHERE r->>'reference'=item->'subject'->>'reference')
+     THEN RAISE EXCEPTION 'INTAKE_SCREEN_SCOPE'; END IF;
+    ELSE RAISE EXCEPTION 'INTAKE_NO_DOWNSTREAM_TASK'; END IF;
+   END IF;
+   -- Limits are finite positive values bounded by the existing worker envelope.
+   IF NOT (item->'limits' ?& ARRAY['aggregate_rss','audit_bytes','bytes','outer_seconds','pages','requests','rows','source_rss','worker_seconds']) OR item->'limits' IS NULL OR jsonb_typeof(item->'limits')<>'object' OR (item->'limits')-ARRAY['aggregate_rss','audit_bytes','bytes','outer_seconds','pages','requests','rows','source_rss','worker_seconds']<>'{}'::jsonb
+    OR EXISTS(SELECT 1 FROM jsonb_each(item->'limits') x WHERE jsonb_typeof(x.value)<>'number' OR (x.value::text)::numeric<=0)
+    OR (item->'limits'->>'rows')::int>60 OR (item->'limits'->>'pages')::int>6 OR (item->'limits'->>'requests')::int>80
+    OR (item->'limits'->>'bytes')::bigint>20971520 OR (item->'limits'->>'audit_bytes')::bigint>2097152
+    OR (item->'limits'->>'worker_seconds')::int>75 OR (item->'limits'->>'outer_seconds')::int>90
+    OR (item->'limits'->>'source_rss')::bigint>1610612736 OR (item->'limits'->>'aggregate_rss')::bigint>2147483648
+   THEN RAISE EXCEPTION 'INTAKE_ITEM_LIMITS'; END IF;
+   INSERT INTO public.ingestion_work_items SELECT * FROM jsonb_populate_record(NULL::public.ingestion_work_items,item);
+  END LOOP;
+  -- Screening grants include the already registered root binding but never insert it.
+  IF (SELECT count(*) FROM jsonb_each(g->'bindings'))<>(SELECT count(*) FROM jsonb_array_elements(p->'rows'))+(CASE WHEN p->>'operation'='intake_screen' THEN 1 ELSE 0 END)
+   OR jsonb_array_length(g->'keys')<>(SELECT count(*) FROM jsonb_each(g->'bindings'))
+   OR EXISTS(SELECT 1 FROM jsonb_each(g->'bindings') b WHERE NOT (g->'keys' ? b.key) OR NOT (g->'contracts' ? (b.value->>'contract')))
+   OR (p->>'operation'='intake_screen' AND g->'bindings'->root.key IS DISTINCT FROM jsonb_build_object('subject',root.subject::jsonb,'task',root.task,'contract',root.contract,'revision',root.revision))
+  THEN RAISE EXCEPTION 'INTAKE_CLOSED_KEY_SET'; END IF;
+  IF coalesce(p->>'run_id','') !~ '^[a-f0-9]{32}$'
+   OR p->>'publication_path' IS DISTINCT FROM ('docs/design/ingestion-operational-execution-daily-intake/'||a||'/'||(p->>'run_id')||'/final/result-before-publication.json')
+   THEN RAISE EXCEPTION 'INTAKE_RUN_IDENTITY'; END IF;
+  IF NOT (ctl ? 'intake_run') OR ctl->'intake_run'->>'state'='VERIFIED' THEN
+   IF p->>'operation'<>'intake_capture' THEN RAISE EXCEPTION 'INTAKE_RUN_CAPTURE_FIRST'; END IF;
+   ctl:=jsonb_set(ctl,'{intake_run}',jsonb_build_object('id',p->>'run_id','period',a,
+     'day',p->'rows'->0->'subject'->>'end','state','OPEN','started_at',t,
+     'publication_path',p->>'publication_path'));
+  ELSIF ctl->'intake_run'->>'publication_path' IS DISTINCT FROM p->>'publication_path' THEN RAISE EXCEPTION 'INTAKE_RUN_IDENTITY';
+  END IF;
+  g:=g||jsonb_build_object('intake_period',a,'intake_run',p->>'run_id');
+  ctl:=jsonb_set(ctl,'{grants}',coalesce(ctl->'grants','{}'::jsonb)||jsonb_build_object(p->>'authority',g));
+  UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+  RETURN g;
+ END IF;
+""".replace('__SNAPSHOT__', SNAPSHOT)
+
 SETTLEMENT = r"""
   IF p_op='settle_failure' THEN
    IF w.phase NOT IN ('SOURCE_INTENT','CLAIMED','CHECKPOINTED') OR w.task<>'DISCOVERY'
@@ -248,24 +477,168 @@ def worker_text():
     return text
 
 
-def policy_sql():
+
+# Demonstration of the *post-settlement* shared-stop preconditions ONLY.
+# Never emitted by the normal policy_sql() or production installation_script().
+# This does not qualify Bolton coverage, touch production, or grant a source run.
+DISPOSABLE_SHARED_STOP_RELEASE = r"""
+CREATE OR REPLACE FUNCTION public.ingestion_disposable_shared_stop_release(p jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $release$
+DECLARE ctl jsonb; r jsonb; w public.ingestion_work_items%ROWTYPE; t double precision; before_stop jsonb;
+BEGIN
+ IF current_database() IS DISTINCT FROM 'ingestion_provisioning_test' THEN RAISE EXCEPTION 'DISPOSABLE_STOP_ONLY'; END IF;
+ IF session_user IS DISTINCT FROM 'provisioning_migrator'
+  OR NOT pg_has_role(session_user,'ingestion_barrier_releaser','USAGE')
+ THEN RAISE EXCEPTION 'DISPOSABLE_OWNER_ONLY' USING ERRCODE='42501'; END IF;
+ IF p IS NULL OR jsonb_typeof(p) IS DISTINCT FROM 'object' OR octet_length(p::text)>4096
+  OR NOT (p ?& ARRAY['operation','expected_stop'])
+  OR (p-ARRAY['operation','expected_stop'])<>'{}'::jsonb
+  OR p->>'operation' IS DISTINCT FROM 'S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1'
+ THEN RAISE EXCEPTION 'DISPOSABLE_STOP_ARGUMENT'; END IF;
+ SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items
+ WHERE key=repeat('0',64) FOR UPDATE;
+ before_stop:=jsonb_build_object('global_stop',ctl->'global_stop',
+  'manual_stop',ctl->'manual_stop','last_hard_stop',ctl->'last_hard_stop',
+  'hard_stop_generation',coalesce(ctl->'hard_stop_generation','0'::jsonb));
+ IF p->'expected_stop' IS DISTINCT FROM before_stop
+  OR ctl->'global_stop' IS DISTINCT FROM '{"reason":"DAILY_INTAKE_SHARED_FAILURE"}'::jsonb
+  OR ctl->>'manual_stop' IS DISTINCT FROM 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+  OR ctl->>'last_hard_stop' IS DISTINCT FROM 'ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP'
+  OR (ctl->>'hard_stop_generation')::integer IS DISTINCT FROM 15
+  OR ctl ? 'intake_run' OR ctl ? 'disposable_shared_stop_release'
+ THEN RAISE EXCEPTION 'DISPOSABLE_STOP_GENERATION_OR_MARKER'; END IF;
+ r:=ctl->'intake_periods'->'b-bolton-20261103-1105-01'->'failed_runs'->'ee7cf0d9bc714f56951527b940937054';
+ IF jsonb_typeof(r) IS DISTINCT FROM 'object'
+  OR r->>'version' IS DISTINCT FROM 'BOLTON01_FAILED_RECOVERY_V1'
+  OR r->>'status' IS DISTINCT FROM 'FAILED_RECONCILED'
+  OR r->>'coverage' IS DISTINCT FROM 'UNKNOWN'
+  OR r->>'period' IS DISTINCT FROM 'b-bolton-20261103-1105-01'
+  OR r->>'run_id' IS DISTINCT FROM 'ee7cf0d9bc714f56951527b940937054'
+  OR r->>'recovered_key' IS DISTINCT FROM 'd9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252'
+  OR r->'recovered_fence' IS DISTINCT FROM '2'::jsonb
+  OR r->'source_or_write_replay_authorised' IS DISTINCT FROM 'false'::jsonb
+  OR r->'stop_after' IS DISTINCT FROM before_stop
+  OR r->'original_marker'->>'state' IS DISTINCT FROM 'OPEN'
+  OR r->'original_marker'->>'id' IS DISTINCT FROM 'ee7cf0d9bc714f56951527b940937054'
+  OR r->'original_marker'->>'period' IS DISTINCT FROM 'b-bolton-20261103-1105-01'
+ THEN RAISE EXCEPTION 'DISPOSABLE_SETTLEMENT_EVIDENCE'; END IF;
+ SELECT * INTO w FROM public.ingestion_work_items
+ WHERE key='d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252' FOR UPDATE;
+ IF w.key IS NULL OR w.task IS DISTINCT FROM 'DISCOVERY'
+  OR w.contract IS DISTINCT FROM 'bolton-received-intake-v1'
+  OR w.subject::jsonb IS DISTINCT FROM '{"kind":"DISCOVERY_SCOPE","council":"bolton","semantics":"RECEIVED","start":"2026-11-03","end":"2026-11-05"}'::jsonb
+  OR w.state IS DISTINCT FROM 'SAFETY_BLOCKED' OR w.phase IS DISTINCT FROM 'RECOVERED'
+  OR w.fence IS DISTINCT FROM 2 OR w.attempt_count IS DISTINCT FROM 1
+  OR w.owner IS NOT NULL OR w.lease_until IS NOT NULL OR w.checkpoint IS NOT NULL
+  OR w.reason IS DISTINCT FROM 'ABANDONED_SOURCE_INTENT'
+  OR w.next_action IS DISTINCT FROM 'RECONCILE'
+  OR w.outcome::jsonb IS DISTINCT FROM '{"outcome":"ABANDONED_SOURCE_INTENT","source_or_write_replay_authorised":false}'::jsonb
+  OR (SELECT count(*) FROM public.ingestion_work_attempts
+      WHERE work_key=w.key AND fence=1 AND phase='RECOVERED'
+       AND finished_at IS NOT NULL AND checkpoint IS NULL)<>1
+ THEN RAISE EXCEPTION 'DISPOSABLE_BOLTON_EFFECT_UNRESOLVED'; END IF;
+ t:=extract(epoch FROM clock_timestamp());
+ IF EXISTS (SELECT 1 FROM public.ingestion_work_items x
+    WHERE x.state='CLAIMED' OR x.phase IN ('SOURCE_INTENT','WRITE_INTENT')
+      OR x.state='PERSISTENCE_UNCERTAIN')
+  -- The historical Salford audit seed is a zero-attempt, non-executable
+  -- REVIEW_ONLY preservation record, not another abandoned source effect.
+  -- Require its complete immutable identity and zero attempts. Missing,
+  -- altered or replayed audit evidence refuses clearance atomically.
+  OR NOT EXISTS (SELECT 1 FROM public.ingestion_work_items audit
+      WHERE audit.key='c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
+        AND to_jsonb(audit) IS NOT DISTINCT FROM '{"attempt_count":0,"authority":null,"checkpoint":{"evidence_commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","live_allowance":{"source_calls":0,"writes":0},"retained_evidence":{"checkpoint_sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e","durable_reference":{"bytes":4298,"commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","path":"docs/design/stage4-r0-execution/metadata-rollout-result-20261016/scopes/00/artifact/checkpoints/000.json","sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"},"run":"38884069913"}},"contract":"storage-acceptance-blocked-v1","dependencies":[],"eligible_at":0,"fence":0,"key":"c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3","lease_until":null,"limits":{"aggregate_rss":1610612736,"audit_bytes":2097152,"bytes":20971520,"outer_seconds":60,"pages":6,"requests":80,"rows":60,"source_rss":1073741824,"worker_seconds":45},"max_attempts":1,"next_action":"REVIEW_ONLY","outcome":null,"owner":null,"phase":"IDLE","priority":0,"reason":"CONSUMED_SALFORD_GLOBAL_STOP","revision":"20261016","state":"SAFETY_BLOCKED","subject":{"council":"salford","end":"2026-10-14","kind":"DISCOVERY_SCOPE","semantics":"VALIDATED","start":"2026-10-08"},"task":"LISTING_METADATA"}'::jsonb
+        AND NOT EXISTS (SELECT 1 FROM public.ingestion_work_attempts aa
+                        WHERE aa.work_key=audit.key))
+  -- Every other blocked/recovered/abandoned effect must have an independently
+  -- evidenced disposition. The legacy Salford marker is NOT a generic bypass.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_items x
+     WHERE x.key<>w.key AND x.key<>'c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3'
+       AND (x.state='SAFETY_BLOCKED' OR x.phase='RECOVERED'
+            OR x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE'))
+  -- A terminal-looking work row cannot conceal an unresolved earlier attempt.
+  -- Inspect attempts separately, not just the mutable work state/phase.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_attempts aa
+     JOIN public.ingestion_work_items xx ON xx.key=aa.work_key
+     WHERE aa.work_key<>w.key
+       AND (aa.phase IN ('SOURCE_INTENT','WRITE_INTENT')
+            OR aa.finished_at IS NULL))
+  -- Reclassifying an abandoned source row as DEFERRED is NOT its disposition.
+  -- Its original unresolved outcome must receive an evidence-backed review.
+  OR EXISTS (SELECT 1 FROM public.ingestion_work_items xx
+     WHERE xx.key<>w.key
+       AND xx.outcome::jsonb->>'outcome'='ABANDONED_SOURCE_INTENT')
+  OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'grants','{}'::jsonb)) g
+     WHERE jsonb_typeof(g.value->'expires_at') IS DISTINCT FROM 'number'
+       OR (g.value->>'expires_at')::double precision>t)
+  OR EXISTS (SELECT 1 FROM jsonb_each(coalesce(ctl->'intake_periods','{}'::jsonb)) e
+     WHERE jsonb_typeof(e.value->'expires_at') IS DISTINCT FROM 'number'
+       OR (e.value->>'expires_at')::double precision>t)
+ THEN RAISE EXCEPTION 'DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'; END IF;
+ -- Does NOT reset last_hard_stop, delete Bolton receipts, grant work or issue a period.
+ -- The exact generation is consumed once; a changed concurrent stop fails under the lock.
+ ctl:=ctl||jsonb_build_object('global_stop',null,'manual_stop',null,
+  'hard_stop_generation',16,'disposable_shared_stop_release',
+  jsonb_build_object('test_only',true,'source_stop_generation',15,
+   'outcome','DISPOSABLE_ONLY_REVIEW_PROOF','original_bolton_key',w.key));
+ UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
+ RETURN jsonb_build_object('status','DISPOSABLE_ONLY_STOP_RELEASED',
+   'hard_stop_generation',16,'work_key',w.key,'no_work_issued',true);
+END $release$;
+REVOKE ALL ON FUNCTION public.ingestion_disposable_shared_stop_release(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ingestion_disposable_shared_stop_release(jsonb) TO ingestion_barrier_releaser;
+"""
+
+
+def policy_sql(*, disposable_catchup=False):
     from .operational_owner import GENERATION3_SCREENING_V3_POLICY
     text=GENERATION3_SCREENING_V3_POLICY.read_text()
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(')
     end=text.index('$register$;',start)+len('$register$;')
-    register=text[start:end]
-    register=register.replace("BEGIN\n IF NOT pg_has_role", "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
+    original_register=text[start:end]
+    # The original is a pinned reviewed SQL function: never silently emit an
+    # unguarded fallback if its insertion point changes.
+    register_anchor="BEGIN\n IF NOT pg_has_role"
+    if original_register.count(register_anchor)!=1:
+        raise ValueError('INTAKE_SQL_ISSUER_ANCHOR_DRIFT')
+    register=original_register.replace(register_anchor, "BEGIN\n"+REGISTRATION+"\n IF NOT pg_has_role",1)
     start=text.index('CREATE OR REPLACE FUNCTION public.ingestion_bolton_allowed(')
     end=text.index('$policy$;',start)+len('$policy$;')
     allowed=text[start:end]
+    # Count the complete line anchor, not a substring inside extra leading
+    # whitespace: otherwise a shifted SQL body could bypass the guard.
+    if allowed.count('\n SELECT coalesce(')!=1:
+        raise ValueError('INTAKE_SQL_ALLOWED_ANCHOR_DRIFT')
     rolling="""coalesce(ctl->'grants'->authority->>'intake_period' IS NOT NULL
  AND ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->'expected_stop'=__SNAPSHOT__
  AND (ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->>'expires_at')::double precision>extract(epoch FROM statement_timestamp())
  AND ctl->'intake_periods'->(ctl->'grants'->authority->>'intake_period')->'councils' ? (subject->>'council')
  AND (ctl->'grants'->authority->>'expires_at')::double precision>extract(epoch FROM statement_timestamp()),false) OR """.replace('__SNAPSHOT__',SNAPSHOT)
     allowed=allowed.replace(' SELECT coalesce(', ' SELECT '+rolling+'coalesce(',1)
-    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'
+    disposable_sql=''
+    if disposable_catchup:
+        # Additional issuer in the fixed disposable DB only; leave the frozen
+        # daily registration function's exact body unchanged for B inspection.
+        disposable_register=original_register.replace(
+            'CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception(',
+            'CREATE OR REPLACE FUNCTION public.ingestion_register_disposable_catchup(', 1)
+        disposable_register=disposable_register.replace(
+            register_anchor, "BEGIN\n"+DISPOSABLE_CATCHUP_REGISTRATION+"\n IF NOT pg_has_role", 1)
+        if disposable_register==original_register:raise ValueError('DISPOSABLE_ISSUER_INJECTION')
+        disposable_sql=('\n'+disposable_register+
+           '\nREVOKE ALL ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) FROM PUBLIC;'+
+           '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_worker;'+
+           '\nGRANT EXECUTE ON FUNCTION public.ingestion_register_disposable_catchup(jsonb) TO ingestion_barrier_releaser;\n')
+    if disposable_catchup:
+        disposable_sql += DISPOSABLE_SHARED_STOP_RELEASE
+    return allowed+'\n'+register+'\nGRANT EXECUTE ON FUNCTION public.ingestion_register_bolton_exception(jsonb) TO ingestion_worker;\n'+disposable_sql
 
 
-def installation_script():
-    return v3.CEREMONY_OPEN+policy_sql()+v3.original_function(worker_text())+'\n'+v3.CEREMONY_CLOSE
+def installation_script(*, disposable_catchup=False):
+    # Test-only variant fails before changing any database object unless the
+    # server database is the exact preexisting disposable PostgreSQL fixture.
+    preflight=("DO $$ BEGIN IF current_database() IS DISTINCT FROM "
+               "'ingestion_provisioning_test' THEN RAISE EXCEPTION "
+               "'INTAKE_CATCHUP_DISPOSABLE_ONLY'; END IF; END $$;\n"
+               if disposable_catchup else "")
+    return v3.CEREMONY_OPEN+preflight+policy_sql(disposable_catchup=disposable_catchup)+v3.original_function(worker_text())+'\n'+v3.CEREMONY_CLOSE

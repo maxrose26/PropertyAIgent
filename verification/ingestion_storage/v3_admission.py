@@ -103,6 +103,17 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
             or progress.get('next') != plan.get('last') or b.screening_key not in progress.get('children', [])
             or record not in receipt['records'][plan.get('first', 0):plan.get('last', 0)]):
         raise Denied('V3_COMPLETED_BATCH_BINDING')
+    # The current daily intake commits capture-specific v3 screen revisions;
+    # historical v3 children remain unbound. The saved plan, not a caller
+    # flag or a proposed fact, selects which exact identity is admissible.
+    mode = plan.get('capture_bound', False)
+    capture_bound = mode is True
+    if (type(mode) is not bool
+            or capture_bound is not (coordinator.capture_bound_screening is True)):
+        raise Denied('V3_CAPTURE_BOUND_MODE')
+    if capture_bound:
+        from app.ingestion.observation_screening import observation_revision
+        revision = observation_revision(revision, digest(receipt))
     screen = ledger.get(b.screening_key)
     subject = dict(kind='APPLICATION', council=binding.council, reference=b.reference)
     if (screen['state'] != 'COMPLETE' or screen['task'] != 'SCREENING'
@@ -111,7 +122,8 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
         raise Denied('V3_COMPLETED_SCREENING_BINDING')
     stored = screen['checkpoint'] or {}
     expected = rule.screen(record)
-    if (any(stored.get(k) != v for k, v in expected.items())
+    if ((stored.get('capture_bound') is True) is not capture_bound
+            or any(stored.get(k) != v for k, v in expected.items())
             or stored.get('record_sha256') != record_sha or stored.get('config') != config
             or stored.get('config_sha256') != config_sha or stored.get('assessment_revision') != revision):
         raise Denied('V3_ASSESSMENT_BINDING')
@@ -132,3 +144,228 @@ def execute_retained_v3(coordinator, binding, *, detail_reader, envelope, counci
         raise Denied('V3_SOURCE_REFETCH_FORBIDDEN')
     return _execute(coordinator, b, listing_reader=no_listing, detail_reader=detail_reader,
                    envelope=envelope, council=council, check=check)
+
+
+def readback_committed_v3_facts(work_connection, application_engine, factual_key, *, council, reference, allow_test_evidence=False):
+    """Bounded Stage 4 read-only proof: saved v3 fact and independently saved B2 row.
+
+    A returned match is a factual/status readback, NOT a source-completeness,
+    development-unit, buyer-fit, or Stage 4 qualification certificate.
+    The caller supplies existing authenticated connections. No grants, writes,
+    external requests, issuance, or retry of uncertain effects occur here.
+    """
+    from app.ingestion.ledger import bounded
+    from app.pipeline.discovery_admission import PROTECTED_FIELDS
+    from app.db.models import Application
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    import re
+    if (type(factual_key) is not str or not re.fullmatch(r'[a-f0-9]{64}', factual_key)
+            or type(council) is not str or not re.fullmatch(r'[a-z]{2,25}', council)
+            or type(reference) is not str or not 1 <= len(reference) <= 100
+            or reference != reference.strip()):
+        raise Denied('FACT_READBACK_BOUND')
+
+    def one(key):
+        rows = work_connection.execute(
+            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w WHERE w.key=%s LIMIT 2",
+            (key,)).fetchall()
+        if len(rows) != 1 or not isinstance(rows[0][0], dict):
+            raise Denied('FACT_READBACK_ROW_MISSING')
+        return rows[0][0]
+
+    fact = one(factual_key)
+    subject = dict(kind='APPLICATION', council=council, reference=reference)
+    if (fact.get('key') != factual_key or fact.get('task') != 'FACTUAL_REFRESH'
+            or fact.get('subject') != subject or fact.get('state') != 'COMPLETE'
+            or fact.get('phase') != 'FINISHED'
+            or not isinstance(fact.get('dependencies'), list)
+            or len(fact['dependencies']) != 1):
+        raise Denied('FACT_READBACK_TASK')
+    screen = one(fact['dependencies'][0])
+    screen_state = screen.get('checkpoint')
+    screen_outcome = screen.get('outcome')
+    if (screen.get('task') != 'SCREENING' or screen.get('state') != 'COMPLETE'
+            or screen.get('subject') != subject
+            or screen.get('contract') != 'listing-screen-v3'
+            or not isinstance(screen_state, dict)
+            or screen_state.get('capture_bound') is not True
+            or not isinstance(screen_outcome, dict)
+            or screen_outcome.get('outcome') not in ('ADMIT_SCHEME', 'ADMIT_FOR_ASSESSMENT')
+            or screen_outcome.get('retained') is not True
+            or not isinstance(screen.get('dependencies'), list)
+            or len(screen['dependencies']) != 1):
+        raise Denied('FACT_READBACK_SCREEN')
+    capture = one(screen['dependencies'][0])
+    receipt = capture.get('checkpoint')
+    if (capture.get('task') != 'DISCOVERY' or capture.get('state') != 'COMPLETE'
+            or not isinstance(receipt, dict) or receipt.get('kind') != 'LISTING_RECEIPT_V1'
+            or capture.get('subject', {}).get('council') != council
+            or receipt.get('council') != council
+            or not isinstance(receipt.get('records'), list)
+            or len(receipt['records']) > 60
+            or screen_state.get('capture_key') != capture['key']
+            or screen_state.get('capture_checkpoint_sha256') != digest(receipt)
+            or screen_state.get('source_sha256') != receipt.get('source_sha256')
+            or receipt.get('accounting_complete') is not True
+            or receipt.get('cleanup') != 'CLOSED'
+            or not isinstance(receipt.get('durable_archive'), dict)
+            or receipt['durable_archive'].get('readback_verified') is not True
+            or receipt['durable_archive'].get('sha256') != receipt.get('source_sha256')
+            or sum(r.get('reference') == reference for r in receipt['records']
+                   if isinstance(r, dict)) != 1):
+        raise Denied('FACT_READBACK_CAPTURE')
+    # A disposable source must never appear as real owner-verified facts.
+    # Tests may opt in explicitly, without weakening the normal read path.
+    if receipt.get('evidence_label') is not None and not allow_test_evidence:
+        raise Denied('FACT_READBACK_TEST_EVIDENCE')
+    candidate = next(r for r in receipt['records'] if r['reference'] == reference)
+    if (screen_state.get('record_sha256') != digest(candidate)
+            or screen_state.get('source_url') != candidate.get('source_url')
+            or screen_state.get('source_record_id') != candidate.get('source_record_id')):
+        raise Denied('FACT_READBACK_SOURCE_BINDING')
+    # The stored screen label alone is insufficient proof of admission.
+    # Recompute the exact capture-bound v3 assessment and its code/config
+    # identity before independently reporting saved B2 facts.
+    from app.ingestion.listing_screening import (
+        ScreeningRule, RULE_V3, council_unit_threshold, assessment_identity,
+        qualifier_output_of, routing_of)
+    from app.ingestion.observation_screening import observation_revision
+    try:
+        rule = ScreeningRule(RULE_V3, unit_threshold=council_unit_threshold(council),
+                             link_related=False)
+        record_sha, config, config_sha, base_revision = assessment_identity(candidate, rule)
+        revision = observation_revision(base_revision, digest(receipt))
+        expected = rule.screen(candidate)
+        route = routing_of(expected)[1]
+        assessment_sha = digest(expected['count_assessment'])
+        qualifier_sha = digest(qualifier_output_of(expected))
+    except (KeyError, TypeError, ValueError, Denied):
+        raise Denied('FACT_READBACK_SCREEN_RECOMPUTED') from None
+    if (route not in ('ADMIT_SCHEME', 'ADMIT_FOR_ASSESSMENT')
+            or screen.get('phase') != 'FINISHED'
+            or screen.get('revision') != revision
+            or screen_outcome != dict(outcome=route, retained=True)
+            or any(screen_state.get(k) != v for k, v in expected.items())
+            or screen_state.get('record_sha256') != record_sha
+            or screen_state.get('config') != config
+            or screen_state.get('config_sha256') != config_sha
+            or screen_state.get('assessment_revision') != revision
+            or screen_state.get('assessment_sha256') != assessment_sha
+            or screen_state.get('qualifier_output_sha256') != qualifier_sha
+            or screen_state.get('capture_key') != capture['key']
+            or screen_state.get('capture_sha256') != receipt.get('source_sha256')
+            or screen_state.get('source_sha256') != receipt.get('source_sha256')):
+        raise Denied('FACT_READBACK_SCREEN_RECOMPUTED')
+    outcome, saved = fact.get('outcome'), fact.get('checkpoint')
+    if (not isinstance(outcome, dict) or not isinstance(saved, dict)
+            or outcome != saved
+            or outcome.get('outcome') != 'SUPPORTED_FACTS_VERIFIED'
+            or outcome.get('identity') != 'COMMITTED_PENDING_IDENTITY'
+            or outcome.get('verification_scope') != 'COUPLED'
+            or outcome.get('unit_facts') != 'NOT_WRITTEN'
+            or outcome.get('cleanup') != 'CLOSED'
+            or outcome.get('accounting_complete') is not True
+            or type(outcome.get('application_id')) is not int
+            or outcome['application_id'] <= 0):
+        raise Denied('FACT_READBACK_OUTCOME')
+    stored = saved.get('readback')
+    if (not isinstance(stored, dict)
+            or stored.get('application_id') != outcome['application_id']
+            or not isinstance(stored.get('protected'), dict)
+            or set(stored['protected']) != set(PROTECTED_FIELDS)):
+        raise Denied('FACT_READBACK_SNAPSHOT')
+    bounded([fact, screen, capture], 2 * 1024 ** 2)
+    with Session(application_engine) as session:
+        columns = [Application.id, *[getattr(Application, field) for field in PROTECTED_FIELDS]]
+        rows = session.execute(select(*columns).where(
+            Application.id == outcome['application_id'],
+            Application.council_code == council,
+            Application.reference == reference).limit(2)).mappings().all()
+    if len(rows) != 1:
+        raise Denied('FACT_READBACK_APPLICATION_MISSING')
+    actual = {field: (rows[0][field].isoformat() if hasattr(rows[0][field], 'isoformat')
+                      else rows[0][field]) for field in PROTECTED_FIELDS}
+    if (actual != stored['protected']
+            or not actual.get('status_verified_at')
+            or not actual.get('status')):
+        raise Denied('FACT_READBACK_APPLICATION_CHANGED')
+    # An optimistic read-only fence against a work-ledger mutation between
+    # source/screen/fact inspection and the separate Application readback.
+    # Not an atomic cross-connection snapshot or a future-write lock.
+    if (one(factual_key) != fact or one(screen['key']) != screen or one(capture['key']) != capture):
+        raise Denied('FACT_READBACK_LEDGER_CHANGED')
+    return dict(council=council, reference=reference,
+                application_id=outcome['application_id'], factual_key=factual_key,
+                state='COMMITTED_B2_FACTS_READ_BACK',
+                saved_key_facts={key: actual[key] for key in
+                                 ('status', 'decision', 'decision_issued_date')},
+                verification_scope='COUPLED', unit_count_verified=False,
+                source_completeness='UNKNOWN', buyer_opportunity_qualified=False)
+
+
+def readback_committed_v3_facts_page(work_connection, application_engine, *, council, after=None, limit=5, allow_test_evidence=False):
+    """Bounded, owner-only discovery of SAVED factual work in one council.
+
+    This is a read-only factual task page, not an admission/qualification or a
+    statement of full council coverage. Every COMPLETE candidate must pass the
+    existing independent capture -> screen -> B2 readback; one contradictory
+    row fails the whole page rather than being silently skipped. Incomplete
+    tasks are visible as pending, never saved facts. No source, issuer, grant,
+    mutable database operation or buyer opportunity is exposed here.
+    """
+    import re
+    from app.config import load_councils
+    from app.ingestion.ledger import bounded
+    if (type(council) is not str or council not in load_councils()
+            or type(limit) is not int or not 1 <= limit <= 10
+            or (after is not None and
+                (type(after) is not str or re.fullmatch(r'[a-f0-9]{64}', after) is None))):
+        raise Denied('FACT_BACKLOG_PARAMS')
+    rows = work_connection.execute(
+        "SELECT key,subject,state FROM public.ingestion_work_items "
+        "WHERE task='FACTUAL_REFRESH' AND subject->>'council'=%s "
+        "AND key>%s ORDER BY key LIMIT %s",
+        (council, after or '', limit + 1)).fetchall()
+    more = len(rows) > limit
+    records = []
+    for key, subject, state in rows[:limit]:
+        if (type(key) is not str or re.fullmatch(r'[a-f0-9]{64}', key) is None
+                or not isinstance(subject, dict)
+                or subject.get('kind') != 'APPLICATION'
+                or subject.get('council') != council
+                or type(subject.get('reference')) is not str
+                or not 1 <= len(subject['reference']) <= 100
+                or subject['reference'] != subject['reference'].strip()):
+            raise Denied('FACT_BACKLOG_SAVED_ROW')
+        if state == 'COMPLETE':
+            records.append(readback_committed_v3_facts(
+                work_connection, application_engine, key,
+                council=council, reference=subject['reference'],
+                allow_test_evidence=allow_test_evidence))
+        else:
+            # "Not complete" is not synonymous with pending: a blocked or
+            # uncertain owner task must not be presented as waiting for ordinary
+            # work. Never infer freshness, retry permission or saved facts.
+            unverified = {
+                'QUEUED': 'FACTUAL_TASK_NOT_VERIFIED',
+                'DEFERRED': 'FACTUAL_TASK_DEFERRED',
+                'CLAIMED': 'FACTUAL_TASK_CLAIM_UNVERIFIED',
+                'UNSUPPORTED_CONTRACT': 'FACTUAL_TASK_BLOCKED',
+                'SAFETY_BLOCKED': 'FACTUAL_TASK_BLOCKED',
+                'PERSISTENCE_UNCERTAIN': 'FACTUAL_TASK_UNCERTAIN',
+            }
+            if state not in unverified:
+                raise Denied('FACT_BACKLOG_WORK_STATE')
+            item = dict(council=council, reference=subject['reference'],
+                        factual_key=key, state=unverified[state],
+                        saved_key_facts=None)
+            if state != 'QUEUED':
+                item['work_state'] = state
+            records.append(item)
+    result = dict(council=council, records=records, more=more,
+                  next_cursor=rows[limit-1][0] if more else None,
+                  page_only=True, source_coverage='UNKNOWN',
+                  unit_counts_verified=False, buyer_opportunities_proven=False)
+    bounded(result, 128 * 1024)
+    return result

@@ -77,3 +77,28 @@ def test_zero_rejects_separate_error_list_or_messagebox():
     for extra in (b'<ul><li>Invalid date</li></ul>',b'<div class="messagebox"><ul><li>Invalid date</li></ul></div>'):
         changed=b.replace(b'</div></html>',extra+b'</div></html>')
         with pytest.raises(ListingError):explicit_zero(changed,'bury')
+
+
+def test_trafford_repository_hint_parses_offline_but_cannot_open_networked_window():
+    """Synthetic Idox compatibility only: no Trafford source or completeness qualification."""
+    from app.pipeline.discovery_contract import SOURCE_ROOTS, COUNCILS
+    from app.scrapers.discovery_idox import source_url, explicit_zero
+    from verification.discovery.idox_window import WindowConfig
+    from verification.discovery.finite_acceptance import manifest
+    assert SOURCE_ROOTS['trafford']==('pa.trafford.gov.uk','/online-applications/')
+    assert 'trafford' not in COUNCILS
+    assert 'trafford' not in {r['council'] for r in manifest('2026-11-01','2026-11-07','PROSPECTIVE')['rows']}
+    with pytest.raises(ValueError,match='TRAFFORD_SOURCE_NOT_QUALIFIED'):
+        WindowConfig('trafford')
+    candidate=parse_page(page(refs=('TRA/26/001','TRA/26/002')),'trafford',1,D,D)
+    assert [r.reference for r in candidate.rows]==['TRA/26/001','TRA/26/002']
+    assert candidate.terminal=='EXPLICIT_LAST_EQUALS_TOTAL'
+    assert candidate.rows[0].source_url.startswith('https://pa.trafford.gov.uk/online-applications/applicationDetails.do?')
+    assert candidate.rows[0].fields['received_date'].state=='PRESENT_VALUE'
+    assert not explicit_zero(b'<html><h1>Error</h1></html>','trafford')
+    with pytest.raises(ListingError):
+        source_url('trafford','https://pa.trafford.gov.uk.evil.example/online-applications/applicationDetails.do?keyVal=K0')
+    with pytest.raises(ListingError):
+        parse_page(page().replace(b'28 Sep',b'29 Sep'),'trafford',1,D,D)
+    with pytest.raises(ListingError):
+        parse_page(page().replace(b'</html>',b''),'trafford',1,D,D)

@@ -81,6 +81,12 @@ def pg():
                 c.execute(Path('docs/design/ingestion-operational-acceptance-20261016/runtime-mappings.sql').read_text())
                 # Existing reviewed v3 function, unchanged, installed as fixture only.
                 c.execute(screening_v3_worker_sql.installation_script())
+            # This disposable-only candidate needs the same existing opt-in
+            # complete-capture v3 SQL extension as daily-intake-PG tests.
+            # Installing it in the fixture proves the real worker's identity
+            # derivation without modifying any hosted or production function.
+            boot.execute(screening_v3_worker_sql.original_function(
+                screening_v3_worker_sql.capture_bound_text()))
             for role in names[1:]:
                 boot.execute(sql.SQL('ALTER ROLE {} PASSWORD {}').format(sql.Identifier(role), sql.Literal(passwords[role])))
             with connect('provisioning_migrator') as c:
@@ -106,7 +112,7 @@ def pg():
                 boot.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(name)))
 
 
-def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
+def scenario(pg, tag, proposal='Erection of 20 residential dwellings', *, capture_bound=False):
     """Install synthetic saved capture; generate its assessment via real batch SQL."""
     boot = pg['boot']
     target, detail, _ = projected(summary('01780/26', status='Decided', decision='Approve', date='Mon 28 Sep 2026'))
@@ -127,10 +133,14 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
     record = capture['records'][0]
     root = item(dict(subject=dict(kind='DISCOVERY_SCOPE', council='bolton', start=cfg.start.isoformat(), end=cfg.end.isoformat(), semantics='RECEIVED'), task='DISCOVERY', contract=contract.name, revision=tag))
     root.update(state='COMPLETE', phase='FINISHED', checkpoint=capture, outcome=dict(children=[]))
-    plans = batch_plans(root['key'], capture, rule)
+    plans = batch_plans(root['key'], capture, rule, capture_bound=capture_bound)
     batch = item({k: plans[0][k] for k in ('subject', 'task', 'contract', 'revision')}, dependencies=plans[0]['dependencies'], checkpoint=plans[0]['checkpoint'])
     subject = dict(kind='APPLICATION', council='bolton', reference=record['reference'])
-    screen = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=assessment_identity(record, rule)[3]), dependencies=[root['key']])
+    screen_revision = assessment_identity(record, rule)[3]
+    if capture_bound:
+        from app.ingestion.observation_screening import observation_revision
+        screen_revision = observation_revision(screen_revision, digest(capture))
+    screen = item(dict(subject=subject, task='SCREENING', contract=V3_CONTRACT, revision=screen_revision), dependencies=[root['key']])
     factual_contract = accepted_idox_new_identity('controller-fact', target)
     fact = item(dict(subject=subject, task='FACTUAL_REFRESH', contract=factual_contract.name, revision=tag), dependencies=[screen['key']])
     # Each scenario is an independent disposable world, not a recovery/retry.
@@ -151,7 +161,7 @@ def scenario(pg, tag, proposal='Erection of 20 residential dwellings'):
         budgets.append(budget)
         worker, broker, app = [budget.engine(pg['urls'][r]) for r in ['ingestion_worker_login', 'ingestion_effect_login', 'ingestion_application_login']]
         ledger = ControllerLedger(worker, budget=budget, owner='one', authority=authority, bindings=bindings, broker_engine=broker, application_engine=app)
-        return Coordinator(ledger, {contract.name: contract, factual_contract.name: factual_contract}, screening_rules={V3_CONTRACT: rule})
+        return Coordinator(ledger, {contract.name: contract, factual_contract.name: factual_contract}, screening_rules={V3_CONTRACT: rule}, capture_bound_screening=capture_bound)
     b0 = DatabaseBudget(slot_key=batch['key'])
     co = coordinator(b0)
     try:
@@ -354,3 +364,201 @@ def test_restricted_v3_handoff(pg, case, monkeypatch, record_property):
                         fixture_and_assertions={k: pg['fixture_costs'][k] - fixture_before[k] for k in fixture_before})
         record_property('measured', json.dumps(measured, sort_keys=True))
         print('V3_HANDOFF_MEASURED ' + json.dumps(measured, sort_keys=True))
+
+
+@pytest.mark.parametrize('forgery', ['NONE', 'MISSING_FLAG', 'ALTERED_SCREEN_REVISION', 'EXISTING_APPLICATION'])
+def test_capture_bound_retained_v3_factual_write_and_readback(pg, forgery):
+    """Real disposable SQL: bound saved screen -> targeted fact -> committed Application.
+
+    No source request is made; a changed plan/screen must refuse before detail
+    or Application effects. The legacy unbound fixture above is unchanged.
+    """
+    from app.config import get_council
+    from verification.ingestion_storage.v3_admission import execute_retained_v3
+    sc = scenario(pg, 'capture-bound-' + forgery, capture_bound=True)
+    boot = pg['boot']
+    actual = boot.execute(
+        'SELECT revision,checkpoint FROM ingestion_work_items WHERE key=%s',
+        (sc['screen']['key'],)).fetchone()
+    assert actual[0] == sc['screen']['revision']
+    assert actual[1]['capture_bound'] is True
+    # This matches the real-world situation where a stored, screened
+    # candidate already has a legacy Application. Stage 4 must not duplicate
+    # its identity or overwrite previously saved facts to increase counts.
+    if forgery == 'EXISTING_APPLICATION':
+        with Session(pg['app']) as session:
+            session.add(Application(council_code='bolton', reference='01780/26',
+                                    status='Deposited', proposal='Previously saved legacy fact'))
+            session.commit()
+    if forgery == 'MISSING_FLAG':
+        bad = dict(actual[1])
+        bad.pop('capture_bound')
+        boot.execute('UPDATE ingestion_work_items SET checkpoint=%s::json WHERE key=%s',
+                     (json.dumps(bad), sc['screen']['key']))
+    elif forgery == 'ALTERED_SCREEN_REVISION':
+        boot.execute('UPDATE ingestion_work_items SET revision=%s WHERE key=%s',
+                     ('0'*64, sc['screen']['key']))
+    calls = []
+    def detail(_):
+        calls.append(1)
+        return sc['detail'], outer()
+    try:
+        if forgery in ('NONE', 'EXISTING_APPLICATION'):
+            result = execute_retained_v3(
+                sc['co'], sc['binding'], detail_reader=detail, envelope=sc['envelope'],
+                council=get_council('bolton'), check=sc['budget'].check)
+            if forgery == 'NONE':
+                assert result['outcome'] == 'SUPPORTED_FACTS_VERIFIED'
+                assert calls == [1]
+                saved = boot.execute(
+                    "SELECT reference,status,decision,site_id,estimated_unit_count "
+                    "FROM applications WHERE council_code='bolton'").fetchall()
+                assert len(saved) == 1 and saved[0][0] == '01780/26'
+                assert saved[0][1] == 'Decided' and saved[0][2] == 'Approve'
+                assert saved[0][3:] == (None, None)
+                # Independent persisted work-item -> saved Application readback,
+                # distinct from the writer's in-memory success return.
+                from verification.ingestion_storage.v3_admission import readback_committed_v3_facts
+                proof = readback_committed_v3_facts(
+                    boot, pg['app'], sc['fact']['key'],
+                    council='bolton', reference='01780/26')
+                assert proof['state'] == 'COMMITTED_B2_FACTS_READ_BACK'
+                assert proof['saved_key_facts']['status'] == 'Decided'
+                assert proof['saved_key_facts']['decision'] == 'Approve'
+                assert proof['verification_scope'] == 'COUPLED'
+                assert proof['unit_count_verified'] is False
+                assert proof['source_completeness'] == 'UNKNOWN'
+                assert proof['buyer_opportunity_qualified'] is False
+                # A consumer can now discover the committed fact without
+                # already knowing its 64-character factual task key.
+                from verification.ingestion_storage.v3_admission import readback_committed_v3_facts_page
+                page = readback_committed_v3_facts_page(
+                    boot, pg['app'], council='bolton', limit=1)
+                assert page['page_only'] is True and page['source_coverage'] == 'UNKNOWN'
+                assert page['buyer_opportunities_proven'] is False
+                assert page['more'] is False and page['next_cursor'] is None
+                assert page['records'] == [proof]
+                assert readback_committed_v3_facts_page(
+                    boot, pg['app'], council='bolton', after=sc['fact']['key'])['records'] == []
+                with pytest.raises(Denied, match='FACT_BACKLOG_PARAMS'):
+                    readback_committed_v3_facts_page(
+                        boot, pg['app'], council='bolton', after='untrusted')
+                # A forged ledger outcome cannot turn a saved identity into
+                # a verified fact; always roll back the disposable mutation.
+                boot.execute('BEGIN')
+                try:
+                    boot.execute(
+                        "UPDATE ingestion_work_items SET outcome="
+                        "jsonb_set(outcome::jsonb, '{verification_scope}', "
+                        "to_jsonb('INITIAL_STATUS_ONLY'::text))::json "
+                        "WHERE key=%s", (sc['fact']['key'],))
+                    with pytest.raises(Denied, match='FACT_READBACK_OUTCOME'):
+                        readback_committed_v3_facts(
+                            boot, pg['app'], sc['fact']['key'],
+                            council='bolton', reference='01780/26')
+                    with pytest.raises(Denied, match='FACT_READBACK_OUTCOME'):
+                        readback_committed_v3_facts_page(
+                            boot, pg['app'], council='bolton')
+                finally:
+                    boot.execute('ROLLBACK')
+                # A saved screening label is not evidence by itself:
+                # recompute its outcome, count assessment, exact code/config,
+                # capture-bound revision and retained source SHA.
+                original_screen = boot.execute(
+                    'SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',
+                    (sc['screen']['key'],)).fetchone()[0]
+                for tamper in ('ROUTE', 'COUNT_ASSESSMENT', 'RULE_CONFIG',
+                               'TASK_REVISION', 'SOURCE_DIGEST'):
+                    boot.execute('BEGIN')
+                    try:
+                        changed = copy.deepcopy(original_screen)
+                        if tamper == 'ROUTE':
+                            changed['outcome']['outcome'] = 'ADMIT_FOR_ASSESSMENT'
+                        elif tamper == 'COUNT_ASSESSMENT':
+                            changed['checkpoint']['count_assessment']['admission'] = 'RETAIN_BELOW_THRESHOLD'
+                        elif tamper == 'RULE_CONFIG':
+                            changed['checkpoint']['config']['unit_threshold'] = 999
+                        elif tamper == 'TASK_REVISION':
+                            changed['revision'] = '0' * 64
+                        else:
+                            changed['checkpoint']['source_sha256'] = '0' * 64
+                        boot.execute(
+                            'UPDATE ingestion_work_items SET revision=%s,'
+                            'checkpoint=%s::json,outcome=%s::json WHERE key=%s',
+                            (changed['revision'], json.dumps(changed['checkpoint']),
+                             json.dumps(changed['outcome']), sc['screen']['key']))
+                        # SOURCE_DIGEST is already rejected by the earlier
+                        # immutable-capture guard; other forgeries must be
+                        # rejected by independent v3 recomputation.
+                        rejection = ('FACT_READBACK_CAPTURE' if tamper == 'SOURCE_DIGEST'
+                                     else 'FACT_READBACK_SCREEN_RECOMPUTED')
+                        with pytest.raises(Denied, match=rejection):
+                            readback_committed_v3_facts(
+                                boot, pg['app'], sc['fact']['key'],
+                                council='bolton', reference='01780/26')
+                    finally:
+                        boot.execute('ROLLBACK')
+                    assert boot.execute(
+                        'SELECT row_to_json(w) FROM ingestion_work_items w WHERE key=%s',
+                        (sc['screen']['key'],)).fetchone()[0] == original_screen
+                # Simulate work-ledger drift after the separate B2 read,
+                # before emitting a saved-facts proof. Test-only SQL change.
+                class DriftAfterApplicationRead:
+                    def __init__(self, raw):
+                        self.raw = raw
+                        self.reads = 0
+
+                    def execute(self, statement, params):
+                        if statement.startswith("SELECT row_to_json(w)"):
+                            self.reads += 1
+                            if self.reads == 4:
+                                self.raw.execute(
+                                    'UPDATE ingestion_work_items SET reason=%s WHERE key=%s',
+                                    ('TEST_READBACK_CONCURRENT_DRIFT', sc['fact']['key']))
+                        return self.raw.execute(statement, params)
+
+                boot.execute('BEGIN')
+                try:
+                    drift = DriftAfterApplicationRead(boot)
+                    with pytest.raises(Denied, match='FACT_READBACK_LEDGER_CHANGED'):
+                        readback_committed_v3_facts(
+                            drift, pg['app'], sc['fact']['key'],
+                            council='bolton', reference='01780/26')
+                    assert drift.reads == 4
+                finally:
+                    boot.execute('ROLLBACK')
+                assert boot.execute(
+                    'SELECT reason FROM ingestion_work_items WHERE key=%s',
+                    (sc['fact']['key'],)).fetchone()[0] != 'TEST_READBACK_CONCURRENT_DRIFT'
+                # A changed committed B2 fact must be refused, not reported
+                # as though the first successful readback still applied.
+                with pg['app'].begin() as conn:
+                    conn.execute(text(
+                        "UPDATE applications SET status='Tampered' "
+                        "WHERE council_code='bolton' AND reference='01780/26'"))
+                with pytest.raises(Denied, match='FACT_READBACK_APPLICATION_CHANGED'):
+                    readback_committed_v3_facts(
+                        boot, pg['app'], sc['fact']['key'],
+                        council='bolton', reference='01780/26')
+                with pytest.raises(Denied, match='FACT_READBACK_APPLICATION_CHANGED'):
+                    readback_committed_v3_facts_page(
+                        boot, pg['app'], council='bolton')
+            else:
+                # A legacy Application is preserved and no factual task runs.
+                # This is NOT_ATTEMPTED, not a new admitted identity.
+                assert result['admission'] == 'NOT_ATTEMPTED'
+                assert calls == []
+                saved = boot.execute(
+                    "SELECT reference,status,proposal,site_id,estimated_unit_count "
+                    "FROM applications WHERE council_code='bolton'").fetchall()
+                assert saved == [('01780/26', 'Deposited',
+                                  'Previously saved legacy fact', None, None)]
+        else:
+            with pytest.raises(Denied):
+                execute_retained_v3(
+                    sc['co'], sc['binding'], detail_reader=detail, envelope=sc['envelope'],
+                    council=get_council('bolton'), check=sc['budget'].check)
+            assert calls == [] and boot.execute('SELECT count(*) FROM applications').fetchone()[0] == 0
+    finally:
+        costs = sc['budget'].close([])
+        assert costs['cleanup'] == 'CLOSED' and costs['connections_closed']

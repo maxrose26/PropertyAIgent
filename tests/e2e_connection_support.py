@@ -12,6 +12,7 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from app.ingestion.arcus_adapter import ArcusListingContract
+from app.ingestion.ledger import digest
 from app.ingestion.idox_adapter import IdoxListingContract
 from app.pipeline.discovery_contract import SOURCE_ROOTS
 from tests.test_discovery_idox_window import SORT, Response
@@ -135,7 +136,11 @@ def idox_contract(council, start, end, *, name=None, owner_acceptance=None):
     return IdoxListingContract(name or f'e2e-idox-{council}', idox_config(council, start, end), TEST_QUALIFICATION, owner_acceptance=owner_acceptance)
 
 
-def idox_detail_target(council, record, case='e2e_idox_detail'):
+def idox_detail_target(council, record, case=None):
+    # The accepted Tameside owner handoff seals the exact captured record into
+    # the case identity. Historical sealed Idox test targets use their own factory.
+    if case is None:
+        case = f'chain_idox_{council}_{digest(record)}' if council == 'tameside' else 'e2e_idox_detail'
     return dict(admission='ADMITTED_DIRECT_ROUTE', platform_family='IDOX', application_id=None, application_role='UNKNOWN', site_relationship='UNKNOWN',
                 case=case, council=council, reference=record['reference'], source_identifier=record['source_record_id'], source_url=record['source_url'])
 

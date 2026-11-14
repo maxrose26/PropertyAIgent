@@ -463,21 +463,45 @@ class Owner:
         worker={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(worker_text())}
         return {**cls.screening_v3_inventory(),**modified,'ingestion_worker_step':worker['ingestion_worker_step']}
 
-    def register_intake_period(self,name,policy):
+    def register_intake_period(self,name,policy,*,disposable_catchup=False):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
         Does not clear a stop, install SQL, provision a login or issue daily work.
         The SQL boundary verifies expiry, council list and expected stop snapshot.
         """
+        if not disposable_catchup and any(k in policy for k in ('catchup_scope','mode')):
+            # The frozen rolling issuer has no catch-up interpretation. Reject
+            # foreign metadata at the owner seam without altering its SQL body.
+            raise ValueError('INTAKE_ROLLING_SCOPE_ONLY')
+        if disposable_catchup:
+            # The exact nine-source finite manifest must be canonical, not a
+            # caller-supplied plausible-looking SHA. This is a test-only
+            # compatibility contract, not Trafford qualification or authority.
+            from verification.discovery.finite_acceptance import manifest,digest as manifest_digest
+            try:
+                scope=policy['catchup_scope']
+                expected=manifest_digest(manifest(scope['start'],scope['end'],'SUSPENSION_CATCHUP'))
+                if scope['source_plan_sha256']!=expected:
+                    raise ValueError('CATCHUP_SOURCE_PLAN_MISMATCH')
+            except (TypeError,KeyError,ValueError):
+                raise ValueError('CATCHUP_SOURCE_PLAN_MISMATCH') from None
         self.permitted_policy_states={'DAILY_INTAKE_APPLIED'}
         self.expected_generation=policy['expected_stop']['hard_stop_generation']
         with self.connection() as c:
             self.verify_installed(c)
+            if disposable_catchup:
+                from .intake_policy import policy_sql
+                versioned={m[1]:m[3] for m in self.FUNCTION_PATTERN.finditer(policy_sql(disposable_catchup=True))}
+                expected_sha=hashlib.sha256(versioned['ingestion_register_disposable_catchup'].encode()).hexdigest()
+                actual=self.q(c,"SELECT current_database(),encode(sha256(convert_to(prosrc,'UTF8')),'hex'),pg_get_userbyid(proowner),prosecdef FROM pg_proc WHERE oid='public.ingestion_register_disposable_catchup(jsonb)'::regprocedure")[0]
+                if actual!=('ingestion_provisioning_test',expected_sha,'ingestion_storage_owner',True):
+                    raise Uncertain('INTAKE_CATCHUP_ISSUER_IDENTITY')
             self.expected_generation=policy['expected_stop']['hard_stop_generation']
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            result=self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',
-                          (json.dumps(dict(operation='intake_period',period=name,policy=policy)),),effect=True)[0][0]
+            issuer='ingestion_register_disposable_catchup' if disposable_catchup else 'ingestion_register_bolton_exception'
+            result=self.q(c,'SELECT public.'+issuer+'(%s::jsonb)',
+                          (json.dumps(dict(operation='intake_catchup_period' if disposable_catchup else 'intake_period',period=name,policy=policy)),),effect=True)[0][0]
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)
             flags=self.q(c,"SELECT pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET')")[0]

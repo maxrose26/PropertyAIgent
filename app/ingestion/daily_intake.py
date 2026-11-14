@@ -87,6 +87,14 @@ def intake_slot(caller, root_key, collect, archive, prepare_screening, *, check=
             caller.settle_intake_failure(claim,category,source,outer,archive)
             return dict(status='INCOMPLETE',failure=category,council=root['subject']['council'],
                         records=[],coverage_advance=False,window_claim='NONE')
+        # A non-contained, incomplete audit is not a qualified capture. Only
+        # the selected private backend can preserve the original evidence;
+        # never promote it to a checkpoint, screening, or coverage claim.
+        if isinstance(source,dict) and source.get('failure'):
+            retain=getattr(caller,'retain_unqualified_source',None)
+            if retain is not None:
+                retain(source,outer,root)
+                raise Denied('INTAKE_UNQUALIFIED_SOURCE_EVIDENCE_ONLY')
         # Timestamp supplied by the supervised collection envelope, not retention
         # time or the historical date filter. Missing timestamp is a blocker.
         stamp=outer.get('observed_at')
@@ -153,12 +161,21 @@ def backlog(caller):
                         archive=capture['durable_archive'],screening_key=descriptor['key'] if descriptor else None,
                         screening_outcome=outcome,screening_state=row['state'] if row else 'NOT_PREPARED',
                         failure_reason=row['reason'] if row else None,
-                        processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
+                        processing_state=_screening_only_state(result) if result else 'AWAITING_SCREENING',
                         admission_eligible=identity_admission_eligible(result) if result else False,
                         application_admitted=False,extraction_complete=False))
     tasks=[{k:r[k] for k in ('key','task','state','phase','reason','attempt_count','next_action')} for r in rows.values()]
     return bounded(dict(records=out,tasks=tasks,coverage_advance=False,window_claim='NONE',extraction_consumer_connected=False),2*1024**2)
 
+
+
+def _screening_only_state(result):
+    """Expose the authoritative screening route, never factual admission.
+
+    This projection cannot prove an Application, verified units, coverage,
+    buyer qualification or downstream extraction. Unknown routes refuse.
+    """
+    return 'SCREENING_ONLY_'+routing_of(result)[1]
 
 def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=None):
     """Paginated restricted read across runs, no historical key inventory.
@@ -168,15 +185,19 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
     Separate observations remain separate with their original provenance.
     """
     import re
-    from sqlalchemy import select,cast
+    from sqlalchemy import select,cast,and_,or_
     from sqlalchemy.dialects.postgresql import JSONB
     from .schema import WorkItem as W
     if (type(limit) is not int or not 1<=limit<=3 or not 1<=len(councils)<=2
         or len(set(councils))!=len(councils) or len(contracts)!=len(councils)
         or after is not None and not re.fullmatch('[a-f0-9]{64}',after)):
         raise Denied('BACKLOG_PAGE_BOUND')
-    query=select(W).where(W.c.task=='DISCOVERY',W.c.subject['kind'].as_string()=='DISCOVERY_SCOPE',
-                         W.c.subject['council'].as_string().in_(councils),W.c.contract.in_(contracts))
+    # A cross-product of councils and contracts would admit a root under a
+    # different council's approved contract. Bind each exact pair instead.
+    paired=or_(*(and_(W.c.subject['council'].as_string()==c,
+                      W.c.contract==contract) for c,contract in zip(councils,contracts)))
+    query=select(W).where(W.c.task=='DISCOVERY',
+                          W.c.subject['kind'].as_string()=='DISCOVERY_SCOPE',paired)
     if after is not None:query=query.where(W.c.key>after)
     from contextlib import nullcontext
     with (nullcontext(connection) if connection is not None else ledger.worker_engine.begin()) as connection:
@@ -190,15 +211,98 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                                      reason=root['reason'],phase=root['phase'],attempt_count=root['attempt_count'],
                                      evidence=capture.get('durable_archive'),downstream_complete=False))
                 continue
-            if capture.get('council')!=root['subject']['council'] or not capture.get('durable_archive') or len(capture['records'])>60:
+            # COMPLETE alone is not proof of a usable listing: require the
+            # stored root, final receipt, and privately read-back archive to
+            # agree on the exact source evidence before exposing this backlog.
+            subject=root['subject'];archive=capture.get('durable_archive')
+            # Historical Bolton RECEIVED-v1 receipts omit date_semantics.
+            # Only this exact legacy contract can inherit its bound scope basis;
+            # explicit contradictory source evidence must still be rejected.
+            legacy_received_basis=(isinstance(subject,dict)
+                and subject.get('council')=='bolton'
+                and root['contract']=='bolton-received-idox-coordinator-v1'
+                and subject.get('semantics')=='RECEIVED'
+                and 'date_semantics' not in capture)
+            outcome=root['outcome'];source_sha=capture.get('source_sha256')
+            if (not isinstance(subject,dict) or not isinstance(archive,dict)
+                or not isinstance(outcome,dict) or not isinstance(source_sha,str)
+                or re.fullmatch('[a-f0-9]{64}',source_sha) is None
+                or archive.get('sha256')!=source_sha or archive.get('readback_verified') is not True
+                or outcome.get('outcome')!='ENUMERATED_METADATA_RETAINED'
+                or outcome.get('source_sha256')!=source_sha
+                or capture.get('accounting_complete') is not True
+                or capture.get('cleanup')!='CLOSED'
+                or capture.get('council')!=subject.get('council')
+                or capture.get('contract')!=root['contract']
+                or capture.get('interval')!=[subject.get('start'),subject.get('end')]
+                or (capture.get('date_semantics')!=subject.get('semantics') and not legacy_received_basis)
+                or not isinstance(capture.get('records'),list) or len(capture['records'])>60):
                 raise Denied('BACKLOG_CAPTURE_PROVENANCE')
-            screens=[dict(r) for r in connection.execute(select(W).where(W.c.task=='SCREENING',
-                cast(W.c.dependencies,JSONB)==[root['key']]).order_by(W.c.key).limit(61)).mappings()]
-            if len(screens)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
+            # Preserve historical v1/unbound v3 alongside an eventual bound
+            # v3 WITHOUT raising the 60-row SQL read or returned-item bound.
+            # Summarise all versions server-side; fetch only actionable rows.
+            from sqlalchemy import func,and_,or_
+            subject_json=cast(W.c.subject,JSONB)
+            scope=(W.c.task=='SCREENING',cast(W.c.dependencies,JSONB)==[root['key']])
+            bound_v3=and_(W.c.contract=='listing-screen-v3',
+                         W.c.checkpoint['capture_bound'].as_string()=='true')
+            selected=or_(W.c.state!='COMPLETE',bound_v3)
+            summaries=[dict(g) for g in connection.execute(
+                select(subject_json.label('subject'),
+                       func.count().label('total'),
+                       func.count().filter(W.c.contract=='listing-screen-v1').label('v1'),
+                       func.count().filter(W.c.contract=='listing-screen-v3').label('v3'),
+                       func.count().filter(bound_v3).label('bound'),
+                       func.count().filter(W.c.state!='COMPLETE').label('unfinished'),
+                       func.count().filter(selected).label('selected'))
+                .where(*scope).group_by(subject_json)
+                .order_by(subject_json).limit(61)).mappings()]
+            if len(summaries)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
+            expected_refs={r['reference'] for r in capture['records']}
+            if len(expected_refs)!=len(capture['records']):raise Denied('BACKLOG_DUPLICATE_CAPTURE_REFERENCE')
+            grouped={}
+            for g in summaries:
+                subject=g['subject']
+                if (not isinstance(subject,dict) or subject.get('reference') not in expected_refs
+                    or subject!=dict(kind='APPLICATION',council=capture['council'],
+                                     reference=subject.get('reference'))):
+                    raise Denied('BACKLOG_SCREENING_IDENTITY')
+                if g['total']!=g['v1']+g['v3']:
+                    raise Denied('BACKLOG_UNKNOWN_ASSESSMENT_CONTRACT')
+                if (g['v1']>1 or g['v3']>2 or g['bound']>1
+                    or g['v3']==2 and g['bound']!=1
+                    or g['unfinished'] and g['total']>1):
+                    raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                grouped[subject['reference']]=g
+            active=[dict(s) for s in connection.execute(
+                select(W).where(*scope,selected)
+                .order_by(W.c.key).limit(61)).mappings()]
+            if len(active)>60:raise Denied('BACKLOG_ASSESSMENT_OVERFLOW')
+            active_by_ref={}
+            for s in active:
+                sub=s['subject']
+                if (not isinstance(sub,dict) or sub.get('reference') not in grouped
+                    or sub!=dict(kind='APPLICATION',council=capture['council'],
+                                 reference=sub.get('reference'))):
+                    raise Denied('BACKLOG_SCREENING_IDENTITY')
+                active_by_ref.setdefault(sub['reference'],[]).append(s)
+            if any(len(active_by_ref.get(ref,[]))!=g['selected']
+                   for ref,g in grouped.items()):
+                raise Denied('BACKLOG_SCREENING_IDENTITY')
             for record in capture['records']:
-                matches=[s for s in screens if s['subject']==dict(kind='APPLICATION',council=capture['council'],reference=record['reference'])]
-                if len(matches)>1:raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
-                s=matches[0] if matches else None;result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
+                group=grouped.get(record['reference'])
+                matches=active_by_ref.get(record['reference'],[])
+                current=[m for m in matches if (m['contract']=='listing-screen-v3'
+                         and m['state']=='COMPLETE'
+                         and isinstance(m['checkpoint'],dict)
+                         and m['checkpoint'].get('capture_bound') is True)]
+                if len(current)!=(group['bound'] if group else 0):
+                    raise Denied('BACKLOG_MULTIPLE_ASSESSMENTS')
+                s=(current[0] if current else
+                   matches[0] if group and group['total']==1 and len(matches)==1
+                   and matches[0]['state']!='COMPLETE' else None)
+                result=s['checkpoint'] if s and s['state']=='COMPLETE' else None
+                unbound_legacy=bool(group) and not current and s is None
                 if result:
                     from .observation_screening import observation_revision
                     config=result.get('config')
@@ -214,11 +318,15 @@ def backlog_page(ledger,councils,contracts,rule,*,after=None,limit=3,connection=
                 records.append(dict(council=capture['council'],reference=record['reference'],source_record_id=record['source_record_id'],
                     source_url=record['source_url'],fields=record['fields'],observed_at=capture.get('observed_at'),
                     capture_key=root['key'],capture_sha256=digest(capture),source_sha256=capture['source_sha256'],archive=capture['durable_archive'],
-                    screening_key=s['key'] if s else None,screening_state=s['state'] if s else 'NOT_PREPARED',
+                    screening_key=s['key'] if s else None,
+                    screening_state=('HISTORICAL_UNBOUND_REQUIRES_RESCREENING' if unbound_legacy else
+                                     s['state'] if s else 'NOT_PREPARED'),
+                    historical_screening_items=group['total'] if group else 0,
                     screening_outcome=routing_of(result)[1] if result else None,
                     screening_config_sha256=result.get('config_sha256') if result else None,
                     screening_matches_current_rule=result.get('config_sha256')==digest(rule.config()) if result else None,
-                    processing_state='AWAITING_LATER_ASSESSMENT_OR_EXTRACTION' if result else 'AWAITING_SCREENING',
+                    processing_state=('HISTORICAL_RESCREENING_REQUIRED' if unbound_legacy else
+                                      _screening_only_state(result) if result else 'AWAITING_SCREENING'),
                     application_admitted=None,extraction_complete=None,downstream_state='NOT_TRACKED_BY_INTAKE'))
     captures=[dict(capture_key=r['key'],council=r['subject']['council'],scope=r['subject'],
                    record_count=len((r['checkpoint'] or {}).get('records',[])),

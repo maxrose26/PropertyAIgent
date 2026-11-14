@@ -61,3 +61,139 @@ def capacity(rows,limits, *, profiled=False):
 
 def input_from_manifest(value):
     return {k:value[k] for k in (INPUT_KEYS|{'collection_mode'} if 'collection_mode' in value else INPUT_KEYS)}
+
+
+INITIAL_TWO_SLOT_VERSION='NINE_COUNCIL_INITIAL_28D_DAY_ALIGNED_SOURCE_PROOF_V1'
+
+
+def initial_two_slot_packages(plan, expected_sha256):
+    """Pure, NON-AUTHORISING nine-council source-package compatibility proof.
+
+    No PostgreSQL issuance, collection permission, source qualification or
+    retention is established by this structural proof.
+    """
+    from .four_council_release import SUCCESSOR_V2_LIMITS
+    try:
+        if not isinstance(plan,dict) or set(plan)!={'purpose','start','end','rule','limits','rows'}:
+            raise ValueError()
+        first,last=date.fromisoformat(plan['start']),date.fromisoformat(plan['end'])
+        if (last-first).days!=27 or plan['purpose']!='PROSPECTIVE':raise ValueError()
+        canonical=finite.manifest(plan['start'],plan['end'],'PROSPECTIVE')
+        if plan!=canonical or expected_sha256!=finite.digest(canonical):raise ValueError()
+        if len(finite.SEMANTICS)!=9 or 'bolton' not in finite.SEMANTICS or len(plan['rows'])!=36:
+            raise ValueError()
+        if any(sum(row['council']==c for row in plan['rows'])!=4 for c in finite.SEMANTICS):
+            raise ValueError()
+    except (ValueError,KeyError,TypeError,OverflowError):
+        raise ValueError('INITIAL_28_MANIFEST_UNVERIFIED') from None
+    arcus=[i for i,row in enumerate(plan['rows']) if row['council'] in finite.ARCUS]
+    idox=[i for i,row in enumerate(plan['rows']) if row['council'] not in finite.ARCUS]
+    if len(arcus)!=12 or len(idox)!=24:raise ValueError('INITIAL_28_FAMILY_COUNTS')
+    # Connected intake finalisation binds ONE end date. Source-only packing
+    # across dates would falsely imply that the current SQL can finalise it.
+    groups=[]
+    for day in sorted({row['end'] for row in plan['rows']}):
+        week_arcus=[i for i in arcus if plan['rows'][i]['end']==day]
+        week_idox=[i for i in idox if plan['rows'][i]['end']==day]
+        if len(week_arcus)!=3 or len(week_idox)!=6:
+            raise ValueError('INITIAL_28_WEEK_PARTITION')
+        groups += [[week_arcus[i],week_idox[i]] for i in range(3)]
+        groups += [[week_idox[3],week_idox[4]],[week_idox[5]]]
+    if len(groups)!=20 or sorted(i for g in groups for i in g)!=list(range(36)):
+        raise ValueError('INITIAL_28_PARTITION')
+    packages=[]
+    for ordinal,group in enumerate(groups,1):
+        payload=dict(finite_manifest=plan,finite_manifest_sha256=expected_sha256,
+                     selected_ordinals=sorted(group),collection_mode='SCREENING_METADATA')
+        rows=select(payload,profiled=True)
+        reservation=capacity(rows,SUCCESSOR_V2_LIMITS,profiled=True)
+        if not 1<=len(rows)<=2 or reservation['observations']!=len(rows) or reservation['requests']>100 or len({r['end'] for r in rows})!=1 or len({r['council'] for r in rows})!=len(rows):
+            raise ValueError('INITIAL_28_TWO_SOURCE_CAP')
+        packages.append(dict(ordinal=ordinal,selected_ordinals=payload['selected_ordinals'],
+                             reservation=reservation))
+    return dict(version=INITIAL_TWO_SLOT_VERSION,manifest_sha256=expected_sha256,
+                window=[plan['start'],plan['end']],packages=packages,
+                sql_issuer_qualified=False,source_qualified=False,
+                initial_capture_authorised=False,operationally_usable=False)
+
+
+# PA-D004 v1.2: purely structural shutdown-gap planning. No source/SQL authority.
+SHUTDOWN_GAP_SOURCE_VERSION='TEN_COUNCIL_SHUTDOWN_GAP_OFFLINE_BOUNDARY_V1'
+SHUTDOWN_GAP_FALLBACK=date(2026,9,15)
+REVIEWED_NINE=frozenset({'bolton','bury','manchester','oldham','rochdale',
+                         'salford','stockport','tameside','wigan'})
+
+
+def shutdown_gap_source_packages(as_of):
+    """Freeze an execution-date catch-up inventory, not an executable manifest.
+
+    The existing nine-council <=7-day source profiles can be *structurally*
+    packed into independently bounded packages. Trafford is an explicit
+    unqualified tenth source on every interval; never invent its contract,
+    route, denominator, qualification or SQL permit. A separate exact owner
+    decision is still required for any live batch or persistence.
+    """
+    from datetime import datetime,timedelta
+    from zoneinfo import ZoneInfo
+    from .four_council_release import SUCCESSOR_V2_LIMITS
+    if type(as_of) is not datetime or as_of.utcoffset() is None:
+        raise ValueError('SHUTDOWN_AWARE_CLOCK_REQUIRED')
+    observed=as_of.astimezone(ZoneInfo('Europe/London'))
+    final=observed.date()
+    if final<SHUTDOWN_GAP_FALLBACK:
+        raise ValueError('SHUTDOWN_DATE_BEFORE_FALLBACK')
+    # Refuse registry drift rather than making a newly configured council
+    # appear qualified for collection or automatically changing the budget.
+    if set(finite.SEMANTICS)!=REVIEWED_NINE or finite.ARCUS!=frozenset({'manchester','rochdale','salford'}):
+        raise ValueError('SHUTDOWN_SOURCE_REGISTRY_CHANGED')
+    cursor=SHUTDOWN_GAP_FALLBACK
+    windows=[]
+    while cursor<=final:
+        stop=min(cursor+timedelta(days=6),final)
+        start_text,end_text=cursor.isoformat(),stop.isoformat()
+        plan=finite.manifest(start_text,end_text,'SUSPENSION_CATCHUP')
+        sha=finite.digest(plan)
+        if len(plan['rows'])!=9 or {r['council'] for r in plan['rows']}!=REVIEWED_NINE:
+            raise ValueError('SHUTDOWN_NINE_MANIFEST_MISMATCH')
+        arcus=[i for i,r in enumerate(plan['rows']) if r['council'] in finite.ARCUS]
+        idox=[i for i,r in enumerate(plan['rows']) if r['council'] not in finite.ARCUS]
+        if len(arcus)!=3 or len(idox)!=6:
+            raise ValueError('SHUTDOWN_SOURCE_FAMILY_MISMATCH')
+        # The current private-store budget permits at most two captures. Keep
+        # all selected source rows on ONE end date (SQL finish is day bound).
+        groups=[[arcus[i],idox[i]] for i in range(3)]
+        groups.extend(([idox[3],idox[4]],[idox[5]]))
+        packages=[]
+        for n,group in enumerate(groups,1):
+            payload=dict(finite_manifest=plan,finite_manifest_sha256=sha,
+                         selected_ordinals=sorted(group),collection_mode='SCREENING_METADATA')
+            rows=select(payload,profiled=True)
+            reservation=capacity(rows,SUCCESSOR_V2_LIMITS,profiled=True)
+            if len(rows)>2 or reservation['requests']>100 or len({r['end'] for r in rows})!=1:
+                raise ValueError('SHUTDOWN_TWO_SOURCE_BOUND')
+            packages.append(dict(ordinal=n,selected_ordinals=payload['selected_ordinals'],
+                                 reservation=reservation))
+        if sorted(i for p in packages for i in p['selected_ordinals'])!=list(range(9)):
+            raise ValueError('SHUTDOWN_MISSING_OR_DUPLICATE_NINE')
+        windows.append(dict(start=start_text,end=end_text,finite_manifest=plan,
+                            finite_manifest_sha256=sha,packages=packages,
+                            source_only_scopes=9,
+                            unqualified_tenth=dict(council='trafford',start=start_text,end=end_text,
+                                configured_date_basis='RECEIVED_NOT_QUALIFIED',
+                                status='SOURCE_CONTRACT_AND_SQL_SCOPE_UNQUALIFIED'),
+                            end_day_incomplete=(stop==final)))
+        cursor=stop+timedelta(days=1)
+    return dict(version=SHUTDOWN_GAP_SOURCE_VERSION,
+                as_of_london=observed.isoformat(),fallback_start=SHUTDOWN_GAP_FALLBACK.isoformat(),
+                endpoint_date=final.isoformat(),
+                fallback_is_verified_shutdown=False,
+                earlier_proven_gaps_reconciled=False,
+                per_council_last_contiguous_coverage='UNKNOWN',
+                required_councils=sorted(REVIEWED_NINE|{'trafford'}),
+                total_date_scopes=10*len(windows),
+                nine_source_shape_scopes=9*len(windows),
+                trafford_unqualified_scopes=len(windows),
+                windows=windows,
+                sql_issuer_qualified=False,source_qualified=False,
+                collection_authorised=False,stored_records_verified=False,
+                entire_day_coverage_proven=False)

@@ -217,7 +217,12 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
         if fault=='authority_expires':assert v3_count==0 or v3_count<29      # the lapsed allowance created at most what it covered, and nothing after expiry
         assert retained_snapshot(w,retained_keys)==snapshot_before
         return
-    assert result['authority_invalidation']=='ACKNOWLEDGED_READBACK'
+    # Publication failure can occur after authority was already invalidated; a second
+    # cleanup must independently read back the expired grant, not report uncertainty.
+    if fault=='owner_publication_fails':
+        assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK')
+    else:
+        assert result['authority_invalidation']=='ACKNOWLEDGED_READBACK'
     assert v3_count==29 and w.boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()[0]==items_before+29      # exactly five new batch rows and 24 v3 children
     assert all(state=='COMPLETE' for _,state in w.items())
     admissions={}
@@ -242,4 +247,4 @@ def test_screening_v3_lifecycle(world,fault,monkeypatch):
         print('SV3_LIFECYCLE_MEASURED',json.dumps(dict(owner_commands=orunner.owner.commands,owner_connections=orunner.owner.connections,owner_github_requests=orunner.github.requests,hosted_statements=totals['statements'],hosted_connections=totals['connections'],
                                                       hosted_returned_bytes=totals['returned_bytes'],hosted_supervised_seconds=round(totals['seconds'],2),policy_commands=prunner.owner.commands,policy_connections=prunner.owner.connections,hosted_elapsed=hosted_final['accounting'].get('database_active_seconds')),sort_keys=True))
     if fault=='owner_publication_fails':      # a reporting failure after confirmed invalidation: the invalidation is preserved, the publication is reported as uncertain
-        assert result['authority_invalidation']=='ACKNOWLEDGED_READBACK' and result['publication'].startswith('UNCERTAIN') and result['status'].endswith('_PUBLICATION_UNCERTAIN') and ctl_after['grants'][NAME]['expires_at']==0
+        assert result['authority_invalidation'] in ('ACKNOWLEDGED_READBACK','ALREADY_INVALIDATED_READBACK') and result['publication'].startswith('UNCERTAIN') and result['status'].endswith('_PUBLICATION_UNCERTAIN') and ctl_after['grants'][NAME]['expires_at']==0
