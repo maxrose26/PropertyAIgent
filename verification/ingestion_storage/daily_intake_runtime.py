@@ -173,13 +173,20 @@ class Runtime:
         """
         from app.ingestion.private_evidence import READ_FUNCTION_SHA256,WRITE_FUNCTION_SHA256
         names=['ingestion_intake_evidence_read','ingestion_intake_evidence_write']
+        # The installed owner-only reader also grants EXECUTE to the
+        # PostgreSQL owner login. The writer must remain worker-only.
+        # Test exact permitted grantees; an unexpected PUBLIC/third-party
+        # grantee or any extra writer grantee must still refuse.
         rows=connection.execute(text(
             "SELECT p.proname,encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),"
             "r.rolname,p.prosecdef,p.proconfig,"
             "pg_catalog.pg_get_function_identity_arguments(p.oid),"
             "pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE'), "
-            "coalesce((SELECT bool_and(acl.grantee='ingestion_worker'::regrole "
-            "AND acl.privilege_type='EXECUTE' AND NOT acl.is_grantable) "
+            "coalesce((SELECT bool_and(acl.privilege_type='EXECUTE' "
+            "AND NOT acl.is_grantable AND ("
+            "acl.grantee='ingestion_worker'::regrole OR "
+            "(p.proname='ingestion_intake_evidence_read' "
+            "AND pg_catalog.pg_get_userbyid(acl.grantee)='postgres'))) "
             "FROM pg_catalog.aclexplode(coalesce(p.proacl, "
             "pg_catalog.acldefault('f',p.proowner))) acl "
             "WHERE acl.grantee<>p.proowner),false) "
