@@ -46,6 +46,13 @@ def test_pinned_settlement_then_successor(failed_bolton, monkeypatch, tmp_path):
         c.execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)', (json.dumps(seed),))
     else:
         assert found[0] == seed
+    # The reused fixtures execute historical runs now, so their finite policy
+    # deadlines are initially in the future. Model the historical expiry BEFORE
+    # settlement, under STOP; no receipt/settlement output is manufactured.
+    ctl = op.control(c)
+    for policy in ctl['intake_periods'].values():
+        policy['expires_at'] = 0
+    c.execute('UPDATE ingestion_work_items SET outcome=%s::json WHERE key=%s', (json.dumps(ctl), op.CONTROL))
     w['all_other'] = s.all_other_work_sha(c)
     assert op.stop_snapshot(op.control(c)) == s.STOP14
     before = op.ledger_sha(c)

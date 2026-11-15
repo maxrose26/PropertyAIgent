@@ -2401,6 +2401,8 @@ def _continue_s4_04_recovery(world,tmp_path):
             released = _disposable_release(disposable,release_payload)
             assert released['hard_stop_generation'] == 16
             assert released['status'] == 'DISPOSABLE_ONLY_STOP_RELEASED'
+            with pytest.raises(Exception,match='DISPOSABLE_STOP_GENERATION_OR_MARKER'):
+                _disposable_release(disposable,release_payload)
             assert boot.execute(
                 'SELECT row_to_json(a) FROM ingestion_work_attempts a '
                 'WHERE work_key=ANY(%s) ORDER BY work_key,fence',
@@ -2467,6 +2469,10 @@ def _continue_s4_04_recovery(world,tmp_path):
             assert all(hashlib.sha256(body).hexdigest()==sha
                        for _,body,sha in private)
             assert boot.execute(
+                "SELECT period,run_id,name,encode(body,'hex'),sha256,created_at "
+                "FROM ingestion_run_evidence WHERE period<>'test-connected-poststop-tameside' "
+                "ORDER BY period,run_id,name").fetchall() == saved_before
+            assert boot.execute(
                 'SELECT to_jsonb(w) FROM ingestion_work_items w WHERE key=%s',
                 (salford_key,)).fetchone()[0] == salford_before
             assert boot.execute(
@@ -2486,9 +2492,13 @@ def test_s4_04_pinned_settlement_writer_transition_and_private_tameside_cli(tmp_
     pin = Path(pin).resolve()
     assert subprocess.check_output(['git','-C',str(pin),'rev-parse','HEAD'],text=True).strip() == 'f027ba28af69ae70208eab5ed047e4a8a81c6337'
     report = tmp_path/'connected-recovery.json'
+    # Keep the new harness outside both 'tests' packages. Otherwise pytest's
+    # package discovery can select #227/tests before the pinned fixture imports.
+    helper = tmp_path/'pinned_recovery_stage.py'
+    helper.write_bytes(Path('tests/pinned_bolton_recovery_stage.py').read_bytes())
     env = dict(os.environ, PYTHONPATH=str(pin), S4_SUCCESSOR_ROOT=str(Path.cwd()),
                S4_RECOVERY_REPORT=str(report), S4_SALFORD_SEED=json.dumps(_historical_salford_seed()))
-    run = subprocess.run([sys.executable,'-m','pytest',str(Path('tests/pinned_bolton_recovery_stage.py').resolve()),
+    run = subprocess.run([sys.executable,'-m','pytest',str(helper), '--rootdir',str(pin),
                           '--import-mode=importlib','-q','-p','no:cacheprovider','--basetemp',str(tmp_path/'pinned')],
                          cwd=pin,env=env,capture_output=True,text=True,timeout=150)
     assert run.returncode == 0, run.stdout[-20000:] + run.stderr[-4000:]

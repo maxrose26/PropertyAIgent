@@ -26,6 +26,11 @@ def main():
         assert boot.info.server_version >= 170000
         oid = boot.execute('SELECT oid FROM pg_database WHERE datname=current_database()').fetchone()[0]
         assert oid == state['database_oid']
+        ledger_sha = boot.execute("""SELECT encode(sha256(convert_to(jsonb_build_object(
+            'items',(SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY key),'[]') FROM ingestion_work_items w),
+            'attempts',(SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY work_key,fence),'[]') FROM ingestion_work_attempts a)
+            )::text,'UTF8')),'hex')""").fetchone()[0]
+        assert ledger_sha == state['settlement_ledger_sha256'], 'NO_RESET_BETWEEN_CHECKOUTS'
         w = dict(boot=boot,connect=connect,urls=state['urls'],pinned_settlement=True)
         before = _recovery_control(w)
         assert before['hard_stop_generation'] == 15
@@ -63,6 +68,7 @@ def main():
         print(json.dumps(dict(status='CONNECTED_RECOVERY_PROVEN',same_database=True,
               postgres_version=boot.info.server_version,settlement_revision='f027ba28af69ae70208eab5ed047e4a8a81c6337',
               generations=[14,15,16],settlement_readback=state['settlement'],
+              committed_seam_sha256=ledger_sha,
               evidence_independent_readback=rows,synthetic_listing_records=1,
               backlog_independent_readback=True,
               screening='COMPLETE',coverage_advance=False,qualification=False,
