@@ -2297,6 +2297,14 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world
         boot.execute(Path('tests/fixtures/pa_d002_private_postgres.sql').read_text())
         boot.execute('ALTER TABLE public.ingestion_run_evidence ENABLE ROW LEVEL SECURITY')
         boot.execute('ALTER TABLE public.ingestion_run_evidence FORCE ROW LEVEL SECURITY')
+        # Match the installed owner-only RLS policy, confirmed SELECT-only in
+        # production on 15 Nov. FORCE RLS without this policy would reject the
+        # correctly scoped restricted SECURITY DEFINER writer after stop release.
+        # The test creates it on disposable PG only; the candidate migration
+        # does not add/alter policies or relax production RLS.
+        boot.execute('CREATE POLICY ingestion_evidence_owner ON '
+                     'public.ingestion_run_evidence FOR ALL '
+                     'TO ingestion_storage_owner USING (true) WITH CHECK (true)')
         boot.execute('CREATE ROLE postgres NOLOGIN')
         try:
             boot.execute('GRANT EXECUTE ON FUNCTION public.'
