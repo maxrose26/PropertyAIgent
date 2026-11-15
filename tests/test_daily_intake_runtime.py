@@ -2269,3 +2269,197 @@ def test_shared_stop_release_preserves_exact_salford_after_rollback_and_success(
     assert result['no_work_issued'] is True
     assert c.execute("SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s",(key,)).fetchone()[0]==before
     assert c.execute("SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=%s",(key,)).fetchone()[0]==0
+
+
+def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(tmp_path):
+    """One fixed disposable PG17 state, real SQL transitions and actual CLI.
+
+    This starts AFTER a simulated #213 Bolton settlement. Six historical
+    dispositions are explicitly TEST-ONLY assumptions, not independently
+    authenticated physical source/cleanup facts. It closes a different seam:
+    stopped generation 15 + complete six-key census + original Salford audit
+    -> exact old-writer function replacement -> conditional generation 16
+    release -> restricted Tameside capture/screen and committed private readback.
+    The #213 owner-command 14->15 seam and real per-key review remain NO-GO.
+    """
+    import hashlib
+    from tests.e2e_pg_world import disposable_world
+    from verification.ingestion_storage import intake_policy
+    from verification.ingestion_storage.operational_owner import item
+    from verification.ingestion_storage.daily_intake_runtime import LIVE_PRIVATE_EVIDENCE_RELEASE
+
+    assert LIVE_PRIVATE_EVIDENCE_RELEASE is False
+    for disposable in disposable_world():
+        with disposable['connect']('provisioning_migrator') as migrator:
+            migrator.execute(intake_policy.installation_script(disposable_catchup=True))
+        boot = disposable['boot']
+        boot.execute(Path('tests/fixtures/pa_d002_private_postgres.sql').read_text())
+        boot.execute('ALTER TABLE public.ingestion_run_evidence ENABLE ROW LEVEL SECURITY')
+        boot.execute('ALTER TABLE public.ingestion_run_evidence FORCE ROW LEVEL SECURITY')
+        boot.execute('CREATE ROLE postgres NOLOGIN')
+        try:
+            boot.execute('GRANT EXECUTE ON FUNCTION public.'
+                         'ingestion_intake_evidence_read(text,text,text) TO postgres')
+            boot.execute(Path('tests/fixtures/pa_d002_installed_writer.sql').read_text())
+            old_writer = boot.execute(
+                "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
+                "FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write("
+                "text,text,text,bytea)'::regprocedure").fetchone()[0]
+            assert old_writer == '8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
+
+            stopped = _settled_fixture(disposable)
+            assert stop_snapshot(stopped)['hard_stop_generation'] == 15
+            salford_key = _historical_salford_seed()['key']
+            salford_before = boot.execute(
+                'SELECT to_jsonb(w) FROM ingestion_work_items w WHERE key=%s',
+                (salford_key,)).fetchone()[0]
+            assert salford_before == _historical_salford_seed()
+            # A real existing-table row must survive the replacement unchanged.
+            historical_body = b'{"preserve":"no-replay"}'
+            boot.execute(
+                "INSERT INTO public.ingestion_run_evidence"
+                "(period,run_id,name,body,sha256) VALUES"
+                "('historical-private','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',"
+                "'final/result-before-publication.json',%s,"
+                "encode(sha256(%s),'hex'))",
+                (historical_body,historical_body))
+            saved_before = boot.execute(
+                'SELECT period,run_id,name,encode(body,\'hex\'),sha256,created_at '
+                'FROM public.ingestion_run_evidence ORDER BY period,run_id,name').fetchall()
+
+            keys = []
+            for key,council,semantics,start,end,contract,revision,authority in _HISTORICAL_ABANDONED_IDENTITIES:
+                identity = dict(
+                    subject=dict(kind='DISCOVERY_SCOPE',council=council,
+                                 semantics=semantics,start=start,end=end),
+                    task='DISCOVERY',contract=contract,revision=revision)
+                row = item(identity,max_attempts=1 if council=='bolton' else 2)
+                assert row['key'] == key
+                row.update(state='SAFETY_BLOCKED',phase='RECOVERED',fence=2,
+                           attempt_count=1,owner=None,lease_until=None,
+                           checkpoint=None,authority=authority,
+                           reason='ABANDONED_SOURCE_INTENT',next_action='RECONCILE',
+                           outcome=dict(outcome='ABANDONED_SOURCE_INTENT',
+                                        source_or_write_replay_authorised=False))
+                boot.execute(
+                    'INSERT INTO public.ingestion_work_items SELECT * FROM '
+                    'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
+                    (json.dumps(row),))
+                boot.execute(
+                    'INSERT INTO public.ingestion_work_attempts '
+                    '(work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint) '
+                    "VALUES (%s,1,'required_once',0,100,%s,'RECOVERED',%s::json,NULL)",
+                    (key,authority,json.dumps(row['outcome'])))
+                keys.append(key)
+            assert len(set(keys)) == 6
+            attempts_before = boot.execute(
+                'SELECT row_to_json(a) FROM ingestion_work_attempts a '
+                'WHERE work_key=ANY(%s) ORDER BY work_key,fence',(keys,)).fetchall()
+            assert len(attempts_before) == 6
+            release_payload = dict(operation='S4_DISPOSABLE_BOLTON_STOP_RELEASE_V1',
+                                   expected_stop=stop_snapshot(stopped))
+            with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+                _disposable_release(disposable,release_payload)
+            assert _recovery_control(disposable) == stopped
+
+            # Exact pre-existing-table, exact expected-old-fingerprint SQL
+            # replacement is valid under STOP at generation 15 despite all six
+            # outstanding keys. This SQL does not dispose or change those keys.
+            boot.execute(Path(
+                'verification/ingestion_storage/private_evidence_writer_transition.sql'
+                ).read_text())
+            new_writer = boot.execute(
+                "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
+                "FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write("
+                "text,text,text,bytea)'::regprocedure").fetchone()[0]
+            assert new_writer == '4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77'
+            assert _recovery_control(disposable) == stopped
+            assert boot.execute(
+                'SELECT period,run_id,name,encode(body,\'hex\'),sha256,created_at '
+                'FROM public.ingestion_run_evidence ORDER BY period,run_id,name'
+                ).fetchall() == saved_before
+            with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+                _disposable_release(disposable,release_payload)
+
+            # CONDITIONAL reachability only: these six synthetic metadata
+            # changes stand in for distinct, NOT-YET-GIVEN reviewer dispositions.
+            # They cannot be copied as an operational recovery recipe.
+            for index,key in enumerate(keys):
+                boot.execute(
+                    "UPDATE public.ingestion_work_items SET state='DEFERRED',"
+                    "phase='FINISHED',reason='SYNTHETIC_DISPOSITION_NOT_AUTHORISED',"
+                    "next_action='PRESERVE_HISTORY_NO_REPLAY',"
+                    "checkpoint=%s::json,outcome=%s::json WHERE key=%s "
+                    "AND state='SAFETY_BLOCKED' AND phase='RECOVERED'",
+                    (json.dumps(dict(test_only=True,source_effect_status='UNKNOWN',
+                                     reviewer_evidence='NOT_SUPPLIED',coverage='UNKNOWN')),
+                     json.dumps(dict(outcome='TEST_ONLY_ASSUMED_DISPOSITION',
+                                     coverage='UNKNOWN',
+                                     source_or_write_replay_authorised=False)),key))
+                if index != len(keys)-1:
+                    with pytest.raises(Exception,match='DISPOSABLE_OUTSTANDING_EFFECT_OR_AUTHORITY'):
+                        _disposable_release(disposable,release_payload)
+            assumed_before = boot.execute(
+                'SELECT row_to_json(w) FROM public.ingestion_work_items w '
+                'WHERE key=ANY(%s) ORDER BY key',(keys,)).fetchall()
+            assert all(r[0]['checkpoint']['reviewer_evidence']=='NOT_SUPPLIED'
+                       and r[0]['outcome']['coverage']=='UNKNOWN'
+                       for r in assumed_before)
+            assert _disposable_release(disposable,release_payload,rollback=True)['no_work_issued']
+            assert _recovery_control(disposable) == stopped
+            released = _disposable_release(disposable,release_payload)
+            assert released['hard_stop_generation'] == 16
+            assert released['status'] == 'DISPOSABLE_ONLY_STOP_RELEASED'
+            assert boot.execute(
+                'SELECT row_to_json(a) FROM ingestion_work_attempts a '
+                'WHERE work_key=ANY(%s) ORDER BY work_key,fence',
+                (keys,)).fetchall() == attempts_before
+            assert boot.execute(
+                'SELECT row_to_json(w) FROM public.ingestion_work_items w '
+                'WHERE key=ANY(%s) ORDER BY key',(keys,)).fetchall() == assumed_before
+            assert boot.execute(
+                'SELECT to_jsonb(w) FROM ingestion_work_items w WHERE key=%s',
+                (salford_key,)).fetchone()[0] == salford_before
+
+            # Issue the existing restricted Tameside-only period at a fresh
+            # generation-16 stop snapshot, then run the REAL daily CLI with
+            # SYNTHETIC Idox evidence, NOT a council request or live grant.
+            p = policy(disposable)
+            p['councils'] = {'tameside':p['councils']['tameside']}
+            p['max_runs'] = 1
+            p['evidence_backend'] = 'POSTGRES_PILOT_V1'
+            registration = authorise(disposable,'test-connected-poststop-tameside',p)
+            assert registration['expected_stop']['hard_stop_generation'] == 16
+            run,result,_ = invoke(disposable,tmp_path,
+                                  'test-connected-poststop-tameside',count=1)
+            assert run.returncode == 0, (result.get('status'),result.get('reason'))
+            assert result['status'] == 'RETAINED_AND_SCREENED'
+            assert result['publication'] == 'TEST_PRIVATE_SUMMARY'
+            assert result['cleanup'] == 'CLOSED'
+            assert result['authority_closure'] == 'INVALIDATED'
+            assert result['coverage_advance'] is False
+            assert result['admission_connected'] is False
+            assert result['extraction_connected'] is False
+            assert len(result['backlog']['records']) == 1
+            assert result['backlog']['records'][0]['screening_state'] == 'COMPLETE'
+            assert result['backlog']['records'][0]['archive']['readback_verified'] is True
+            private = boot.execute(
+                'SELECT name,body,sha256 FROM public.ingestion_run_evidence '
+                "WHERE period='test-connected-poststop-tameside' ORDER BY name"
+                ).fetchall()
+            assert {name for name,_,_ in private} == {
+                'capture-1/source.json','final/result-before-publication.json',
+                'final/events-before-publication.json'}
+            assert all(hashlib.sha256(body).hexdigest()==sha
+                       for _,body,sha in private)
+            assert boot.execute(
+                'SELECT to_jsonb(w) FROM ingestion_work_items w WHERE key=%s',
+                (salford_key,)).fetchone()[0] == salford_before
+            assert boot.execute(
+                'SELECT row_to_json(a) FROM ingestion_work_attempts a '
+                'WHERE work_key=ANY(%s) ORDER BY work_key,fence',
+                (keys,)).fetchall() == attempts_before
+        finally:
+            boot.execute('REVOKE EXECUTE ON FUNCTION public.'
+                         'ingestion_intake_evidence_read(text,text,text) FROM postgres')
+            boot.execute('DROP ROLE postgres')
