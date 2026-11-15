@@ -569,6 +569,16 @@ class Runtime:
             result['failure']=type(error).__name__
             if isinstance(error,Denied):result['reason']=str(error)[:120]
             original=getattr(error,'orig',None)
+            if self.test and original is not None and not result.get('reason'):
+                # Fixed loopback PostgreSQL fixture ONLY. A bounded SQLSTATE/
+                # diagnostic identifier helps identify a new contract seam,
+                # never raw exception text, SQL parameters or source records.
+                import re
+                code=getattr(original,'sqlstate',None)
+                primary=getattr(getattr(original,'diag',None),'message_primary',None)
+                if type(code) is str and re.fullmatch('[A-Z0-9]{5}',code):
+                    clue=re.sub('[^A-Z0-9_]+','_',str(primary).upper())[:60] if primary else 'NO_PRIMARY'
+                    result['reason']='TEST_SQLSTATE_'+code+'_'+clue
             if original is not None and getattr(original,'sqlstate',None)=='P0001':
                 import re
                 message=original.diag.message_primary
