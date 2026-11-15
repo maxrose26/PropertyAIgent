@@ -2433,7 +2433,30 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world
             assert registration['expected_stop']['hard_stop_generation'] == 16
             run,result,_ = invoke(disposable,tmp_path,
                                   'test-connected-poststop-tameside',count=1)
-            assert run.returncode == 0, (result.get('status'),result.get('reason'))
+            if run.returncode != 0:
+                # Synthetic-fixture-only failure metadata: never emit source
+                # bodies, archive bytes, urls, record content or credentials.
+                events_file = tmp_path/'result'/'events.json'
+                events = json.loads(events_file.read_text()) if events_file.exists() else []
+                ctl_after = _recovery_control(disposable)
+                private_names = boot.execute(
+                    'SELECT name FROM public.ingestion_run_evidence '
+                    "WHERE period='test-connected-poststop-tameside' ORDER BY name"
+                    ).fetchall()
+                failure = dict(
+                    status=result.get('status'),failure=result.get('failure'),
+                    reason=result.get('reason'),publication=result.get('publication'),
+                    cleanup=result.get('cleanup'),
+                    authority_closure=result.get('authority_closure'),
+                    stop_readback=result.get('stop_readback'),
+                    scope_statuses=[(s.get('council'),s.get('status'),
+                                     s.get('failure')) for s in result.get('scopes',[])],
+                    event_kinds=[e.get('event') for e in events][-16:],
+                    private_names=[n[0] for n in private_names],
+                    stop=stop_snapshot(ctl_after),
+                    intake_state=(ctl_after.get('intake_run') or {}).get('state'))
+                pytest.fail('S4_DISPOSABLE_CONNECTED_DIAGNOSTIC '+json.dumps(failure,sort_keys=True))
+
             assert result['status'] == 'RETAINED_AND_SCREENED'
             assert result['publication'] == 'TEST_PRIVATE_SUMMARY'
             assert result['cleanup'] == 'CLOSED'
