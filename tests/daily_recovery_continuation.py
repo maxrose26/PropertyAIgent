@@ -34,12 +34,14 @@ def main():
         w = dict(boot=boot,connect=connect,urls=state['urls'],pinned_settlement=True)
         before = _recovery_control(w)
         assert before['hard_stop_generation'] == 15
-        # Existing fixture credentials are reused solely in this disposable DB.
-        # The real owner fixture closed both roles before settlement; activate
-        # their existing test-only memberships for the restricted synthetic CLI.
-        for role,cap in [('ingestion_worker_login','ingestion_worker'),('ingestion_effect_login','ingestion_effect_broker')]:
-            boot.execute(sql.SQL('ALTER ROLE {} LOGIN VALID UNTIL \'infinity\'').format(sql.Identifier(role)))
-            boot.execute(sql.SQL('GRANT {} TO {} WITH INHERIT TRUE, SET TRUE').format(sql.Identifier(cap),sql.Identifier(role)))
+        assert boot.execute("SELECT bool_and(NOT rolcanlogin) FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(True,)
+        def activate_restricted_fixture():
+            # Only AFTER generation 16. Existing synthetic credentials and
+            # roles; this is disposable fixture plumbing, not a live issuer.
+            for role,cap in [('ingestion_worker_login','ingestion_worker'),('ingestion_effect_login','ingestion_effect_broker')]:
+                boot.execute(sql.SQL('ALTER ROLE {} LOGIN VALID UNTIL \'infinity\'').format(sql.Identifier(role)))
+                boot.execute(sql.SQL('GRANT {} TO {} WITH INHERIT TRUE, SET TRUE').format(sql.Identifier(cap),sql.Identifier(role)))
+        w['activate_restricted_fixture'] = activate_restricted_fixture
         target=Path(sys.argv[1]);target.mkdir()
         try:
             _continue_s4_04_recovery(w,target)
@@ -65,6 +67,8 @@ def main():
                 boot.execute(sql.SQL('ALTER ROLE {} NOLOGIN').format(sql.Identifier(role)))
                 boot.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(cap),sql.Identifier(role)))
         assert boot.execute("SELECT count(*) FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(0,)
+        assert boot.execute("SELECT bool_and(NOT rolcanlogin) FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(True,)
+        assert boot.execute("SELECT count(*) FROM pg_auth_members WHERE member IN ('ingestion_worker_login'::regrole,'ingestion_effect_login'::regrole)").fetchone()==(0,)
         print(json.dumps(dict(status='CONNECTED_RECOVERY_PROVEN',same_database=True,
               postgres_version=boot.info.server_version,settlement_revision='f027ba28af69ae70208eab5ed047e4a8a81c6337',
               generations=[14,15,16],settlement_readback=state['settlement'],

@@ -2417,6 +2417,7 @@ def _continue_s4_04_recovery(world,tmp_path):
             # Issue the existing restricted Tameside-only period at a fresh
             # generation-16 stop snapshot, then run the REAL daily CLI with
             # SYNTHETIC Idox evidence, NOT a council request or live grant.
+            disposable['activate_restricted_fixture']()
             p = policy(disposable)
             p['councils'] = {'tameside':p['councils']['tameside']}
             p['max_runs'] = 1
