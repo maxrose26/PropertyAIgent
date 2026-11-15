@@ -2271,16 +2271,11 @@ def test_shared_stop_release_preserves_exact_salford_after_rollback_and_success(
     assert c.execute("SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=%s",(key,)).fetchone()[0]==0
 
 
-def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world,tmp_path):
-    """One fixed disposable PG17 state, real SQL transitions and actual CLI.
+def _continue_s4_04_recovery(world,tmp_path):
+    """Continue the actual pinned settlement database; six dispositions conditional.
 
-    This starts AFTER a simulated #213 Bolton settlement. Six historical
-    dispositions are explicitly TEST-ONLY assumptions, not independently
-    authenticated physical source/cleanup facts. It closes a different seam:
-    stopped generation 15 + complete six-key census + original Salford audit
-    -> exact old-writer function replacement -> conditional generation 16
-    release -> restricted Tameside capture/screen and committed private readback.
-    The #213 owner-command 14->15 seam and real per-key review remain NO-GO.
+    No production evidence acceptance is implied. Historical UNKNOWN outcomes
+    and all prior evidence/attempt rows are preserved.
     """
     import hashlib
     from verification.ingestion_storage import intake_policy
@@ -2294,29 +2289,19 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world
         with disposable['connect']('provisioning_migrator') as migrator:
             migrator.execute(intake_policy.installation_script(disposable_catchup=True))
         boot = disposable['boot']
-        boot.execute(Path('tests/fixtures/pa_d002_private_postgres.sql').read_text())
-        boot.execute('ALTER TABLE public.ingestion_run_evidence ENABLE ROW LEVEL SECURITY')
-        boot.execute('ALTER TABLE public.ingestion_run_evidence FORCE ROW LEVEL SECURITY')
-        # Match the installed owner-only RLS policy, confirmed SELECT-only in
-        # production on 15 Nov. FORCE RLS without this policy would reject the
-        # correctly scoped restricted SECURITY DEFINER writer after stop release.
-        # The test creates it on disposable PG only; the candidate migration
-        # does not add/alter policies or relax production RLS.
-        boot.execute('CREATE POLICY ingestion_evidence_owner ON '
-                     'public.ingestion_run_evidence FOR ALL '
-                     'TO ingestion_storage_owner USING (true) WITH CHECK (true)')
-        boot.execute('CREATE ROLE postgres NOLOGIN')
+        if not world.get('pinned_settlement'):
+            raise AssertionError('ACTUAL_PINNED_SETTLEMENT_REQUIRED')
+        # Use the existing table, owner, ACLs, policies and bytes left by #213.
+        # No fixture reset, DROP/CREATE, or fabricated generation-15 receipt.
         try:
-            boot.execute('GRANT EXECUTE ON FUNCTION public.'
-                         'ingestion_intake_evidence_read(text,text,text) TO postgres')
-            boot.execute(Path('tests/fixtures/pa_d002_installed_writer.sql').read_text())
             old_writer = boot.execute(
                 "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
                 "FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write("
                 "text,text,text,bytea)'::regprocedure").fetchone()[0]
             assert old_writer == '8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290'
 
-            stopped = _settled_fixture(disposable)
+            stopped = _recovery_control(disposable)
+            assert stopped['intake_periods'][_RECOVERY_PERIOD]['failed_runs'][_RECOVERY_RUN]['status'] == 'FAILED_RECONCILED'
             assert stop_snapshot(stopped)['hard_stop_generation'] == 15
             salford_key = _historical_salford_seed()['key']
             salford_before = boot.execute(
@@ -2350,15 +2335,12 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world
                            reason='ABANDONED_SOURCE_INTENT',next_action='RECONCILE',
                            outcome=dict(outcome='ABANDONED_SOURCE_INTENT',
                                         source_or_write_replay_authorised=False))
-                boot.execute(
-                    'INSERT INTO public.ingestion_work_items SELECT * FROM '
-                    'json_populate_record(NULL::public.ingestion_work_items,%s::json)',
-                    (json.dumps(row),))
-                boot.execute(
-                    'INSERT INTO public.ingestion_work_attempts '
-                    '(work_key,fence,owner,started_at,finished_at,authority,phase,outcome,checkpoint) '
-                    "VALUES (%s,1,'required_once',0,100,%s,'RECOVERED',%s::json,NULL)",
-                    (key,authority,json.dumps(row['outcome'])))
+                existing = boot.execute(
+                    'SELECT state,phase,fence FROM ingestion_work_items WHERE key=%s',
+                    (key,)).fetchone()
+                assert existing == ('SAFETY_BLOCKED','RECOVERED',2)
+                # All six rows and attempts came through #213 fixture/recovery;
+                # do not replace them with a new synthetic inventory here.
                 keys.append(key)
             assert len(set(keys)) == 6
             attempts_before = boot.execute(
@@ -2492,6 +2474,25 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world
                 'WHERE work_key=ANY(%s) ORDER BY work_key,fence',
                 (keys,)).fetchall() == attempts_before
         finally:
-            boot.execute('REVOKE EXECUTE ON FUNCTION public.'
-                         'ingestion_intake_evidence_read(text,text,text) FROM postgres')
-            boot.execute('DROP ROLE postgres')
+            pass  # pinned fixture owns and verifies teardown after this process.
+
+
+
+def test_s4_04_pinned_settlement_writer_transition_and_private_tameside_cli(tmp_path,record_property):
+    """Two pinned interpreters, one disposable PG17 database, no ledger reset."""
+    pin = os.environ.get('S4_BOLTON_PINNED_CHECKOUT')
+    if not pin:
+        pytest.skip('separate pinned #213 checkout required; CI supplies it')
+    pin = Path(pin).resolve()
+    assert subprocess.check_output(['git','-C',str(pin),'rev-parse','HEAD'],text=True).strip() == 'f027ba28af69ae70208eab5ed047e4a8a81c6337'
+    report = tmp_path/'connected-recovery.json'
+    env = dict(os.environ, PYTHONPATH=str(pin), S4_SUCCESSOR_ROOT=str(Path.cwd()),
+               S4_RECOVERY_REPORT=str(report), S4_SALFORD_SEED=json.dumps(_historical_salford_seed()))
+    run = subprocess.run([sys.executable,'-m','pytest',str(Path('tests/pinned_bolton_recovery_stage.py').resolve()),
+                          '--import-mode=importlib','-q','-p','no:cacheprovider','--basetemp',str(tmp_path/'pinned')],
+                         cwd=pin,env=env,capture_output=True,text=True,timeout=150)
+    assert run.returncode == 0, run.stdout[-20000:] + run.stderr[-4000:]
+    result = json.loads(report.read_text())
+    assert result['status'] == 'CONNECTED_RECOVERY_PROVEN'
+    for key,value in result.items():
+        record_property(key,json.dumps(value,sort_keys=True))

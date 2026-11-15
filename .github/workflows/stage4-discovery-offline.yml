@@ -176,6 +176,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Exact frozen Bolton settlement checkout (no legacy merge)
+        uses: actions/checkout@v4
+        with:
+          ref: f027ba28af69ae70208eab5ed047e4a8a81c6337
+          path: .s4-pinned-bolton
+          persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/daily-intake-venv"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
@@ -187,6 +193,12 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
         run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake.py tests/test_daily_intake_limits.py tests/test_daily_intake_pg.py tests/test_daily_intake_runtime.py tests/test_daily_intake_interruptions.py tests/test_private_evidence.py tests/test_private_evidence_pg.py tests/test_retention_dry_run.py tests/test_public_evidence.py tests/test_render_intake.py -q --junitxml="$RUNNER_TEMP/daily-intake.xml"
+      - name: Actual pinned Bolton settlement through private Tameside readback
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+          S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
+        run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake_runtime.py::test_s4_04_pinned_settlement_writer_transition_and_private_tameside_cli -q --junitxml="$RUNNER_TEMP/connected-recovery.xml"
       - name: Fixed B read-only inspection, disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -198,6 +210,7 @@ jobs:
           name: daily-intake-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/daily-intake.xml
+            ${{ runner.temp }}/connected-recovery.xml
             ${{ runner.temp }}/b-readonly.xml
             ${{ runner.temp }}/b-targeted.xml
   v3-admission-pg:
