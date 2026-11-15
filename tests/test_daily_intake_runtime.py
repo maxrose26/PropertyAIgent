@@ -2271,7 +2271,7 @@ def test_shared_stop_release_preserves_exact_salford_after_rollback_and_success(
     assert c.execute("SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=%s",(key,)).fetchone()[0]==0
 
 
-def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(tmp_path):
+def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(world,tmp_path):
     """One fixed disposable PG17 state, real SQL transitions and actual CLI.
 
     This starts AFTER a simulated #213 Bolton settlement. Six historical
@@ -2283,13 +2283,14 @@ def test_s4_04_six_dispositions_writer_transition_and_private_tameside_cli(tmp_p
     The #213 owner-command 14->15 seam and real per-key review remain NO-GO.
     """
     import hashlib
-    from tests.e2e_pg_world import disposable_world
     from verification.ingestion_storage import intake_policy
     from verification.ingestion_storage.operational_owner import item
     from verification.ingestion_storage.daily_intake_runtime import LIVE_PRIVATE_EVIDENCE_RELEASE
 
     assert LIVE_PRIVATE_EVIDENCE_RELEASE is False
-    for disposable in disposable_world():
+    # Reuse this module's already-provisioned disposable world: a second
+    # fixed-URL world would collide with its temporary PostgreSQL roles.
+    with nullcontext(world) as disposable:
         with disposable['connect']('provisioning_migrator') as migrator:
             migrator.execute(intake_policy.installation_script(disposable_catchup=True))
         boot = disposable['boot']
