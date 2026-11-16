@@ -339,6 +339,7 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     assert after["global_stop"] is None and after["manual_stop"] is None
     assert after["last_hard_stop"]==ctl_before["last_hard_stop"]
     assert after["owner_shared_stop_release"]["review_sha256"]==OWNER_SHA
+    assert after["owner_shared_stop_release"]["manifest_binding_sha256"]==manifest["manifest_binding_sha256"]
     assert after["owner_shared_stop_release"]["no_work_issued"] is True
     assert w["boot"].execute(
         "SELECT to_jsonb(a) FROM public.ingestion_work_attempts a "
