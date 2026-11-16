@@ -91,3 +91,64 @@ def validate(value):
     except (TypeError, KeyError, ValueError, OverflowError):
         raise ValueError('TEN_COUNCIL_INVENTORY_UNVERIFIED') from None
     return value
+
+
+# PA-D004 v1.3: reuse one canonical campaign inventory for every finite
+# council/date selection, rather than producing new per-week issuer code.
+# This is an OFFLINE selection contract, never a live source/SQL permit.
+BATCH_VERSION = 'TEN_COUNCIL_CONFIGURABLE_FINITE_BATCH_OFFLINE_V1'
+
+
+def select_finite_batch(as_of, council, start, end):
+    """Bind one already-planned <=7-day scope to the existing finite caller.
+
+    No new issuer, owner grant, source request, credential, run or permission.
+    One batch at a time; observed completions and running checkpoints must be
+    independently read back by the later authorised runtime. Trafford remains
+    in the ten-council campaign inventory but cannot be selected for source
+    execution until its missing contract/SQL evidence is actually qualified.
+    """
+    if type(council) is not str or type(start) is not str or type(end) is not str:
+        raise ValueError('TEN_COUNCIL_BATCH_INPUT')
+    inventory = build(as_of)  # binds the Europe/London clock, nine + Trafford
+    if council not in TEN:
+        raise ValueError('TEN_COUNCIL_BATCH_UNKNOWN_COUNCIL')
+    if council == 'trafford':
+        raise ValueError('TRAFFORD_SOURCE_NOT_QUALIFIED')
+    window = next((w for w in inventory['windows']
+                   if w['start'] == start and w['end'] == end), None)
+    if window is None:
+        # No arbitrary dates, extra-day widening or partial-week overlap.
+        raise ValueError('TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN')
+    manifest = finite.manifest(start, end, 'SUSPENSION_CATCHUP')
+    manifest_sha = finite.digest(manifest)
+    if manifest_sha != window['original_nine_manifest_sha256']:
+        raise ValueError('TEN_COUNCIL_BATCH_MANIFEST_DRIFT')
+    indexes = [i for i, row in enumerate(manifest['rows'])
+               if row['council'] == council]
+    if len(indexes) != 1:
+        raise ValueError('TEN_COUNCIL_BATCH_SELECTION')
+    payload = dict(finite_manifest=manifest,
+                   finite_manifest_sha256=manifest_sha,
+                   selected_ordinals=indexes,
+                   collection_mode='SCREENING_METADATA')
+    selected = campaign.select(payload, profiled=True)
+    if len(selected) != 1:
+        raise ValueError('TEN_COUNCIL_BATCH_SELECTION')
+    profile = next(x for x in window['profiles']
+                   if x['row']['council'] == council)
+    if profile['row'] != selected[0] or profile['profile'] is None:
+        raise ValueError('TEN_COUNCIL_BATCH_PROFILE_DRIFT')
+    from .four_council_release import SUCCESSOR_V2_LIMITS
+    reservation = campaign.capacity(selected, SUCCESSOR_V2_LIMITS,
+                                    profiled=True)
+    return dict(version=BATCH_VERSION, campaign_as_of=inventory['as_of_london'],
+                fallback_start=inventory['fallback_start'],
+                execution_date=inventory['endpoint_date'],
+                selected_row=selected[0], selected_payload=payload,
+                reservation=reservation,
+                current_day_partial=window['last_day_not_yet_complete'],
+                # Existing daily SQL still forbids historical issuance.
+                status='OFFLINE_PLAN_ONLY', source_contract_qualified=False,
+                sql_issuer_qualified=False, collection_authorised=False,
+                persistence_verified=False, screening_verified=False)
