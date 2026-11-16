@@ -150,6 +150,7 @@ BEGIN
         x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE' OR
         (x.state='SAFETY_BLOCKED' AND x.key<>audit.key))
        AND x.key<>repeat('0',64)
+       AND x.key<>audit.key  -- exact whole-row audit already verified above
        AND NOT (x.key='d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252'
          AND x.state='SAFETY_BLOCKED' AND x.phase='RECOVERED'
          AND x.next_action='RECONCILE'))

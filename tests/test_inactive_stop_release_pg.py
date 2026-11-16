@@ -27,7 +27,23 @@ def isolated_world():
     for w in disposable_world():
         with w["connect"]("provisioning_migrator") as c:
             c.execute(intake_policy.installation_script(disposable_catchup=True))
-        yield w
+        # Reuse the existing exact PA-D002 table/function fixture instead of
+        # inventing or granting a broader private evidence interface.
+        boot=w["boot"]
+        boot.execute(Path("tests/fixtures/pa_d002_private_postgres.sql").read_text())
+        boot.execute("""ALTER TABLE public.ingestion_run_evidence ENABLE ROW LEVEL SECURITY;
+             ALTER TABLE public.ingestion_run_evidence FORCE ROW LEVEL SECURITY;
+             CREATE POLICY ingestion_evidence_owner ON public.ingestion_run_evidence
+               FOR ALL TO ingestion_storage_owner USING (true) WITH CHECK (true);
+             CREATE ROLE postgres NOLOGIN;
+             GRANT EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(
+               text,text,text) TO postgres;""")
+        try:
+            yield w
+        finally:
+            boot.execute("REVOKE EXECUTE ON FUNCTION public.ingestion_intake_evidence_read("
+                         "text,text,text) FROM postgres")
+            boot.execute("DROP ROLE postgres")
 
 
 def _script(manifest=None):
