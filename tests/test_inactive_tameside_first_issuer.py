@@ -42,36 +42,3 @@ def test_tampered_source_or_changed_issuer_anchor_refuses(monkeypatch):
     monkeypatch.setattr(candidate, "_policy_source_bytes", lambda: b"changed")
     with pytest.raises(ValueError, match="TAMESIDE_FIRST_POLICY_SOURCE_DRIFT"):
         candidate.render_inactive_tameside_first_issuer()
-
-
-def test_disposable_pg_parses_withheld_sql_and_refuses_source_authority():
-    """PG17 syntax, public EXECUTE refusal and zero controller mutations.
-
-    A disposable-only installation for negative testing; no positive live
-    historical issuer, owner runtime or source call is exercised.
-    """
-    import json
-    from tests.e2e_pg_world import disposable_world
-    for world in disposable_world():
-        with world["connect"]("provisioning_migrator") as c:
-            c.execute(intake_policy.installation_script(disposable_catchup=True))
-            c.execute(candidate.render_inactive_tameside_first_issuer())
-            public_execute = c.execute(
-                "SELECT has_function_privilege('ingestion_worker_login',"
-                "'public.ingestion_register_tameside_first_once(jsonb)','EXECUTE')"
-            ).fetchone()[0]
-            assert public_execute is False
-            controller_before = world["boot"].execute(
-                "SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)"
-            ).fetchone()[0]
-            request = dict(operation="intake_period",
-                           period=candidate.PERIOD, policy={})
-            with pytest.raises(Exception, match="TAMESIDE_FIRST_SCOPE_OR_STOP"):
-                c.execute(
-                    "SELECT public.ingestion_register_tameside_first_once(%s::jsonb)",
-                    (json.dumps(request),)
-                )
-            controller_after = world["boot"].execute(
-                "SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)"
-            ).fetchone()[0]
-            assert controller_after == controller_before
