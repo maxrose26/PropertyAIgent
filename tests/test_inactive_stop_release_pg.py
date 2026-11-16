@@ -491,3 +491,128 @@ def test_non_superuser_owner_transactional_capability_and_readback(isolated_worl
                      "GRANTED BY provisioning_bootstrap RESTRICT")
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
                      "NOBYPASSRLS PASSWORD NULL")
+
+
+def test_writer_transition_non_superuser_owner_rollback_and_restoration(isolated_world):
+    """Prove the pre-release writer install can use existing owner capability.
+
+    This is a disposable PostgreSQL test, not a production installer or a
+    credential/operational-authority test. The original writer transition SQL
+    body is unchanged; only its BEGIN/COMMIT boundary is embedded inside the
+    exact admin-only temporary-owner transaction for this proof.
+    """
+    from tests.e2e_pg_world import settings
+    w=isolated_world
+    boot=w["boot"]
+    _,info,_,_=settings()
+    password=secrets.token_urlsafe(40)
+    original=_control(w)
+    _seed(w)
+    stopped=_control(w)
+    assert stopped != original
+    writer_hash=lambda: boot.execute(
+        "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
+        "FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write("
+        "text,text,text,bytea)'::regprocedure").fetchone()[0]
+    old_hash="8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290"
+    new_hash="4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77"
+    assert writer_hash()==old_hash
+
+    source=Path("verification/ingestion_storage/"
+                "private_evidence_writer_transition.sql").read_text()
+    assert source.count("\nBEGIN;\n")==1 and source.count("\nCOMMIT;\n")==1
+    body=source.replace("\nBEGIN;\n","\n",1).replace("\nCOMMIT;\n","\n",1)
+    # The wrapper is deliberately local to this test. Neither the frozen
+    # writer transition file nor an executable production command is changed.
+    script="""BEGIN;
+SET LOCAL lock_timeout = '3s';
+SET LOCAL statement_timeout = '10s';
+DO $owner_install_preflight$
+DECLARE n integer; baseline_ok boolean;
+BEGIN
+ IF session_user IS DISTINCT FROM 'postgres'
+    OR current_user IS DISTINCT FROM 'postgres'
+    OR (SELECT rolsuper OR NOT rolcreaterole OR NOT rolcreatedb OR NOT rolbypassrls
+        FROM pg_catalog.pg_roles WHERE rolname=current_user)
+ THEN RAISE EXCEPTION 'OWNER_WRITER_IDENTITY' USING ERRCODE='42501'; END IF;
+ SELECT count(*),coalesce(bool_and(grantor<>'postgres'::regrole
+       AND admin_option AND NOT inherit_option AND NOT set_option),false)
+   INTO n,baseline_ok FROM pg_catalog.pg_auth_members
+   WHERE member='postgres'::regrole AND roleid='ingestion_storage_owner'::regrole;
+ IF n<>1 OR NOT baseline_ok
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
+ THEN RAISE EXCEPTION 'OWNER_WRITER_ADMIN_ONLY_BASELINE' USING ERRCODE='42501'; END IF;
+END $owner_install_preflight$;
+GRANT ingestion_storage_owner TO postgres
+ WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres;
+""" + body + """
+REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
+DO $owner_install_restored$
+DECLARE n integer; baseline_ok boolean;
+BEGIN
+ SELECT count(*),coalesce(bool_and(grantor<>'postgres'::regrole
+       AND admin_option AND NOT inherit_option AND NOT set_option),false)
+   INTO n,baseline_ok FROM pg_catalog.pg_auth_members
+   WHERE member='postgres'::regrole AND roleid='ingestion_storage_owner'::regrole;
+ IF n<>1 OR NOT baseline_ok
+    OR current_user IS DISTINCT FROM 'postgres'
+    OR session_user IS DISTINCT FROM 'postgres'
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
+ THEN RAISE EXCEPTION 'OWNER_WRITER_CAPABILITY_REMAINS' USING ERRCODE='42501'; END IF;
+END $owner_install_restored$;
+COMMIT;
+"""
+    assert script.count("\nCOMMIT;\n")==1
+    boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
+                         "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
+                             sql.Literal(password)))
+    boot.execute("GRANT ingestion_storage_owner TO postgres "
+                 "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                 "GRANTED BY provisioning_bootstrap")
+    def membership():
+        return boot.execute(
+            "SELECT grantor::regrole::text,admin_option,inherit_option,set_option "
+            "FROM pg_auth_members WHERE member='postgres'::regrole "
+            "AND roleid='ingestion_storage_owner'::regrole ORDER BY grantor"
+        ).fetchall()
+    def owner():
+        return psycopg.connect(**{**info,"user":"postgres","password":password},
+                               autocommit=True,prepare_threshold=None)
+    baseline=membership()
+    assert baseline==[("provisioning_bootstrap",True,False,False)]
+    try:
+        # The whole writer replacement can be rolled back along with the
+        # temporary owner membership; no persistent privilege is required.
+        with owner() as c:
+            c.execute(script.replace("\nCOMMIT;\n","\nROLLBACK;\n"))
+        assert writer_hash()==old_hash and membership()==baseline
+        assert _control(w)==stopped
+
+        # Removing the exact pre-existing admin-only membership must refuse
+        # before the writer function or any controller state changes.
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        try:
+            with owner() as c:
+                with pytest.raises(Exception,match="OWNER_WRITER_ADMIN_ONLY_BASELINE"):
+                    c.execute(script)
+                c.execute("ROLLBACK")
+        finally:
+            boot.execute("GRANT ingestion_storage_owner TO postgres "
+                         "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                         "GRANTED BY provisioning_bootstrap")
+        assert writer_hash()==old_hash and membership()==baseline
+        assert _control(w)==stopped
+
+        with owner() as c:
+            c.execute(script)
+        # Separate bootstrap readback, not a self-reported success.
+        assert writer_hash()==new_hash and membership()==baseline
+        assert _control(w)==stopped
+    finally:
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
+                     "NOBYPASSRLS PASSWORD NULL")
