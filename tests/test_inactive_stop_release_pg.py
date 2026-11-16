@@ -637,6 +637,10 @@ def test_s4_first_tameside_noninstalled_issuer_pg17_refuses_before_source(isolat
             "'public.ingestion_register_tameside_first_once(jsonb)','EXECUTE')"
         ).fetchone()[0]
         assert public_grant is False
+        # No inherited Bolton fallback is reachable through the clone.
+        with pytest.raises(Exception,match="TAMESIDE_FIRST_NO_LEGACY_OPERATION"):
+            c.execute("SELECT public."+FUNCTION+"(%s::jsonb)",
+                      (json.dumps(dict(operation="bolton_exception",period=PERIOD)),))
         with pytest.raises(Exception,match="TAMESIDE_FIRST_SCOPE_OR_STOP"):
             c.execute("SELECT public."+FUNCTION+"(%s::jsonb)",
                       (json.dumps(dict(operation="intake_period",period=PERIOD,policy={})),))
