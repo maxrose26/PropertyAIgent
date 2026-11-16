@@ -349,8 +349,9 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
     assert result['backlog']['records'][0]['application_admitted'] is None
     retained=persisted_council_capture_inventory(world['boot'],'tameside')
     assert len(retained)==1 and retained[0]['state']=='COMPLETE'
-    assert retained[0]['checkpoint']['start']==scope['start']
-    assert retained[0]['checkpoint']['end']==scope['end']
+    assert retained[0]['subject']['start']==scope['start']
+    assert retained[0]['subject']['end']==scope['end']
+    assert retained[0]['checkpoint']['interval']==[scope['start'],scope['end']]
     rows=world['boot'].execute(
         "SELECT task,subject->>'council',state FROM ingestion_work_items "
         "WHERE key<>repeat('0',64) AND task IN ('DISCOVERY','SCREENING') "
