@@ -258,10 +258,18 @@ def test_initial_28_day_overlap_is_not_supported_by_current_rolling_issuer(world
 
 def _catchup_fixture(world):
     from zoneinfo import ZoneInfo
-    from verification.discovery.finite_acceptance import manifest,digest as manifest_digest
-    scope=dict(start='2026-09-15',end='2026-09-21',
-               execution_day=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date().isoformat(),
-               source_plan_sha256=manifest_digest(manifest('2026-09-15','2026-09-21','SUSPENSION_CATCHUP')))
+    from verification.discovery.ten_council_offline import select_finite_batch
+    now=datetime.now(timezone.utc)
+    t=select_finite_batch(now,'tameside','2026-09-15','2026-09-21')
+    m=select_finite_batch(now,'manchester','2026-09-15','2026-09-21')
+    # New configurable campaign selection, same existing disconnected
+    # disposable owner/SQL/runtime proof; do not simulate production release.
+    assert t['selected_payload']['finite_manifest_sha256']==m['selected_payload']['finite_manifest_sha256']
+    assert t['selected_row']['semantics']=='RECEIVED' and m['selected_row']['semantics']=='VALIDATED'
+    assert not t['collection_authorised'] and not m['collection_authorised']
+    scope=dict(start=t['selected_row']['start'],end=t['selected_row']['end'],
+               execution_day=now.astimezone(ZoneInfo('Europe/London')).date().isoformat(),
+               source_plan_sha256=t['selected_payload']['finite_manifest_sha256'])
     p=policy(world);p['max_runs']=1;p['catchup_scope']=scope
     return p,scope
 
