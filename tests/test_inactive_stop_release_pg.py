@@ -243,6 +243,31 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
                       "public.ingestion_run_evidence")
     assert _control(w)==ctl_before
 
+    # A terminal-looking DEFERRED row must not conceal an unrelated original
+    # abandoned source effect merely by changing its state/reason/action.
+    # The original outcome remains evidence of unresolved physical effects.
+    hidden_key="f"*64
+    hidden=w["boot"].execute(
+        "SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key=%s",
+        (manifest["effects"][1]["key"],)
+    ).fetchone()[0]
+    hidden["key"]=hidden_key
+    hidden["state"]="DEFERRED"
+    hidden["phase"]="FINISHED"
+    hidden["reason"]="REVIEWED_PRESERVE_NO_REPLAY"
+    hidden["next_action"]="PRESERVE_HISTORY_NO_REPLAY"
+    hidden["outcome"]["outcome"]="ABANDONED_SOURCE_INTENT"
+    w["boot"].execute(
+        "INSERT INTO public.ingestion_work_items SELECT * FROM "
+        "json_populate_record(NULL::public.ingestion_work_items,%s::json)",
+        (json.dumps(hidden),)
+    )
+    with pytest.raises(Exception,match="OWNER_RELEASE_OUTSTANDING_EFFECT_OR_AUTHORITY"):
+        _run(w,mock)
+    w["boot"].execute("DELETE FROM public.ingestion_work_items WHERE key=%s",
+                      (hidden_key,))
+    assert _control(w)==ctl_before
+
     # The shipped SQL still refuses; only the synthetic in-memory substitution
     # reaches these tests. No test approval lands in repository SQL.
     with pytest.raises(Exception,match="OWNER_RELEASE_REVIEW_WITHHELD"):

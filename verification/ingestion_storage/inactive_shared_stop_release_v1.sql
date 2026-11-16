@@ -166,6 +166,7 @@ BEGIN
        (x.state IN ('CLAIMED','PERSISTENCE_UNCERTAIN') OR
         x.phase IN ('SOURCE_INTENT','WRITE_INTENT') OR
         x.reason='ABANDONED_SOURCE_INTENT' OR x.next_action='RECONCILE' OR
+        x.outcome::jsonb->>'outcome'='ABANDONED_SOURCE_INTENT' OR
         (x.state='SAFETY_BLOCKED' AND x.key<>audit.key))
        AND x.key<>repeat('0',64)
        AND x.key<>audit.key  -- exact whole-row audit already verified above
