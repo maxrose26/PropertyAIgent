@@ -25,7 +25,7 @@ _ROLLING = """OR item->'subject'->>'end'<>((clock_timestamp() AT TIME ZONE 'Euro
     OR item->'subject'->>'start'<>((clock_timestamp() AT TIME ZONE 'Europe/London')::date-7)::text"""
 _HISTORICAL = """OR item->'subject'->>'end' IS DISTINCT FROM '2026-09-21'
     OR item->'subject'->>'start' IS DISTINCT FROM '2026-09-15'"""
-_ENTRY_ANCHOR = "BEGIN\n IF p->>'operation' IN ('intake_period','intake_capture','intake_screen','intake_close','intake_finish') THEN"
+_ENTRY_ANCHOR = "IF p->>'operation' IN ('intake_period','intake_capture','intake_screen','intake_close','intake_finish') THEN"
 _ENTRY_GUARD = """ IF coalesce(p->>'operation','') NOT IN
    ('intake_period','intake_capture','intake_screen','intake_close','intake_finish')
  THEN RAISE EXCEPTION 'TAMESIDE_FIRST_NO_LEGACY_OPERATION' USING ERRCODE='42501'; END IF;
@@ -97,7 +97,7 @@ def render_inactive_tameside_first_issuer():
         "CREATE OR REPLACE FUNCTION public." + FUNCTION + "(", 1)
     # Refuse legacy Bolton operations before entering inherited fallback.
     function = function.replace(_ENTRY_ANCHOR,
-        'BEGIN\n' + _ENTRY_GUARD + _ENTRY_ANCHOR[len('BEGIN\n'):], 1)
+        _ENTRY_GUARD + _ENTRY_ANCHOR, 1)
     function = function.replace(_ROLLING, _HISTORICAL, 1)
     function = function.replace(_PERIOD_ANCHOR, _PERIOD_ANCHOR + "\n" + _GUARD, 1)
     if function.count("TAMESIDE_FIRST_MANIFEST_WITHHELD") != 1:
