@@ -189,6 +189,11 @@ jobs:
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
           S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
         run: timeout --kill-after=2s 180s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_daily_intake_runtime.py::test_s4_04_pinned_settlement_writer_transition_and_private_tameside_cli -q --junitxml="$RUNNER_TEMP/connected-recovery.xml"
+      - name: Inactive one-shot owner release install, rollback and drift (disposable only)
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+        run: timeout --kill-after=2s 90s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_inactive_stop_release_pg.py -q --junitxml="$RUNNER_TEMP/inactive-release.xml"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
