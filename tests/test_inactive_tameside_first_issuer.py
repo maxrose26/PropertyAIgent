@@ -42,3 +42,69 @@ def test_tampered_source_or_changed_issuer_anchor_refuses(monkeypatch):
     monkeypatch.setattr(candidate, "_policy_source_bytes", lambda: b"changed")
     with pytest.raises(ValueError, match="TAMESIDE_FIRST_POLICY_SOURCE_DRIFT"):
         candidate.render_inactive_tameside_first_issuer()
+
+
+# PA-D004 v1.3: generated single-function, manifest-bound historical slices.
+# Existing permanently WITHHELD first-Tameside function remains unchanged.
+from datetime import datetime, timezone
+
+
+def _candidate(council, start, end):
+    return candidate.render_inactive_campaign_issuer(
+        datetime(2026, 11, 16, 20, tzinfo=timezone.utc), council, start, end)
+
+
+def test_one_inactive_issuer_name_and_canonical_binding_reused_across_periods():
+    first = _candidate("tameside", "2026-09-15", "2026-09-21")
+    second = _candidate("tameside", "2026-09-22", "2026-09-28")
+    manchester = _candidate("manchester", "2026-09-15", "2026-09-21")
+    assert len({x["period"] for x in (first, second, manchester)}) == 3
+    assert all(x["review_status"] == "WITHHELD"
+               and not x["collection_authorised"] and not x["installed"]
+               for x in (first, second, manchester))
+    assert all(x["sql"].count("CREATE OR REPLACE FUNCTION public."
+                              + candidate.CAMPAIGN_FUNCTION + "(") == 1
+               for x in (first, second, manchester))
+    for entry, basis in ((first, "RECEIVED"), (second, "RECEIVED"),
+                         (manchester, "VALIDATED")):
+        sql = entry["sql"]
+        assert entry["row"]["semantics"] == basis
+        assert ("'campaign_source_plan_sha256' IS DISTINCT FROM '"
+                + entry["source_plan_sha256"] + "'") in sql
+        assert ("a IS DISTINCT FROM '" + entry["period"] + "'") in sql
+        assert ("item->'subject'->>'start' IS DISTINCT FROM '"
+                + entry["row"]["start"] + "'") in sql
+        assert ("item->'subject'->>'end' IS DISTINCT FROM '"
+                + entry["row"]["end"] + "'") in sql
+        assert ("p->'rows'->0->'subject'->>'semantics' IS DISTINCT FROM '"
+                + basis + "'") in sql
+        assert "current_database() IS DISTINCT FROM 'postgres'" in sql
+        assert "TAMESIDE_FIRST_MANIFEST_WITHHELD" not in sql
+        assert "RAISE EXCEPTION 'CAMPAIGN_FINITE_MANIFEST_WITHHELD'" in sql
+        assert "CAMPAIGN_FINITE_NO_LEGACY_OPERATION" in sql
+        assert ("REVOKE ALL ON FUNCTION public." + candidate.CAMPAIGN_FUNCTION
+                + "(jsonb) FROM PUBLIC;") in sql
+        assert "GRANT EXECUTE" not in sql
+    assert first["source_plan_sha256"] == manchester["source_plan_sha256"]
+    assert first["sql"] != second["sql"] != manchester["sql"]
+    assert candidate.CAMPAIGN_FUNCTION not in intake_policy.policy_sql()
+    assert candidate.CAMPAIGN_FUNCTION not in intake_policy.installation_script()
+
+
+@pytest.mark.parametrize("council,start,end,error", [
+    ("trafford", "2026-09-15", "2026-09-21", "TRAFFORD_SOURCE_NOT_QUALIFIED"),
+    ("tameside", "2026-09-14", "2026-09-20", "TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
+    ("tameside", "2026-09-15", "2026-09-22", "TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
+    ("tameside", "2026-11-16", "2026-11-16", "CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
+    ("fake", "2026-09-15", "2026-09-21", "TEN_COUNCIL_BATCH_UNKNOWN_COUNCIL"),
+])
+def test_configurable_candidate_refuses_unqualified_partial_or_widened_scope(
+        council, start, end, error):
+    with pytest.raises(ValueError, match=error):
+        _candidate(council, start, end)
+
+
+def test_configurable_candidate_detects_changed_base_policy(monkeypatch):
+    monkeypatch.setattr(candidate, "_policy_source_bytes", lambda: b"unreviewed")
+    with pytest.raises(ValueError, match="TAMESIDE_FIRST_POLICY_SOURCE_DRIFT"):
+        _candidate("tameside", "2026-09-15", "2026-09-21")
