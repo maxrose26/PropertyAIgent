@@ -146,10 +146,16 @@ class Runtime:
         return row.policy
 
     def intake_issuer(self):
-        if self.policy and self.policy.get('mode')=='DISPOSABLE_SHUTDOWN_GAP_V1':
+        mode=self.policy.get('mode') if self.policy else None
+        if mode=='DISPOSABLE_SHUTDOWN_GAP_V1':
             if not self.test or self.route_name!='DISPOSABLE':
                 raise Denied('INTAKE_CATCHUP_DISPOSABLE_BINDING')
             return 'public.ingestion_register_disposable_catchup'
+        if mode is not None:
+            # PA-D004 v1.3: an inactive historical/campaign policy MUST NOT
+            # silently fall back to the ordinary rolling SQL issuer. Owner
+            # registration and production release remain separately withheld.
+            raise Denied('INTAKE_MODE_NOT_RELEASED')
         return 'public.ingestion_register_bolton_exception'
 
     def issue(self,reg):
@@ -508,7 +514,12 @@ class Runtime:
                     if not self.run.closing:self.memory.check()
                 self.run.check=monitored_check
             councils=sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c))
-            if self.policy.get('mode')=='DISPOSABLE_SHUTDOWN_GAP_V1':
+            mode=self.policy.get('mode')
+            if mode not in (None,'DISPOSABLE_SHUTDOWN_GAP_V1'):
+                # Fail BEFORE source selection when an unreviewed campaign mode
+                # appears, even if a stored period is otherwise well formed.
+                raise Denied('INTAKE_MODE_NOT_RELEASED')
+            if mode=='DISPOSABLE_SHUTDOWN_GAP_V1':
                 from zoneinfo import ZoneInfo
                 scope=self.policy['catchup_scope']
                 today=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date()
