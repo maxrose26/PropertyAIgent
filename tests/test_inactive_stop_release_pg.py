@@ -544,13 +544,16 @@ BEGIN
     OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
  THEN RAISE EXCEPTION 'OWNER_WRITER_ADMIN_ONLY_BASELINE' USING ERRCODE='42501'; END IF;
 END $owner_install_preflight$;
+-- Match the documented operational_owner schema capability preflight.
+DO $owner_schema_preflight$
+BEGIN
+ IF NOT pg_catalog.has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION')
+    OR NOT pg_catalog.has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')
+ THEN RAISE EXCEPTION 'OWNER_WRITER_SCHEMA_CAPABILITY' USING ERRCODE='42501'; END IF;
+END $owner_schema_preflight$;
 GRANT ingestion_storage_owner TO postgres
  WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres;
--- Match the frozen #213 owner lifecycle: table/function ownership requires
--- the actual storage-owner role, not inherited administrator privileges alone.
-SET LOCAL ROLE ingestion_storage_owner;
 """ + body + """
-RESET ROLE;
 REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
 DO $owner_install_restored$
 DECLARE n integer; baseline_ok boolean;
@@ -575,6 +578,9 @@ COMMIT;
     boot.execute("GRANT ingestion_storage_owner TO postgres "
                  "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
                  "GRANTED BY provisioning_bootstrap")
+    # Disposable-only representation of the existing owner schema options;
+    # not a production privilege change or new role.
+    boot.execute("GRANT USAGE, CREATE ON SCHEMA public TO postgres WITH GRANT OPTION")
     def membership():
         return boot.execute(
             "SELECT grantor::regrole::text,admin_option,inherit_option,set_option "
@@ -587,6 +593,16 @@ COMMIT;
     baseline=membership()
     assert baseline==[("provisioning_bootstrap",True,False,False)]
     try:
+        # Missing schema options must refuse before the temporary role grant.
+        boot.execute("REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres")
+        try:
+            with owner() as c:
+                with pytest.raises(Exception,match="OWNER_WRITER_SCHEMA_CAPABILITY"):
+                    c.execute(script)
+                c.execute("ROLLBACK")
+        finally:
+            boot.execute("GRANT USAGE, CREATE ON SCHEMA public TO postgres WITH GRANT OPTION")
+        assert writer_hash()==old_hash and membership()==baseline
         # The whole writer replacement can be rolled back along with the
         # temporary owner membership; no persistent privilege is required.
         with owner() as c:
@@ -616,6 +632,7 @@ COMMIT;
         assert writer_hash()==new_hash and membership()==baseline
         assert _control(w)==stopped
     finally:
+        boot.execute("REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres")
         boot.execute("REVOKE ingestion_storage_owner FROM postgres "
                      "GRANTED BY provisioning_bootstrap RESTRICT")
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
