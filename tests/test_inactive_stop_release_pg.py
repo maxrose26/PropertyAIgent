@@ -617,3 +617,27 @@ def test_owner_writer_renderer_is_pure_pinned_and_dormant():
     assert "CREATE OR REPLACE FUNCTION public.ingestion_intake_evidence_write" in sql_text
     with pytest.raises(ValueError,match="OWNER_WRITER_SOURCE_DRIFT"):
         render_inactive_writer_install(source+"--changed\n")
+
+
+def test_s4_first_tameside_noninstalled_issuer_pg17_refuses_before_source(isolated_world):
+    """The exact dormant first-batch issuer is syntactically valid but cannot run.
+
+    Existing disposable PostgreSQL world, no production installer, no grants,
+    no source request. Original rolling issuer must remain unchanged.
+    """
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        render_inactive_tameside_first_issuer, FUNCTION, PERIOD
+    )
+    w=isolated_world
+    ctl_before=_control(w)
+    with w["connect"]("provisioning_migrator") as c:
+        c.execute(render_inactive_tameside_first_issuer())
+        public_grant=c.execute(
+            "SELECT has_function_privilege('ingestion_worker_login',"
+            "'public.ingestion_register_tameside_first_once(jsonb)','EXECUTE')"
+        ).fetchone()[0]
+        assert public_grant is False
+        with pytest.raises(Exception,match="TAMESIDE_FIRST_SCOPE_OR_STOP"):
+            c.execute("SELECT public."+FUNCTION+"(%s::jsonb)",
+                      (json.dumps(dict(operation="intake_period",period=PERIOD,policy={})),))
+    assert _control(w)==ctl_before
