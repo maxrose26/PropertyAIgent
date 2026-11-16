@@ -43,6 +43,32 @@ def test_screening_only_owner_projection_preserves_every_authoritative_route():
 
 
 
+
+def test_unreleased_campaign_mode_refuses_instead_of_rolling_source():
+    """The generic finite campaign remains OFFLINE; no fallback to live daily."""
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    runtime=object.__new__(Runtime)
+    runtime.route_name='SUPABASE_RESTRICTED'
+    runtime.test=False
+    for mode in ('CAMPAIGN_FINITE_HISTORICAL_V1',
+                 'TAMESIDE_FIRST_HISTORICAL_V1',
+                 'UNREVIEWED_CATCHUP_MODE'):
+        runtime.policy={'mode':mode}
+        with pytest.raises(Denied,match='INTAKE_MODE_NOT_RELEASED'):
+            runtime.intake_issuer()
+    runtime.policy={}  # existing ordinary rolling mode is unchanged
+    assert runtime.intake_issuer()=='public.ingestion_register_bolton_exception'
+    runtime.policy={'mode':'DISPOSABLE_SHUTDOWN_GAP_V1'}
+    with pytest.raises(Denied,match='INTAKE_CATCHUP_DISPOSABLE_BINDING'):
+        runtime.intake_issuer()
+    runtime.test=True
+    runtime.route_name='DISPOSABLE'
+    assert runtime.intake_issuer()=='public.ingestion_register_disposable_catchup'
+    runtime.policy={'mode':'CAMPAIGN_FINITE_HISTORICAL_V1'}
+    with pytest.raises(Denied,match='INTAKE_MODE_NOT_RELEASED'):
+        runtime.intake_issuer()
+
+
 @pytest.fixture(scope='module')
 def world():
     for world in disposable_world():
