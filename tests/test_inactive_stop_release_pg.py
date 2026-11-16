@@ -232,6 +232,42 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
                        else "REVIEWED_PRESERVE_NO_REPLAY",key))
     assert _control(w)==ctl_before
 
+    # Explicitly withheld UNKNOWN physical-effect risk must not be converted
+    # into stop-release authority by a preservation-only review finding.
+    withheld=copy.deepcopy(manifest)
+    withheld["effects"][-1]["risk_acceptance"]="WITHHELD_UNKNOWN_EFFECT"
+    with pytest.raises(Exception,match="OWNER_RELEASE_EFFECT_REVIEW_MISSING"):
+        _run(w,_script(withheld))
+    assert _control(w)==ctl_before
+
+    # An independently active finite grant blocks release, even with otherwise
+    # valid synthetic review payload and a still-unchanged STOP generation.
+    stray=copy.deepcopy(ctl_before)
+    stray["grants"]={"test_active_grant":{"expires_at":4102444800}}
+    w["boot"].execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                      "WHERE key=repeat('0',64)",(json.dumps(stray),))
+    with pytest.raises(Exception,match="OWNER_RELEASE_OUTSTANDING_EFFECT_OR_AUTHORITY"):
+        _run(w,mock)
+    w["boot"].execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                      "WHERE key=repeat('0',64)",(json.dumps(ctl_before),))
+    assert _control(w)==ctl_before
+
+    # A newly uncertain historical attempt must also refuse, not be treated
+    # as finished just because its parent work row has a reviewed marker.
+    attempt_key=manifest["effects"][0]["key"]
+    prior_finished=w["boot"].execute(
+        "SELECT finished_at FROM public.ingestion_work_attempts "
+        "WHERE work_key=%s AND fence=1",(attempt_key,)).fetchone()[0]
+    w["boot"].execute(
+        "UPDATE public.ingestion_work_attempts SET finished_at=NULL "
+        "WHERE work_key=%s AND fence=1",(attempt_key,))
+    with pytest.raises(Exception,match="OWNER_RELEASE_EFFECT_OR_NO_REPLAY_DRIFT"):
+        _run(w,mock)
+    w["boot"].execute(
+        "UPDATE public.ingestion_work_attempts SET finished_at=%s "
+        "WHERE work_key=%s AND fence=1",(prior_finished,attempt_key))
+    assert _control(w)==ctl_before
+
     _run(w,mock,rollback=True)
     assert _control(w)==ctl_before
     _run(w,mock)
