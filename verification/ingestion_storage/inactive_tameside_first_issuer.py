@@ -106,3 +106,78 @@ def render_inactive_tameside_first_issuer():
     # This returned SQL is not wired into installation_script or the live runtime.
     return (function + "\nREVOKE ALL ON FUNCTION public." + FUNCTION +
             "(jsonb) FROM PUBLIC;\n")
+
+
+# PA-D004 v1.3: ONE reusable source-pinned, uninstalled finite-batch
+# renderer, not a new issuer module/function name for each council/week.
+# This is a negative-only review artifact: every generated issuer ALWAYS
+# refuses source work, even with a plausible manifest or owner-shaped policy.
+CAMPAIGN_FUNCTION = "ingestion_register_campaign_once"
+CAMPAIGN_MODE = "CAMPAIGN_FINITE_HISTORICAL_V1"
+
+
+def render_inactive_campaign_issuer(as_of, council, start, end):
+    """Render a single selected campaign batch; never install or authorise it.
+
+    select_finite_batch reconstructs the canonical 15-Sep-to-execution-date
+    manifest, validates council/date alignment, source profile and unchanged
+    per-run capacity. The rendered SQL additionally binds the exact selected
+    council, date semantics, finite period, full nine-council plan digest and
+    STOP generation 16. A digest is not an owner's signed release decision.
+    No arbitrary SQL identifier, input date or caller-provided digest is used.
+    This artifact is WITHHELD regardless of its inputs and is NOT a live path.
+    """
+    import json
+    from verification.discovery.ten_council_offline import select_finite_batch
+
+    selected = select_finite_batch(as_of, council, start, end)
+    row = selected["selected_row"]
+    if selected["current_day_partial"]:
+        # Today's incomplete endpoint is planning-only; never certify it as
+        # a complete historical capture under the same batch authority.
+        raise ValueError("CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL")
+    full_sha = selected["selected_payload"]["finite_manifest_sha256"]
+    token = hashlib.sha256(json.dumps(
+        dict(row=row, full_manifest_sha256=full_sha),
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:24]
+    period_id = "S4_FINITE_" + token
+    expected_first = '{"start":"2026-09-15","end":"2026-09-21","council":"tameside","semantics":"RECEIVED","max_runs":1,"status":"WITHHELD"}'
+    first = json.dumps(dict(start=start, end=end, council=council,
+                            semantics=row["semantics"], max_runs=1,
+                            status=REVIEW_STATUS), separators=(",", ":"))
+    sql = render_inactive_tameside_first_issuer()
+    replacements = (
+        ("ingestion_register_tameside_first_once", CAMPAIGN_FUNCTION),
+        (PERIOD, period_id),
+        (expected_first, first),
+        ("TAMESIDE_FIRST_HISTORICAL_V1", CAMPAIGN_MODE),
+        ("'tameside'", "'" + council + "'"),
+        ('"council":"tameside"', '"council":"' + council + '"'),
+        ("2026-09-15", start),
+        ("2026-09-21", end),
+        ('"semantics":"RECEIVED"', '"semantics":"' + row["semantics"] + '"'),
+        ("TAMESIDE_FIRST_", "CAMPAIGN_FINITE_"),
+    )
+    for old, new in replacements:
+        if old not in sql:
+            raise ValueError("CAMPAIGN_FINITE_TEMPLATE_DRIFT")
+        sql = sql.replace(old, new)
+    # The ordinary issuer is unchanged; this candidate is a single distinct
+    # function whose registration and capture remain permanently denied.
+    anchor = "OR p->'policy'->'max_runs' IS DISTINCT FROM '1'::jsonb"
+    if sql.count(anchor) != 1:
+        raise ValueError("CAMPAIGN_FINITE_POLICY_ANCHOR_DRIFT")
+    sql = sql.replace(anchor, anchor + "\n"
+        + "    OR p->'policy'->>'campaign_source_plan_sha256' IS DISTINCT FROM '"
+        + full_sha + "'", 1)
+    if (sql.count("RAISE EXCEPTION 'CAMPAIGN_FINITE_MANIFEST_WITHHELD'") != 1
+            or sql.count("CREATE OR REPLACE FUNCTION public."
+                         + CAMPAIGN_FUNCTION + "(") != 1
+            or "GRANT EXECUTE" in sql
+            or "REVOKE ALL ON FUNCTION public." + CAMPAIGN_FUNCTION
+                + "(jsonb) FROM PUBLIC;" not in sql
+            or "current_database() IS DISTINCT FROM 'postgres'" not in sql):
+        raise ValueError("CAMPAIGN_FINITE_INACTIVE_PROOF_FAILED")
+    return dict(sql=sql, period=period_id, source_plan_sha256=full_sha,
+                row=dict(row), review_status=REVIEW_STATUS,
+                collection_authorised=False, installed=False)
