@@ -652,3 +652,48 @@ def test_s4_first_tameside_noninstalled_issuer_pg17_refuses_before_source(isolat
             c.execute("SELECT public."+FUNCTION+"(%s::jsonb)",
                       (json.dumps(dict(operation="intake_period",period=PERIOD,policy={})),))
     assert _control(w)==ctl_before
+
+
+
+def test_v13_reusable_inactive_campaign_sql_pg17_refuses_without_side_effect(isolated_world):
+    """New generic source-pinned issuer, focused disposable SQL negative proof.
+
+    Reuses the existing disposable superuser fixture to syntax-check the
+    identical function name for *two different selected* windows. No real
+    owner route, production ACL, SQL installation, stop release, or positive
+    historical operation is claimed. Each emitted body remains WITHHELD.
+    """
+    from datetime import datetime, timezone
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        CAMPAIGN_FUNCTION, render_inactive_campaign_issuer,
+    )
+    w = isolated_world
+    before = _control(w)
+    for council, start, end in (
+        ("tameside", "2026-09-15", "2026-09-21"),
+        ("manchester", "2026-09-22", "2026-09-28"),
+    ):
+        candidate = render_inactive_campaign_issuer(
+            datetime(2026, 11, 16, 20, tzinfo=timezone.utc),
+            council, start, end)
+        # TEST DB ONLY; never add this SQL to installation_script().
+        w["boot"].execute(candidate["sql"])
+        w["boot"].execute(
+            "GRANT EXECUTE ON FUNCTION public."
+            + CAMPAIGN_FUNCTION + "(jsonb) TO provisioning_migrator")
+        with w["connect"]("provisioning_migrator") as c:
+            assert c.execute(
+                "SELECT has_function_privilege('ingestion_worker_login',"
+                "'public.ingestion_register_campaign_once(jsonb)','EXECUTE')"
+            ).fetchone()[0] is False
+            with pytest.raises(Exception, match="CAMPAIGN_FINITE_NO_LEGACY_OPERATION"):
+                c.execute("SELECT public." + CAMPAIGN_FUNCTION + "(%s::jsonb)",
+                          (json.dumps(dict(operation="bolton_exception",
+                                           period=candidate["period"])),))
+            with pytest.raises(Exception, match="CAMPAIGN_FINITE_SCOPE_OR_STOP"):
+                c.execute("SELECT public." + CAMPAIGN_FUNCTION + "(%s::jsonb)",
+                          (json.dumps(dict(operation="intake_period",
+                                           period=candidate["period"],
+                                           policy=dict(mode="CAMPAIGN_FINITE_HISTORICAL_V1"))),))
+        assert _control(w) == before
+    assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
