@@ -11,7 +11,7 @@ future separately authorised owner session; do not import it into #227.
 """
 import hashlib
 
-WRITER_SOURCE_GIT_BLOB = "e0ad8a32c8b466f265e551117e8bd795b5d82c6"
+WRITER_SOURCE_GIT_BLOB = "e0ad8a32c8b466f265e551117e8bd795b5d82c6b"
 
 PRELUDE = """BEGIN;
 SET LOCAL lock_timeout = '3s';
