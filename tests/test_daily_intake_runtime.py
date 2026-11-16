@@ -314,6 +314,54 @@ def _catchup_owner(world):
                  bindings=execution_binding())
 
 
+
+def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(world,tmp_path):
+    """One selected council/week, not a new per-week issuer or live authority.
+
+    Distinguishes a successful source->retention->screening SQL readback from
+    the separately WITHHELD production-intended historical issuer candidate.
+    """
+    from zoneinfo import ZoneInfo
+    from verification.discovery.ten_council_offline import select_finite_batch
+    from verification.ingestion_storage.inactive_tameside_first_issuer import render_inactive_campaign_issuer
+    from verification.ingestion_storage.chain_registration import persisted_council_capture_inventory
+    reset(world)
+    now=datetime.now(timezone.utc)
+    selected=select_finite_batch(now,'tameside','2026-09-15','2026-09-21')
+    artifact=render_inactive_campaign_issuer(now,'tameside','2026-09-15','2026-09-21')
+    assert artifact['source_plan_sha256']==selected['selected_payload']['finite_manifest_sha256']
+    assert artifact['row']==selected['selected_row']
+    assert artifact['review_status']=='WITHHELD' and not artifact['installed']
+    assert "CAMPAIGN_FINITE_MANIFEST_WITHHELD" in artifact['sql']
+    p,scope=_catchup_fixture(world)
+    p['councils']={'tameside':p['councils']['tameside']}
+    p['max_runs']=1
+    name='finite-tameside-only-synthetic'
+    grant=_catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
+    assert grant['mode']=='DISPOSABLE_SHUTDOWN_GAP_V1'
+    run,result,_=invoke(world,tmp_path,name,catchup_window=scope)
+    assert run.returncode==0,(run.stderr,result)
+    assert result['status']=='RETAINED_AND_SCREENED'
+    assert result['coverage_advance'] is False and result['admission_connected'] is False
+    assert result['cleanup']=='CLOSED' and result['authority_closure']=='INVALIDATED'
+    assert len(result['scopes'])==1 and result['scopes'][0]['council']=='tameside'
+    assert len(result['backlog']['records'])==1
+    assert result['backlog']['records'][0]['application_admitted'] is None
+    retained=persisted_council_capture_inventory(world['boot'],'tameside')
+    assert len(retained)==1 and retained[0]['state']=='COMPLETE'
+    assert retained[0]['checkpoint']['start']==scope['start']
+    assert retained[0]['checkpoint']['end']==scope['end']
+    rows=world['boot'].execute(
+        "SELECT task,subject->>'council',state FROM ingestion_work_items "
+        "WHERE key<>repeat('0',64) AND task IN ('DISCOVERY','SCREENING') "
+        "AND state='COMPLETE'").fetchall()
+    assert ('DISCOVERY','tameside','COMPLETE') in rows
+    assert ('SCREENING','tameside','COMPLETE') in rows
+    assert all(row[1]=='tameside' for row in rows)
+    assert world['boot'].execute(
+        "SELECT count(*) FROM ingestion_work_items "
+        "WHERE key<>repeat('0',64) AND subject->>'council'='manchester'").fetchone()[0]==0
+
 def test_disposable_catchup_installed_sql_refuses_other_database_identity(world):
     """Read the effective installed SQL issuer, not just the Python source.
 
