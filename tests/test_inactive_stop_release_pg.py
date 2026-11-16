@@ -518,59 +518,22 @@ def test_writer_transition_non_superuser_owner_rollback_and_restoration(isolated
     new_hash="4ce46b98cbf986596f907b7236509b87ade6788bce7e4c9f40ebbd8167381f77"
     assert writer_hash()==old_hash
 
+    # Use exactly the offline, source-pinned artifact renderer instead of
+    # a test-local SQL wrapper that could drift from the reviewed installer.
+    from verification.ingestion_storage.inactive_owner_writer_install import (
+        render_inactive_writer_install,
+    )
     source=Path("verification/ingestion_storage/"
                 "private_evidence_writer_transition.sql").read_text()
-    assert source.count("\nBEGIN;\n")==1 and source.count("\nCOMMIT;\n")==1
-    body=source.replace("\nBEGIN;\n","\n",1).replace("\nCOMMIT;\n","\n",1)
-    # The wrapper is deliberately local to this test. Neither the frozen
-    # writer transition file nor an executable production command is changed.
-    script="""BEGIN;
-SET LOCAL lock_timeout = '3s';
-SET LOCAL statement_timeout = '10s';
-DO $owner_install_preflight$
-DECLARE n integer; baseline_ok boolean;
-BEGIN
- IF session_user IS DISTINCT FROM 'postgres'
-    OR current_user IS DISTINCT FROM 'postgres'
-    OR (SELECT rolsuper OR NOT rolcreaterole OR NOT rolcreatedb OR NOT rolbypassrls
-        FROM pg_catalog.pg_roles WHERE rolname=current_user)
- THEN RAISE EXCEPTION 'OWNER_WRITER_IDENTITY' USING ERRCODE='42501'; END IF;
- SELECT count(*),coalesce(bool_and(grantor<>'postgres'::regrole
-       AND admin_option AND NOT inherit_option AND NOT set_option),false)
-   INTO n,baseline_ok FROM pg_catalog.pg_auth_members
-   WHERE member='postgres'::regrole AND roleid='ingestion_storage_owner'::regrole;
- IF n<>1 OR NOT baseline_ok
-    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
-    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
- THEN RAISE EXCEPTION 'OWNER_WRITER_ADMIN_ONLY_BASELINE' USING ERRCODE='42501'; END IF;
-END $owner_install_preflight$;
--- Match the documented operational_owner schema capability preflight.
-DO $owner_schema_preflight$
-BEGIN
- IF NOT pg_catalog.has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION')
-    OR NOT pg_catalog.has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')
- THEN RAISE EXCEPTION 'OWNER_WRITER_SCHEMA_CAPABILITY' USING ERRCODE='42501'; END IF;
-END $owner_schema_preflight$;
-GRANT ingestion_storage_owner TO postgres
- WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres;
-""" + body + """
-REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
-DO $owner_install_restored$
-DECLARE n integer; baseline_ok boolean;
-BEGIN
- SELECT count(*),coalesce(bool_and(grantor<>'postgres'::regrole
-       AND admin_option AND NOT inherit_option AND NOT set_option),false)
-   INTO n,baseline_ok FROM pg_catalog.pg_auth_members
-   WHERE member='postgres'::regrole AND roleid='ingestion_storage_owner'::regrole;
- IF n<>1 OR NOT baseline_ok
-    OR current_user IS DISTINCT FROM 'postgres'
-    OR session_user IS DISTINCT FROM 'postgres'
-    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
-    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
- THEN RAISE EXCEPTION 'OWNER_WRITER_CAPABILITY_REMAINS' USING ERRCODE='42501'; END IF;
-END $owner_install_restored$;
-COMMIT;
-"""
+    script=render_inactive_writer_install(source)
+    assert "current_database() IS DISTINCT FROM 'postgres'" in script
+    # The sole disposable substitution is the database name; both owner
+    # session/current-user predicates must stay literal postgres.
+    script=script.replace(
+        "current_database() IS DISTINCT FROM 'postgres'",
+        "current_database() NOT IN ('postgres','ingestion_provisioning_test')",1)
+    assert "session_user IS DISTINCT FROM 'postgres'" in script
+    assert "current_user IS DISTINCT FROM 'postgres'" in script
     assert script.count("\nCOMMIT;\n")==1
     boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
                          "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
@@ -637,3 +600,20 @@ COMMIT;
                      "GRANTED BY provisioning_bootstrap RESTRICT")
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
                      "NOBYPASSRLS PASSWORD NULL")
+
+
+def test_owner_writer_renderer_is_pure_pinned_and_dormant():
+    from verification.ingestion_storage.inactive_owner_writer_install import (
+        render_inactive_writer_install,
+    )
+    source=Path("verification/ingestion_storage/"
+                "private_evidence_writer_transition.sql").read_text()
+    sql_text=render_inactive_writer_install(source)
+    assert sql_text.count("\nCOMMIT;\n")==1
+    assert sql_text.count("GRANT ingestion_storage_owner TO postgres")==1
+    assert "OWNER_WRITER_SCHEMA_CAPABILITY" in sql_text
+    assert "OWNER_WRITER_CAPABILITY_REMAINS" in sql_text
+    assert "OWNER_WRITER_SOURCE_DRIFT" not in sql_text
+    assert "CREATE OR REPLACE FUNCTION public.ingestion_intake_evidence_write" in sql_text
+    with pytest.raises(ValueError,match="OWNER_WRITER_SOURCE_DRIFT"):
+        render_inactive_writer_install(source+"--changed\n")
