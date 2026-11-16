@@ -93,5 +93,8 @@ def render_inactive_tameside_first_issuer():
     function = function.replace(_PERIOD_ANCHOR, _PERIOD_ANCHOR + "\n" + _GUARD, 1)
     if function.count("TAMESIDE_FIRST_MANIFEST_WITHHELD") != 1:
         raise ValueError("TAMESIDE_FIRST_REFUSAL_REQUIRED")
-    # No installation_script hook, EXECUTE GRANT or public callable alias.
-    return function
+    # PostgreSQL grants EXECUTE to PUBLIC by default on new functions; make
+    # even an accidental standalone installation non-callable by other roles.
+    # There is no owner/runtime wiring, standing GRANT or enabled path.
+    return (function + "\nREVOKE ALL ON FUNCTION public." + FUNCTION +
+            "(jsonb) FROM PUBLIC;\n")
