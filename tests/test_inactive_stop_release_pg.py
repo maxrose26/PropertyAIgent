@@ -546,7 +546,11 @@ BEGIN
 END $owner_install_preflight$;
 GRANT ingestion_storage_owner TO postgres
  WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres;
+-- Match the frozen #213 owner lifecycle: table/function ownership requires
+-- the actual storage-owner role, not inherited administrator privileges alone.
+SET LOCAL ROLE ingestion_storage_owner;
 """ + body + """
+RESET ROLE;
 REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
 DO $owner_install_restored$
 DECLARE n integer; baseline_ok boolean;
