@@ -7,6 +7,10 @@ tests are not owner authorisation, real effect closure or production installer.
 import copy
 import json
 import re
+import secrets
+
+import psycopg
+from psycopg import sql
 from pathlib import Path
 
 import pytest
@@ -54,24 +58,39 @@ def isolated_world():
             boot.execute("DROP ROLE postgres")
 
 
-def _script(manifest=None):
+def _script(manifest=None, *, owner_path=False):
     source=PATH.read_text()
     assert "OWNER_RELEASE_REVIEW_WITHHELD" in source
     assert 'review_manifest jsonb := \x27{"release_status":"WITHHELD","review_sha256":null,"effects":[]}\x27::jsonb' in source
     assert "ingestion_disposable_shared_stop_release" not in source
     assert "CREATE OR REPLACE FUNCTION" not in source
-    assert "GRANT " not in "\n".join(
-        l for l in source.splitlines() if not l.lstrip().startswith("--"))
-    # Test-only identity substitution, never committed to the production SQL.
+    assert "-- OWNER_CAPABILITY_BEGIN" in source
+    assert "-- OWNER_CAPABILITY_CLEANUP_BEGIN" in source
+    assert "WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres" in source
+    if not owner_path:
+        # Existing bootstrap fixture tests exercise the guarded body, not the
+        # owner privilege lifecycle; a SEPARATE non-superuser test covers it.
+        for start,end in (("-- OWNER_CAPABILITY_BEGIN", "-- OWNER_CAPABILITY_END"),
+                          ("-- OWNER_CAPABILITY_CLEANUP_BEGIN", "-- OWNER_CAPABILITY_CLEANUP_END")):
+            source=re.sub(re.escape(start)+r".*?"+re.escape(end)+r"\n",
+                          "",source,flags=re.S)
+        assert "GRANT " not in "\n".join(
+            l for l in source.splitlines() if not l.lstrip().startswith("--"))
+    # The local disposable DB name is the ONLY identity substitution for the
+    # restricted owner-path test: both postgres role checks remain literal.
     source=source.replace(
         "current_database() IS DISTINCT FROM 'postgres'",
         "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
-    source=source.replace(
-        "session_user IS DISTINCT FROM 'postgres'",
-        "session_user IS DISTINCT FROM 'provisioning_bootstrap'")
-    source=source.replace(
-        "current_user IS DISTINCT FROM 'postgres'",
-        "current_user IS DISTINCT FROM 'provisioning_bootstrap'")
+    if not owner_path:
+        source=source.replace(
+            "session_user IS DISTINCT FROM 'postgres'",
+            "session_user IS DISTINCT FROM 'provisioning_bootstrap'")
+        source=source.replace(
+            "current_user IS DISTINCT FROM 'postgres'",
+            "current_user IS DISTINCT FROM 'provisioning_bootstrap'")
+    else:
+        assert "session_user IS DISTINCT FROM 'postgres'" in source
+        assert "current_user IS DISTINCT FROM 'postgres'" in source
     if manifest is not None:
         source=source.replace(
             '\x27{"release_status":"WITHHELD","review_sha256":null,"effects":[]}\x27::jsonb',
@@ -375,3 +394,100 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     with pytest.raises(Exception,match="OWNER_RELEASE_STOP_CAS"):
         _run(w,mock)
     assert _control(w)==after
+
+
+def test_non_superuser_owner_transactional_capability_and_readback(isolated_world):
+    """Focused real-role PG17 proof; only disposable database NAME is substituted.
+
+    This exercises current_user=session_user=postgres without a superuser.
+    Does NOT establish current production grants or a real signed review.
+    """
+    from tests.e2e_pg_world import settings
+    w=isolated_world
+    boot=w["boot"]
+    _,info,_,_=settings()
+    password=secrets.token_urlsafe(40)
+    # Existing fixture creates postgres NOLOGIN; change only this disposable
+    # principal to match the reviewed owner's non-superuser administrative flags.
+    boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
+                         "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
+                             sql.Literal(password)))
+    boot.execute("GRANT ingestion_storage_owner TO postgres "
+                 "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                 "GRANTED BY provisioning_bootstrap")
+    def owner():
+        return psycopg.connect(**{**info,"user":"postgres","password":password},
+                               autocommit=True,prepare_threshold=None)
+    def memberships():
+        return boot.execute(
+            "SELECT grantor::regrole::text,admin_option,inherit_option,set_option "
+            "FROM pg_auth_members WHERE member='postgres'::regrole "
+            "AND roleid='ingestion_storage_owner'::regrole ORDER BY grantor"
+        ).fetchall()
+    baseline=memberships()
+    assert baseline==[("provisioning_bootstrap",True,False,False)]
+    try:
+        stopped=_seed(w)
+        boot.execute(Path("verification/ingestion_storage/"
+                          "private_evidence_writer_transition.sql").read_text())
+        mock=_script(_manifest(w),owner_path=True)
+        assert "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'" in mock
+        assert "session_user IS DISTINCT FROM 'postgres'" in mock
+        assert "current_user IS DISTINCT FROM 'postgres'" in mock
+        with owner() as c:
+            flags=c.execute(
+                "SELECT current_user,session_user,rolsuper,rolcreaterole,"
+                "rolcreatedb,rolbypassrls FROM pg_roles WHERE rolname=current_user"
+            ).fetchone()
+            assert flags==("postgres","postgres",False,True,True,True)
+            assert c.execute("SELECT pg_has_role(current_user,"
+                             "'ingestion_storage_owner','USAGE'),"
+                             "pg_has_role(current_user,"
+                             "'ingestion_storage_owner','SET')").fetchone()==(False,False)
+            # No owner authority is inferred from even a signed-looking fixture.
+            with pytest.raises(Exception,match="OWNER_RELEASE_REVIEW_WITHHELD"):
+                c.execute(_script(owner_path=True))
+            c.execute("ROLLBACK")
+        assert memberships()==baseline
+        assert _control(w)==stopped
+
+        # Rollback after the complete checked release also restores the
+        # temporary role membership and generation-15 STOP.
+        with owner() as c:
+            c.execute(mock.replace("\nCOMMIT;\n","\nROLLBACK;\n"))
+        assert _control(w)==stopped and memberships()==baseline
+
+        # Removing the exact preexisting admin-only grant must REFUSE BEFORE
+        # any table lock/release; the transaction cannot create authority.
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        try:
+            with owner() as c:
+                with pytest.raises(Exception,match="OWNER_RELEASE_OWNER_ADMIN_ONLY_BASELINE"):
+                    c.execute(mock)
+                c.execute("ROLLBACK")
+        finally:
+            boot.execute("GRANT ingestion_storage_owner TO postgres "
+                         "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                         "GRANTED BY provisioning_bootstrap")
+        assert _control(w)==stopped and memberships()==baseline
+
+        with owner() as c:
+            c.execute(mock)
+        # Independent fresh bootstrap readback: no second run/replay attempt
+        # after a hypothetical lost acknowledgement.
+        after=_control(w)
+        assert after["hard_stop_generation"]==16
+        assert after["owner_shared_stop_release"]["version"]=="OWNER_REVIEWED_ONE_SHOT_V1"
+        assert after["owner_shared_stop_release"]["no_work_issued"] is True
+        assert memberships()==baseline
+        with owner() as c:
+            with pytest.raises(Exception,match="OWNER_RELEASE_STOP_CAS"):
+                c.execute(mock)
+            c.execute("ROLLBACK")
+        assert _control(w)==after and memberships()==baseline
+    finally:
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
+                     "NOBYPASSRLS PASSWORD NULL")

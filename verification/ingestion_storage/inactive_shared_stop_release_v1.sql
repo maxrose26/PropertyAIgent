@@ -6,6 +6,35 @@
 BEGIN;
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '10s';
+-- OWNER_CAPABILITY_BEGIN: pre-lock, transaction-local, existing owner role only.
+-- Reuse the #213 intake_owner admin-only baseline; no permanent privilege.
+DO $owner_capability_preflight$
+DECLARE r record; n integer; baseline_ok boolean;
+BEGIN
+  IF current_database() IS DISTINCT FROM 'postgres'
+    OR session_user IS DISTINCT FROM 'postgres'
+    OR current_user IS DISTINCT FROM 'postgres'
+  THEN RAISE EXCEPTION 'OWNER_RELEASE_EXECUTION_IDENTITY' USING ERRCODE='42501'; END IF;
+  SELECT rolsuper,rolcreaterole,rolcreatedb,rolbypassrls INTO STRICT r
+    FROM pg_catalog.pg_roles WHERE rolname=current_user;
+  IF r.rolsuper OR NOT r.rolcreaterole OR NOT r.rolcreatedb OR NOT r.rolbypassrls
+  THEN RAISE EXCEPTION 'OWNER_RELEASE_RESTRICTED_OWNER_IDENTITY' USING ERRCODE='42501'; END IF;
+  SELECT count(*),coalesce(bool_and(
+      grantor<>'postgres'::regrole AND admin_option
+      AND NOT inherit_option AND NOT set_option),false)
+    INTO n,baseline_ok FROM pg_catalog.pg_auth_members
+    WHERE roleid='ingestion_storage_owner'::regrole
+      AND member='postgres'::regrole;
+  IF n<>1 OR NOT baseline_ok
+     OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+     OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
+  THEN RAISE EXCEPTION 'OWNER_RELEASE_OWNER_ADMIN_ONLY_BASELINE' USING ERRCODE='42501'; END IF;
+END $owner_capability_preflight$;
+GRANT ingestion_storage_owner TO postgres
+  WITH ADMIN FALSE, INHERIT TRUE, SET TRUE GRANTED BY postgres;
+-- Current/session identity stays postgres; inherited table access lasts only
+-- until the exact self-issued grant below is revoked BEFORE COMMIT.
+-- OWNER_CAPABILITY_END
 LOCK TABLE public.ingestion_work_items IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE public.ingestion_work_attempts IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE public.ingestion_run_evidence IN SHARE MODE;
@@ -203,6 +232,26 @@ BEGIN
         'source_generation',15,'no_work_issued',true));
   UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
 END $owner_release$;
+-- OWNER_CAPABILITY_CLEANUP_BEGIN: restore baseline inside same transaction.
+REVOKE ingestion_storage_owner FROM postgres GRANTED BY postgres RESTRICT;
+DO $owner_capability_restored$
+DECLARE n integer; baseline_ok boolean;
+BEGIN
+  IF current_user IS DISTINCT FROM 'postgres'
+    OR session_user IS DISTINCT FROM 'postgres'
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','USAGE')
+    OR pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','SET')
+  THEN RAISE EXCEPTION 'OWNER_RELEASE_OWNER_CAPABILITY_REMAINS' USING ERRCODE='42501'; END IF;
+  SELECT count(*),coalesce(bool_and(
+      grantor<>'postgres'::regrole AND admin_option
+      AND NOT inherit_option AND NOT set_option),false)
+    INTO n,baseline_ok FROM pg_catalog.pg_auth_members
+    WHERE roleid='ingestion_storage_owner'::regrole
+      AND member='postgres'::regrole;
+  IF n<>1 OR NOT baseline_ok
+  THEN RAISE EXCEPTION 'OWNER_RELEASE_OWNER_MEMBERSHIP_DRIFT' USING ERRCODE='42501'; END IF;
+END $owner_capability_restored$;
+-- OWNER_CAPABILITY_CLEANUP_END
 COMMIT;
 -- On unknown COMMIT acknowledgement: separate read-only gen16 + receipt readback,
 -- NEVER retry, never restore gen14/15. On later failure raise a NEW stop and
