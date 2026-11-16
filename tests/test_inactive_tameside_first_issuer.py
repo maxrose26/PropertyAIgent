@@ -18,6 +18,8 @@ def test_normal_daily_issuer_is_unchanged_and_candidate_is_withheld():
     assert "TAMESIDE_FIRST_MANIFEST_WITHHELD" in sql
     assert "status" in sql and "WITHHELD" in sql
     assert "GRANT EXECUTE" not in sql
+    assert ("REVOKE ALL ON FUNCTION public." + candidate.FUNCTION +
+            "(jsonb) FROM PUBLIC;") in sql
     assert "ingestion_provisioning_test" not in sql
     assert "ingestion_register_disposable_catchup" not in sql
     assert "current_database() IS DISTINCT FROM 'postgres'" in sql
