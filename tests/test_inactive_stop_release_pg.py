@@ -630,8 +630,15 @@ def test_s4_first_tameside_noninstalled_issuer_pg17_refuses_before_source(isolat
     )
     w=isolated_world
     ctl_before=_control(w)
+    # For this test ONLY, use existing disposable bootstrap as the
+    # SECURITY DEFINER owner: the normal migrator lacks control-table locks.
+    # No production role/ACL inference. Grant this one test invoker EXECUTE
+    # in the ephemeral DB, never the restricted worker.
+    w["boot"].execute(render_inactive_tameside_first_issuer())
+    w["boot"].execute("GRANT EXECUTE ON FUNCTION "
+                      "public.ingestion_register_tameside_first_once(jsonb) "
+                      "TO provisioning_migrator")
     with w["connect"]("provisioning_migrator") as c:
-        c.execute(render_inactive_tameside_first_issuer())
         public_grant=c.execute(
             "SELECT has_function_privilege('ingestion_worker_login',"
             "'public.ingestion_register_tameside_first_once(jsonb)','EXECUTE')"
