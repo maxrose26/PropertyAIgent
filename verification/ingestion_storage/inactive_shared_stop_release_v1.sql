@@ -93,6 +93,16 @@ BEGIN
      OR rd.proacl::text IS DISTINCT FROM '{ingestion_storage_owner=X/ingestion_storage_owner,ingestion_worker=X/ingestion_storage_owner,postgres=X/ingestion_storage_owner}'
      OR rel.relacl::text IS DISTINCT FROM '{ingestion_storage_owner=arwdDxtm/ingestion_storage_owner}'
      OR NOT rel.relrowsecurity OR NOT rel.relforcerowsecurity
+     OR (SELECT count(*) FROM pg_catalog.pg_policy p
+         WHERE p.polrelid=rel.oid) <> 1
+     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policy p
+         WHERE p.polrelid=rel.oid
+           AND p.polname='ingestion_evidence_owner'
+           AND p.polpermissive AND p.polcmd='*'
+           AND pg_catalog.cardinality(p.polroles)=1
+           AND pg_catalog.pg_get_userbyid(p.polroles[1])='ingestion_storage_owner'
+           AND pg_catalog.pg_get_expr(p.polqual,p.polrelid)='true'
+           AND pg_catalog.pg_get_expr(p.polwithcheck,p.polrelid)='true')
      OR EXISTS (SELECT 1 FROM public.ingestion_run_evidence
         WHERE encode(pg_catalog.sha256(body),'hex') IS DISTINCT FROM sha256)
   THEN RAISE EXCEPTION 'OWNER_RELEASE_WRITER_OR_EVIDENCE_DRIFT'; END IF;

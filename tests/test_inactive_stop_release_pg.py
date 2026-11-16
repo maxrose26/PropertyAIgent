@@ -205,6 +205,22 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     ).read_text())
     manifest=_manifest(w)
     mock=_script(manifest)
+    # Exact production owner-only RLS policy must not drift at release.
+    w["boot"].execute("ALTER POLICY ingestion_evidence_owner ON "
+                      "public.ingestion_run_evidence WITH CHECK (false)")
+    with pytest.raises(Exception,match="OWNER_RELEASE_WRITER_OR_EVIDENCE_DRIFT"):
+        _run(w,mock)
+    w["boot"].execute("ALTER POLICY ingestion_evidence_owner ON "
+                      "public.ingestion_run_evidence WITH CHECK (true)")
+    w["boot"].execute("CREATE POLICY extraneous_release_test ON "
+                      "public.ingestion_run_evidence FOR SELECT TO "
+                      "ingestion_storage_owner USING (true)")
+    with pytest.raises(Exception,match="OWNER_RELEASE_WRITER_OR_EVIDENCE_DRIFT"):
+        _run(w,mock)
+    w["boot"].execute("DROP POLICY extraneous_release_test ON "
+                      "public.ingestion_run_evidence")
+    assert _control(w)==ctl_before
+
     # The shipped SQL still refuses; only the synthetic in-memory substitution
     # reaches these tests. No test approval lands in repository SQL.
     with pytest.raises(Exception,match="OWNER_RELEASE_REVIEW_WITHHELD"):
