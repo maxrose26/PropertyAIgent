@@ -152,10 +152,9 @@ def render_inactive_campaign_issuer(as_of, council, start, end):
         (expected_first, first),
         ("TAMESIDE_FIRST_HISTORICAL_V1", CAMPAIGN_MODE),
         ("'tameside'", "'" + council + "'"),
-        ('"council":"tameside"', '"council":"' + council + '"'),
         ("2026-09-15", start),
         ("2026-09-21", end),
-        ('"semantics":"RECEIVED"', '"semantics":"' + row["semantics"] + '"'),
+        ("'RECEIVED'", "'" + row["semantics"] + "'"),
         ("TAMESIDE_FIRST_", "CAMPAIGN_FINITE_"),
     )
     for old, new in replacements:
