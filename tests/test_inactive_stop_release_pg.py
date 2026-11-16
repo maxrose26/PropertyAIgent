@@ -38,6 +38,14 @@ def isolated_world():
              CREATE ROLE postgres NOLOGIN;
              GRANT EXECUTE ON FUNCTION public.ingestion_intake_evidence_read(
                text,text,text) TO postgres;""")
+        # The standard PA-D002 fixture ships the candidate writer; restore the
+        # exact reviewed installed OLD body before exercising the transition.
+        boot.execute(Path("tests/fixtures/pa_d002_installed_writer.sql").read_text())
+        old_sha=boot.execute(
+            "SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
+            "FROM pg_proc WHERE oid='public.ingestion_intake_evidence_write("
+            "text,text,text,bytea)'::regprocedure").fetchone()[0]
+        assert old_sha=="8ffd8fdda0692a49a776137ea6342c1378d1f513cd418b8f983a92f0fe910290"
         try:
             yield w
         finally:
