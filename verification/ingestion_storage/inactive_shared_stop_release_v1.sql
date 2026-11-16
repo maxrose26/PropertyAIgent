@@ -105,7 +105,15 @@ BEGIN
        OR coalesce(e->>'review_ref','') NOT LIKE 'https://github.com/maxrose26/PropertyAIgent/%'
        OR coalesce(e->>'work_sha256','') !~ '^[a-f0-9]{64}$'
        OR coalesce(e->>'attempts_sha256','') !~ '^[a-f0-9]{64}$'
+       OR e->>'source_decision_scope' IS DISTINCT FROM 'EXPLICIT_OPERATIONAL_RELEASE_NOT_PRESERVATION_ONLY'
        OR e ? 'test_only'
+       OR (k IN ('21330c060171f6f95286a8f31131bda00fa3c081a21ebfc0f418b10706e510e4',
+                    'dc8ae276a9c3f697b9905adf0ec8835398009769b69e788e4fd70e13216ee6fc')
+            AND (e->>'effect_state' IS DISTINCT FROM 'UNKNOWN'
+                 OR e->>'risk_acceptance' IS DISTINCT FROM 'OWNER_AND_DISTINCT_REVIEW_EXPLICIT_UNKNOWN'
+                 OR e->>'risk_boundary' IS DISTINCT FROM 'NO_REPLAY_ONE_GENERATION_NO_COVERAGE'
+                 OR coalesce(e->>'owner_decision_ref','')
+                       NOT LIKE 'https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-%'))
     THEN RAISE EXCEPTION 'OWNER_RELEASE_EFFECT_REVIEW_MISSING'; END IF;
     SELECT * INTO STRICT w FROM public.ingestion_work_items WHERE key=k FOR UPDATE;
     SELECT encode(pg_catalog.sha256(pg_catalog.convert_to(

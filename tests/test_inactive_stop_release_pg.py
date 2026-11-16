@@ -44,10 +44,10 @@ def _script(manifest=None):
         "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
     source=source.replace(
         "session_user IS DISTINCT FROM 'postgres'",
-        "session_user IS DISTINCT FROM 'provisioning_migrator'")
+        "session_user IS DISTINCT FROM 'provisioning_bootstrap'")
     source=source.replace(
         "current_user IS DISTINCT FROM 'postgres'",
-        "current_user IS DISTINCT FROM 'provisioning_migrator'")
+        "current_user IS DISTINCT FROM 'provisioning_bootstrap'")
     if manifest is not None:
         source=source.replace(
             '\x27{"release_status":"WITHHELD","review_sha256":null,"effects":[]}\x27::jsonb',
@@ -59,8 +59,14 @@ def _run(w, source, *, rollback=False):
     if rollback:
         assert source.count("\nCOMMIT;\n")==1
         source=source.replace("\nCOMMIT;\n","\nROLLBACK;\n")
-    with w["connect"]("provisioning_migrator") as c:
-        c.execute(source)
+    # The fixed disposable bootstrap is the only existing principal with
+    # physical table LOCK authority. No new privileges/grants are introduced.
+    # The production template still requires actual session_user=postgres.
+    try:
+        w["boot"].execute(source)
+    except BaseException:
+        w["boot"].execute("ROLLBACK")
+        raise
 
 
 def _control(w):
@@ -125,7 +131,13 @@ def _manifest(w):
                            work_sha256=row[0],attempts_sha256=row[1],
                            release_containment="ACCEPT",coverage="UNKNOWN",
                            source_or_write_replay_authorised=False,
-                           review_ref="https://github.com/maxrose26/PropertyAIgent/pull/227#SYNTHETIC_TEST_ONLY"))
+                           source_decision_scope="EXPLICIT_OPERATIONAL_RELEASE_NOT_PRESERVATION_ONLY",
+                           review_ref="https://github.com/maxrose26/PropertyAIgent/pull/227#SYNTHETIC_TEST_ONLY",
+                           **(dict(effect_state="UNKNOWN",
+                                   risk_acceptance="OWNER_AND_DISTINCT_REVIEW_EXPLICIT_UNKNOWN",
+                                   risk_boundary="NO_REPLAY_ONE_GENERATION_NO_COVERAGE",
+                                   owner_decision_ref="https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-SYNTHETIC_TEST_ONLY")
+                              if key.startswith(("21330c06","dc8ae276")) else {})))
     return dict(release_status="ACCEPTED_FOR_OPERATIONAL_RELEASE",
                 review_sha256=OWNER_SHA,effects=result)
 
