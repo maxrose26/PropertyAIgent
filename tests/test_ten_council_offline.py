@@ -94,3 +94,57 @@ def test_as_of_date_cannot_be_guessed_or_pulled_from_a_running_manifest():
     assert tomorrow['windows'][-1]['end']=='2026-11-11'
     assert candidate.validate(morning)==morning
     assert candidate.validate(tomorrow)==tomorrow
+
+
+
+def test_v13_one_reusable_finite_selector_across_all_existing_nine_councils():
+    as_of = datetime(2026, 11, 16, 21, tzinfo=timezone.utc)
+    # The existing campaign generator gives 9 finite <=7-day windows across
+    # all ten required councils, but only nine have profiled source shapes.
+    plan = candidate.build(as_of)
+    assert plan['window_count'] == 9 and plan['scope_count'] == 90
+    assert plan['trafford_unqualified_count'] == 9
+    assert plan['fallback_start'] == '2026-09-15'
+    assert plan['endpoint_date'] == '2026-11-16'
+    for council in sorted(candidate.NINE):
+        first = candidate.select_finite_batch(
+            as_of, council, '2026-09-15', '2026-09-21')
+        second = candidate.select_finite_batch(
+            as_of, council, '2026-09-22', '2026-09-28')
+        for item in (first, second):
+            row = item['selected_row']
+            assert item['version'] == candidate.BATCH_VERSION
+            assert item['status'] == 'OFFLINE_PLAN_ONLY'
+            assert item['collection_authorised'] is False
+            assert item['sql_issuer_qualified'] is False
+            assert item['persistence_verified'] is False
+            assert item['screening_verified'] is False
+            assert row['council'] == council
+            assert row['semantics'] == finite.SEMANTICS[council]
+            assert row['start'] <= row['end']
+            assert campaign.select(item['selected_payload'], profiled=True) == [row]
+            assert item['reservation']['observations'] == 1
+            assert item['current_day_partial'] is False
+        assert first['selected_payload']['finite_manifest_sha256'] != second['selected_payload']['finite_manifest_sha256']
+    # A distinct historical day is not an implicit current-day coverage claim.
+    final = candidate.select_finite_batch(
+        as_of, 'tameside', '2026-11-10', '2026-11-16')
+    assert final['current_day_partial'] is True
+    assert final['selected_row']['semantics'] == 'RECEIVED'
+    assert final['collection_authorised'] is False
+
+
+@pytest.mark.parametrize('council,start,end,error', [
+    ('trafford', '2026-09-15', '2026-09-21', 'TRAFFORD_SOURCE_NOT_QUALIFIED'),
+    ('unqualified_fake', '2026-09-15', '2026-09-21', 'TEN_COUNCIL_BATCH_UNKNOWN_COUNCIL'),
+    ('tameside', '2026-09-15', '2026-09-22', 'TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN'),
+    ('tameside', '2026-09-16', '2026-09-21', 'TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN'),
+    ('tameside', '2026-09-22', '2026-09-21', 'TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN'),
+    ('tameside', '2026-11-17', '2026-11-17', 'TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN'),
+    ('tameside', '2026-09-15', None, 'TEN_COUNCIL_BATCH_INPUT'),
+])
+def test_v13_selection_refuses_unapproved_or_unqualified_batch(council,start,end,error):
+    with pytest.raises(ValueError, match=error):
+        candidate.select_finite_batch(
+            datetime(2026, 11, 16, 21, tzinfo=timezone.utc),
+            council, start, end)
