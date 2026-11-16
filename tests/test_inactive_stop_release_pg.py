@@ -162,8 +162,13 @@ def _manifest(w):
                                    risk_boundary="NO_REPLAY_ONE_GENERATION_NO_COVERAGE",
                                    owner_decision_ref="https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-SYNTHETIC_TEST_ONLY")
                               if key.startswith(("21330c06","dc8ae276")) else {})))
+    controller_sha=w["boot"].execute(
+        "SELECT encode(sha256(convert_to(outcome::jsonb::text,'UTF8')),'hex') "
+        "FROM public.ingestion_work_items WHERE key=repeat('0',64)"
+    ).fetchone()[0]
     return dict(release_status="ACCEPTED_FOR_OPERATIONAL_RELEASE",
-                review_sha256=OWNER_SHA,effects=result)
+                review_sha256=OWNER_SHA,
+                expected_controller_sha256=controller_sha,effects=result)
 
 
 def test_adapter_default_is_inert_no_installer_or_live_enablement(isolated_world):
@@ -268,6 +273,22 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     w["boot"].execute(
         "UPDATE public.ingestion_work_attempts SET finished_at=%s "
         "WHERE work_key=%s AND fence=1",(prior_finished,attempt_key))
+    assert _control(w)==ctl_before
+
+    # A syntactically valid but unbound full-controller digest cannot
+    # authorise a release. A non-STOP policy change also refuses under lock.
+    wrong_digest=copy.deepcopy(manifest)
+    wrong_digest["expected_controller_sha256"]="0"*64
+    with pytest.raises(Exception,match="OWNER_RELEASE_CONTROLLER_DRIFT"):
+        _run(w,_script(wrong_digest))
+    unrelated_ctl=copy.deepcopy(ctl_before)
+    unrelated_ctl["unreviewed_controller_change"]="TEST_ONLY"
+    w["boot"].execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                      "WHERE key=repeat('0',64)",(json.dumps(unrelated_ctl),))
+    with pytest.raises(Exception,match="OWNER_RELEASE_CONTROLLER_DRIFT"):
+        _run(w,mock)
+    w["boot"].execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                      "WHERE key=repeat('0',64)",(json.dumps(ctl_before),))
     assert _control(w)==ctl_before
 
     _run(w,mock,rollback=True)
