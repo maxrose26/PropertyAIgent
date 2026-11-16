@@ -235,7 +235,9 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     # Explicitly withheld UNKNOWN physical-effect risk must not be converted
     # into stop-release authority by a preservation-only review finding.
     withheld=copy.deepcopy(manifest)
-    withheld["effects"][-1]["risk_acceptance"]="WITHHELD_UNKNOWN_EFFECT"
+    withheld_key=next(e for e in withheld["effects"]
+                      if e["key"].startswith("dc8ae276"))
+    withheld_key["risk_acceptance"]="WITHHELD_UNKNOWN_EFFECT"
     with pytest.raises(Exception,match="OWNER_RELEASE_EFFECT_REVIEW_MISSING"):
         _run(w,_script(withheld))
     assert _control(w)==ctl_before
