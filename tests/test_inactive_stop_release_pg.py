@@ -138,6 +138,17 @@ def _seed(w):
     return ctl
 
 
+def _seal_manifest(w, manifest):
+    # Hash PostgreSQL jsonb's canonical text; this is not signed approval.
+    payload={k:v for k,v in manifest.items() if k!="manifest_binding_sha256"}
+    digest=w["boot"].execute(
+        "SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",
+        (json.dumps(payload,sort_keys=True,separators=(",",":")),)
+    ).fetchone()[0]
+    manifest["manifest_binding_sha256"]=digest
+    return manifest
+
+
 def _manifest(w):
     prior=_preimage_keys()
     result=[]
@@ -166,9 +177,9 @@ def _manifest(w):
         "SELECT encode(sha256(convert_to(outcome::jsonb::text,'UTF8')),'hex') "
         "FROM public.ingestion_work_items WHERE key=repeat('0',64)"
     ).fetchone()[0]
-    return dict(release_status="ACCEPTED_FOR_OPERATIONAL_RELEASE",
+    return _seal_manifest(w,dict(release_status="ACCEPTED_FOR_OPERATIONAL_RELEASE",
                 review_sha256=OWNER_SHA,
-                expected_controller_sha256=controller_sha,effects=result)
+                expected_controller_sha256=controller_sha,effects=result))
 
 
 def test_adapter_default_is_inert_no_installer_or_live_enablement(isolated_world):
@@ -205,6 +216,17 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     ).read_text())
     manifest=_manifest(w)
     mock=_script(manifest)
+    # A plausible reviewer reference may not be swapped after review digest.
+    tampered=copy.deepcopy(manifest)
+    tampered["effects"][0]["review_ref"]=(
+        "https://github.com/maxrose26/PropertyAIgent/pull/227#UNREVIEWED_CHANGE")
+    with pytest.raises(Exception,match="OWNER_RELEASE_MANIFEST_BINDING"):
+        _run(w,_script(tampered))
+    missing=copy.deepcopy(manifest)
+    missing.pop("manifest_binding_sha256")
+    with pytest.raises(Exception,match="OWNER_RELEASE_MANIFEST_BINDING"):
+        _run(w,_script(missing))
+    assert _control(w)==ctl_before
     # Exact production owner-only RLS policy must not drift at release.
     w["boot"].execute("ALTER POLICY ingestion_evidence_owner ON "
                       "public.ingestion_run_evidence WITH CHECK (false)")
@@ -259,6 +281,7 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     withheld_key=next(e for e in withheld["effects"]
                       if e["key"].startswith("dc8ae276"))
     withheld_key["risk_acceptance"]="WITHHELD_UNKNOWN_EFFECT"
+    _seal_manifest(w,withheld)  # even a recomputed digest cannot lift WITHHOLD
     with pytest.raises(Exception,match="OWNER_RELEASE_EFFECT_REVIEW_MISSING"):
         _run(w,_script(withheld))
     assert _control(w)==ctl_before
@@ -295,6 +318,7 @@ def test_adapter_install_rollback_negative_drift_and_single_generation(isolated_
     # authorise a release. A non-STOP policy change also refuses under lock.
     wrong_digest=copy.deepcopy(manifest)
     wrong_digest["expected_controller_sha256"]="0"*64
+    _seal_manifest(w,wrong_digest)  # matching payload hash cannot hide DB drift
     with pytest.raises(Exception,match="OWNER_RELEASE_CONTROLLER_DRIFT"):
         _run(w,_script(wrong_digest))
     unrelated_ctl=copy.deepcopy(ctl_before)
