@@ -733,6 +733,10 @@ def test_v13_stable_campaign_sql_pg17_withheld_non_superuser_call(isolated_world
     boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
                          "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
                              sql.Literal(password)))
+    # Test fixture only: this login otherwise cannot resolve a function in
+    # schema public. Restore the privilege before fixture teardown; this is
+    # NOT a proposed production grant or runtime role change.
+    boot.execute("GRANT USAGE ON SCHEMA public TO postgres")
     boot.execute("GRANT EXECUTE ON FUNCTION "+name+" TO postgres")
     try:
         with psycopg.connect(**{**info,"user":"postgres","password":password},
@@ -761,5 +765,8 @@ def test_v13_stable_campaign_sql_pg17_withheld_non_superuser_call(isolated_world
         assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
     finally:
         boot.execute("REVOKE EXECUTE ON FUNCTION "+name+" FROM postgres")
+        boot.execute("REVOKE USAGE ON SCHEMA public FROM postgres")
+        assert boot.execute("SELECT has_schema_privilege("
+                            "'postgres','public','USAGE')").fetchone()[0] is False
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
                      "NOBYPASSRLS PASSWORD NULL")
