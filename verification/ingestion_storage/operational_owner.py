@@ -638,11 +638,20 @@ class Owner:
                               'ingestion_storage_owner',True,
                               ['search_path=pg_catalog']):
                     raise Uncertain('CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT')
-                # Read and lock the actual controller in this same verified
-                # owner session, before acquiring any temporary capability.
-                # A policy's expected_stop is a comparison target, not evidence.
+                # Before temporary capability, this is a SELECT-only
+                # diagnostic snapshot. PostgreSQL FOR SHARE requires UPDATE
+                # privilege even for a read-only projection; the observed
+                # production postgres session has no table-level UPDATE and
+                # its column-level UPDATE permissions are unverified.
+                # Do not grant UPDATE to make the preflight work.
+                #
+                # The pinned issuer independently locks the controller using
+                # FOR UPDATE *after* the reviewed temporary capability and
+                # compares expected_stop under that lock before any write.
+                # If STOP changes between these two reads it must refuse;
+                # never treat this preliminary observation as release CAS.
                 rows=self.q(c,"SELECT outcome FROM public.ingestion_work_items "
-                              "WHERE key=repeat('0',64) FOR SHARE")
+                              "WHERE key=repeat('0',64)")
                 keys={'global_stop','manual_stop','last_hard_stop',
                       'hard_stop_generation'}
                 if (len(rows)!=1 or len(rows[0])!=1
