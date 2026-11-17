@@ -509,6 +509,8 @@ class Owner:
             raise ValueError('CAMPAIGN_DISPOSABLE_ASOF')
         candidate = prepare_inactive_campaign_owner_batch(
             as_of, council, start, end)
+        if type(name) is not str or name != candidate['period']:
+            raise ValueError('CAMPAIGN_DISPOSABLE_PERIOD_DRIFT')
         expected_scope = dict(
             start=candidate['campaign_batch']['start'],
             end=candidate['campaign_batch']['end'],
