@@ -69,6 +69,80 @@ def test_unreleased_campaign_mode_refuses_instead_of_rolling_source():
         runtime.intake_issuer()
 
 
+def test_production_intended_historical_owner_and_runtime_are_code_sealed_off():
+    """Wired real issuer NAME / production owner entry cannot issue today.
+
+    No fixture registration or SQL occurs. Both hardcoded Python release gates
+    stay FALSE independently of a plausible reviewed policy or SQL candidate.
+    """
+    from datetime import timedelta
+    from tests.test_inactive_tameside_first_issuer import (
+        _inactive_owner_policy_fixture,
+    )
+    from verification.ingestion_storage.daily_intake_runtime import (
+        LIVE_HISTORICAL_CAMPAIGN_RELEASE, LIVE_PRIVATE_EVIDENCE_RELEASE,
+        Runtime,
+    )
+    assert LIVE_HISTORICAL_CAMPAIGN_RELEASE is False
+    assert LIVE_PRIVATE_EVIDENCE_RELEASE is False
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    invoked = []
+    def impossible_connector():
+        invoked.append('opened')
+        raise AssertionError('OWNER_PRODUCTION_CONNECTION_MUST_NOT_OPEN')
+    owner = Owner(
+        impossible_connector, lambda *_: None, lambda: None,
+        identity='postgres', expiry=as_of+timedelta(hours=1), bindings=binding,
+    )
+    with pytest.raises(ValueError, match='CAMPAIGN_OWNER_OPERATIONAL_RELEASE_WITHHELD'):
+        owner.register_historical_campaign_period(
+            period, policy, as_of=as_of)
+    assert owner.connections == 0 and not invoked
+    runtime = object.__new__(Runtime)
+    runtime.test = False
+    runtime.route_name = 'POOLER'
+    runtime.policy = policy
+    with pytest.raises(Denied, match='INTAKE_MODE_NOT_RELEASED'):
+        runtime.intake_issuer()
+
+
+@pytest.mark.parametrize('mutation', [
+    'period', 'council', 'semantics', 'source_plan', 'two_councils',
+    'max_runs', 'mode',
+])
+def test_production_intended_historical_runtime_recomputes_one_finite_batch(mutation):
+    """No SQL/sources: the runtime must not trust forged owner policy bytes."""
+    from copy import deepcopy
+    from tests.test_inactive_tameside_first_issuer import (
+        _inactive_owner_policy_fixture,
+    )
+    from verification.ingestion_storage.daily_intake_runtime import (
+        selected_historical_campaign_rows,
+    )
+    as_of, period, policy, _, _ = _inactive_owner_policy_fixture()
+    assert selected_historical_campaign_rows(policy, period, as_of) == [
+        dict(council='tameside', start='2026-09-15',
+             end='2026-09-21', semantics='RECEIVED')]
+    p = deepcopy(policy)
+    if mutation == 'period':
+        period = 'other-period'
+    elif mutation == 'council':
+        p['campaign_batch']['council'] = 'manchester'
+    elif mutation == 'semantics':
+        p['campaign_batch']['semantics'] = 'VALIDATED'
+    elif mutation == 'source_plan':
+        p['campaign_source_plan_sha256'] = 'f' * 64
+    elif mutation == 'two_councils':
+        p['councils']['manchester'] = dict(
+            contract='other', qualification_sha256='b' * 64)
+    elif mutation == 'max_runs':
+        p['max_runs'] = 2
+    else:
+        p['mode'] = 'DISPOSABLE_SHUTDOWN_GAP_V1'
+    with pytest.raises(Denied, match='INTAKE_CAMPAIGN_RUNTIME_'):
+        selected_historical_campaign_rows(p, period, as_of)
+
+
 @pytest.fixture(scope='module')
 def world():
     for world in disposable_world():
