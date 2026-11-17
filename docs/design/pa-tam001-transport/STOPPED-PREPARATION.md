@@ -1,8 +1,8 @@
 # PA-TAM002 v1.3: checkpoint/deployment correction
 
 Stage 4 OPEN. Inactive until independent REVIEW and acceptance of the amended
-executable/order. Source: `0f751613f1479e1088d820b8f809f267466071e9`; tree:
-`a92017a3b624cc8d351956a6d83b1a99df09f899`. Package pin is the documentation commit
+executable/order. Source: `e1e17e9033a6f95e0a8754d0b3f177b28eb9852f`; tree:
+`5c6a4807a9850d6aee6f0e8a1e9c46c8e40e132b`. Package pin is the documentation commit
 containing this file and artifact-pins.json. Existing v1.2 scope and expiry remain.
 
 ## Choice and exact ordering delta
@@ -37,7 +37,7 @@ Use the corrected source checkout as cwd with the existing owner runtime, and th
 separate clean #213 checkout at f027ba28af69ae70208eab5ed047e4a8a81c6337. The existing
 short-command/receipt route may call the following entry points; it must not call
 old Pilot.run/build. Verify the candidate checkout and immutable remote ref
-`pa-tam002/0f751613f1479e1088d820b8f809f267466071e9` both resolve to that full SHA
+`pa-tam002/e1e17e9033a6f95e0a8754d0b3f177b28eb9852f` both resolve to that full SHA
 before effects. No moving PR branch is a deployment pin.
 
 ```python
@@ -62,14 +62,14 @@ try:
     deployments = pinned.complete_inventory(api.call('GET', '/deploys?limit=100'), 'deploy')
 finally:
     api.close()
-assert current == original['original_service']
+assert pinned.service_guard(current) == original['original_guard']
 assert environment == original['original_environment']
 state = prepare_stopped(
     db, pinned=pinned, recovery=recovery, binding=binding,
     journal_source=journal_source, api_factory=api_factory,
-    revision='0f751613f1479e1088d820b8f809f267466071e9',
+    revision='e1e17e9033a6f95e0a8754d0b3f177b28eb9852f',
     checkpoint={'ordinal':55, 'sha256':CHECKPOINT_SHA},
-    baseline={'service':current, 'environment':environment,
+    baseline={'service':original['original_service'], 'environment':environment,
               'deploy_ids':[d['id'] for d in deployments]},
 )
 assert state['status'] == 'STOPPED_BUILD_READY'
@@ -102,7 +102,7 @@ council calls. Fresh service/environment, dormant roles and STOP15 are checked
 again before build effects. Environment contains only PYTHONUNBUFFERED, LANG, TZ,
 OPENBLAS_NUM_THREADS if originally present. The default command stays /bin/true.
 Resume is the sole build dispatch; POST /deploys and POST /jobs are not used here.
-Provider IO retains frozen response/HTTP bounds, plus 40 calls, 40 active seconds
+Provider IO retains frozen response/HTTP bounds, plus 40 calls, 40 elapsed seconds
 and 786432 aggregate decoded bytes per preparation invocation. Pending builds
 may be read back within the original 20 observations / 300 seconds maximum; no
 resume resubmission. A completed or uncertain invocation is not a new allowance.
@@ -130,7 +130,7 @@ resume resubmission. A completed or uncertain invocation is not a new allowance.
 
 ## Connected validation
 
-Final local connected test: **1 passed in 57.33s**, PostgreSQL17.11. It calls the
+Final local connected test: **1 passed in 57.37s**, PostgreSQL17.11. It calls the
 actual prepare_stopped/recovery/install/encrypted Journal/owner access entry points,
 starting STOP14 with the unresolved Bolton fixture and a real 56-row old encrypted
 journal at ordinal55 (normal-write refusal proved). It exercises 19 interruption

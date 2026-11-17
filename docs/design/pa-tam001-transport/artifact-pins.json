@@ -1,8 +1,8 @@
 {
   "decision_id": "PA-TAM002",
   "execution_binding": {
-    "manifest_sha256": "ee67f574cf8c55d560900b9ffda8bdb95c377a972645a41084b33b35d5d7d7f2",
-    "revision": "0f751613f1479e1088d820b8f809f267466071e9",
+    "manifest_sha256": "15cd25a3d2828bcd9ef122a62f0c49223770d3bb1f76a5ecabf1e8c3d258f22a",
+    "revision": "e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
     "workflow_sha256": "ab766bfe702448220b2d4d13ce7af266db8c3d9ef45c5a2d255f61bdea765b48"
   },
   "expiry_ceiling": "2026-11-18T20:00:00+00:00",
@@ -24,8 +24,8 @@
       "sha256": "1232966bcfc28bb21152f2e14d9f06ef68bdae740bb8d6d515fa82ac3a3ce5fe"
     },
     "tests/stopped_preparation_proof.py": {
-      "bytes": 12190,
-      "sha256": "ea03581eff2317dfc21bc08c120308643d7ca0296426300834ec66438b9abb60"
+      "bytes": 12360,
+      "sha256": "7e8f0129ff2aeb3d0dde1afd479c155cc925d9038c238a2ebae20f1bcc6060f3"
     },
     "tests/tameside_journal_proof.py": {
       "bytes": 6042,
@@ -96,8 +96,8 @@
       "sha256": "a57e4a5e7429ae6c0c2f18d82a5cadf538da8c2354ca865c7a0c40f61d3d3e3d"
     },
     "verification/ingestion_storage/tameside_preparation.py": {
-      "bytes": 21487,
-      "sha256": "b4b08ae14f8617a24f92f9a419aff9f8f6b188c137efe4f30780ed322a10d554"
+      "bytes": 21538,
+      "sha256": "6b6919951fdc965f36d4a81d88a4473d872e977c8265d26810ee6f41211bf512"
     }
   },
   "latest_bound_at": "2026-11-18T19:25:00+00:00",
@@ -121,7 +121,7 @@
   "preparation": {
     "cleanup_snapshots": 16,
     "entry_point": "tameside_preparation.prepare_stopped",
-    "immutable_build_ref": "pa-tam002/0f751613f1479e1088d820b8f809f267466071e9",
+    "immutable_build_ref": "pa-tam002/e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
     "old_checkpoint_ordinal": 55,
     "old_normal_limit": 47,
     "order": [
@@ -135,9 +135,9 @@
     ]
   },
   "proposal_version": "1.3",
-  "revision": "0f751613f1479e1088d820b8f809f267466071e9",
+  "revision": "e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
   "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "a92017a3b624cc8d351956a6d83b1a99df09f899",
+  "tree": "5c6a4807a9850d6aee6f0e8a1e9c46c8e40e132b",
   "version": 1
 }
