@@ -1014,3 +1014,55 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
         boot.execute('REVOKE SELECT,UPDATE ON public.ingestion_work_items FROM postgres')
         boot.execute('REVOKE USAGE ON SCHEMA public FROM postgres')
         boot.execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
+
+
+def test_historical_controller_pregrant_requires_select_not_for_share(isolated_world):
+    """Actual disposable PG17 non-superuser ACL boundary; no production SQL.
+
+    The historical campaign owner preflight uses SELECT without row locks.
+    PostgreSQL requires UPDATE for FOR SHARE. Test SELECT-only as a
+    negative contract, before any temporary owner membership; the stable
+    issuer's separate locked expected_stop CAS is covered by source checks.
+    """
+    from tests.e2e_pg_world import settings
+
+    w = isolated_world
+    boot = w["boot"]
+    _, info, _, _ = settings()
+    password = secrets.token_urlsafe(40)
+    control_before = _control(w)
+    boot.execute(sql.SQL(
+        "ALTER ROLE postgres LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+        "NOINHERIT NOBYPASSRLS PASSWORD {}"
+    ).format(sql.Literal(password)))
+    boot.execute("GRANT USAGE ON SCHEMA public TO postgres")
+    boot.execute("GRANT SELECT ON public.ingestion_work_items TO postgres")
+    try:
+        with psycopg.connect(
+                **{**info, "user": "postgres", "password": password},
+                autocommit=True, prepare_threshold=None) as c:
+            flags = c.execute(
+                "SELECT current_user,session_user,"
+                "pg_has_role(current_user,'ingestion_storage_owner','USAGE'),"
+                "has_table_privilege(current_user,"
+                "'public.ingestion_work_items','SELECT'),"
+                "has_table_privilege(current_user,"
+                "'public.ingestion_work_items','UPDATE')"
+            ).fetchone()
+            assert flags == ("postgres", "postgres", False, True, False)
+            row = c.execute(
+                "SELECT outcome FROM public.ingestion_work_items "
+                "WHERE key=repeat('0',64)"
+            ).fetchone()
+            assert row is not None
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                c.execute(
+                    "SELECT outcome FROM public.ingestion_work_items "
+                    "WHERE key=repeat('0',64) FOR SHARE"
+                )
+        assert _control(w) == control_before
+    finally:
+        boot.execute("REVOKE SELECT ON public.ingestion_work_items FROM postgres")
+        boot.execute("REVOKE USAGE ON SCHEMA public FROM postgres")
+        boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEDB NOCREATEROLE "
+                     "NOBYPASSRLS PASSWORD NULL")
