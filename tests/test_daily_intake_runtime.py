@@ -333,6 +333,25 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
     assert artifact['row']==selected['selected_row']
     assert artifact['review_status']=='WITHHELD' and not artifact['installed']
     assert "CAMPAIGN_FINITE_MANIFEST_WITHHELD" in artifact['sql']
+    # Exact same Tameside source/semantics is examined at the proposed
+    # owner/runtime boundary before executing the EXISTING disposable-only
+    # SQL issuer. This does not transform the WITHHELD stable issuer into
+    # a working production route or approve any external source request.
+    from tests.test_inactive_tameside_first_issuer import (
+        _inactive_owner_policy_fixture,
+    )
+    from verification.ingestion_storage.daily_intake_runtime import (
+        review_inactive_campaign_runtime_batch,
+    )
+    candidate_asof,candidate_period,candidate_policy,candidate_stop,candidate_binding = (
+        _inactive_owner_policy_fixture())
+    owner_runtime=review_inactive_campaign_runtime_batch(
+        candidate_asof,period=candidate_period,policy=candidate_policy,
+        observed_stop=candidate_stop,execution_binding=candidate_binding)
+    assert owner_runtime['scope']==selected['selected_row']
+    assert owner_runtime['source_plan_sha256']==artifact['source_plan_sha256']
+    assert owner_runtime['manifest_status']=='WITHHELD'
+    assert owner_runtime['collection_authorised'] is False
     p,scope=_catchup_fixture(world)
     p['councils']={'tameside':p['councils']['tameside']}
     p['max_runs']=1
