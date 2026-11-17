@@ -141,3 +141,45 @@ Follow-on scope remains all ten: Manchester, Bolton, Tameside, Bury, Oldham,
 Rochdale, Salford, Stockport, Trafford and Wigan. Initial fallback 15 September
 2026 through the bound London execution date, <=7-day windows, current day partial.
 Trafford remains required but unqualified for live execution; no dummy contract.
+
+### Exact checkpoint-access boundary found
+
+The signed-in Render owner shell is still available on instance `xgxgz`; no
+terminal command was submitted. This is not a login/access-framework failure.
+Pinned #213 `owner_pilot.Journal.load()` retrieves the retained checkpoint from
+`ingestion_intake_owner_state`, then decrypts it locally using the existing
+protected owner configuration. It is not a repository file or ordinary provider
+log. Therefore obtaining its omitted runtime fields requires a production read,
+which this offline instruction does not authorise. The consumed v1.4 receipt
+cannot substitute for that checkpoint or authorise another read.
+
+The smallest prospective retrieval is the existing NULL-body read branch:
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '10s';
+SET LOCAL lock_timeout = '3s';
+SELECT ordinal, body, sha256
+FROM public.ingestion_intake_owner_state(
+ 'b-bolton-20261103-1105-01_owner',
+ '65ea9cfb9eb260a54b728d1de44eb4d7', '', NULL::bytea);
+ROLLBACK;
+```
+
+One existing owner connection, five statements, 20 seconds including rollback
+and close, maximum 64 KiB returned, no retry. Before decryption require journal
+SHA256 `a5ba6be74c47eea89bd5068111bf3bc65198c8b4fd54c5036394a2c512f55c52`.
+Use the pinned decoder; output only allowlisted non-secret profile/route,
+deployment/configuration identities and closure-verification fields. Never print
+or publish the ciphertext, passwords, tokens, private environment or full state.
+A differing/missing hash is a STOP, not permission to follow another journal.
+Record rollback acknowledgement separately from connection closure. Any future
+execution needs a pinned bounded launcher and separate explicit read authority;
+this SQL is preparation only, not a submitted command or ready live approval.
+
+This would decide whether the existing runtime binding and restoration path can
+be reused in the exact first-Tameside package. It would not prove a new deployment,
+current provider process containment, fresh source qualification or population.
+Alternatively REVIEW may accept a fully specified checkpoint-read/bind step as
+part of the eventual single operational sequence; that choice must not be
+silently substituted for the requested pre-pinned configuration.
