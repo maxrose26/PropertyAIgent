@@ -171,6 +171,11 @@ def provider_io(pinned_root,access):
             text=text.replace('    from .intake_owner_operations import installation_token_allowed\n','')
             text=text.replace("    require(publication_token is None if database else installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')", "    require(database and publication_token is None, 'PRIVATE_DATABASE_HANDOFF_ONLY')")
             if node.name=='handoff':
+                entry="    b = state['binding']; boundary(b,observation)"
+                if text.count(entry)!=1:raise ValueError('PINNED_HTTP_ENTRY_DRIFT')
+                text=text.replace(entry, "    b = state['binding']\n"
+                    "    require(b.get('period')=='S4_FINITE_677f555670666bcf21f45860' and b.get('timing_policy',{}).get('version')=='SEPARATE_EXPIRY_V2_RESERVE', 'TAMESIDE_HTTP_SCOPE_REQUIRED')\n"
+                    "    validate_binding(b,opening=True); boundary(b,observation)")
                 # The frozen #213 browser guards remain unchanged for Manchester.
                 # Tameside uses the HTTP Idox source and must not inherit them.
                 browser_start="    require('PLAYWRIGHT_BROWSERS_PATH' in new, 'RENDER_PROFILE_MAPPING_REQUIRED')"

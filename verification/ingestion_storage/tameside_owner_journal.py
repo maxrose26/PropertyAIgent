@@ -3,6 +3,7 @@ No new table, credential, crypto, byte limit, history limit or retry mechanism.
 """
 import hashlib
 from pathlib import Path
+from contextlib import contextmanager
 from .tameside_package import PERIOD
 SOURCE_SHA='dffed8afd34e9ac379fd69177ef85b9cfbaaad921f6f103cad61d413fe9d9f2f'
 BODY_SHA='adadf1970a5156c5b02b3b0db193376bf71767b04cf29c1557c94d58c185aacb'
@@ -42,7 +43,7 @@ SET LOCAL ROLE ingestion_storage_owner;
     return PRELUDE+checks+revised+'\nRESET ROLE;\nREVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner;\nDO $restored$ BEGIN IF has_schema_privilege(\'ingestion_storage_owner\',\'public\',\'CREATE\') THEN RAISE EXCEPTION \'TAMESIDE_JOURNAL_SCHEMA_REMAINS\'; END IF; END $restored$;\n'+EPILOGUE
 
 
-def fresh(pinned_owner_module,db):
+def _bound_journal(pinned_owner_module,db):
     """Existing Vault codec and CAS journal, separate new operation namespace.
 
     Caller verifies exact pinned module/build and installed function before use.
@@ -52,5 +53,32 @@ def fresh(pinned_owner_module,db):
         raise ValueError('TAMESIDE_PINNED_JOURNAL_CODEC')
     journal=pinned_owner_module.Journal(db)
     journal.period=PERIOD;journal.owner_period=JOURNAL;journal.owner_run=RUN
+    return journal
+
+
+def fresh(pinned_owner_module,db):
+    journal=_bound_journal(pinned_owner_module,db)
     if journal.load() is not None:raise ValueError('TAMESIDE_OWNER_JOURNAL_USED')
     return journal
+
+
+def reconcile(pinned_owner_module,db):
+    """Independent decrypting read after uncertain ACK; never repeats a write.
+
+    Compare returned state with the retained intended state before any next
+    action. Missing state is UNKNOWN, not permission to start another operation.
+    """
+    journal=_bound_journal(pinned_owner_module,db)
+    class ReadOnly:
+        key=db.key
+        @contextmanager
+        def connection(self):
+            with db.connection() as connection:
+                connection.execute('BEGIN READ ONLY')
+                try:yield connection
+                finally:connection.execute('ROLLBACK')
+    journal.db=ReadOnly()
+    try:state=journal.load()
+    finally:journal.db=db
+    if state is None:raise ValueError('TAMESIDE_OWNER_JOURNAL_OUTCOME_UNKNOWN')
+    return journal,state

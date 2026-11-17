@@ -76,3 +76,13 @@ def test_old_browser_env_is_not_inherited_and_is_restored(tmp_path):
  state['state']='DATABASE_CLOSURE_ACKNOWLEDGED'
  io.restore_handoff(api,state,lambda _:None,None)
  assert api.env==original
+
+
+@pytest.mark.parametrize('drift',['period','timing'])
+def test_http_handoff_cannot_fall_back_to_legacy_binding(tmp_path,drift):
+ io,api,state,obs,_=setup(tmp_path)
+ if drift=='period':state['binding']['period']='legacy-manchester'
+ else:state['binding'].pop('timing_policy')
+ with pytest.raises(Exception,match='TAMESIDE_HTTP_SCOPE_REQUIRED'):
+  io.handoff(api,state,lambda _:None,None,observation=obs('HANDOFF'))
+ assert api.calls==0 and 'render' not in state

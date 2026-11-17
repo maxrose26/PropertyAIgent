@@ -45,7 +45,15 @@ def main():
             b=dict(version='FINITE_INTAKE_OWNER_V1',period='S4_FINITE_677f555670666bcf21f45860',route=policy['route'],hostaddr=policy['hostaddr'],owner_hostaddr=policy['hostaddr'],execution_binding=policy['execution_binding'],accepted_stop=policy['expected_stop'],evidence_backend='POSTGRES_PILOT_V1',credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=hashes,runtime_deadline=policy['expires_at'],valid_until=policy['expires_at']+185)
             passwords={urlparse(url).username:unquote(urlparse(url).password) for url in state['urls'].values() if urlparse(url).username in tameside_owner_access.ROLES}
             assert set(passwords)==set(tameside_owner_access.ROLES),sorted(passwords)
-            def save(value):access['state']=copy.deepcopy(value)
+            def save(value):
+                access['state']=copy.deepcopy(value)
+                import subprocess
+                checked=subprocess.run([sys.executable,str(Path('tests/tameside_journal_proof.py').resolve())],
+                    cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],env=dict(os.environ,PYTHONPATH=os.environ['S4_BOLTON_PINNED_CHECKOUT']),capture_output=True,text=True,
+                    input=json.dumps(dict(owner=state['owner'],source=str(Path('verification/ingestion_storage/tameside_owner_journal.py').resolve()),mode='save',access=value)),timeout=15)
+                assert checked.returncode==0,checked.stderr
+                assert json.loads(checked.stdout)['status']=='ENCRYPTED_CALLBACK_READBACK'
+
             # Fixture passwords are private disposable state. The actual helper
             # keeps the production entropy and verifier-preservation checks.
             with actor() as c:
@@ -67,7 +75,25 @@ def main():
             script="from verification.ingestion_storage.intake_successor import owner_sql;print(owner_sql(),end='')"
             source=subprocess.run([sys.executable,'-c',script],cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],capture_output=True,text=True,check=True).stdout
             assert boot.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()==(j.BODY_SHA,)
-            with actor() as c:c.execute(j.render_install(source).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'"))
+            def history():
+                return boot.execute("SELECT period,run_id,name,sha256,encode(sha256(body),'hex') FROM ingestion_run_evidence WHERE period<>%s ORDER BY period,run_id,name",(j.JOURNAL,)).fetchall()
+            original_history=history();assert original_history
+            function=lambda:boot.execute("SELECT prosrc,proacl,proowner,proconfig FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()
+            baseline=function()
+            script=j.render_install(source).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+            with actor() as c:c.execute(script.replace('COMMIT;','ROLLBACK;'))
+            assert function()==baseline and history()==original_history
+            with actor() as c:
+                try:
+                    c.execute(script)
+                    raise RuntimeError('DISPOSABLE_INSTALL_ACK_LOST')
+                except RuntimeError as exc:assert 'INSTALL_ACK_LOST' in str(exc)
+            # Reconcile installed body independently, never resubmit installation.
+            expected_body=source.replace(" IF p_period NOT IN ("," IF p_period NOT IN ('"+j.JOURNAL+"',",1).split('$owner_state$')[1]
+            with actor() as c:
+                assert c.execute("SELECT prosrc FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()==(expected_body,)
+                assert c.execute("SELECT pg_has_role('postgres','ingestion_storage_owner','USAGE'),pg_has_role('postgres','ingestion_storage_owner','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()==(False,False,False)
+            assert history()==original_history
             with actor() as c:
                 c.execute('BEGIN')
                 q='SELECT * FROM ingestion_intake_owner_state(%s,%s,%s,%s)'
@@ -86,6 +112,16 @@ def main():
                 except psycopg.errors.RaiseException as exc:
                     c.execute('ROLLBACK');assert 'TAMESIDE_JOURNAL_INSTALLED_DRIFT' in str(exc)
                 else:raise AssertionError('duplicate journal installation accepted')
+            check=subprocess.run([sys.executable,str(Path('tests/tameside_journal_proof.py').resolve())],
+                cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],env=dict(os.environ,PYTHONPATH=os.environ['S4_BOLTON_PINNED_CHECKOUT']),capture_output=True,text=True,
+                input=json.dumps(dict(owner=state['owner'],source=str(Path('verification/ingestion_storage/tameside_owner_journal.py').resolve()))),timeout=30)
+            assert check.returncode==0,check.stdout+check.stderr
+            assert json.loads(check.stdout)['final_ordinal']==63 and history()==original_history
+            # Test-only reset of the synthetic namespace after its exhaustive
+            # capacity proof. Original namespaces are compared byte/hash exact.
+            boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s AND run_id=%s',(j.JOURNAL,j.RUN))
+            assert history()==original_history
+
         def close():
             with actor() as c:receipt=access['api'].close(c,access['state'],access['save'])
             assert receipt['runtime_access']=='DISABLED' and receipt['temporary_owner']=='REMOVED'
