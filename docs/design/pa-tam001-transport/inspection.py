@@ -118,7 +118,7 @@ def rollback_and_close():
             out['rollback_attempted'] = True
             cursor = execute('ROLLBACK', cleanup=True)
             require(cursor.statusmessage=='ROLLBACK' and
-                    c.pgconn.transaction_status.name=='IDLE', 'ROLLBACK_ACK_UNVERIFIED')
+                    c.info.transaction_status.name=='IDLE', 'ROLLBACK_ACK_UNVERIFIED')
             out['rollback_acknowledged'] = True
             out['transaction'] = 'ROLLED_BACK'
     except BaseException:

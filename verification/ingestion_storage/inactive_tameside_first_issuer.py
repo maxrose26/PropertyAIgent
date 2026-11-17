@@ -5,7 +5,7 @@ private evidence flag, owner connection and frozen #213 remain unchanged.
 No credentials, SQL connection, source request or owner approval is supplied.
 
 This is the first source-pinned part of the historical issuer/owner/runtime
-integration. It deliberately always refuses invocation (WITHHELD) until a
+integration. It deliberately refuses mutating invocation (WITHHELD) until a
 separately reviewed release revision and explicit owner operation approval.
 """
 import hashlib
@@ -115,6 +115,25 @@ def render_inactive_tameside_first_issuer():
 CAMPAIGN_FUNCTION = "ingestion_register_campaign_once"
 CAMPAIGN_MODE = "CAMPAIGN_FINITE_HISTORICAL_V1"
 
+# A narrow read/lock operation in the SAME uninstalled issuer. Installation
+# must grant only its reviewed owner EXECUTE; no table UPDATE is needed.
+# The caller independently verifies database/session and installed body first.
+_OWNER_LOCK_PREFLIGHT = r"""
+ IF p->>'operation'='campaign_owner_preflight' THEN
+  IF p IS DISTINCT FROM '{"operation":"campaign_owner_preflight"}'::jsonb
+     OR session_user IS DISTINCT FROM 'postgres'
+     OR current_user IS DISTINCT FROM 'ingestion_storage_owner'
+  THEN RAISE EXCEPTION 'CAMPAIGN_PREFLIGHT_OWNER_ONLY' USING ERRCODE='42501'; END IF;
+  SELECT outcome::jsonb INTO STRICT ctl FROM public.ingestion_work_items
+    WHERE key=repeat('0',64) FOR UPDATE;
+  IF NOT (ctl ?& ARRAY['global_stop','manual_stop','last_hard_stop','hard_stop_generation'])
+  THEN RAISE EXCEPTION 'CAMPAIGN_PREFLIGHT_CONTROLLER_STRUCTURE' USING ERRCODE='42501'; END IF;
+  RETURN jsonb_build_object('global_stop',ctl->'global_stop',
+    'manual_stop',ctl->'manual_stop','last_hard_stop',ctl->'last_hard_stop',
+    'hard_stop_generation',ctl->'hard_stop_generation');
+ END IF;
+"""
+
 
 def _canonical_campaign_identity(as_of, council, start, end):
     """One canonical data-only selected period; never a per-batch SQL version."""
@@ -188,7 +207,7 @@ def render_inactive_campaign_issuer(as_of, council, start, end):
 
 # PA-D004 v1.3 production-direction artifact: ONE STABLE SQL BODY, independent
 # of the number of councils or historical windows. It is NOT installed and
-# deliberately refuses every invocation. The earlier per-batch negative proof
+# deliberately refuses every mutating invocation. The earlier per-batch negative proof
 # above is retained as historical test evidence, not an installation pattern.
 _STABLE_CAPTURE_DATES = """OR item->'subject'->>'end' IS DISTINCT FROM
        (ctl->'intake_periods'->a->'campaign_batch'->>'end')
@@ -285,7 +304,8 @@ def render_inactive_stable_campaign_issuer():
 
     Future review must separately prove the owner registration lifecycle,
     actual production session ACL, and runtime binding. Do not install this
-    negative-only SQL and do not treat its syntax proof as operational approval.
+    inactive SQL and do not treat its syntax proof as operational approval.
+    The narrow owner-only preflight reads/locks; it never issues authority.
     """
     source = _policy_source_bytes()
     if hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source
@@ -303,7 +323,8 @@ def render_inactive_stable_campaign_issuer():
     function = function.replace(original,
         "CREATE OR REPLACE FUNCTION public." + CAMPAIGN_FUNCTION + "(", 1)
     function = function.replace(_ENTRY_ANCHOR,
-        _ENTRY_GUARD.replace("TAMESIDE_FIRST_", "CAMPAIGN_STABLE_")
+        _OWNER_LOCK_PREFLIGHT
+        + _ENTRY_GUARD.replace("TAMESIDE_FIRST_", "CAMPAIGN_STABLE_")
         + _ENTRY_ANCHOR, 1)
     function = function.replace(_ROLLING, _STABLE_CAPTURE_DATES, 1)
     function = function.replace(_STABLE_COUNCILS_ANCHOR,

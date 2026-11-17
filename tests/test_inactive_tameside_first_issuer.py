@@ -95,7 +95,7 @@ def test_one_inactive_issuer_name_and_canonical_binding_reused_across_periods():
     ("trafford", "2026-09-15", "2026-09-21", "TRAFFORD_SOURCE_NOT_QUALIFIED"),
     ("tameside", "2026-09-14", "2026-09-20", "TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
     ("tameside", "2026-09-15", "2026-09-22", "TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
-    ("tameside", "2026-11-16", "2026-11-16", "CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
+    ("tameside", "2026-11-10", "2026-11-16", "CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
     ("fake", "2026-09-15", "2026-09-21", "TEN_COUNCIL_BATCH_UNKNOWN_COUNCIL"),
 ])
 def test_configurable_candidate_refuses_unqualified_partial_or_widened_scope(
@@ -179,7 +179,7 @@ def test_stable_campaign_owner_sql_never_accepts_unbound_private_evidence():
 @pytest.mark.parametrize("council,start,end,error",[
     ("trafford","2026-09-15","2026-09-21","TRAFFORD_SOURCE_NOT_QUALIFIED"),
     ("tameside","2026-09-15","2026-09-22","TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
-    ("tameside","2026-11-16","2026-11-16","CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
+    ("tameside","2026-11-10","2026-11-16","CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
 ])
 def test_stable_owner_preview_refuses_unqualified_or_partial(council,start,end,error):
     with pytest.raises(ValueError,match=error):
@@ -417,6 +417,8 @@ def test_historical_owner_pregrant_observation_requires_no_update_privilege():
     pregrant = source[start:grant]
     assert '"WHERE key=repeat(\'0\',64)")' in pregrant
     assert "FOR SHARE" not in pregrant and "FOR UPDATE" not in pregrant
+    assert "operation='campaign_owner_preflight'" in pregrant
+    assert pregrant.index("campaign_owner_preflight") < pregrant.index("CAMPAIGN_OWNER_STOP_CHANGED_BEFORE_GRANT")
     # This assertion prevents incorrectly replacing the issuer's protective
     # locking CAS with only an unlocked owner-side SELECT.
     stable = candidate.render_inactive_stable_campaign_issuer()

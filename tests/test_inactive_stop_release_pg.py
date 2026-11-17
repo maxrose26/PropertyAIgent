@@ -905,7 +905,7 @@ def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_
 @pytest.mark.parametrize('drift', [
     'body', 'owner', 'search_path', 'security_definer',
     'global_stop', 'manual_stop', 'generation', 'last_hard_stop',
-    'missing_controller', 'missing_stop_field', 'matching',
+    'missing_controller', 'missing_stop_field', 'matching', 'raced_stop',
 ])
 def test_historical_owner_preflight_before_grant_and_actual_stop(
         isolated_world, monkeypatch, drift):
@@ -933,6 +933,7 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     boot.execute(render_inactive_stable_campaign_issuer())
     function='public.ingestion_register_campaign_once(jsonb)'
     boot.execute('ALTER FUNCTION '+function+' OWNER TO ingestion_storage_owner')
+    boot.execute('GRANT EXECUTE ON FUNCTION '+function+' TO postgres')
     if drift=='body':
         boot.execute("CREATE OR REPLACE FUNCTION public.ingestion_register_campaign_once(p jsonb)"+
                      " RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER "
@@ -964,6 +965,8 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     # no-table-UPDATE principal; no broader temporary privilege is proposed.
     boot.execute('GRANT USAGE ON SCHEMA public TO postgres')
     boot.execute('GRANT SELECT ON public.ingestion_work_items TO postgres')
+    assert boot.execute("SELECT has_any_column_privilege('postgres',"
+                        "'public.ingestion_work_items','UPDATE')").fetchone()==(False,)
     monkeypatch.setattr(runtime,'LIVE_HISTORICAL_CAMPAIGN_RELEASE',True)
     monkeypatch.setattr(runtime,'LIVE_PRIVATE_EVIDENCE_RELEASE',True)
     owner=Owner(lambda:psycopg.connect(**{**info,'user':'postgres','password':password},
@@ -975,17 +978,19 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     class ReachedGrant(Exception):pass
     def observed_q(c,statement,params=None,*,effect=False):
         statements.append(statement)
+        if params and params == (json.dumps(dict(operation='campaign_owner_preflight')),):
+            if drift=='raced_stop':
+                changed=dict(ctl,manual_stop='RACED_STOP')
+                boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                             "WHERE key=repeat('0',64)",(json.dumps(changed),))
         if statement.startswith('GRANT '):
-            # The early owner SELECT is deliberately NOT a row lock.
-            # Another operator can update between review and issuance; only
-            # the pinned issuer's subsequent FOR UPDATE/expected_stop CAS may
-            # authorise registration. Do not turn this read into release CAS.
+            # Narrow SECURITY DEFINER preflight holds the controller lock,
+            # without any owner table/column UPDATE permission.
             with psycopg.connect(**info,autocommit=True) as other:
                 other.execute("SET lock_timeout='50ms'")
-                changed=other.execute(
-                    "UPDATE public.ingestion_work_items SET outcome=outcome "
-                    "WHERE key=repeat('0',64)")
-                assert changed.rowcount==1
+                with pytest.raises(psycopg.errors.LockNotAvailable):
+                    other.execute("UPDATE public.ingestion_work_items SET outcome=outcome "
+                                  "WHERE key=repeat('0',64)")
             raise ReachedGrant()
         result=original_q(c,statement,params,effect=effect)
         if statement.startswith('SELECT current_database(),'):
@@ -996,8 +1001,9 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     try:
         expected=(ReachedGrant if drift=='matching' else
                   Uncertain if drift in ('body','owner','search_path','security_definer',
-                                         'missing_controller','missing_stop_field') else ValueError)
+                                         'missing_controller','missing_stop_field','raced_stop') else ValueError)
         reason=(None if drift=='matching' else
+                'CAMPAIGN_OWNER_STOP_CHANGED_BEFORE_GRANT' if drift=='raced_stop' else
                 'CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT' if drift in ('body','owner','search_path','security_definer') else
                 'CAMPAIGN_OWNER_CONTROLLER_NOT_OBSERVED' if drift in ('missing_controller','missing_stop_field') else
                 'CAMPAIGN_OWNER_STOP_NOT_RELEASED')
@@ -1009,16 +1015,21 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
             catalog=next(i for i,s in enumerate(statements) if "'public.ingestion_register_campaign_once(jsonb)'" in s)
             controller=next(i for i,s in enumerate(statements)
                             if s.startswith('SELECT outcome FROM public.ingestion_work_items'))
+            locked=next(i for i,s in enumerate(statements)
+                        if s.startswith('SELECT public.ingestion_register_campaign_once'))
             grant=next(i for i,s in enumerate(statements) if s.startswith('GRANT '))
-            assert catalog<controller<grant
+            assert catalog<controller<locked<grant
         assert owner.opened==owner.closed==1
-        assert boot.execute('SELECT key,outcome FROM public.ingestion_work_items ORDER BY key').fetchall()==before
+        if drift=='raced_stop':
+            assert _control(w)==dict(ctl,manual_stop='RACED_STOP')
+        else:
+            assert boot.execute('SELECT key,outcome FROM public.ingestion_work_items ORDER BY key').fetchall()==before
         assert boot.execute("SELECT count(*) FROM pg_auth_members WHERE member='postgres'::regrole "
                             "AND roleid='ingestion_barrier_releaser'::regrole").fetchone()==(0,)
-        # The owner never acquired a controller row lock in this pregrant
-        # path; the issuer must acquire its own one after the temporary grant.
+        # Closure releases the preflight lock on every exit.
         boot.execute("UPDATE public.ingestion_work_items SET outcome=outcome WHERE key=repeat('0',64)")
     finally:
+        boot.execute('REVOKE EXECUTE ON FUNCTION '+function+' FROM postgres')
         boot.execute('REVOKE SELECT ON public.ingestion_work_items FROM postgres')
         boot.execute('REVOKE USAGE ON SCHEMA public FROM postgres')
         boot.execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
@@ -1030,7 +1041,7 @@ def test_historical_controller_pregrant_requires_select_not_for_share(isolated_w
     The historical campaign owner preflight uses SELECT without row locks.
     PostgreSQL requires UPDATE for FOR SHARE. Test SELECT-only as a
     negative contract, before any temporary owner membership; the stable
-    issuer's separate locked expected_stop CAS is covered by source checks.
+    same-issuer owner preflight and later locked CAS retain concurrency protection.
     """
     from tests.e2e_pg_world import settings
 
@@ -1068,9 +1079,64 @@ def test_historical_controller_pregrant_requires_select_not_for_share(isolated_w
                     "SELECT outcome FROM public.ingestion_work_items "
                     "WHERE key=repeat('0',64) FOR SHARE"
                 )
+            # A column-only UPDATE grant suffices while table UPDATE stays
+            # false. This is a disposable negative-boundary proof, NOT a
+            # proposed production privilege (it would permit key mutation).
+            boot.execute("GRANT UPDATE(key) ON public.ingestion_work_items TO postgres")
+            assert c.execute("SELECT has_table_privilege(current_user,"
+                "'public.ingestion_work_items','UPDATE'),has_any_column_privilege("
+                "current_user,'public.ingestion_work_items','UPDATE')").fetchone()==(False,True)
+            assert c.execute("SELECT outcome FROM public.ingestion_work_items "
+                "WHERE key=repeat('0',64) FOR SHARE").fetchone() is not None
         assert _control(w) == control_before
     finally:
+        boot.execute("REVOKE UPDATE(key) ON public.ingestion_work_items FROM postgres")
         boot.execute("REVOKE SELECT ON public.ingestion_work_items FROM postgres")
         boot.execute("REVOKE USAGE ON SCHEMA public FROM postgres")
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEDB NOCREATEROLE "
                      "NOBYPASSRLS PASSWORD NULL")
+
+
+def test_real_driver_rollback_receipt_and_close(isolated_world):
+    from tests.e2e_pg_world import settings
+    from tests.test_pa_tam001_rollback import cleanup_namespace
+    _, info, _, _ = settings()
+    c=psycopg.connect(**info,autocommit=True)
+    c.execute('BEGIN READ ONLY')
+    calls=[]
+    def execute(sql, *, cleanup):
+        calls.append((sql,cleanup))
+        return c.execute(sql)
+    ns=cleanup_namespace(c,execute)
+    ns['rollback_and_close']()
+    assert calls==[('ROLLBACK',True)]
+    assert ns['out']['rollback_acknowledged'] is True
+    assert ns['out']['transaction']=='ROLLED_BACK'
+    assert ns['out']['connection_closed'] is True
+    assert ns['out']['unknowns']=={}
+
+
+def test_campaign_lock_preflight_rejects_other_sessions_and_extra_payload(isolated_world):
+    from tests.e2e_pg_world import settings
+    from verification.ingestion_storage.inactive_tameside_first_issuer import render_inactive_stable_campaign_issuer
+    w=isolated_world; boot=w['boot']; before=_control(w)
+    function='public.ingestion_register_campaign_once(jsonb)'
+    boot.execute(render_inactive_stable_campaign_issuer())
+    boot.execute('ALTER FUNCTION '+function+' OWNER TO ingestion_storage_owner')
+    query='SELECT public.ingestion_register_campaign_once(%s::jsonb)'
+    with pytest.raises(psycopg.errors.InsufficientPrivilege,match='CAMPAIGN_PREFLIGHT_OWNER_ONLY'):
+        boot.execute(query,(json.dumps(dict(operation='campaign_owner_preflight')),))
+    _,info,_,_=settings(); password=secrets.token_urlsafe(40)
+    boot.execute(sql.SQL('ALTER ROLE postgres LOGIN PASSWORD {}').format(sql.Literal(password)))
+    boot.execute('GRANT USAGE ON SCHEMA public TO postgres')
+    boot.execute('GRANT EXECUTE ON FUNCTION '+function+' TO postgres')
+    try:
+        with psycopg.connect(**{**info,'user':'postgres','password':password},autocommit=True) as c:
+            with pytest.raises(psycopg.errors.InsufficientPrivilege,match='CAMPAIGN_PREFLIGHT_OWNER_ONLY'):
+                c.execute(query,(json.dumps(dict(operation='campaign_owner_preflight',extra=True)),))
+        assert _control(w)==before
+        assert boot.execute("SELECT count(*) FROM pg_auth_members WHERE member='postgres'::regrole").fetchone()==(0,)
+    finally:
+        boot.execute('REVOKE EXECUTE ON FUNCTION '+function+' FROM postgres')
+        boot.execute('REVOKE USAGE ON SCHEMA public FROM postgres')
+        boot.execute('ALTER ROLE postgres NOLOGIN PASSWORD NULL')

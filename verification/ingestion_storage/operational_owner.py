@@ -645,11 +645,9 @@ class Owner:
                 # its column-level UPDATE permissions are unverified.
                 # Do not grant UPDATE to make the preflight work.
                 #
-                # The pinned issuer independently locks the controller using
-                # FOR UPDATE *after* the reviewed temporary capability and
-                # compares expected_stop under that lock before any write.
-                # If STOP changes between these two reads it must refuse;
-                # never treat this preliminary observation as release CAS.
+                # The same pinned issuer's owner-only read/lock operation
+                # rechecks this observation BEFORE temporary capability.
+                # The normal issuance path retains its own locked CAS too.
                 rows=self.q(c,"SELECT outcome FROM public.ingestion_work_items "
                               "WHERE key=repeat('0',64)")
                 keys={'global_stop','manual_stop','last_hard_stop',
@@ -668,6 +666,11 @@ class Owner:
                     batch['end'], period=name, policy=policy,
                     observed_stop=observed_stop,
                     execution_binding=self.bindings)
+                locked=self.q(c,
+                    'SELECT public.ingestion_register_campaign_once(%s::jsonb)',
+                    (json.dumps(dict(operation='campaign_owner_preflight')),))
+                if locked!=[(observed_stop,)]:
+                    raise Uncertain('CAMPAIGN_OWNER_STOP_CHANGED_BEFORE_GRANT')
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             issuer=('ingestion_register_disposable_catchup' if disposable_catchup
                     else 'ingestion_register_campaign_once' if historical_campaign
