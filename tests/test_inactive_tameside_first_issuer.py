@@ -162,3 +162,138 @@ def test_stable_issuer_does_not_tolerate_changed_pinned_policy(monkeypatch):
     monkeypatch.setattr(candidate,"_policy_source_bytes",lambda:b"changed")
     with pytest.raises(ValueError,match="CAMPAIGN_STABLE_POLICY_SOURCE_DRIFT"):
         candidate.render_inactive_stable_campaign_issuer()
+
+
+def _inactive_owner_policy_fixture():
+    """Synthetic contract shape only; NONE of these values grants authority."""
+    from copy import deepcopy
+    as_of = datetime(2026, 11, 17, 3, tzinfo=timezone.utc)
+    preview = candidate.prepare_inactive_campaign_owner_batch(
+        as_of, "tameside", "2026-09-15", "2026-09-21")
+    stop = dict(global_stop=None, manual_stop=None,
+                last_hard_stop="DAILY_INTAKE_SHARED_FAILURE",
+                hard_stop_generation=16)
+    binding = dict(revision="a" * 40, workflow_sha256="b" * 64,
+                   manifest_sha256="c" * 64)
+    policy = dict(
+        expires_at=as_of.timestamp()+3600, max_runs=1, overlap_days=7,
+        councils={"tameside":dict(contract="daily-intake-tameside",
+                                   qualification_sha256="d" * 64)},
+        expected_stop=deepcopy(stop), execution_binding=deepcopy(binding),
+        test_evidence=False, screening_config="e" * 64,
+        route="POOLER", hostaddr="1.1.1.1",
+        mode=candidate.CAMPAIGN_MODE,
+        campaign_batch=deepcopy(preview["campaign_batch"]),
+        campaign_source_plan_sha256=preview["campaign_source_plan_sha256"],
+        evidence_backend="POSTGRES_PILOT_V1",
+        private_release=dict(schema="PA_D002_LIVE_PRIVATE_V1",
+                             revision=binding["revision"],
+                             councils=["tameside"], semantics="RECEIVED"))
+    return as_of, preview["period"], policy, stop, binding
+
+
+def test_inactive_owner_runtime_policy_requires_canonical_source_and_stop():
+    """Owner-contract preflight can't promote reviewed SHAPE to live permission."""
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    result = candidate.review_inactive_campaign_owner_policy(
+        as_of, "tameside", "2026-09-15", "2026-09-21",
+        period=period, policy=policy, observed_stop=stop,
+        execution_binding=binding)
+    assert result["schema"] == "PA_D004_OWNER_RUNTIME_POLICY_OFFLINE_REVIEW_V1"
+    assert result["period"] == period
+    assert result["manifest_status"] == "WITHHELD"
+    assert result["campaign_batch"]["semantics"] == "RECEIVED"
+    assert result["campaign_source_plan_sha256"] == policy[
+        "campaign_source_plan_sha256"]
+    assert result["stable_issuer_sha256"]
+    assert len(result["policy_sha256"]) == 64
+    for flag in ("actual_role_acl_verified", "live_stop_observed",
+                 "source_contract_qualified", "installer_authorised",
+                 "owner_registration_authorised", "runtime_enabled",
+                 "collection_authorised"):
+        assert result[flag] is False
+    assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
+
+
+@pytest.mark.parametrize("mutation,expected", [
+    ("source_sha", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("source_row", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("wrong_mode", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("two_councils", "CAMPAIGN_OWNER_SINGLE_COUNCIL"),
+    ("wrong_semantics", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("test_evidence", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("max_runs_bool", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("screening", "CAMPAIGN_OWNER_CONTRACT_OR_SCREENING"),
+    ("contract_qual", "CAMPAIGN_OWNER_CONTRACT_OR_SCREENING"),
+    ("role_loopback", "CAMPAIGN_OWNER_ROUTE_UNVERIFIED"),
+    ("private_release", "CAMPAIGN_OWNER_PRIVATE_RELEASE_NOT_BOUND"),
+    ("wrong_binding", "CAMPAIGN_OWNER_RUNTIME_BINDING"),
+    ("expires", "CAMPAIGN_OWNER_EXPIRY"),
+    ("unbounded", "CAMPAIGN_OWNER_POLICY_SCHEMA"),
+])
+def test_inactive_owner_runtime_policy_rejects_mutations(mutation, expected):
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    if mutation == "source_sha":
+        policy["campaign_source_plan_sha256"] = "f" * 64  # plausible SHA
+    elif mutation == "source_row":
+        policy["campaign_batch"]["start"] = "2026-09-22"
+    elif mutation == "wrong_mode":
+        policy["mode"] = None
+    elif mutation == "two_councils":
+        policy["councils"]["manchester"] = policy["councils"]["tameside"]
+    elif mutation == "wrong_semantics":
+        policy["campaign_batch"]["semantics"] = "VALIDATED"
+    elif mutation == "test_evidence":
+        policy["test_evidence"] = True
+    elif mutation == "max_runs_bool":
+        policy["max_runs"] = True  # Python True==1 but not an SQL integer
+    elif mutation == "screening":
+        policy["screening_config"] = "not-a-hash"
+    elif mutation == "contract_qual":
+        policy["councils"]["tameside"]["qualification_sha256"] = "changed"
+    elif mutation == "role_loopback":
+        policy["hostaddr"] = "127.0.0.1"
+    elif mutation == "private_release":
+        policy["private_release"]["revision"] = "f" * 40
+    elif mutation == "wrong_binding":
+        policy["execution_binding"]["revision"] = "f" * 40
+    elif mutation == "expires":
+        policy["expires_at"] = as_of.timestamp() + 604801
+    elif mutation == "unbounded":
+        policy["catchup_scope"] = {"start": "2026-09-15"}
+    with pytest.raises(ValueError, match=expected):
+        candidate.review_inactive_campaign_owner_policy(
+            as_of, "tameside", "2026-09-15", "2026-09-21",
+            period=period, policy=policy, observed_stop=stop,
+            execution_binding=binding)
+
+
+@pytest.mark.parametrize("mutation", ["generation14", "global_stop",
+                                       "manual_stop", "snapshot_drift"])
+def test_inactive_owner_runtime_policy_rejects_unreleased_stop(mutation):
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    if mutation == "generation14":
+        stop["hard_stop_generation"] = 14
+        policy["expected_stop"]["hard_stop_generation"] = 14
+    elif mutation == "global_stop":
+        stop["global_stop"] = {"reason": "DAILY_INTAKE_SHARED_FAILURE"}
+        policy["expected_stop"]["global_stop"] = stop["global_stop"]
+    elif mutation == "manual_stop":
+        stop["manual_stop"] = "DAILY_INTAKE_SHARED_FAILURE"
+        policy["expected_stop"]["manual_stop"] = stop["manual_stop"]
+    else:
+        stop["last_hard_stop"] = "changed"
+    with pytest.raises(ValueError, match="CAMPAIGN_OWNER_STOP_NOT_RELEASED"):
+        candidate.review_inactive_campaign_owner_policy(
+            as_of, "tameside", "2026-09-15", "2026-09-21",
+            period=period, policy=policy, observed_stop=stop,
+            execution_binding=binding)
+
+
+def test_inactive_owner_runtime_policy_refuses_replayed_period():
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    with pytest.raises(ValueError, match="CAMPAIGN_OWNER_PERIOD_NOT_CANONICAL"):
+        candidate.review_inactive_campaign_owner_policy(
+            as_of, "tameside", "2026-09-15", "2026-09-21",
+            period="unbound-replay", policy=policy, observed_stop=stop,
+            execution_binding=binding)
