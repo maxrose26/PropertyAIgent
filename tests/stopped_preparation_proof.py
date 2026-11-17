@@ -75,8 +75,23 @@ def exercise(w, recovery, tmp_path):
     old.owner_run=hashlib.sha256(old.owner_period.encode()).hexdigest()[:32]
     state=dict(period=old.period,status='CLOSED',original_service=service,original_environment=environment,
         original_guard=pinned.service_guard(service),
+        original_deploy_ids=[],build_guard=pinned.service_guard(service),
+        build_environment={'PYTHONUNBUFFERED':'1'},build_receipt_created_at='2026-11-03T11:05:00Z',
         cleanup_reserve=dict(pinned.cleanup_reserve_policy(),cleanup_writes=0))
-    for n in range(48):
+    state.update(binding={'render_config_sha256':state['original_guard']},
+        access={'state':'DATABASE_CLOSURE_ACKNOWLEDGED','render':{
+            'guard':state['original_guard'],'original':environment}},
+        intents={k:{'state':'ACKNOWLEDGED'} for k in
+            ('RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')})
+    for n in range(23):
+        state['sequence']=n;old.save(copy.deepcopy(state))
+    # Invoke the frozen writer's actual compaction at the observed ordinal 22.
+    # Ciphertext and private values are synthetic; shape/linkage are not flattened.
+    pilot=pinned.Pilot.__new__(pinned.Pilot);pilot.journal=old;pilot.state=copy.deepcopy(old.state)
+    pilot.reserve_closure_space()
+    state=copy.deepcopy(old.state)
+    assert state['closed_build_archive']['prior_ordinal']==22 and 'original_service' not in state
+    for n in range(24,48):
         state['sequence']=n;old.save(copy.deepcopy(state))
     with pytest.raises(Exception,match='CLEANUP_ROW_BOUND'):old.save(copy.deepcopy(state))
     old.cleanup_mode=True
@@ -88,6 +103,9 @@ def exercise(w, recovery, tmp_path):
     def history():
         return boot.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence WHERE period<>%s ORDER BY period,run_id,name',(ja.JOURNAL,)).fetchall()
     original_history=history()
+    resolved=prep.original_checkpoint(pinned,db)
+    assert resolved['original_service']==service and resolved['original_environment']==environment
+    assert 'original_service' not in old.state and history()==original_history
     # Interrupted recovery is reconciled by actual inspector. The commit reply
     # is deliberately lost; there is one recovery commit across both entries.
     db.lose_commit=True
@@ -133,7 +151,7 @@ def exercise(w, recovery, tmp_path):
             if method!='GET' and self.lose:
                 self.lose=False;raise RuntimeError('PROVIDER_ACK_LOST')
             if path=='/env-vars?limit=100':return [{'envVar':dict(key=k,value=v)} for k,v in self.env.items()]
-            if path=='/deploys?limit=100':return copy.deepcopy(self.deploys)
+            if path=='/deploys?limit=100':return [{'deploy':copy.deepcopy(d),'cursor':'synthetic'} for d in self.deploys]
             if path=='/jobs?limit=100':return []
             observed=copy.deepcopy(self.service)
             observed['updatedAt']='2026-11-17T20:30:00Z'  # not a configuration field
@@ -180,6 +198,29 @@ def exercise(w, recovery, tmp_path):
         assert not api.writes
         boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
         assert history()==original_history
+    # Provider completion can outlive a browser/driver instance. A fresh driver
+    # observes the existing deployment, never dispatches another resume/build.
+    for terminal in ('live','build_failed'):
+        boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s',(ja.JOURNAL,))
+        api=Provider()
+        original_call=api.call
+        def pending(method,path='',body=None):
+            result=original_call(method,path,body)
+            if method=='POST' and path=='/resume':
+                api.deploys[0]['status']='build_in_progress'
+            return result
+        api.call=pending
+        with pytest.raises(ValueError,match='EFFECT_UNKNOWN:ONE_RESUME_BUILD'):
+            new(api).prepare()
+        assert sum(p=='/resume' for _,p,_ in api.writes)==1
+        api.deploys[0]['status']=terminal
+        if terminal=='live':assert new(api).prepare()['status']=='STOPPED_BUILD_READY'
+        else:
+            with pytest.raises(ValueError,match='EFFECT_UNKNOWN:ONE_RESUME_BUILD'):
+                new(api).prepare()
+            new(api).contain()
+        assert api.env==environment and api.service==service
+        assert sum(p=='/resume' for _,p,_ in api.writes)==1 and history()==original_history
     # Final happy path also loses journal and provider acknowledgements.
     boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s',(ja.JOURNAL,))
     api=Provider();db.lose_journal=True;api.lose=True
@@ -194,4 +235,5 @@ def exercise(w, recovery, tmp_path):
     return dict(boundaries=len(boundaries),drift_refusals=3,old_ordinal=55,normal_last_ordinal=47,
                 recovery_readback=prep.recover_and_install(db,recovery=recovery,binding=w['binding'],journal_source=owner_sql()),
                 recovery_commits=db.commits,provider_submissions=0,deployment_submissions=1,
+                provider_fixture=dict(service=api.service,environment=api.env,deployment='dep-synthetic'),
                 live_requests=0,original_history_preserved=True)

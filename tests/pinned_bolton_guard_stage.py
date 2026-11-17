@@ -80,3 +80,5 @@ def test_guarded_real_recovery_and_lost_ack(failed_bolton,tmp_path):
             capture_output=True,text=True,timeout=90)
         assert result.returncode==0,result.stdout[-14000:]+result.stderr[-5000:]
         assert json.loads(result.stdout.splitlines()[-1])['status']=='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED'
+        if os.environ.get('S4_JOINED_RECEIPT'):
+            Path(os.environ['S4_JOINED_RECEIPT']).write_text(result.stdout.splitlines()[-1]+'\n')

@@ -25,7 +25,7 @@ from verification.ingestion_storage import release_candidate as candidate
 from verification.ingestion_storage.bolton_recovery_guard import OLD, NEW
 
 
-def test_pinned_guard_actual_recovery_entrypoint(tmp_path):
+def test_pinned_guard_actual_recovery_entrypoint(tmp_path,record_property):
     pin = os.environ.get('S4_BOLTON_PINNED_CHECKOUT')
     if not pin:
         pytest.skip('separate pinned #213 checkout required')
@@ -35,12 +35,15 @@ def test_pinned_guard_actual_recovery_entrypoint(tmp_path):
     helper.write_bytes(Path('tests/pinned_bolton_guard_stage.py').read_bytes())
     from tests.test_daily_intake_runtime import _historical_salford_seed
     env = dict(os.environ, PYTHONPATH=str(pin), S4_SUCCESSOR_ROOT=str(Path.cwd()),
-               S4_SALFORD_SEED=json.dumps(_historical_salford_seed()))
+               S4_SALFORD_SEED=json.dumps(_historical_salford_seed()),
+               S4_JOINED_RECEIPT=str(tmp_path/'joined-receipt.json'))
     result = subprocess.run([sys.executable, '-m', 'pytest', str(helper), '--rootdir', str(pin),
                              '--import-mode=importlib', '-q', '-p', 'no:cacheprovider',
                              '--basetemp', str(tmp_path/'pinned')], cwd=pin, env=env,
                             capture_output=True, text=True, timeout=240)
     assert result.returncode == 0, result.stdout[-12000:] + result.stderr[-4000:]
+    receipt=json.loads((tmp_path/'joined-receipt.json').read_text())
+    record_property('joined_receipt',json.dumps(receipt,sort_keys=True))
 
 
 def release_script(w, *, expiry=None):
@@ -281,8 +284,11 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
     now = datetime.now(timezone.utc)
     preview = prepare_inactive_campaign_owner_batch(now, 'tameside', '2026-09-15', '2026-09-21')
     period = preview['period']
-    policy = base_policy(w)
-    if recovered: policy['expires_at']=time.time()+1800
+    # Carry the sealed policy forward. Only the three existing disposable
+    # transport markers differ; never replace product limits/contracts with a
+    # second policy fixture after compiling the package.
+    policy = json.loads(package['policy.json']) if recovered else base_policy(w)
+    if recovered: policy.update(test_evidence=True,route='DISPOSABLE',hostaddr=None)
     policy['expected_stop'].update(global_stop=None,manual_stop=None,hard_stop_generation=16)
     policy['councils'] = {'tameside':policy['councils']['tameside']}
     policy.update(max_runs=1,mode='CAMPAIGN_FINITE_HISTORICAL_V1',
@@ -295,9 +301,16 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
     assert _control(w)['hard_stop_generation']==15
     compiled=candidate.installed_campaign_sql(period,policy,now)
     if recovered:
-        production_projection=dict(policy,test_evidence=False,route='DIRECT',hostaddr='192.0.2.1')
-        kwargs=dict(as_of=now,period=period,policy=production_projection,release_manifest_sha256=manifest['manifest_binding_sha256'])
-        install=candidate.render_campaign_install(**kwargs).replace(candidate.render_campaign(**kwargs),compiled)
+        production_policy=json.loads(package['policy.json'])
+        assert {k for k in set(policy)|set(production_policy) if policy.get(k)!=production_policy.get(k)}=={'test_evidence','route','hostaddr'}
+        kwargs=dict(as_of=now,period=period,policy=production_policy,release_manifest_sha256=manifest['manifest_binding_sha256'])
+        original_campaign=candidate.render_campaign(**kwargs)
+        projected=original_campaign.replace(candidate._literal(production_policy),candidate._literal(policy))
+        projected=projected.replace("e->'test_evidence' IS DISTINCT FROM 'false'::jsonb", "e->'test_evidence' IS DISTINCT FROM 'true'::jsonb")
+        projected=projected.replace("current_database() IS DISTINCT FROM 'postgres'", "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+        assert compiled==projected
+        assert package['campaign-install.sql'].decode().count(original_campaign)==1
+        install=package['campaign-install.sql'].decode().replace(original_campaign,compiled)
         install=install.replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
         with w['actor']() as actor: actor.execute(install)
     else:
@@ -306,11 +319,13 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
     w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO ingestion_worker')
     assert _control(w)['hard_stop_generation']==15
     if recovered:
-        release=candidate.render_release(manifest,expires_at=manifest['expires_at']).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+        release=package['conditional-release.sql'].decode().replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
         with w['actor']() as actor: actor.execute(release)
     else: _run(w, source)
     from verification.ingestion_storage.tameside_candidate import enabled
-    with enabled(policy):
+    # The final production CLI owns enablement on the joined path.
+    from contextlib import nullcontext
+    with (nullcontext() if recovered else enabled(policy)):
         if recovered:
             from verification.ingestion_storage.operational_owner import Owner
             from datetime import timedelta
@@ -318,7 +333,8 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
             w['boot'].execute('GRANT ingestion_barrier_releaser TO postgres WITH ADMIN TRUE, INHERIT FALSE, SET FALSE GRANTED BY provisioning_bootstrap')
             owner=Owner(w['actor'],lambda *_:None,lambda:None,identity='postgres',
                         expiry=now+timedelta(hours=1),bindings=policy['execution_binding'])
-            owner.register_historical_campaign_period(period,policy,as_of=now)
+            with enabled(policy):
+                owner.register_historical_campaign_period(period,policy,as_of=now)
             assert owner.opened==owner.closed==1
             assert w['boot'].execute("SELECT pg_has_role('postgres','ingestion_barrier_releaser','USAGE'),pg_has_role('postgres','ingestion_barrier_releaser','SET')").fetchone()==(False,False)
         else:
@@ -326,16 +342,62 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
                               (json.dumps(dict(operation='intake_period',period=period,policy=policy)),))
         if recovered: w['activate_restricted_fixture'](policy,manifest)
         env, sources = env_and_sources(w, tmp_path, count=1, catchup_window=candidate.BATCH)
+        if recovered:
+            from tests.test_source_profiles import synthetic_tameside_source_from_owned_child
+            child=tmp_path/'actual-source-child';child.mkdir()
+            audit=synthetic_tameside_source_from_owned_child(child,1,row=dict(
+                council='tameside',semantics='RECEIVED',start=candidate.BATCH['start'],end=candidate.BATCH['end']))
+            (sources/'tameside.json').write_text(json.dumps(audit))
         for key, value in env.items(): monkeypatch.setenv(key,value)
         output = tmp_path/'candidate-result'
-        status = runtime.main(['--period',period,'--output',str(output),
-                               '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')])
+        if recovered:
+            from verification.ingestion_storage import tameside_candidate as executable
+            for key in ('DATABASE_URL','INGESTION_ADMIN_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL',
+                        'SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','ANTHROPIC_API_KEY',
+                        'PROPERTYAIGENT_INTAKE_RENDER_API_KEY','GH_TOKEN','GITHUB_TOKEN'):
+                monkeypatch.delenv(key,raising=False)
+            monkeypatch.setenv('RENDER_SERVICE_ID','crn-d9sv93vavr4c73f98rb0')
+            monkeypatch.setenv('RENDER_GIT_COMMIT',production_policy['execution_binding']['revision'])
+            actual_runtime=runtime.main
+            observed_commands=[]
+            def disposable_transport(argv):
+                # Only transport/output substitution, after the unmodified CLI
+                # has verified the actual sealed policy/hash/target/deadline.
+                observed_commands.append(list(argv))
+                assert argv==['--period',period,'--output','/tmp/propertyaigent-tameside-once',
+                              '--hostaddr','18.169.28.97']
+                return actual_runtime(['--period',period,'--output',str(output),
+                    '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')])
+            monkeypatch.setattr(runtime,'main',disposable_transport)
+            argv=command[command.index('verification.ingestion_storage.tameside_candidate')+1:]
+            status=executable.main(argv)
+            assert len(observed_commands)==1
+            assert (runtime.LIVE_PRIVATE_EVIDENCE_RELEASE,runtime.LIVE_HISTORICAL_CAMPAIGN_RELEASE)==(False,False)
+        else:
+            status = runtime.main(['--period',period,'--output',str(output),
+                                   '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')])
         result = json.loads((output/'final-result.json').read_text())
         assert status == 0, result
         assert result['status'] == 'RETAINED_AND_SCREENED'
         assert result['cleanup'] == 'CLOSED' and result['authority_closure'] == 'INVALIDATED'
-        assert len(result['backlog']['records']) == 1
-        assert result['backlog']['records'][0]['screening_state'] == 'COMPLETE'
+        retained=result['backlog']['records']
+        if recovered:
+            # Existing history is deliberately preserved. The first cross-run
+            # page is not this batch's outcome; independently traverse cursors.
+            retained=[];after=None
+            for page_number in range(10):
+                page_output=tmp_path/f'independent-backlog-{page_number}'
+                args=['--period',period,'--output',str(page_output),'--backlog',
+                      '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')]
+                if after:args+=['--after',after]
+                assert actual_runtime(args)==0
+                page=json.loads((page_output/'backlog.json').read_text())
+                retained.extend(r for r in page['records'] if r['archive']['period']==period)
+                if not page['more']:break
+                assert page['next_cursor']!=after;after=page['next_cursor']
+            else:raise AssertionError('bounded backlog traversal incomplete')
+        assert len(retained) == 1
+        assert retained[0]['screening_state'] == 'COMPLETE'
         assert result['admission_connected'] is False
         with psycopg.connect(settings()[0], autocommit=True) as independent:
             independent.execute('BEGIN READ ONLY')

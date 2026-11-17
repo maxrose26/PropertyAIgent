@@ -43,6 +43,32 @@ def main():
             api=scope['lifecycle'](os.environ['S4_BOLTON_PINNED_CHECKOUT'],policy=policy,manifest=manifest,expected_inventory=inventory)
             hashes=dict(boot.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login')").fetchall())
             b=dict(version='FINITE_INTAKE_OWNER_V1',period='S4_FINITE_677f555670666bcf21f45860',route=policy['route'],hostaddr=policy['hostaddr'],owner_hostaddr=policy['hostaddr'],execution_binding=policy['execution_binding'],accepted_stop=policy['expected_stop'],evidence_backend='POSTGRES_PILOT_V1',credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=hashes,runtime_deadline=policy['expires_at'],valid_until=policy['expires_at']+185)
+            # Continue the SAME simulated provider state left by preparation,
+            # now through the actual pinned HTTP handoff and restoration paths.
+            import ast
+            fixture=state['preparation']['provider_fixture']
+            io=tameside_owner_access.provider_io(os.environ['S4_BOLTON_PINNED_CHECKOUT'],api)
+            provider_scope=dict(copy=copy,SERVICE='crn-d9sv93vavr4c73f98rb0')
+            provider_source=(Path(os.environ['S4_BOLTON_PINNED_CHECKOUT'])/'tests/test_intake_owner_io.py').read_text()
+            node=next(n for n in ast.parse(provider_source).body if isinstance(n,ast.ClassDef) and n.name=='API')
+            exec(compile(ast.get_source_segment(provider_source,node),'synthetic-render-api','exec'),provider_scope)
+            provider=provider_scope['API']();provider.service=copy.deepcopy(fixture['service']);provider.env=copy.deepcopy(fixture['environment'])
+            root=Path(sys.argv[1]);root.mkdir(exist_ok=True)
+            b.update(render_config_sha256=io.service_guard(provider.service),
+                timing_policy=dict(version='SEPARATE_EXPIRY_V2_RESERVE',bound_at=policy['expires_at']-1915),
+                retained_deployment=fixture['deployment'],release_root=str(root),submission_intent_path=str(root/'submission-intent'))
+            def local_url(route,role,password):
+                assert route=='DISPOSABLE' and passwords[role]==password
+                return state['urls'][role]
+            io.handoff.__globals__['url']=local_url  # transport only, never a production route
+            def observation(operation):
+                import hashlib
+                from verification.ingestion_storage.operational_publication import canonical
+                return dict(version='FINITE_OPERATION_OBSERVATION_V1',operation=operation,
+                    binding_sha256=hashlib.sha256(canonical(b)).hexdigest(),service_id=provider_scope['SERVICE'],
+                    observed_at=time.time(),env_groups=[],secret_files=[],inherited_credential_names=[],
+                    reviewed=True,no_current_work=True,other_activity_stopped=True,
+                    deployment_id=fixture['deployment'],revision=b['execution_binding']['revision'],suspended=True)
             passwords={urlparse(url).username:unquote(urlparse(url).password) for url in state['urls'].values() if urlparse(url).username in tameside_owner_access.ROLES}
             assert set(passwords)==set(tameside_owner_access.ROLES),sorted(passwords)
             def save(value):
@@ -69,6 +95,13 @@ def main():
                     boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(original),))
                 api.activate(c,b,save,prepared=prepared)
             access.update(api=api,binding=b,save=save)
+            io.handoff(provider,access['state'],save,None,observation=observation('HANDOFF'))
+            assert set(k for k in provider.env if 'DATABASE' in k)=={'INGESTION_WORKER_DATABASE_URL','INGESTION_EFFECT_DATABASE_URL'}
+            assert 'PLAYWRIGHT_BROWSERS_PATH' not in provider.env
+            io.submission_check(provider,access['state'],save,observation('SUBMISSION'))
+            with pytest.raises(Exception,match='SUBMISSION_PRIOR_INTENT_NO_RETRY'):
+                io.submission_check(provider,access['state'],save,observation('SUBMISSION'))
+            access.update(io=io,provider=provider)
         def install_journal():
             import subprocess
             from verification.ingestion_storage import tameside_owner_journal as j
@@ -133,8 +166,13 @@ def main():
             with actor() as c:
                 assert c.execute("SELECT bool_and(NOT rolcanlogin) FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(True,)
                 assert c.execute("SELECT count(*) FROM pg_auth_members WHERE member IN ('ingestion_worker_login'::regrole,'ingestion_effect_login'::regrole)").fetchone()==(0,)
+            # Synthetic job terminal observation; actual cleanup adapter and
+            # encrypted callback. No claim of a real provider submission.
+            access['io'].restore_handoff(access['provider'],access['state'],access['save'],'job-'+'a'*20)
+            assert access['provider'].env==state['preparation']['provider_fixture']['environment']
+            assert access['provider'].service==state['preparation']['provider_fixture']['service']
         w=dict(boot=boot,connect=connect,actor=actor,urls=state['urls'],activate_restricted_fixture=activate,close_restricted_fixture=close,install_journal_fixture=install_journal)
-        target=Path(sys.argv[1]);target.mkdir()
+        target=Path(sys.argv[1]);target.mkdir(exist_ok=True)
         try:
             with pytest.MonkeyPatch.context() as monkeypatch:
                 result=exercise_conditional_runtime(w,target,monkeypatch,recovered=True)
@@ -143,6 +181,9 @@ def main():
                 boot.execute(sql.SQL('ALTER ROLE {} NOLOGIN').format(sql.Identifier(role)))
                 boot.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(cap),sql.Identifier(role)))
         result['preparation']=state.get('preparation')
+        result['preparation'].pop('provider_fixture',None)
+        result['package_cli']='ACTUAL_CLI_DISPOSABLE_TRANSPORT_ONLY'
+        result['provider_handoff_restore']='ACTUAL_ADAPTER_SIMULATED_RENDER'
         print(json.dumps(result,sort_keys=True))
 
 

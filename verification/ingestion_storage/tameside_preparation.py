@@ -62,6 +62,43 @@ def original_checkpoint(pinned, db):
     state=j.load()
     require(state and state.get('status')=='CLOSED' and j.ordinal==55 and
             j.previous==CHECKPOINT_SHA, 'PREPARATION_ORIGINAL_CHECKPOINT_DRIFT')
+    archive=state.get('closed_build_archive')
+    require(isinstance(archive,dict) and set(archive)==
+            {'prior_ordinal','prior_ciphertext_sha256','fields'}, 'PREPARATION_ARCHIVE_REFERENCE')
+    fields={'original_service','original_deploy_ids','build_guard','build_environment','build_receipt_created_at'}
+    hexhash=lambda v:isinstance(v,str) and len(v)==64 and all(c in '0123456789abcdef' for c in v)
+    require(type(archive['prior_ordinal']) is int and 0<=archive['prior_ordinal']<j.ordinal
+            and hexhash(archive['prior_ciphertext_sha256'])
+            and isinstance(archive['fields'],dict) and set(archive['fields'])==fields
+            and all(hexhash(v) for v in archive['fields'].values()), 'PREPARATION_ARCHIVE_REFERENCE')
+    # Exact immutable row only. Bound ciphertext on the server, before transfer;
+    # duplicates, oversized bodies and hash drift return metadata, never bodies.
+    with j.db.connection() as c:
+        row=c.execute("""WITH matches AS MATERIALIZED (
+            SELECT body,sha256 FROM public.ingestion_run_evidence
+            WHERE period=%s AND run_id=%s AND name=%s LIMIT 2
+        ), summary AS (SELECT count(*) AS n FROM matches)
+        SELECT n, CASE WHEN n=1 THEN (SELECT octet_length(body) FROM matches) END,
+          CASE WHEN n=1 THEN (SELECT CASE WHEN octet_length(body)<=32768
+            AND sha256=%s AND encode(sha256(body),'hex')=%s THEN body END FROM matches) END
+        FROM summary""",(j.owner_period,j.owner_run,
+            'owner/state-'+str(archive['prior_ordinal']).zfill(3),
+            archive['prior_ciphertext_sha256'],archive['prior_ciphertext_sha256'])).fetchone()
+    require(row and row[0]==1 and type(row[1]) is int and 0<row[1]<=32768
+            and row[2] is not None,'PREPARATION_ARCHIVE_ROW')
+    raw=bytes(row[2])
+    require(hashlib.sha256(raw).hexdigest()==archive['prior_ciphertext_sha256'],
+            'PREPARATION_ARCHIVE_HASH')
+    prior=j._vault(raw=raw)
+    require(prior.get('period')==j.period,'PREPARATION_ARCHIVE_PERIOD')
+    for name,expected in archive['fields'].items():
+        require(name in prior and hashlib.sha256(pinned.canonical(prior[name])).hexdigest()==expected,
+                'PREPARATION_ARCHIVE_FIELD')
+        require(name not in state or state[name]==prior[name],'PREPARATION_ARCHIVE_CONFLICT')
+        state[name]=copy.deepcopy(prior[name])
+    require(prior.get('original_environment')==state.get('original_environment') and
+            prior.get('original_guard')==state.get('original_guard'),
+            'PREPARATION_ARCHIVE_BASELINE')
     return state
 
 
@@ -392,6 +429,11 @@ def prepare_stopped(db, *, pinned, recovery, binding, journal_source, api_factor
     installation, manifest sealing, release, activation and handoff follow only
     after this returns STOPPED_BUILD_READY. No expiry is bound before deployment.
     """
+    # Resolve historical structure before the first mutation, not only when the
+    # deployment object is constructed after committed recovery/installation.
+    original=original_checkpoint(pinned,db)
+    require(original['original_environment']==baseline['environment'] and
+            original['original_service']==baseline['service'],'PREPARATION_RESTORATION_BASELINE')
     recover_and_install(db,recovery=recovery,binding=binding,journal_source=journal_source,
                         interrupt=interrupt)
     deployment=StoppedDeployment(pinned,db,api_factory,revision=revision,

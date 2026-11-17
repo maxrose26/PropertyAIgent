@@ -555,7 +555,7 @@ finally:
     else:
         assert source['failure'] is None
         assert source['enumeration_evidence']=='COUNT_RECONCILED'
-        assert len(source['records'])==22
+        assert len(source['records'])==count
     return source
 
 
