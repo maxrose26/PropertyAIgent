@@ -384,6 +384,80 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
         "SELECT count(*) FROM ingestion_work_items "
         "WHERE key<>repeat('0',64) AND subject->>'council'='manchester'").fetchone()[0]==0
 
+def test_two_sequential_campaign_weeks_persist_separate_screened_batches(world, tmp_path):
+    """One reusable campaign selector -> two independent one-use PG batches.
+
+    Positive evidence is restricted to disposable SQL and synthetic sources.
+    Reusing the same source-shaped reference in two historical weeks must not
+    erase the earlier capture/screen, invent qualification, or grant a new
+    period without an independent owner registration.
+    """
+    from zoneinfo import ZoneInfo
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        prepare_inactive_campaign_owner_batch,
+    )
+    from verification.ingestion_storage.chain_registration import (
+        persisted_council_capture_inventory,
+    )
+    reset(world)
+    now = datetime.now(timezone.utc)
+    execution_day = now.astimezone(ZoneInfo('Europe/London')).date().isoformat()
+    expected = [('2026-09-15', '2026-09-21'),
+                ('2026-09-22', '2026-09-28')]
+    periods = []
+    stable_sha = None
+    for ordinal, (start, end) in enumerate(expected):
+        proposed = prepare_inactive_campaign_owner_batch(
+            now, 'tameside', start, end)
+        assert proposed['manifest_status'] == 'WITHHELD'
+        assert proposed['campaign_batch']['semantics'] == 'RECEIVED'
+        assert not proposed['live_collection_authorised']
+        if stable_sha is None:
+            stable_sha = proposed['stable_issuer_sha256']
+        else:
+            assert proposed['stable_issuer_sha256'] == stable_sha
+        scope = dict(start=start, end=end, execution_day=execution_day,
+                     source_plan_sha256=proposed['campaign_source_plan_sha256'])
+        p = policy(world)
+        p['max_runs'] = 1
+        p['catchup_scope'] = scope
+        p['councils'] = {'tameside': p['councils']['tameside']}
+        name = proposed['period']
+        assert name not in periods
+        grant = _catchup_owner(world).register_disposable_finite_campaign_batch(
+            name, p, as_of=now, council='tameside', start=start, end=end)
+        assert grant['mode'] == 'DISPOSABLE_SHUTDOWN_GAP_V1'
+        run_dir = tmp_path / ('batch-' + str(ordinal))
+        run_dir.mkdir()
+        run, result, _ = invoke(world, run_dir, name, catchup_window=scope)
+        assert run.returncode == 0, (run.stderr, result)
+        assert result['status'] == 'RETAINED_AND_SCREENED'
+        assert result['cleanup'] == 'CLOSED'
+        assert result['authority_closure'] == 'INVALIDATED'
+        assert result['coverage_advance'] is False
+        assert result['admission_connected'] is False
+        assert len(result['backlog']['records']) >= 1
+        assert all(r['application_admitted'] is None
+                   for r in result['backlog']['records'])
+        periods.append(name)
+
+    # Independent SQL readback after BOTH committed runs, not file outputs.
+    captured = persisted_council_capture_inventory(world['boot'], 'tameside')
+    assert len(captured) == 2
+    intervals = {(r['subject']['start'], r['subject']['end'])
+                 for r in captured if r['state'] == 'COMPLETE'}
+    assert intervals == set(expected)
+    persisted = world['boot'].execute(
+        "SELECT task,subject->>'council',state FROM ingestion_work_items "
+        "WHERE key<>repeat('0',64) AND task IN ('DISCOVERY','SCREENING') "
+        "AND state='COMPLETE'").fetchall()
+    assert sum(t == 'DISCOVERY' and c == 'tameside'
+               for t, c, _ in persisted) == 2
+    assert sum(t == 'SCREENING' and c == 'tameside'
+               for t, c, _ in persisted) == 2
+    assert all(c == 'tameside' for _, c, _ in persisted)
+
+
 @pytest.mark.parametrize("mutation", [
     "wrong_start", "wrong_end", "wrong_digest", "wrong_day",
     "wrong_council", "two_councils", "max_runs", "wrong_route",
