@@ -34,7 +34,7 @@ LIVE_PRIVATE_EVIDENCE_RELEASE = False
 LIVE_HISTORICAL_CAMPAIGN_RELEASE = False
 
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
-             'verification/ingestion_storage/release_candidate.py','verification/ingestion_storage/bolton_recovery_guard.py',
+             'verification/ingestion_storage/release_candidate.py','verification/ingestion_storage/campaign_private_finish.py','verification/ingestion_storage/bolton_recovery_guard.py',
              'verification/ingestion_storage/tameside_candidate.py',
              'verification/ingestion_storage/tameside_preparation.py','verification/ingestion_storage/tameside_build_receipt.py',
              'verification/ingestion_storage/tameside_owner_access.py','verification/ingestion_storage/tameside_owner_journal.py','verification/ingestion_storage/tameside_package.py',
@@ -771,24 +771,26 @@ class Runtime:
             result['test_evidence']=self.test;result['execution_binding']=self.binding
             if self.memory:
                 result['memory']=self.memory.evidence();result['render_profile']=self.policy['render_profile']
-            raw=canonical(result);events=canonical(self.events)
             private_backend=(self.policy or {}).get('evidence_backend')=='POSTGRES_PILOT_V1'
+            private_only=private_backend and (self.policy or {}).get('mode')=='CAMPAIGN_FINITE_HISTORICAL_V1'
+            if private_only:result['github_publication']='NOT_REQUESTED'
+            raw=canonical(result);events=canonical(self.events)
             publication_raw=raw
             try:
                 if self.authorities:self.run.publication(len(raw)+len(events),10)
                 if self.authorities and private_backend:
-                    self.archive_private_final(raw,events)
+                    private_receipts=self.archive_private_final(raw,events)
                     from app.ingestion.public_evidence import project_public_summary
                     publication_raw=canonical(project_public_summary(
                         result,original_raw=raw,original_events=events))
-                if self.authorities and not self.test:
+                if self.authorities and not self.test and not private_only:
                     if self.github is None:
                         self.run.publication(0,1)
                         self.github=GitHub(self.emit,self.run.check,bound=LIMITS['github_calls']);self.head=self.github.call('GET',REPO+'/git/ref/heads/'+BRANCH)['object']['sha']
                     self.head=self.github.publish(
                         {'result-before-publication.json':publication_raw} if private_backend
                         else {'result-before-publication.json':raw,'events-before-publication.json':events},directory='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final',expected_head=self.head)
-                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'TEST_PRIVATE_SUMMARY' if self.test and private_backend else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
+                result['publication']='NOT_REQUIRED_NO_NEW_WORK' if not self.authorities else 'NOT_REQUESTED_PRIVATE_READBACK' if private_only else 'TEST_PRIVATE_SUMMARY' if self.test and private_backend else 'TEST_LOCAL_ARCHIVE' if self.test else 'VERIFIED'
                 if self.authorities and result['status'] in ('RETAINED_AND_SCREENED','INCOMPLETE'):
                     path='docs/design/ingestion-operational-execution-daily-intake/'+self.args.period+'/'+self.run_id+'/final/result-before-publication.json'
                     if self.test:
@@ -801,6 +803,8 @@ class Runtime:
                         if dest.read_bytes()!=publication_raw:raise Denied('FINAL_ARCHIVE_READBACK')
                     publication=dict(path=path,sha256=hashlib.sha256(publication_raw).hexdigest(),
                         commit=hashlib.sha1(b'TEST_FINAL'+publication_raw).hexdigest() if self.test else self.head,readback_verified=True)
+                    if private_only:
+                        publication=dict(private_receipts['final/result-before-publication.json'],path=path)
                     payload=dict(operation='intake_finish',period=self.args.period,run_id=self.run_id,
                                  execution_binding=self.binding,status=result['status'],publication=publication)
                     with self.connection() as (c,_):

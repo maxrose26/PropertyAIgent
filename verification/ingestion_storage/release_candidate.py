@@ -143,7 +143,8 @@ def render_campaign(*, as_of, period, policy, release_manifest_sha256):
     second = source.index(preflight, source.index('RETURN jsonb_build_object'))
     source = source[:second] + ("  IF p->>'operation'='intake_period' THEN " + lock +
                               'END IF;\n') + source[second:]
-    return source
+    from .campaign_private_finish import adapt
+    return adapt(source)
 
 
 def render_campaign_install(**kwargs):
