@@ -190,6 +190,15 @@ _STABLE_CAPTURE_DATES = """OR item->'subject'->>'end' IS DISTINCT FROM
        (ctl->'intake_periods'->a->'campaign_batch'->>'end')
     OR item->'subject'->>'start' IS DISTINCT FROM
        (ctl->'intake_periods'->a->'campaign_batch'->>'start')"""
+# The frozen normal issuer was Tameside/Manchester-only and treated only
+# Manchester as VALIDATED. The general campaign must bind *existing* finite
+# source semantics for every profiled council, without changing policy_sql().
+_STABLE_COUNCILS_ANCHOR = "OR (e->'councils')-ARRAY['tameside','manchester']<>'{}'::jsonb"
+_STABLE_COUNCILS = """OR (e->'councils')-ARRAY['bolton','bury','manchester','oldham',
+       'rochdale','salford','stockport','tameside','wigan']<>'{}'::jsonb"""
+_STABLE_SEMANTICS_ANCHOR = """OR item->'subject'->>'semantics' IS DISTINCT FROM (CASE WHEN item->'subject'->>'council'='manchester' THEN 'VALIDATED' ELSE 'RECEIVED' END)"""
+_STABLE_SEMANTICS = """OR item->'subject'->>'semantics' IS DISTINCT FROM
+       (ctl->'intake_periods'->a->'campaign_batch'->>'semantics')"""
 _STABLE_OWNER_GUARD = r"""
   -- Owner-sealed finite metadata, not a new SQL body per council/week.
   -- This candidate refuses even if a caller forges the correct-shaped policy.
@@ -270,7 +279,8 @@ def render_inactive_stable_campaign_issuer():
         raise ValueError("CAMPAIGN_STABLE_POLICY_INVENTORY_DRIFT")
     function = raw[raw.index(original):raw.index("$register$;") + len("$register$;")]
     if any(function.count(anchor) != 1 for anchor in
-           (_ROLLING, _ENTRY_ANCHOR, _PERIOD_ANCHOR)):
+           (_ROLLING, _ENTRY_ANCHOR, _PERIOD_ANCHOR,
+            _STABLE_COUNCILS_ANCHOR, _STABLE_SEMANTICS_ANCHOR)):
         raise ValueError("CAMPAIGN_STABLE_ISSUER_ANCHOR_DRIFT")
     function = function.replace(original,
         "CREATE OR REPLACE FUNCTION public." + CAMPAIGN_FUNCTION + "(", 1)
@@ -278,6 +288,10 @@ def render_inactive_stable_campaign_issuer():
         _ENTRY_GUARD.replace("TAMESIDE_FIRST_", "CAMPAIGN_STABLE_")
         + _ENTRY_ANCHOR, 1)
     function = function.replace(_ROLLING, _STABLE_CAPTURE_DATES, 1)
+    function = function.replace(_STABLE_COUNCILS_ANCHOR,
+                                _STABLE_COUNCILS, 1)
+    function = function.replace(_STABLE_SEMANTICS_ANCHOR,
+                                _STABLE_SEMANTICS, 1)
     function = function.replace(_PERIOD_ANCHOR,
         _PERIOD_ANCHOR + "\n" + _STABLE_OWNER_GUARD, 1)
     result = (function + "\nREVOKE ALL ON FUNCTION public."
