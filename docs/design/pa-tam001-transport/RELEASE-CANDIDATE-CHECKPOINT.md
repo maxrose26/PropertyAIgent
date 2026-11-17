@@ -1,3 +1,7 @@
+# Current update — v1.5 checkpoint recovered
+
+The checkpoint read succeeded; see [verified outcome and remaining current-runtime comparison](CHECKPOINT-V1-5-OUTCOME.md). Historical runtime inputs are recovered, not current-runtime acceptance. The older access dependency below is preserved as history. Stage 4 OPEN; operational release remains WITHHELD.
+
 # Conditional release candidate — offline integration checkpoint
 
 17 November 2026. MASTER STAGE 4 OPEN. Current gate: exact executable candidate;
