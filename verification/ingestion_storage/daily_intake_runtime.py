@@ -773,16 +773,17 @@ class Runtime:
                 result['memory']=self.memory.evidence();result['render_profile']=self.policy['render_profile']
             private_backend=(self.policy or {}).get('evidence_backend')=='POSTGRES_PILOT_V1'
             private_only=private_backend and (self.policy or {}).get('mode')=='CAMPAIGN_FINITE_HISTORICAL_V1'
-            if private_only:result['github_publication']='NOT_REQUESTED'
+            if private_only:result.update(github_publication='NOT_REQUESTED',period=self.args.period,run_id=self.run_id)
             raw=canonical(result);events=canonical(self.events)
             publication_raw=raw
             try:
                 if self.authorities:self.run.publication(len(raw)+len(events),10)
                 if self.authorities and private_backend:
                     private_receipts=self.archive_private_final(raw,events)
-                    from app.ingestion.public_evidence import project_public_summary
-                    publication_raw=canonical(project_public_summary(
-                        result,original_raw=raw,original_events=events))
+                    if not private_only:
+                        from app.ingestion.public_evidence import project_public_summary
+                        publication_raw=canonical(project_public_summary(
+                            result,original_raw=raw,original_events=events))
                 if self.authorities and not self.test and not private_only:
                     if self.github is None:
                         self.run.publication(0,1)
