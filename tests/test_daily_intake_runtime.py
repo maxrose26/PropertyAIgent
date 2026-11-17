@@ -355,7 +355,7 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
     p,scope=_catchup_fixture(world)
     p['councils']={'tameside':p['councils']['tameside']}
     p['max_runs']=1
-    name='finite-tameside-only-synthetic'
+    name=owner_runtime['period']  # the ONE source-derived owner period ID
     grant=_catchup_owner(world).register_disposable_finite_campaign_batch(
         name, p, as_of=now, council='tameside',
         start='2026-09-15', end='2026-09-21')
@@ -387,7 +387,7 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
 @pytest.mark.parametrize("mutation", [
     "wrong_start", "wrong_end", "wrong_digest", "wrong_day",
     "wrong_council", "two_councils", "max_runs", "wrong_route",
-    "live_policy", "historical_mode", "wrong_owner",
+    "live_policy", "historical_mode", "wrong_owner", "wrong_period",
 ])
 def test_disposable_campaign_owner_refuses_unbound_batch_before_sql(
         world, mutation):
@@ -401,6 +401,12 @@ def test_disposable_campaign_owner_refuses_unbound_batch_before_sql(
     p['councils'] = {'tameside': p['councils']['tameside']}
     p['max_runs'] = 1
     owner = _catchup_owner(world)
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        prepare_inactive_campaign_owner_batch,
+    )
+    now = datetime.now(timezone.utc)
+    name = prepare_inactive_campaign_owner_batch(
+        now, 'tameside', '2026-09-15', '2026-09-21')['period']
     council = 'tameside'
     if mutation == 'wrong_start':
         scope['start'] = '2026-09-22'
@@ -424,11 +430,13 @@ def test_disposable_campaign_owner_refuses_unbound_batch_before_sql(
         p['test_evidence'] = False
     elif mutation == 'historical_mode':
         p['mode'] = 'CAMPAIGN_FINITE_HISTORICAL_V1'
+    elif mutation == 'wrong_period':
+        name = 'forged-period'
     else:
         owner.identity = 'postgres'
     with pytest.raises(ValueError, match='CAMPAIGN_DISPOSABLE_'):
         owner.register_disposable_finite_campaign_batch(
-            'refused-campaign', p, as_of=datetime.now(timezone.utc),
+            name, p, as_of=now,
             council=council, start='2026-09-15', end='2026-09-21')
     assert owner.connections == 0
     assert world['boot'].execute(
