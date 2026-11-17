@@ -51,7 +51,7 @@ def _bound_journal(pinned_owner_module,db):
     """
     if hashlib.sha256(Path(pinned_owner_module.__file__).read_bytes()).hexdigest()!='f33439807df02e14fec167e7f3782a36af5e12e52949404c2388b610d1e61981':
         raise ValueError('TAMESIDE_PINNED_JOURNAL_CODEC')
-    journal=pinned_owner_module.Journal(db)
+    journal=pinned_owner_module.Journal(db,period=pinned_owner_module.PERIOD)
     journal.period=PERIOD;journal.owner_period=JOURNAL;journal.owner_run=RUN
     return journal
 

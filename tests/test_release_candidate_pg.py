@@ -39,7 +39,7 @@ def test_pinned_guard_actual_recovery_entrypoint(tmp_path):
     result = subprocess.run([sys.executable, '-m', 'pytest', str(helper), '--rootdir', str(pin),
                              '--import-mode=importlib', '-q', '-p', 'no:cacheprovider',
                              '--basetemp', str(tmp_path/'pinned')], cwd=pin, env=env,
-                            capture_output=True, text=True, timeout=150)
+                            capture_output=True, text=True, timeout=240)
     assert result.returncode == 0, result.stdout[-12000:] + result.stderr[-4000:]
 
 

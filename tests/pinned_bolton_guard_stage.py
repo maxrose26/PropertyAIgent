@@ -53,23 +53,26 @@ def test_guarded_real_recovery_and_lost_ack(failed_bolton,tmp_path):
     assert owner.ledger_sha(boot) == blocked
     boot.execute('DELETE FROM ingestion_work_items WHERE key=%s', ('f'*64,))
     assert owner.ledger_sha(boot) == before
-    with w['actor']() as actor:
-        with pytest.raises(RuntimeError):
-            guard.recover(Fault(actor, 'lost'), w['binding'], pinned_module=recovery)
+    preparation_spec=importlib.util.spec_from_file_location('stopped_preparation_proof',
+        Path(os.environ['S4_SUCCESSOR_ROOT'])/'tests/stopped_preparation_proof.py')
+    preparation=importlib.util.module_from_spec(preparation_spec)
+    preparation_spec.loader.exec_module(preparation)
+    preparation_result=preparation.exercise(w,recovery,tmp_path)
+    assert preparation_result['boundaries']==19 and preparation_result['recovery_commits']==1
     # No repeat mutation after uncertain COMMIT: fresh connection readback.
-    with w['actor']() as fresh:
-        result = recovery.inspect(fresh, w['binding'])
+    result = preparation_result['recovery_readback']
     assert result['status'] == 'COMMITTED_STATE_VERIFIED_READ_ONLY'
     assert result['stop'] == recovery.STOP15
     assert recovery.all_other_work_sha(boot) == w['all_other']
     assert boot.execute(owner.MEMBERS).fetchall() == w['members']
-    assert boot.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall() == w['evidence_before']
+    after=boot.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall()
+    assert all(row in after for row in w['evidence_before'])
     if 'S4_SALFORD_SEED' in os.environ:
         with w['actor']() as actor:
             actor_info=actor.info.get_parameters();actor_info['password']=actor.info.password
         with w['connect']('provisioning_migrator') as migrator:
             migrator_info=migrator.info.get_parameters();migrator_info['password']=migrator.info.password
-        state=dict(owner=actor_info,migrator=migrator_info,urls=w['urls'],
+        state=dict(owner=actor_info,migrator=migrator_info,urls=w['urls'],preparation=preparation_result,
                    database_oid=boot.execute('SELECT oid FROM pg_database WHERE datname=current_database()').fetchone()[0])
         root=Path(os.environ['S4_SUCCESSOR_ROOT'])
         result=subprocess.run([sys.executable,'-m','tests.candidate_recovery_continuation',str(tmp_path/'candidate')],

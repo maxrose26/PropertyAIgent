@@ -74,6 +74,11 @@ def main():
             from verification.ingestion_storage import tameside_owner_journal as j
             script="from verification.ingestion_storage.intake_successor import owner_sql;print(owner_sql(),end='')"
             source=subprocess.run([sys.executable,'-c',script],cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],capture_output=True,text=True,check=True).stdout
+            if state.get('preparation'):
+                expected=source.replace(" IF p_period NOT IN ("," IF p_period NOT IN ('"+j.JOURNAL+"',",1).split('$owner_state$')[1]
+                assert boot.execute("SELECT prosrc FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()==(expected,)
+                assert boot.execute('SELECT count(*) FROM ingestion_run_evidence WHERE period=%s',(j.JOURNAL,)).fetchone()[0]>0
+                return  # already installed by actual stopped preparation; never repeat
             assert boot.execute("SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc WHERE oid='ingestion_intake_owner_state(text,text,text,bytea)'::regprocedure").fetchone()==(j.BODY_SHA,)
             def history():
                 return boot.execute("SELECT period,run_id,name,sha256,encode(sha256(body),'hex') FROM ingestion_run_evidence WHERE period<>%s ORDER BY period,run_id,name",(j.JOURNAL,)).fetchall()
@@ -137,6 +142,7 @@ def main():
             for role,cap in [('ingestion_worker_login','ingestion_worker'),('ingestion_effect_login','ingestion_effect_broker')]:
                 boot.execute(sql.SQL('ALTER ROLE {} NOLOGIN').format(sql.Identifier(role)))
                 boot.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(cap),sql.Identifier(role)))
+        result['preparation']=state.get('preparation')
         print(json.dumps(result,sort_keys=True))
 
 
