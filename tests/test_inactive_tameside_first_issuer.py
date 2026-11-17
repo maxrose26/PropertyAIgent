@@ -195,7 +195,8 @@ def _inactive_owner_policy_fixture():
 def test_inactive_owner_runtime_policy_requires_canonical_source_and_stop():
     """Owner-contract preflight can't promote reviewed SHAPE to live permission."""
     as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
-    result = candidate.review_inactive_campaign_owner_policy(
+    from verification.ingestion_storage.operational_owner import Owner
+    result = Owner.review_inactive_campaign_period(
         as_of, "tameside", "2026-09-15", "2026-09-21",
         period=period, policy=policy, observed_stop=stop,
         execution_binding=binding)
