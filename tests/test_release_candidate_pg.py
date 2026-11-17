@@ -231,7 +231,7 @@ def test_candidate_installs_stopped_as_real_restricted_owner(isolated_world):
         w['boot'].execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
 
 
-def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
+def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False, continuation=None):
     from tests.test_daily_intake_runtime import policy as base_policy, env_and_sources
     from verification.ingestion_storage import daily_intake_runtime as runtime
     from verification.ingestion_storage.inactive_tameside_first_issuer import prepare_inactive_campaign_owner_batch
@@ -270,16 +270,24 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
         with w['actor']() as independent:
             independent.execute('BEGIN READ ONLY')
             manifest=candidate.manifest_from_readback(independent,proposal,
-                operational_review_ref='https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-6953476124')
+                operational_review_ref='https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-'+('6962521367' if os.environ.get('S4_STOP15_FULL_RUN') else '6953476124'))
             independent.execute('ROLLBACK')
         # The real comment is a component review only; fixture use is not a
         # claim that it accepted operational release.
         from verification.ingestion_storage.tameside_package import compile_package
+        if w.get('run_stop15'):
+            return w['run_stop15'](manifest)
         journal_source=subprocess.run([sys.executable,'-c','from verification.ingestion_storage.intake_successor import owner_sql;print(owner_sql(),end="")'],cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],capture_output=True,text=True,check=True).stdout
-        package=compile_package(manifest,bound_at=time.time(),owner_journal_source=journal_source)
+        if continuation:
+            # Already committed partial state: continuation starts here. It has
+            # no access to recovery, dispositions, writer or deployment calls.
+            package=continuation.compile_remaining(os.environ['S4_TAMESIDE_RUNTIME_CHECKOUT'],
+                manifest,bound_at=time.time(),owner_journal_source=journal_source)
+        else:
+            package=compile_package(manifest,bound_at=time.time(),owner_journal_source=journal_source)
         import hashlib,base64,shlex
-        index=json.loads(package['package.json'])
-        assert len(package)==8
+        index=json.loads(package['continuation.json' if continuation else 'package.json'])
+        assert len(package)==(6 if continuation else 8)
         assert all(hashlib.sha256(package[n]).hexdigest()==v['sha256'] for n,v in index['files'].items())
         command=shlex.split(package['job-command.txt'].decode())
         assert base64.b64decode(command[command.index('--policy-base64')+1])==package['policy.json']
@@ -317,6 +325,22 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
         install=package['campaign-install.sql'].decode().replace(original_campaign,compiled)
         install=install.replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
         with w['actor']() as actor: actor.execute(install)
+        if continuation:
+            continuation.campaign_acl(w['boot'])
+            # Every ACL defect must fail independently before activation.
+            for mutation in (
+                'REVOKE EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) FROM ingestion_worker',
+                'REVOKE EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) FROM postgres',
+                'GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO PUBLIC',
+                'GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO ingestion_effect_broker',
+                'GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO postgres WITH GRANT OPTION'):
+                w['boot'].execute('BEGIN')
+                try:
+                    w['boot'].execute(mutation)
+                    with pytest.raises(ValueError,match='STOP15_CAMPAIGN_ACL'):
+                        continuation.campaign_acl(w['boot'])
+                finally:w['boot'].execute('ROLLBACK')
+            continuation.campaign_acl(w['boot'])
     else:
         w['boot'].execute(compiled)
         w['boot'].execute('ALTER FUNCTION ingestion_register_campaign_once(jsonb) OWNER TO ingestion_storage_owner')
@@ -334,7 +358,6 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
         if recovered:
             from verification.ingestion_storage.operational_owner import Owner
             from datetime import timedelta
-            w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO postgres')
             w['boot'].execute('GRANT ingestion_barrier_releaser TO postgres WITH ADMIN TRUE, INHERIT FALSE, SET FALSE GRANTED BY provisioning_bootstrap')
             owner=Owner(w['actor'],lambda *_:None,lambda:None,identity='postgres',
                         expiry=now+timedelta(hours=1),bindings=policy['execution_binding'])

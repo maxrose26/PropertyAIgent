@@ -58,7 +58,7 @@ def test_guarded_real_recovery_and_lost_ack(failed_bolton,tmp_path):
     preparation=importlib.util.module_from_spec(preparation_spec)
     preparation_spec.loader.exec_module(preparation)
     preparation_result=preparation.exercise(w,recovery,tmp_path)
-    assert preparation_result['boundaries']==19 and preparation_result['recovery_commits']==1
+    assert preparation_result['boundaries']==(0 if os.environ.get('S4_STOP15_FULL_RUN') else 19) and preparation_result['recovery_commits']==1
     # No repeat mutation after uncertain COMMIT: fresh connection readback.
     result = preparation_result['recovery_readback']
     assert result['status'] == 'COMMITTED_STATE_VERIFIED_READ_ONLY'
@@ -75,10 +75,12 @@ def test_guarded_real_recovery_and_lost_ack(failed_bolton,tmp_path):
         state=dict(owner=actor_info,migrator=migrator_info,urls=w['urls'],preparation=preparation_result,
                    database_oid=boot.execute('SELECT oid FROM pg_database WHERE datname=current_database()').fetchone()[0])
         root=Path(os.environ['S4_SUCCESSOR_ROOT'])
-        result=subprocess.run([sys.executable,'-m','tests.candidate_recovery_continuation',str(tmp_path/'candidate')],
-            cwd=root,env=dict(os.environ,PYTHONPATH=str(root)),input=json.dumps(state),
+        worker=Path(os.environ.get('S4_TAMESIDE_RUNTIME_CHECKOUT',str(root)))
+        command=[sys.executable,str(root/'tests/candidate_recovery_continuation.py'),str(tmp_path/'candidate')] if os.environ.get('S4_STOP15_OWNER_ROOT') else [sys.executable,'-m','tests.candidate_recovery_continuation',str(tmp_path/'candidate')]
+        result=subprocess.run(command,
+            cwd=worker,env=dict(os.environ,PYTHONPATH=str(worker)),input=json.dumps(state),
             capture_output=True,text=True,timeout=90)
         assert result.returncode==0,result.stdout[-14000:]+result.stderr[-5000:]
-        assert json.loads(result.stdout.splitlines()[-1])['status']=='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED'
+        assert json.loads(result.stdout.splitlines()[-1])['status']==('UNKNOWN_SUBMISSION_CONTAINED_NO_RETRY' if os.environ.get('S4_STOP15_FAULT')=='missing_job' else 'SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED')
         if os.environ.get('S4_JOINED_RECEIPT'):
             Path(os.environ['S4_JOINED_RECEIPT']).write_text(result.stdout.splitlines()[-1]+'\n')

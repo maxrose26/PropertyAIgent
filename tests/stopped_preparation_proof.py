@@ -78,6 +78,10 @@ def exercise(w, recovery, tmp_path):
         original_deploy_ids=[],build_guard=pinned.service_guard(service),
         build_environment={'PYTHONUNBUFFERED':'1'},build_receipt_created_at='2026-11-03T11:05:00Z',
         cleanup_reserve=dict(pinned.cleanup_reserve_policy(),cleanup_writes=0))
+    if os.environ.get('S4_STOP15_FULL_RUN'):
+        from urllib.parse import urlparse,unquote
+        passwords={urlparse(v).username:unquote(urlparse(v).password) for v in w['urls'].values() if urlparse(v).username in ('ingestion_worker_login','ingestion_effect_login')}
+        state['stable_credentials']=dict(passwords=passwords,verifier_sha256=dict(boot.execute("SELECT rolname,encode(sha256(convert_to(rolpassword,'UTF8')),'hex') FROM pg_authid WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login')").fetchall()))
     state.update(binding={'render_config_sha256':state['original_guard']},
         access={'state':'DATABASE_CLOSURE_ACKNOWLEDGED','render':{
             'guard':state['original_guard'],'original':environment}},
@@ -122,7 +126,7 @@ def exercise(w, recovery, tmp_path):
         prep.recover_and_install(db,recovery=recovery,binding=w['binding'],journal_source=owner_sql(),interrupt=stop_at_install)
     prep.recover_and_install(db,recovery=recovery,binding=w['binding'],journal_source=owner_sql())
     assert db.commits==1 and history()==original_history
-    revision='1'*40
+    revision='9524503fa90228f31d48d16a58121c45d3eb90b8' if os.environ.get('S4_STOP15_FULL_RUN') else '1'*40
     baseline=dict(service=service,environment=environment,deploy_ids=[])
     class Provider:
         def __init__(self):
@@ -162,6 +166,7 @@ def exercise(w, recovery, tmp_path):
     boundaries=['CHECKPOINT_READY']+[name+':'+point for name in
         ('BUILD_ENVIRONMENT','BUILD_CONFIGURATION','ONE_RESUME_BUILD','RESUSPEND',
          'RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT') for point in ('INTENT','EFFECT','READBACK')]
+    if os.environ.get('S4_STOP15_FULL_RUN'):boundaries=[]  # reuse prior accepted preparation fault matrix
     for boundary in boundaries:
         # Reset ONLY synthetic new namespace between independent fault scenarios.
         boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s',(ja.JOURNAL,))
@@ -182,7 +187,7 @@ def exercise(w, recovery, tmp_path):
         assert sum(p=='/resume' for _,p,_ in api.writes)<=1
         assert history()==original_history
     # A changed live prerequisite between durable intent and dispatch refuses.
-    for changed in ('stop','configuration','environment'):
+    for changed in (() if os.environ.get('S4_STOP15_FULL_RUN') else ('stop','configuration','environment')):
         boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s',(ja.JOURNAL,))
         api=Provider()
         ctl=boot.execute("SELECT outcome::jsonb FROM ingestion_work_items WHERE key=repeat('0',64)").fetchone()[0]
@@ -200,7 +205,7 @@ def exercise(w, recovery, tmp_path):
         assert history()==original_history
     # Provider completion can outlive a browser/driver instance. A fresh driver
     # observes the existing deployment, never dispatches another resume/build.
-    for terminal in ('live','build_failed'):
+    for terminal in (() if os.environ.get('S4_STOP15_FULL_RUN') else ('live','build_failed')):
         boot.execute('DELETE FROM ingestion_run_evidence WHERE period=%s',(ja.JOURNAL,))
         api=Provider()
         original_call=api.call
@@ -228,11 +233,13 @@ def exercise(w, recovery, tmp_path):
         journal_source=owner_sql(),api_factory=lambda:api,revision=revision,
         checkpoint=checkpoint,baseline=baseline)['status']=='STOPPED_BUILD_READY'
     driver=new(api)
-    writes=len(api.writes);assert new(api).prepare()['status']=='STOPPED_BUILD_READY'
+    writes=len(api.writes)
+    if not os.environ.get('S4_STOP15_FULL_RUN'):assert new(api).prepare()['status']=='STOPPED_BUILD_READY'
+    else:assert driver.state['status']=='STOPPED_BUILD_READY'  # no redundant checkpoint on partial-state fixture
     assert len(api.writes)==writes and sum(p=='/resume' for _,p,_ in api.writes)==1
     assert driver.journal.ordinal<47 and history()==original_history
     assert boot.execute("SELECT pg_has_role('postgres','ingestion_storage_owner','USAGE'),pg_has_role('postgres','ingestion_storage_owner','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()==(False,False,False)
-    return dict(boundaries=len(boundaries),drift_refusals=3,old_ordinal=55,normal_last_ordinal=47,
+    return dict(boundaries=len(boundaries),drift_refusals=0 if os.environ.get('S4_STOP15_FULL_RUN') else 3,old_ordinal=55,normal_last_ordinal=47,
                 recovery_readback=prep.recover_and_install(db,recovery=recovery,binding=w['binding'],journal_source=owner_sql()),
                 recovery_commits=db.commits,provider_submissions=0,deployment_submissions=1,
                 provider_fixture=dict(service=api.service,environment=api.env,deployment='dep-synthetic'),

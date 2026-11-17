@@ -9,6 +9,21 @@ from psycopg import sql
 from tests.e2e_pg_world import settings
 from tests.test_release_candidate_pg import exercise_conditional_runtime
 
+continuation=None
+if os.environ.get('S4_STOP15_OWNER_ROOT'):
+    import importlib.util
+    root=Path(os.environ['S4_STOP15_OWNER_ROOT'])
+    name='_stop15_corrected_owner'
+    spec=importlib.util.spec_from_file_location(name,root/'verification/ingestion_storage/__init__.py',submodule_search_locations=[str(root/'verification/ingestion_storage')])
+    pkg=importlib.util.module_from_spec(spec);sys.modules[name]=pkg;spec.loader.exec_module(pkg)
+    from importlib import import_module
+    continuation=import_module(name+'.tameside_stop15')
+    spec=importlib.util.spec_from_file_location('tests.stop15_actual_sequence',root/'tests/test_release_candidate_pg.py')
+    seq=importlib.util.module_from_spec(spec);spec.loader.exec_module(seq)
+    seq.candidate=import_module(name+'.release_candidate')
+    exercise_conditional_runtime=seq.exercise_conditional_runtime
+
+
 
 def main():
     state=json.load(sys.stdin)
@@ -28,10 +43,11 @@ def main():
         import copy,time
         from urllib.parse import unquote,urlparse
         from verification.ingestion_storage import tameside_owner_access
+        if continuation:tameside_owner_access=import_module('_stop15_corrected_owner.tameside_owner_access')
         source=Path(tameside_owner_access.__file__).read_text()
         assert source.count("==policy['route']=='POOLER'")==1
         source=source.replace("==policy['route']=='POOLER'","==policy['route']=='DISPOSABLE'")
-        scope={'__package__':'verification.ingestion_storage'}
+        scope={'__package__':tameside_owner_access.__package__}
         exec(compile(source,'disposable-owner-access.py','exec'),scope)
         access={}
         def activate(policy,manifest):
@@ -172,10 +188,15 @@ def main():
             assert access['provider'].env==state['preparation']['provider_fixture']['environment']
             assert access['provider'].service==state['preparation']['provider_fixture']['service']
         w=dict(boot=boot,connect=connect,actor=actor,urls=state['urls'],activate_restricted_fixture=activate,close_restricted_fixture=close,install_journal_fixture=install_journal)
+        if os.environ.get('S4_STOP15_FULL_RUN'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('stop15_actual_runner',Path(os.environ['S4_STOP15_OWNER_ROOT'])/'tests/stop15_actual_runner.py')
+            proof=importlib.util.module_from_spec(spec);spec.loader.exec_module(proof)
+            w['run_stop15']=lambda manifest:proof.exercise(w,state,manifest,Path(sys.argv[1]))
         target=Path(sys.argv[1]);target.mkdir(exist_ok=True)
         try:
             with pytest.MonkeyPatch.context() as monkeypatch:
-                result=exercise_conditional_runtime(w,target,monkeypatch,recovered=True)
+                result=exercise_conditional_runtime(w,target,monkeypatch,recovered=True,continuation=continuation)
         finally:
             for role,cap in [('ingestion_worker_login','ingestion_worker'),('ingestion_effect_login','ingestion_effect_broker')]:
                 boot.execute(sql.SQL('ALTER ROLE {} NOLOGIN').format(sql.Identifier(role)))
