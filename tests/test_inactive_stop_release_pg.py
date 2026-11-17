@@ -697,3 +697,66 @@ def test_v13_reusable_inactive_campaign_sql_pg17_refuses_without_side_effect(iso
                                            policy=dict(mode="CAMPAIGN_FINITE_HISTORICAL_V1"))),))
         assert _control(w) == before
     assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
+
+
+
+def test_v13_stable_campaign_sql_pg17_withheld_non_superuser_call(isolated_world):
+    """One stable emitted function across windows; refusal via a real PG login.
+
+    Disposable only. Unlike the earlier per-batch cloned SQL proof, this SQL
+    body contains no Tameside/Manchester week literal. It is not an installer,
+    owner registration, release-enabled runtime or evidence of production ACL.
+    """
+    from tests.e2e_pg_world import settings
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
+        prepare_inactive_campaign_owner_batch,
+    )
+    from datetime import datetime, timezone
+    w=isolated_world
+    boot=w["boot"]
+    before=_control(w)
+    stable=render_inactive_stable_campaign_issuer()
+    batch=prepare_inactive_campaign_owner_batch(
+        datetime(2026,11,16,20,tzinfo=timezone.utc),
+        "tameside","2026-09-15","2026-09-21")
+    assert batch["manifest_status"]=="WITHHELD"
+    assert batch["period"].startswith("S4_FINITE_")
+    # The stopped fixture has NOT been released. Creation is fixture-only.
+    boot.execute(stable)
+    name="public."+CAMPAIGN_FUNCTION+"(jsonb)"
+    assert boot.execute("SELECT pg_get_userbyid(proowner),prosecdef "
+                        "FROM pg_proc WHERE oid=%s::regprocedure",
+                        (name,)).fetchone()==("provisioning_bootstrap",True)
+    _,info,_,_=settings()
+    password=secrets.token_urlsafe(40)
+    boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
+                         "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
+                             sql.Literal(password)))
+    boot.execute("GRANT EXECUTE ON FUNCTION "+name+" TO postgres")
+    try:
+        with psycopg.connect(**{**info,"user":"postgres","password":password},
+                             autocommit=True,prepare_threshold=None) as c:
+            actual=c.execute("SELECT current_user,session_user,rolsuper "
+                             "FROM pg_roles WHERE rolname=current_user").fetchone()
+            assert actual==("postgres","postgres",False)
+            assert c.execute("SELECT has_function_privilege("
+                             "'ingestion_worker_login',%s,'EXECUTE')",
+                             (name,)).fetchone()[0] is False
+            with pytest.raises(Exception,match="CAMPAIGN_STABLE_NO_LEGACY_OPERATION"):
+                c.execute("SELECT public."+CAMPAIGN_FUNCTION+"(%s::jsonb)",
+                          (json.dumps(dict(operation="bolton_exception",
+                                           period=batch["period"])),))
+            # Real PostgreSQL function execution, but still STOP and WITHHELD;
+            # no registration/source permission can be produced.
+            with pytest.raises(Exception,match="CAMPAIGN_STABLE_SCOPE_OR_STOP"):
+                c.execute("SELECT public."+CAMPAIGN_FUNCTION+"(%s::jsonb)",
+                          (json.dumps(dict(operation="intake_period",
+                                           period=batch["period"],
+                                           policy=dict(mode=batch["mode"]))),))
+        assert _control(w)==before
+        assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
+    finally:
+        boot.execute("REVOKE EXECUTE ON FUNCTION "+name+" FROM postgres")
+        boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
+                     "NOBYPASSRLS PASSWORD NULL")
