@@ -84,3 +84,51 @@ def render_inactive_writer_install(source: str) -> str:
     if rendered.count("\nCOMMIT;\n") != 1 or rendered.count("GRANT ingestion_storage_owner TO postgres") != 1:
         raise ValueError("OWNER_WRITER_RENDER_BOUNDARY")
     return rendered
+
+# PA-D004 v1.3: reuse the EXACT existing inactive owner transaction lifecycle
+# to prove one static historical issuer can be installed and rolled back by a
+# non-superuser owner in a disposable database. This intentionally does not
+# register a period, release a STOP, install into production, or enable runtime.
+def render_inactive_stable_campaign_owner_install() -> str:
+    """Pure one-shot, INACTIVE owner SQL artifact; not a deployment command.
+
+    Reuses the existing source-pinned writer PRELUDE/EPILOGUE with its exact
+    admin-only capability acquisition/restoration and owner identity checks.
+    The SQL body is the single stable campaign issuer, which ALWAYS raises
+    CAMPAIGN_STABLE_MANIFEST_WITHHELD even after successful installation.
+    A separately approved owner release and production role/ACL observation
+    are required before any real source execution.
+    """
+    from .inactive_tameside_first_issuer import (
+        CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
+    )
+    stable = render_inactive_stable_campaign_issuer()
+    name = "public." + CAMPAIGN_FUNCTION + "(jsonb)"
+    if (stable.count("CREATE OR REPLACE FUNCTION public." +
+                     CAMPAIGN_FUNCTION + "(") != 1
+            or stable.count("CAMPAIGN_STABLE_MANIFEST_WITHHELD") != 1
+            or "REVOKE ALL ON FUNCTION " + name + " FROM PUBLIC;" not in stable
+            or "GRANT EXECUTE" in stable
+            or "ingestion_register_disposable_catchup" in stable):
+        raise ValueError("OWNER_CAMPAIGN_STABLE_SOURCE_DRIFT")
+    # Refuse replay/replacement of an existing installed function, even in a
+    # disposable fixture. No time-dependent window-specific SQL is installed.
+    one_shot = (
+        "DO $campaign_owner_one_shot$ BEGIN\n"
+        " IF to_regprocedure('" + name + "') IS NOT NULL THEN\n"
+        "  RAISE EXCEPTION 'OWNER_CAMPAIGN_ALREADY_INSTALLED' USING ERRCODE='42501';\n"
+        " END IF;\n"
+        "END $campaign_owner_one_shot$;\n"
+    )
+    result = (PRELUDE + one_shot
+              + "SET LOCAL ROLE ingestion_storage_owner;\n"
+              + stable
+              + "RESET ROLE;\n" + EPILOGUE)
+    if (result.count("\nCOMMIT;\n") != 1
+            or result.count("\nBEGIN;\n") != 0
+            or result.count("GRANT ingestion_storage_owner TO postgres") != 1
+            or result.count("REVOKE ingestion_storage_owner FROM postgres") != 1
+            or result.count("SET LOCAL ROLE ingestion_storage_owner;") != 1
+            or result.count("RESET ROLE;") != 1):
+        raise ValueError("OWNER_CAMPAIGN_INSTALL_BOUNDARY_DRIFT")
+    return result
