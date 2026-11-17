@@ -28,6 +28,11 @@ from .intake_budget import IntakeRun,LIMITS
 # commit, with matching installed STOP-CAS writer, role and source binding.
 LIVE_PRIVATE_EVIDENCE_RELEASE = False
 
+# Independent code-sealed historical issuer gate. This remains FALSE even if
+# private evidence is separately released: PA-D004 campaign rollout requires
+# its own exact owner/reviewer operational decision and reviewed code change.
+LIVE_HISTORICAL_CAMPAIGN_RELEASE = False
+
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
              'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
@@ -126,6 +131,38 @@ def review_inactive_campaign_runtime_batch(
 
 
 
+def selected_historical_campaign_rows(policy, period, as_of):
+    """Recompute ONE owner-sealed finite source window; no grant/source access.
+
+    The campaign's execution day is frozen by the registered source-plan
+    digest; a later-day mismatch REFUSES rather than silently widening dates.
+    """
+    from .inactive_tameside_first_issuer import (
+        CAMPAIGN_MODE, prepare_inactive_campaign_owner_batch,
+    )
+    if type(policy) is not dict or policy.get('mode') != CAMPAIGN_MODE:
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_MODE')
+    batch = policy.get('campaign_batch')
+    if type(batch) is not dict or set(batch) != {'council','start','end','semantics'}:
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_SCOPE')
+    try:
+        expected = prepare_inactive_campaign_owner_batch(
+            as_of, batch['council'], batch['start'], batch['end'])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_SCOPE') from None
+    if (period != expected['period']
+            or batch != expected['campaign_batch']
+            or policy.get('campaign_source_plan_sha256') !=
+            expected['campaign_source_plan_sha256']
+            or type(policy.get('councils')) is not dict
+            or set(policy['councils']) != {batch['council']}
+            or type(policy.get('max_runs')) is not int
+            or policy['max_runs'] != 1
+            or binding_for(batch['council']).semantics != batch['semantics']):
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_BINDING')
+    return [dict(batch)]
+
+
 class Runtime:
     def __init__(self,args):
         self.args=args;self.root=Path(args.output);self.run_id=__import__('uuid').uuid4().hex
@@ -200,10 +237,16 @@ class Runtime:
             if not self.test or self.route_name!='DISPOSABLE':
                 raise Denied('INTAKE_CATCHUP_DISPOSABLE_BINDING')
             return 'public.ingestion_register_disposable_catchup'
+        if mode=='CAMPAIGN_FINITE_HISTORICAL_V1':
+            # This is the production-intended function NAME, but the code
+            # gate is FALSE and its stable SQL body is permanently WITHHELD.
+            # No disposable SQL substitution or rolling-issuer fallback.
+            if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
+                    or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
+                    or self.test or self.route_name not in ('POOLER','DIRECT')):
+                raise Denied('INTAKE_MODE_NOT_RELEASED')
+            return 'public.ingestion_register_campaign_once'
         if mode is not None:
-            # PA-D004 v1.3: an inactive historical/campaign policy MUST NOT
-            # silently fall back to the ordinary rolling SQL issuer. Owner
-            # registration and production release remain separately withheld.
             raise Denied('INTAKE_MODE_NOT_RELEASED')
         return 'public.ingestion_register_bolton_exception'
 
@@ -564,11 +607,20 @@ class Runtime:
                 self.run.check=monitored_check
             councils=sorted(self.policy['councils'],key=lambda c:(binding_for(c).family=='arcus',c))
             mode=self.policy.get('mode')
-            if mode not in (None,'DISPOSABLE_SHUTDOWN_GAP_V1'):
-                # Fail BEFORE source selection when an unreviewed campaign mode
-                # appears, even if a stored period is otherwise well formed.
+            if mode not in (None,'DISPOSABLE_SHUTDOWN_GAP_V1',
+                            'CAMPAIGN_FINITE_HISTORICAL_V1'):
                 raise Denied('INTAKE_MODE_NOT_RELEASED')
-            if mode=='DISPOSABLE_SHUTDOWN_GAP_V1':
+            if mode=='CAMPAIGN_FINITE_HISTORICAL_V1':
+                # Exact production-intended source binding, still inert until
+                # BOTH independent code-sealed release gates are reviewed.
+                # Never borrow the disposable historical issuer.
+                if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
+                        or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
+                        or self.test or self.route_name not in ('POOLER','DIRECT')):
+                    raise Denied('INTAKE_MODE_NOT_RELEASED')
+                rows=selected_historical_campaign_rows(
+                    self.policy,self.args.period,datetime.now(timezone.utc))
+            elif mode=='DISPOSABLE_SHUTDOWN_GAP_V1':
                 from zoneinfo import ZoneInfo
                 scope=self.policy['catchup_scope']
                 today=datetime.now(timezone.utc).astimezone(ZoneInfo('Europe/London')).date()
