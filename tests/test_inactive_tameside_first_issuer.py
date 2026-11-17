@@ -108,3 +108,55 @@ def test_configurable_candidate_detects_changed_base_policy(monkeypatch):
     monkeypatch.setattr(candidate, "_policy_source_bytes", lambda: b"unreviewed")
     with pytest.raises(ValueError, match="TAMESIDE_FIRST_POLICY_SOURCE_DRIFT"):
         _candidate("tameside", "2026-09-15", "2026-09-21")
+
+
+def test_single_stable_inactive_issuer_body_shared_by_multiple_weeks():
+    """Owner payloads vary; installed SQL must NOT be cloned per week/council."""
+    import hashlib
+    stable=candidate.render_inactive_stable_campaign_issuer()
+    assert stable.count("CREATE OR REPLACE FUNCTION public."
+                        + candidate.CAMPAIGN_FUNCTION + "(")==1
+    assert "CAMPAIGN_STABLE_MANIFEST_WITHHELD" in stable
+    assert "CAMPAIGN_STABLE_OWNER_BATCH_INVALID" in stable
+    assert "CAMPAIGN_STABLE_CAPTURE_INVALID" in stable
+    assert "CAMPAIGN_STABLE_NO_LEGACY_OPERATION" in stable
+    assert "FROM PUBLIC;" in stable and "GRANT EXECUTE" not in stable
+    assert "2026-09-15" in stable  # fixed campaign fallback, not per-week SQL
+    assert "2026-09-21" not in stable
+    assert "OR item->'subject'->>'end' IS DISTINCT FROM" in stable
+    assert "ctl->'intake_periods'->a->'campaign_batch'" in stable
+    assert candidate.CAMPAIGN_FUNCTION not in intake_policy.installation_script()
+    assert candidate.CAMPAIGN_FUNCTION not in intake_policy.policy_sql()
+    first=candidate.prepare_inactive_campaign_owner_batch(
+        datetime(2026,11,16,20,tzinfo=timezone.utc),
+        "tameside","2026-09-15","2026-09-21")
+    second=candidate.prepare_inactive_campaign_owner_batch(
+        datetime(2026,11,16,20,tzinfo=timezone.utc),
+        "manchester","2026-09-22","2026-09-28")
+    sha=hashlib.sha256(stable.encode()).hexdigest()
+    assert first["stable_issuer_sha256"]==second["stable_issuer_sha256"]==sha
+    assert first["period"]!=second["period"]
+    assert first["campaign_batch"]["semantics"]=="RECEIVED"
+    assert second["campaign_batch"]["semantics"]=="VALIDATED"
+    assert all(x["manifest_status"]=="WITHHELD"
+               and x["max_runs"]==1 and x["expected_generation"]==16
+               and not x["registered"] and not x["installed"]
+               and not x["live_collection_authorised"]
+               for x in (first,second))
+
+
+@pytest.mark.parametrize("council,start,end,error",[
+    ("trafford","2026-09-15","2026-09-21","TRAFFORD_SOURCE_NOT_QUALIFIED"),
+    ("tameside","2026-09-15","2026-09-22","TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
+    ("tameside","2026-11-16","2026-11-16","CAMPAIGN_STABLE_INCOMPLETE_DAY"),
+])
+def test_stable_owner_preview_refuses_unqualified_or_partial(council,start,end,error):
+    with pytest.raises(ValueError,match=error):
+        candidate.prepare_inactive_campaign_owner_batch(
+            datetime(2026,11,16,20,tzinfo=timezone.utc),council,start,end)
+
+
+def test_stable_issuer_does_not_tolerate_changed_pinned_policy(monkeypatch):
+    monkeypatch.setattr(candidate,"_policy_source_bytes",lambda:b"changed")
+    with pytest.raises(ValueError,match="CAMPAIGN_STABLE_POLICY_SOURCE_DRIFT"):
+        candidate.render_inactive_stable_campaign_issuer()
