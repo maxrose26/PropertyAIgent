@@ -106,6 +106,38 @@ def test_production_intended_historical_owner_and_runtime_are_code_sealed_off():
         runtime.intake_issuer()
 
 
+def test_campaign_owner_refuses_disposable_session_masquerading_as_postgres(
+        world, monkeypatch):
+    """Focused disposable-PG proof of the *actual session* owner gate.
+
+    For this negative test ONLY, change the two local Python booleans; the
+    connection is still the existing disposable migrator, not production.
+    A forged Owner.identity='postgres' must not reach a role grant, registration
+    or worker/source activity. This is not release permission or an SQL install.
+    """
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    from verification.ingestion_storage.operational_publication import Uncertain
+    from tests.test_inactive_tameside_first_issuer import (
+        _inactive_owner_policy_fixture,
+    )
+    reset(world)
+    prior = snapshot(world['boot'])
+    as_of, period, policy, _, binding = _inactive_owner_policy_fixture()
+    monkeypatch.setattr(runtime, 'LIVE_HISTORICAL_CAMPAIGN_RELEASE', True)
+    monkeypatch.setattr(runtime, 'LIVE_PRIVATE_EVIDENCE_RELEASE', True)
+    owner = Owner(
+        lambda: world['connect']('provisioning_migrator'),
+        lambda *_: None, lambda: None, identity='postgres',
+        expiry=as_of+timedelta(hours=1), bindings=binding,
+    )
+    with pytest.raises(Uncertain, match='CAMPAIGN_OWNER_ACTUAL_SESSION_IDENTITY'):
+        owner.register_historical_campaign_period(
+            period, policy, as_of=as_of)
+    assert owner.connections == 1
+    assert owner.effect_uncertain is False
+    assert snapshot(world['boot']) == prior
+
+
 @pytest.mark.parametrize('mutation', [
     'period', 'council', 'semantics', 'source_plan', 'two_councils',
     'max_runs', 'mode',
