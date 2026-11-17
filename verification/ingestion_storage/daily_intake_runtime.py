@@ -228,6 +228,38 @@ class Runtime:
         if (not row.policy or row.policy['test_evidence'] is not self.test or row.policy.get('route')!=self.route_name or row.policy.get('hostaddr')!=self.args.hostaddr or not read_only and
             (row.policy['execution_binding']!=self.binding or row.policy['expected_stop']!=row.stop or row.policy['expires_at']<=time.time())):
             raise Denied('INTAKE_PERIOD_BINDING_OR_STOP')
+        if row.policy.get('mode')=='CAMPAIGN_FINITE_HISTORICAL_V1' and not read_only:
+            # A production historical worker must see the EXACT reviewed
+            # installed stable function, restrictive ACL and no owner role
+            # membership before it may create SOURCE_INTENT. This is read-only
+            # and permanently unreachable while either code gate is FALSE.
+            if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
+                    or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
+                    or self.test or self.route_name not in ('POOLER','DIRECT')):
+                raise Denied('INTAKE_MODE_NOT_RELEASED')
+            from .inactive_tameside_first_issuer import (
+                CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
+            )
+            stable=render_inactive_stable_campaign_issuer()
+            snippets=[m[3] for m in Owner.FUNCTION_PATTERN.finditer(stable)
+                      if m[1]==CAMPAIGN_FUNCTION]
+            if len(snippets)!=1:
+                raise Denied('INTAKE_CAMPAIGN_STABLE_INVENTORY')
+            expected_sha=hashlib.sha256(snippets[0].encode()).hexdigest()
+            observed=c.execute(text(
+                "SELECT current_database(),"
+                "encode(sha256(convert_to(p.prosrc,'UTF8')),'hex'),"
+                "pg_get_userbyid(p.proowner),p.prosecdef,p.proconfig,"
+                "pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE'),"
+                "pg_catalog.pg_has_role(current_user,'ingestion_storage_owner','MEMBER') "
+                "FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n "
+                "ON n.oid=p.pronamespace WHERE n.nspname='public' "
+                "AND p.proname='ingestion_register_campaign_once'"
+            )).all()
+            if [tuple(r) for r in observed]!=[
+                    ('postgres',expected_sha,'ingestion_storage_owner',True,
+                     ['search_path=pg_catalog'],True,False)]:
+                raise Denied('INTAKE_CAMPAIGN_INSTALLED_SQL_OR_ACL_DRIFT')
         self.durable_run=row.intake_run
         return row.policy
 
