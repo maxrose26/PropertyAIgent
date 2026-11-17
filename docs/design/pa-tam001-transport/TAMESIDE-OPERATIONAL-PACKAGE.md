@@ -1,9 +1,14 @@
-# PA-TAM002 v1.2 — one inactive recovery/release/Tameside package
+# PA-TAM002 v1.3 — stopped preparation ordering correction
 
-17 November 2026. **Stage 4 OPEN. Prepared for independent REVIEW; not authority
-for execution.** Current gate: independent acceptance of this DNS-only delta. Next gate:
-owner acceptance of the exact pin amendment to the already-approved operation. Source revision: 8b5f4e2e843ec42de37fce5a3827e0de475ba24a;
-source tree: aa9fee6b9d7fbe09dea42c5bb033d25d03d8a0a9. The documentation commit is not the enabled build.
+17 November 2026. **Stage 4 OPEN. Inactive pending independent REVIEW and acceptance of the changed executable.** Current gate: resolve checkpoint/deployment ordering. Source revision and hashes are in `artifact-pins.json`; its documentation commit is not the executable. The existing owner authority is retained, but the amended order must not be applied under the old pin.
+
+## v1.3 correction and recovery implications
+
+[STOPPED-PREPARATION.md](STOPPED-PREPARATION.md) specifies the actual entry point, ordered procedure, interruption handling and connected proof. Exact Bolton recovery and independent STOP15 readback now precede installation of the existing operation namespace; only then can candidate deployment begin. No STOP14 namespace admission, old-history rewrite, allowance increase or cleanup-reserve consumption is used to escape the dependency. The existing recovery inspector remains the independent recovery path before the new namespace exists. After installation, its journal inventory expectation changes only to the exact source-derived installed body; all other checks remain.
+
+The build command invokes the present `verification.ingestion_storage.tameside_build_receipt` module. The immutable `pa-tam002/<executable SHA>` ref must be published and independently resolved to that exact build before production progression. Deployment uses the original resume/build route with a harmless default command and filtered environment, not a collection job.
+
+Earlier v1.2 evidence below remains historical unchanged-path evidence, not acceptance of this ordering delta.
 
 ## DNS-only pin amendment — v1.2, preparation only
 
@@ -80,7 +85,7 @@ neither the shutdown-gap campaign nor Stage 4 completion.
 
 ## Exact pins and finite values
 
-The build is 8b5f4e2e843ec42de37fce5a3827e0de475ba24a. `artifact-pins.json` lists the source hashes and
+The exact amended build is in `artifact-pins.json`. `artifact-pins.json` lists the source hashes and
 execution binding; #213 owner adapter remains
 `f027ba28af69ae70208eab5ed047e4a8a81c6337`. Guarded Bolton recovery source is
 `5bd306a86bc8b273d3bd0d778e7fc7803e737d7a589828f9f0405bc844a18d4a`.
@@ -154,8 +159,7 @@ STOP15, unused namespace and temporary schema/owner restoration; duplicate
 installation refuses. Existing journal loading reads the old state only under
 the future combined operational authority; it does not rerun the v1.5 launcher.
 
-Use `fresh(pinned_owner_module, db)` for the new namespace and the same encrypted
-Journal callback. Retain original checkpoint reference, private original Render
+Use `prepare_stopped` to create the new namespace checkpoint once and then reuse the same encrypted Journal callback; never call fresh() again after preparation. Retain original checkpoint reference, private original Render
 environment and stable credential data needed for restoration; do not copy all
 old phase history or any old pending intents. Validate actual encrypted capacity
 before effects, with the existing cleanup-reserve policy and sixteen reserved
@@ -174,26 +178,8 @@ is repeated. Missing state is UNKNOWN; fresh() refuses a used namespace.
    address, credential verifiers, database/interface permissions and encrypted
    capacity. Check original service/environment and no inherited secret sources.
    Do not mutate if schema/barrier/role capability or cleanup prerequisites fail.
-   Build the exact candidate on the existing suspended restricted service only,
-   keeping autoDeploy=no and harmless default command; independently verify its
-   deployed revision and restore/check the bound service digest. No source job.
-2. **Exact Bolton recovery.** Existing `bolton_recovery_guard.recover(c,binding,
-   pinned_module=bolton01_settlement)` retains #213's locks and strengthens the
-   unrelated CLAIMED predicate. Preserve key
-   `d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252`, run
-   `ee7cf0d9bc714f56951527b940937054`, original marker
-   `1cc12dd9115573308aaaed83676c04260750aab9a8c4d8ad0694a9731cae1f02`.
-   Separate `inspect` must prove committed recovery and STOP15. Unknown COMMIT
-   acknowledgement: inspect, never repeat recovery. Mismatch stops here.
-3. **Stopped installation and exact manifest.** Apply the six exact dispositions
-   using `render_dispositions`; install the pinned private writer transaction.
-   Separately read/seal the seven actual post-recovery/disposition hashes and
-   controller snapshot. Freeze bound_at; compile the package once. Under STOP15
-   install the new journal namespace and policy-bound campaign function using
-   their owner transactions. Read back bodies/owners/search_path/ACLs and original
-   owner/barrier/schema privileges. Create and independently load the new encrypted
-   operation checkpoint. Any failed transaction rolls back; unknown commit is
-   reconciled through installed state before considering any further action.
+2. **Exact Bolton recovery first.** Call the corrected `prepare_stopped` entry point with the frozen recovery module and retained verified binding. Its guarded recovery retains table/controller locks and the strengthened unrelated CLAIMED refusal. The exact original key/run/marker and all historical uncertainty are unchanged. Independent inspection must establish STOP15; a lost COMMIT reply is read back, never repeated.
+3. **Journal, checkpoint, deployment, then remaining stopped installation.** The same entry point installs the existing single-namespace extension under STOP15, verifies body and restored permissions independently, saves and independently decrypts the original restoration state and deployment intent before each provider mutation. It builds the exact candidate once, verifies deployment identity, resuspends and restores original configuration/environment. Only STOPPED_BUILD_READY permits continuation. Apply historical dispositions and the pinned writer transaction; independently read/seal the post-recovery hashes and controller. Freeze bound_at and compile once. Install the policy-bound campaign function while stopped; **do not repeat journal installation or call fresh() on the now-used namespace**. Continue the same encrypted state and preserve its intent history and cleanup reserve. Unknown transaction acknowledgement is reconciled through installed state before progression.
 4. **Conditional release.** Execute the package's exact release SQL once. It
    locks/rechecks all observed hashes, unresolved work, expiry and STOP15. Separate
    readback must establish STOP16, matching manifest, both stops cleared and
@@ -270,14 +256,9 @@ recovery/readback/issuer evidence is reused where unchanged. Prior v1.1 source d
 review must assess these new adapters and journal delta, not inherit an earlier
 component acceptance automatically.
 
-## One proposed pin amendment, after independent delta REVIEW
+## One proposed ordering/pin amendment, after independent delta REVIEW
 
-**PA-TAM002 v1.2 — recommend approval only after exact-head REVIEW accepts this
-package and required checks.** The owner has already approved the finite sequence below at v1.1. The requested v1.2 amendment replaces only the executable/package pins and DNS selection binding, retaining that same authority:
-existing-service candidate deployment while stopped; exact Bolton recovery and
-historical dispositions; stopped writer/campaign/journal installation; mechanical
-manifest/policy binding and conditional STOP release; temporary existing restricted
-access; one Tameside week; independent outcome/cleanup readbacks and restoration.
+**PA-TAM002 v1.3 — recommend acceptance only after exact-head REVIEW.** Replace the executable/package pins with the artifact index and accept this explicit order: exact Bolton recovery under STOP14 → independent STOP15 readback → existing journal namespace installation → encrypted durable deployment checkpoint → candidate deployment/restoration → remaining stopped writer/disposition/campaign installation → deterministic manifest/policy → conditional STOP16 release → restricted access → one Tameside week → independent outcomes/cleanup/restoration. All other operational authority and exclusions remain unchanged. No per-phase approvals are proposed.
 
 Main trade-off: this starts delivering verified retained/screened data now but
 still may yield incomplete coverage or no qualifying scheme. The alternative is
@@ -288,7 +269,7 @@ closure. No approval is requested before independent REVIEW is complete.
 
 ## Expiry check
 
-Checked **17 November 2026 19:32 London**: 24h28m remains to the fixed expiry, and 23h53m to the latest binding time. This is practical for review and approval now, but must be checked again at execution. Latest permitted bound_at is **18 November 2026 19:25 London**
+Checked **17 November 2026 20:56 London**: 23h03m remains to the fixed expiry. Recheck before execution and require enough time for every remaining phase. Latest permitted bound_at is **18 November 2026 19:25 London**
 (20:00 minus 2100s). Preflight/build preparation must also fit. This is not a
 scheduled dispatch. An expired/insufficient window refuses; a later expiry
 requires a revised owner decision, never an automatic extension.

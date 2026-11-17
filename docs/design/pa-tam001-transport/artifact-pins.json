@@ -1,23 +1,31 @@
 {
   "decision_id": "PA-TAM002",
   "execution_binding": {
-    "manifest_sha256": "24fa319f7ba91c683917c3bbe78c0a9e62f676354b2978e230541f35c31743ce",
-    "revision": "8b5f4e2e843ec42de37fce5a3827e0de475ba24a",
-    "workflow_sha256": "c5ae5b0cf77b162fb57e9af6d54251b23ba9c9d76c63eb5269a3b5bdd9776524"
+    "manifest_sha256": "ee67f574cf8c55d560900b9ffda8bdb95c377a972645a41084b33b35d5d7d7f2",
+    "revision": "0f751613f1479e1088d820b8f809f267466071e9",
+    "workflow_sha256": "ab766bfe702448220b2d4d13ce7af266db8c3d9ef45c5a2d255f61bdea765b48"
   },
   "expiry_ceiling": "2026-11-18T20:00:00+00:00",
   "files": {
     ".github/workflows/stage4-discovery-offline.yml": {
       "bytes": 54308,
-      "sha256": "c5ae5b0cf77b162fb57e9af6d54251b23ba9c9d76c63eb5269a3b5bdd9776524"
+      "sha256": "ab766bfe702448220b2d4d13ce7af266db8c3d9ef45c5a2d255f61bdea765b48"
     },
     "docs/design/pa-tam001-transport/release-proposal.json": {
       "bytes": 2152,
       "sha256": "b76a85f17bac08326de0877807ba646b52734d4fdbe1bb417d30020f069859c9"
     },
     "tests/candidate_recovery_continuation.py": {
-      "bytes": 11601,
-      "sha256": "0adf4f9f761f9a02d931b3733ea348d90582715b76054f592014aeaba61a4d21"
+      "bytes": 12213,
+      "sha256": "65ac33fe42c292abf0b697219b0dcd1f3630863d76bd79a659963991d173dc29"
+    },
+    "tests/pinned_bolton_guard_stage.py": {
+      "bytes": 4685,
+      "sha256": "1232966bcfc28bb21152f2e14d9f06ef68bdae740bb8d6d515fa82ac3a3ce5fe"
+    },
+    "tests/stopped_preparation_proof.py": {
+      "bytes": 12190,
+      "sha256": "ea03581eff2317dfc21bc08c120308643d7ca0296426300834ec66438b9abb60"
     },
     "tests/tameside_journal_proof.py": {
       "bytes": 6042,
@@ -25,7 +33,7 @@
     },
     "tests/test_release_candidate_pg.py": {
       "bytes": 25105,
-      "sha256": "98ec68d46c73260c01b1e08cd375f06fe49fd4ae04d590b20e9c8a60b73abd3f"
+      "sha256": "df625984b00e1c906205defa92db2a1eb5fad04b9a468ece6cd621bb3d6c5b43"
     },
     "tests/test_tameside_job_boundary.py": {
       "bytes": 1394,
@@ -48,8 +56,8 @@
       "sha256": "fe2b30085a0c2fa81ddcfcebb5fc6407655281c0de6e2351d25cb6413982bae5"
     },
     "verification/ingestion_storage/daily_intake_runtime.py": {
-      "bytes": 59706,
-      "sha256": "9e57e46563ed09130fd20b270f0f3c5dfe22d757a2ee8d2151897e59c4824edc"
+      "bytes": 59836,
+      "sha256": "490fd0bca256b767fb884af2e9e8a62e6a13cf3b9786be59eecbe2d2eea2aec0"
     },
     "verification/ingestion_storage/inactive_shared_stop_release_v1.sql": {
       "bytes": 18502,
@@ -62,6 +70,10 @@
     "verification/ingestion_storage/release_candidate.py": {
       "bytes": 18840,
       "sha256": "9be00fb8f9f6c9eb1936afba4ec996e1c0b45dbb616b99f323dc561b94c39d09"
+    },
+    "verification/ingestion_storage/tameside_build_receipt.py": {
+      "bytes": 254,
+      "sha256": "7d80e532d46832805b56844067a6d050a3b157b837fc3203c604c04da6e9c7b1"
     },
     "verification/ingestion_storage/tameside_candidate.py": {
       "bytes": 4598,
@@ -76,12 +88,16 @@
       "sha256": "e1adfa1979b69a217de42bf07067b40f2102459b670cfffd91bc72b6037a2ba4"
     },
     "verification/ingestion_storage/tameside_owner_journal.py": {
-      "bytes": 4589,
-      "sha256": "1ed75e2c31c9e2f705afb4877c299b9488de5d2b6d2240546dccafb272c0885a"
+      "bytes": 4623,
+      "sha256": "2d4c8347f76337156ec1c05649d4d6ba92bc40763a11fea4cfc18c568ebb77ce"
     },
     "verification/ingestion_storage/tameside_package.py": {
       "bytes": 5503,
       "sha256": "a57e4a5e7429ae6c0c2f18d82a5cadf538da8c2354ca865c7a0c40f61d3d3e3d"
+    },
+    "verification/ingestion_storage/tameside_preparation.py": {
+      "bytes": 21487,
+      "sha256": "b4b08ae14f8617a24f92f9a419aff9f8f6b188c137efe4f30780ed322a10d554"
     }
   },
   "latest_bound_at": "2026-11-18T19:25:00+00:00",
@@ -102,10 +118,26 @@
     "run": "416cdc40d6837dbb772e2bcce514bf39"
   },
   "owner_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
-  "proposal_version": "1.2",
-  "revision": "8b5f4e2e843ec42de37fce5a3827e0de475ba24a",
+  "preparation": {
+    "cleanup_snapshots": 16,
+    "entry_point": "tameside_preparation.prepare_stopped",
+    "immutable_build_ref": "pa-tam002/0f751613f1479e1088d820b8f809f267466071e9",
+    "old_checkpoint_ordinal": 55,
+    "old_normal_limit": 47,
+    "order": [
+      "STOP14_RECOVERY",
+      "STOP15_READBACK",
+      "STOP15_JOURNAL_INSTALL",
+      "DURABLE_CHECKPOINT",
+      "CANDIDATE_BUILD_AND_RESTORE",
+      "REMAINING_STOPPED_INSTALLATION",
+      "CONDITIONAL_STOP16_RELEASE"
+    ]
+  },
+  "proposal_version": "1.3",
+  "revision": "0f751613f1479e1088d820b8f809f267466071e9",
   "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "aa9fee6b9d7fbe09dea42c5bb033d25d03d8a0a9",
+  "tree": "a92017a3b624cc8d351956a6d83b1a99df09f899",
   "version": 1
 }
