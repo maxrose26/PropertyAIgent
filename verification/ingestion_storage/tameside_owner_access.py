@@ -148,7 +148,7 @@ def lifecycle(pinned_root, *, policy, manifest, expected_inventory=None):
 
 
 def provider_io(pinned_root,access):
-    """Reuse pinned handoff/restore; adapt only the owner binding validator."""
+    """Reuse pinned handoff/restore, with Tameside-specific HTTP-only transport."""
     import os
     from .restricted_route import url
     from .operational_publication import canonical
@@ -161,7 +161,7 @@ def provider_io(pinned_root,access):
     scope=dict(hashlib=hashlib,json=json,os=os,Path=Path,time=time,url=url,canonical=canonical,
         require=require,validate_binding=access.validate_binding,op=access,
         SERVICE='crn-d9sv93vavr4c73f98rb0',
-        KEEP={'PYTHONUNBUFFERED','PLAYWRIGHT_BROWSERS_PATH','INGESTION_RENDER_PROFILE','LANG','TZ','OPENBLAS_NUM_THREADS'})
+        KEEP={'PYTHONUNBUFFERED','LANG','TZ','OPENBLAS_NUM_THREADS'})
     names=('env_values','service_guard','operation_observation','boundary','handoff',
            'submission_check','reconcile_handoff','submission_ack_timing','restore_handoff')
     for node in ast.parse(source).body:
@@ -170,5 +170,20 @@ def provider_io(pinned_root,access):
             text=text.replace('    from . import intake_owner as op\n','')
             text=text.replace('    from .intake_owner_operations import installation_token_allowed\n','')
             text=text.replace("    require(publication_token is None if database else installation_token_allowed(publication_token), 'SELF_REVOCABLE_INSTALLATION_TOKEN_REQUIRED')", "    require(database and publication_token is None, 'PRIVATE_DATABASE_HANDOFF_ONLY')")
+            if node.name=='handoff':
+                # The frozen #213 browser guards remain unchanged for Manchester.
+                # Tameside uses the HTTP Idox source and must not inherit them.
+                browser_start="    require('PLAYWRIGHT_BROWSERS_PATH' in new, 'RENDER_PROFILE_MAPPING_REQUIRED')"
+                role_start="    for role, name in [('ingestion_worker_login', 'INGESTION_WORKER_DATABASE_URL'),"
+                if text.count(browser_start)!=1 or text.count(role_start)!=1:
+                    raise ValueError('PINNED_HTTP_HANDOFF_SOURCE_DRIFT')
+                start=text.index(browser_start)
+                end=text.index(role_start,start)
+                text=text[:start]+(
+                    "    # Reject any stale browser profile binding.\n"
+                    "    require(b.get('render_profile') is None, 'TAMESIDE_HTTP_PROFILE_NOT_PERMITTED')\n"
+                    "    require('PLAYWRIGHT_BROWSERS_PATH' not in new and\n"
+                    "            'INGESTION_RENDER_PROFILE' not in new, 'TAMESIDE_HTTP_BROWSER_ENV')\n"
+                    )+text[end:]
             exec(compile(text,str(path),'exec'),scope)
     return SimpleNamespace(**{k:scope[k] for k in names})
