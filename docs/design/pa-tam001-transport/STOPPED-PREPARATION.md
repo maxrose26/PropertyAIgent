@@ -1,9 +1,13 @@
-# PA-TAM002 v1.3: checkpoint/deployment correction
+# PA-TAM002 v1.4: archived restoration and joined preparation
 
 Stage 4 OPEN. Inactive until independent REVIEW and acceptance of the amended
-executable/order. Source: `310eaa19e396d82b4a4caca73be749a9c504e338`; tree:
-`3f994e2529e368d61fe10a368f45028e5cb74a4e`. Package pin is the documentation commit
+executable/order. Source: `9524503fa90228f31d48d16a58121c45d3eb90b8`; tree:
+`b52191eb31482ca995dc930c0c158b82e2a5316e`. Package pin is the documentation commit
 containing this file and artifact-pins.json. Existing v1.2 scope and expiry remain.
+
+The archive-compatibility correction and complete evidence map are in
+[JOINED-REHEARSAL.md](JOINED-REHEARSAL.md). Read and verify the linked archived
+baseline before recovery. No new grant is authorised if that read is unavailable.
 
 ## Choice and exact ordering delta
 
@@ -37,7 +41,7 @@ Use the corrected source checkout as cwd with the existing owner runtime, and th
 separate clean #213 checkout at f027ba28af69ae70208eab5ed047e4a8a81c6337. The existing
 short-command/receipt route may call the following entry points; it must not call
 old Pilot.run/build. Verify the candidate checkout and immutable remote ref
-`pa-tam002/310eaa19e396d82b4a4caca73be749a9c504e338` both resolve to that full SHA
+`pa-tam002/9524503fa90228f31d48d16a58121c45d3eb90b8` both resolve to that full SHA
 before effects. No moving PR branch is a deployment pin.
 
 ```python
@@ -67,7 +71,7 @@ assert environment == original['original_environment']
 state = prepare_stopped(
     db, pinned=pinned, recovery=recovery, binding=binding,
     journal_source=journal_source, api_factory=api_factory,
-    revision='310eaa19e396d82b4a4caca73be749a9c504e338',
+    revision='9524503fa90228f31d48d16a58121c45d3eb90b8',
     checkpoint={'ordinal':55, 'sha256':CHECKPOINT_SHA},
     baseline={'service':original['original_service'], 'environment':environment,
               'deploy_ids':[d['id'] for d in deployments]},
@@ -130,7 +134,13 @@ resume resubmission. A completed or uncertain invocation is not a new allowance.
 
 ## Connected validation
 
-Final local connected test: **1 passed in 57.37s**, PostgreSQL17.11. It calls the
+Current v1.4 final executable: **56 passed, no failures/errors/skips in75.412s**,
+PostgreSQL17.11. The actual joined run is included; its receipt is in
+[joined-validation.json](joined-validation.json). It uses authentic archive22→55,
+the sealed package, actual CLI and owned synthetic source, paged independent
+backlog, provider handoff/restoration and database access closure.
+
+Historical v1.3 local connected test (superseded by the v1.4 joined proof): **1 passed in 57.37s**, PostgreSQL17.11. It calls the
 actual prepare_stopped/recovery/install/encrypted Journal/owner access entry points,
 starting STOP14 with the unresolved Bolton fixture and a real 56-row old encrypted
 journal at ordinal55 (normal-write refusal proved). It exercises 19 interruption

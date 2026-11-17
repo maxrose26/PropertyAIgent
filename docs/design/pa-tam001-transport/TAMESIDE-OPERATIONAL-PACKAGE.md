@@ -1,4 +1,12 @@
-# PA-TAM002 v1.3 — stopped preparation ordering correction
+# PA-TAM002 v1.4 — joined rehearsal and archived baseline
+
+Current executable `9524503fa90228f31d48d16a58121c45d3eb90b8`; exact artifact index in `artifact-pins.json`.
+[JOINED-REHEARSAL.md](JOINED-REHEARSAL.md) identifies the demonstrated failures,
+correction, connected proof and remaining production-only uncertainties.
+The v1.3 order below is preserved with archived-baseline verification before
+recovery. Production remains inactive until the changed package is accepted.
+
+## Historical v1.3 — stopped preparation ordering correction
 
 17 November 2026. **Stage 4 OPEN. Inactive pending independent REVIEW and acceptance of the changed executable.** Current gate: resolve checkpoint/deployment ordering. Source revision and hashes are in `artifact-pins.json`; its documentation commit is not the executable. The existing owner authority is retained, but the amended order must not be applied under the old pin.
 

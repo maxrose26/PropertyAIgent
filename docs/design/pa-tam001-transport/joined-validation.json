@@ -1,0 +1,111 @@
+{
+  "errors": 0,
+  "failures": 0,
+  "hosted_evidence": {
+    "jobs": [
+      {
+        "completed_at": "2026-11-17T22:03:14Z",
+        "conclusion": "success",
+        "id": 134402490291,
+        "name": "render-a-fixture"
+      },
+      {
+        "completed_at": "2026-11-17T22:03:38Z",
+        "conclusion": "success",
+        "id": 134402490742,
+        "name": "postgres-admission"
+      },
+      {
+        "completed_at": "2026-11-17T22:03:25Z",
+        "conclusion": "success",
+        "id": 134402490743,
+        "name": "v3-admission-pg"
+      },
+      {
+        "completed_at": "2026-11-17T22:06:54Z",
+        "conclusion": "success",
+        "id": 134402490885,
+        "name": "daily-intake-pg"
+      },
+      {
+        "completed_at": "2026-11-17T22:06:00Z",
+        "conclusion": "success",
+        "id": 134402490926,
+        "name": "screening-v3-pg"
+      },
+      {
+        "completed_at": "2026-11-17T22:06:00Z",
+        "conclusion": "success",
+        "id": 134402490931,
+        "name": "e2e-connection-pg"
+      },
+      {
+        "completed_at": "2026-11-17T22:11:42Z",
+        "conclusion": "success",
+        "id": 134402490990,
+        "name": "restricted-provisioning"
+      },
+      {
+        "completed_at": "2026-11-17T22:05:54Z",
+        "conclusion": "success",
+        "id": 134402491164,
+        "name": "offline"
+      }
+    ],
+    "run_id": 44185978466,
+    "source_revision": "9524503fa90228f31d48d16a58121c45d3eb90b8"
+  },
+  "hosted_status": "ALL_EIGHT_REQUIRED_JOBS_SUCCESS",
+  "hosted_workflow": 44185978466,
+  "joined_receipt": {
+    "archive_hashes_independently_verified": true,
+    "backlog_records": 1,
+    "cleanup": "CLOSED",
+    "live_requests": 0,
+    "package_cli": "ACTUAL_CLI_DISPOSABLE_TRANSPORT_ONLY",
+    "period": "S4_FINITE_677f555670666bcf21f45860",
+    "preparation": {
+      "boundaries": 19,
+      "deployment_submissions": 1,
+      "drift_refusals": 3,
+      "live_requests": 0,
+      "normal_last_ordinal": 47,
+      "old_ordinal": 55,
+      "original_history_preserved": true,
+      "provider_submissions": 0,
+      "recovery_commits": 1,
+      "recovery_readback": {
+        "period": "b-bolton-20261103-1105-01",
+        "receipt_sha256": "0efd2f718ef55d511096bf39753616582f4db958c744ee32cec0674fb9121cc2",
+        "retry": false,
+        "run_id": "ee7cf0d9bc714f56951527b940937054",
+        "status": "COMMITTED_STATE_VERIFIED_READ_ONLY",
+        "stop": {
+          "global_stop": {
+            "reason": "DAILY_INTAKE_SHARED_FAILURE"
+          },
+          "hard_stop_generation": 15,
+          "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+          "manual_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP"
+        },
+        "transaction": "ROLLED_BACK"
+      }
+    },
+    "provider_handoff_restore": "ACTUAL_ADAPTER_SIMULATED_RENDER",
+    "screening": "COMPLETE",
+    "status": "SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED",
+    "synthetic_listing_records": 1
+  },
+  "junit_sha256": "e8138cb86861c354edb5184281cd2d952f14e7a0d00bb8b07ea7399bd0ce0571",
+  "live_council_requests": 0,
+  "postgresql": "17.11 disposable localhost",
+  "production_mutations": 0,
+  "production_queries": 0,
+  "revision": "9524503fa90228f31d48d16a58121c45d3eb90b8",
+  "seconds": 75.412,
+  "skipped": 0,
+  "status": "OFFLINE_ONLY_PASSED",
+  "tests": 56,
+  "tree": "b52191eb31482ca995dc930c0c158b82e2a5316e",
+  "version": 1
+}

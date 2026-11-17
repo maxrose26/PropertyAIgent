@@ -1,39 +1,47 @@
 {
   "decision_id": "PA-TAM002",
   "execution_binding": {
-    "manifest_sha256": "15cd25a3d2828bcd9ef122a62f0c49223770d3bb1f76a5ecabf1e8c3d258f22a",
-    "revision": "310eaa19e396d82b4a4caca73be749a9c504e338",
-    "workflow_sha256": "2c19163ed96d534eb41fe6d1ba8e556c26ee364e45d94e15e45a9559057977de"
+    "manifest_sha256": "8dfc823152b1f12edd84e1e8d8d91e134071004cbb57ed824849c40411815c7c",
+    "revision": "9524503fa90228f31d48d16a58121c45d3eb90b8",
+    "workflow_sha256": "dc12196d82577753e60682779c46f59404d501f8b45fd4de8c5f24478200ad4d"
   },
   "expiry_ceiling": "2026-11-18T20:00:00+00:00",
   "files": {
     ".github/workflows/stage4-discovery-offline.yml": {
-      "bytes": 54771,
-      "sha256": "2c19163ed96d534eb41fe6d1ba8e556c26ee364e45d94e15e45a9559057977de"
+      "bytes": 54813,
+      "sha256": "dc12196d82577753e60682779c46f59404d501f8b45fd4de8c5f24478200ad4d"
     },
     "docs/design/pa-tam001-transport/release-proposal.json": {
       "bytes": 2152,
       "sha256": "b76a85f17bac08326de0877807ba646b52734d4fdbe1bb417d30020f069859c9"
     },
     "tests/candidate_recovery_continuation.py": {
-      "bytes": 12213,
-      "sha256": "65ac33fe42c292abf0b697219b0dcd1f3630863d76bd79a659963991d173dc29"
+      "bytes": 15726,
+      "sha256": "2e2ad7551b69d87f44e42c3ffa1de1d537cf5ed6c4eb2ba7c7f1ea97b7e0879a"
     },
     "tests/pinned_bolton_guard_stage.py": {
-      "bytes": 4685,
-      "sha256": "1232966bcfc28bb21152f2e14d9f06ef68bdae740bb8d6d515fa82ac3a3ce5fe"
+      "bytes": 4831,
+      "sha256": "7d9a6713a96cf228ec7e40fc0c68e1409b395505c6a75c60138bb3b59523928f"
     },
     "tests/stopped_preparation_proof.py": {
-      "bytes": 12360,
-      "sha256": "7e8f0129ff2aeb3d0dde1afd479c155cc925d9038c238a2ebae20f1bcc6060f3"
+      "bytes": 15005,
+      "sha256": "7e07eafc6452b928d85f04f56fed5e0d7b65e94a42406db216f35c08a861cde6"
     },
     "tests/tameside_journal_proof.py": {
       "bytes": 6042,
       "sha256": "7a87524a7d4fea297f8d2b2c8f196498624774eb3499f9299bd105b360b331a0"
     },
     "tests/test_release_candidate_pg.py": {
-      "bytes": 25105,
-      "sha256": "df625984b00e1c906205defa92db2a1eb5fad04b9a468ece6cd621bb3d6c5b43"
+      "bytes": 29564,
+      "sha256": "2e7e183fbf637742e41d1d351ddc2c2b71afe3ba6647d7f9a8616488f93bb85f"
+    },
+    "tests/test_source_profiles.py": {
+      "bytes": 50053,
+      "sha256": "aa1d752b285ddb6b6c470772b4779db70bf794b3d73417d1432b83741e4f53c6"
+    },
+    "tests/test_tameside_checkpoint_archive.py": {
+      "bytes": 3855,
+      "sha256": "b5406bb3fe8b959f98d98c6309bdf8da3ef3d4c4bed98e66c12d4a0ce96b17ad"
     },
     "tests/test_tameside_job_boundary.py": {
       "bytes": 1394,
@@ -96,8 +104,8 @@
       "sha256": "a57e4a5e7429ae6c0c2f18d82a5cadf538da8c2354ca865c7a0c40f61d3d3e3d"
     },
     "verification/ingestion_storage/tameside_preparation.py": {
-      "bytes": 21538,
-      "sha256": "6b6919951fdc965f36d4a81d88a4473d872e977c8265d26810ee6f41211bf512"
+      "bytes": 24485,
+      "sha256": "141a1576e07142470ab5aaaa2e527236a0bc0576b9acce482a5fa3fa8be6ca61"
     }
   },
   "latest_bound_at": "2026-11-18T19:25:00+00:00",
@@ -118,13 +126,34 @@
     "run": "416cdc40d6837dbb772e2bcce514bf39"
   },
   "owner_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+  "package_files": {
+    "docs/design/pa-tam001-transport/JOINED-REHEARSAL.md": {
+      "bytes": 7303,
+      "sha256": "f186e79932b96b5b0a6700fa898ae001b4d719059514c204b9b34b273e8aaf27"
+    },
+    "docs/design/pa-tam001-transport/STOPPED-PREPARATION.md": {
+      "bytes": 11267,
+      "sha256": "49b1dd5b89aa0424c8847056031e01f24dba78dda615ea7a5ab7e0da6980a9b4"
+    },
+    "docs/design/pa-tam001-transport/TAMESIDE-OPERATIONAL-PACKAGE.md": {
+      "bytes": 24518,
+      "sha256": "815f30ed008525d28a1b16e771a975b905843e870d29fb4e26f663f5ba192c9f"
+    },
+    "docs/design/pa-tam001-transport/joined-validation.json": {
+      "bytes": 3381,
+      "sha256": "11bfec761bfa2b6c172d3682388c96d45713fd585eca3b0dff033ff1d8c52743"
+    }
+  },
   "preparation": {
+    "archive_ciphertext_sha256": "af2a0c7d8432c92b3a5b4339aca3b9fddafd4800c62fec7f45441ccf096393d4",
+    "archive_ordinal": 22,
     "cleanup_snapshots": 16,
     "entry_point": "tameside_preparation.prepare_stopped",
-    "immutable_build_ref": "pa-tam002/310eaa19e396d82b4a4caca73be749a9c504e338",
+    "immutable_build_ref": "pa-tam002/9524503fa90228f31d48d16a58121c45d3eb90b8",
     "old_checkpoint_ordinal": 55,
     "old_normal_limit": 47,
     "order": [
+      "VERIFY_ARCHIVED_BASELINE_READ_ONLY",
       "STOP14_RECOVERY",
       "STOP15_READBACK",
       "STOP15_JOURNAL_INSTALL",
@@ -134,10 +163,10 @@
       "CONDITIONAL_STOP16_RELEASE"
     ]
   },
-  "proposal_version": "1.3",
-  "revision": "310eaa19e396d82b4a4caca73be749a9c504e338",
+  "proposal_version": "1.4",
+  "revision": "9524503fa90228f31d48d16a58121c45d3eb90b8",
   "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "3f994e2529e368d61fe10a368f45028e5cb74a4e",
+  "tree": "b52191eb31482ca995dc930c0c158b82e2a5316e",
   "version": 1
 }
