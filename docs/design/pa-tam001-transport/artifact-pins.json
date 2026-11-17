@@ -1,0 +1,56 @@
+{
+  "decision_id": "PA-TAM002",
+  "execution_binding": {
+    "manifest_sha256": "90c04b7d9bc2012273d5244cf30b038fa1ca16555613272f761452a6acb7c5be",
+    "revision": "bd292e8110e9098f344d0ef2176d632988706c7a",
+    "workflow_sha256": "0093eaea8d509067950598e35279a739af716f8576640dc5f59b2914194383a8"
+  },
+  "files": {
+    "docs/design/pa-tam001-transport/release-proposal.json": {
+      "bytes": 2152,
+      "sha256": "b76a85f17bac08326de0877807ba646b52734d4fdbe1bb417d30020f069859c9"
+    },
+    "verification/ingestion_storage/bolton_recovery_guard.py": {
+      "bytes": 1199,
+      "sha256": "fe2b30085a0c2fa81ddcfcebb5fc6407655281c0de6e2351d25cb6413982bae5"
+    },
+    "verification/ingestion_storage/inactive_shared_stop_release_v1.sql": {
+      "bytes": 18502,
+      "sha256": "e6ada86a9e55521f9812c2064d5a60c3ba53bc5e0f6e508ca4a64bdca39a034a"
+    },
+    "verification/ingestion_storage/private_evidence_writer_transition.sql": {
+      "bytes": 11818,
+      "sha256": "307994ca2fb2925e3d1501f4fe2686cdc926ba87428c02a70211157998bfa964"
+    },
+    "verification/ingestion_storage/release_candidate.py": {
+      "bytes": 18840,
+      "sha256": "9be00fb8f9f6c9eb1936afba4ec996e1c0b45dbb616b99f323dc561b94c39d09"
+    },
+    "verification/ingestion_storage/tameside_candidate.py": {
+      "bytes": 4598,
+      "sha256": "896986207cb1c96a7cd0166cab27977362e10e48f8a883c4b2e0ce00b3e0745e"
+    },
+    "verification/ingestion_storage/tameside_owner_access.py": {
+      "bytes": 13193,
+      "sha256": "3852d80b8768805cc2562aa2e451044aa93460b40767924fa51484b13a295279"
+    },
+    "verification/ingestion_storage/tameside_owner_journal.py": {
+      "bytes": 3625,
+      "sha256": "e1a09d27ed7a87da7a10b9c468718743f9885f41fd6d922871cbbb6fa80dc7e6"
+    },
+    "verification/ingestion_storage/tameside_package.py": {
+      "bytes": 5620,
+      "sha256": "2e812dc7f5e5c7edea6449fbd8eb2346782a8820f291a37c759ddd5c38f031f0"
+    }
+  },
+  "owner_journal": {
+    "period": "S4_FINITE_677f555670666bcf21f45860_owner",
+    "run": "416cdc40d6837dbb772e2bcce514bf39"
+  },
+  "owner_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+  "proposal_version": "1.0",
+  "revision": "bd292e8110e9098f344d0ef2176d632988706c7a",
+  "status": "INACTIVE_REVIEW_CANDIDATE",
+  "tree": "e6dbe3816c2474ed3dd7016d125b4cbc7a829751",
+  "version": 1
+}

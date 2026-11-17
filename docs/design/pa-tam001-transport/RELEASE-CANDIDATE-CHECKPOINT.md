@@ -1,3 +1,8 @@
+# Current update — final inactive operational review package
+
+See [PA-TAM002 v1.0](TAMESIDE-OPERATIONAL-PACKAGE.md) and [exact artifact pins](artifact-pins.json).
+Source build **bd292e8110e9098f344d0ef2176d632988706c7a**. REVIEW supplied the matching provider configuration digest; v1.5 remains consumed. New owner/campaign adaptation and existing-journal namespace extension passed 26 focused offline tests. Hosted exact-head CI is pending, not inherited from the earlier build. Independent aggregate REVIEW and one owner operational decision remain; Stage 4 OPEN and production actions held. The older dependency descriptions below are preserved history.
+
 # Current update — v1.5 checkpoint recovered
 
 The checkpoint read succeeded; see [verified outcome and remaining current-runtime comparison](CHECKPOINT-V1-5-OUTCOME.md). Historical runtime inputs are recovered, not current-runtime acceptance. The older access dependency below is preserved as history. Stage 4 OPEN; operational release remains WITHHELD.
