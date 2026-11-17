@@ -913,7 +913,9 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
 
     Only current_database() is projected to the production name at the two
     owner identity checks. Actual postgres login/flags, function body/owner,
-    controller read/lock, transaction rollback and membership are real PG.
+    SELECT-only controller observation, rollback and membership are real PG.
+    The issuer's separate locked expected_stop CAS is checked in the source
+    regression, not exercised by this early-stop fixture.
     Release flags are monkeypatched locally; shipped flags remain false.
     """
     from datetime import timedelta
@@ -958,9 +960,10 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     password=secrets.token_urlsafe(40)
     boot.execute(sql.SQL('ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE '
                          'CREATEDB BYPASSRLS INHERIT PASSWORD {}').format(sql.Literal(password)))
-    # Fixture-only read/lock permission, NOT a proposed production grant.
+    # Fixture-only SELECT preflight, matching the production observed
+    # no-table-UPDATE principal; no broader temporary privilege is proposed.
     boot.execute('GRANT USAGE ON SCHEMA public TO postgres')
-    boot.execute('GRANT SELECT,UPDATE ON public.ingestion_work_items TO postgres')
+    boot.execute('GRANT SELECT ON public.ingestion_work_items TO postgres')
     monkeypatch.setattr(runtime,'LIVE_HISTORICAL_CAMPAIGN_RELEASE',True)
     monkeypatch.setattr(runtime,'LIVE_PRIVATE_EVIDENCE_RELEASE',True)
     owner=Owner(lambda:psycopg.connect(**{**info,'user':'postgres','password':password},
@@ -973,13 +976,16 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     def observed_q(c,statement,params=None,*,effect=False):
         statements.append(statement)
         if statement.startswith('GRANT '):
-            # Matching preflight alone reaches here. Verify the controller
-            # lock is held until this exact owner's transaction closes.
+            # The early owner SELECT is deliberately NOT a row lock.
+            # Another operator can update between review and issuance; only
+            # the pinned issuer's subsequent FOR UPDATE/expected_stop CAS may
+            # authorise registration. Do not turn this read into release CAS.
             with psycopg.connect(**info,autocommit=True) as other:
                 other.execute("SET lock_timeout='50ms'")
-                with pytest.raises(psycopg.errors.LockNotAvailable):
-                    other.execute("UPDATE public.ingestion_work_items SET outcome=outcome "
-                                  "WHERE key=repeat('0',64)")
+                changed=other.execute(
+                    "UPDATE public.ingestion_work_items SET outcome=outcome "
+                    "WHERE key=repeat('0',64)")
+                assert changed.rowcount==1
             raise ReachedGrant()
         result=original_q(c,statement,params,effect=effect)
         if statement.startswith('SELECT current_database(),'):
@@ -1001,17 +1007,19 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
         assert len(grants)==(1 if drift=='matching' else 0)
         if drift=='matching':
             catalog=next(i for i,s in enumerate(statements) if "'public.ingestion_register_campaign_once(jsonb)'" in s)
-            controller=next(i for i,s in enumerate(statements) if 'FOR SHARE' in s)
+            controller=next(i for i,s in enumerate(statements)
+                            if s.startswith('SELECT outcome FROM public.ingestion_work_items'))
             grant=next(i for i,s in enumerate(statements) if s.startswith('GRANT '))
             assert catalog<controller<grant
         assert owner.opened==owner.closed==1
         assert boot.execute('SELECT key,outcome FROM public.ingestion_work_items ORDER BY key').fetchall()==before
         assert boot.execute("SELECT count(*) FROM pg_auth_members WHERE member='postgres'::regrole "
                             "AND roleid='ingestion_barrier_releaser'::regrole").fetchone()==(0,)
-        # Connection closure released the lock, including on every refusal.
+        # The owner never acquired a controller row lock in this pregrant
+        # path; the issuer must acquire its own one after the temporary grant.
         boot.execute("UPDATE public.ingestion_work_items SET outcome=outcome WHERE key=repeat('0',64)")
     finally:
-        boot.execute('REVOKE SELECT,UPDATE ON public.ingestion_work_items FROM postgres')
+        boot.execute('REVOKE SELECT ON public.ingestion_work_items FROM postgres')
         boot.execute('REVOKE USAGE ON SCHEMA public FROM postgres')
         boot.execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
 
@@ -1033,7 +1041,7 @@ def test_historical_controller_pregrant_requires_select_not_for_share(isolated_w
     control_before = _control(w)
     boot.execute(sql.SQL(
         "ALTER ROLE postgres LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-        "NOINHERIT NOBYPASSRLS PASSWORD {}"
+        "NOINHERIT BYPASSRLS PASSWORD {}"
     ).format(sql.Literal(password)))
     boot.execute("GRANT USAGE ON SCHEMA public TO postgres")
     boot.execute("GRANT SELECT ON public.ingestion_work_items TO postgres")
