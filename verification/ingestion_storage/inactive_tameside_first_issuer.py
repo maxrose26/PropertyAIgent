@@ -180,3 +180,138 @@ def render_inactive_campaign_issuer(as_of, council, start, end):
     return dict(sql=sql, period=period_id, source_plan_sha256=full_sha,
                 row=dict(row), review_status=REVIEW_STATUS,
                 collection_authorised=False, installed=False)
+
+
+# PA-D004 v1.3 production-direction artifact: ONE STABLE SQL BODY, independent
+# of the number of councils or historical windows. It is NOT installed and
+# deliberately refuses every invocation. The earlier per-batch negative proof
+# above is retained as historical test evidence, not an installation pattern.
+_STABLE_CAPTURE_DATES = """OR item->'subject'->>'end' IS DISTINCT FROM
+       (ctl->'intake_periods'->a->'campaign_batch'->>'end')
+    OR item->'subject'->>'start' IS DISTINCT FROM
+       (ctl->'intake_periods'->a->'campaign_batch'->>'start')"""
+_STABLE_OWNER_GUARD = r"""
+  -- Owner-sealed finite metadata, not a new SQL body per council/week.
+  -- This candidate refuses even if a caller forges the correct-shaped policy.
+  IF current_database() IS DISTINCT FROM 'postgres'
+     OR (ctl->>'hard_stop_generation')::integer IS DISTINCT FROM 16
+     OR ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb
+     OR ctl->>'manual_stop' IS NOT NULL
+  THEN RAISE EXCEPTION 'CAMPAIGN_STABLE_SCOPE_OR_STOP' USING ERRCODE='42501'; END IF;
+  IF p->>'operation'='intake_period' THEN
+   e:=p->'policy';
+   IF e->>'mode' IS DISTINCT FROM 'CAMPAIGN_FINITE_HISTORICAL_V1'
+      OR e->'test_evidence' IS DISTINCT FROM 'false'::jsonb
+      OR e->'max_runs' IS DISTINCT FROM '1'::jsonb
+      OR e->'overlap_days' IS DISTINCT FROM '7'::jsonb
+      OR e->'expected_stop'->'hard_stop_generation' IS DISTINCT FROM '16'::jsonb
+      OR e->'campaign_batch' IS NULL
+      OR jsonb_typeof(e->'campaign_batch') IS DISTINCT FROM 'object'
+      OR e->'campaign_source_plan_sha256' IS NULL
+      OR e->>'campaign_source_plan_sha256' !~ '^[0-9a-f]{64}$'
+      OR (SELECT count(*) FROM jsonb_object_keys(e->'councils'))<>1
+      OR NOT (e->'councils' ? (e->'campaign_batch'->>'council'))
+      OR (e->'campaign_batch'->>'council') NOT IN
+         ('bolton','bury','manchester','oldham','rochdale',
+          'salford','stockport','tameside','wigan')
+      OR (e->'campaign_batch'->>'semantics') IS DISTINCT FROM
+         CASE WHEN e->'campaign_batch'->>'council'
+             IN ('manchester','rochdale','salford','stockport')
+              THEN 'VALIDATED' ELSE 'RECEIVED' END
+      OR (e->'campaign_batch'->>'start')::date < '2026-09-15'::date
+      OR ((e->'campaign_batch'->>'start')::date-'2026-09-15'::date)%7<>0
+      OR (e->'campaign_batch'->>'end')::date-
+         (e->'campaign_batch'->>'start')::date <> 6
+      OR (e->'campaign_batch'->>'end')::date >=
+         (clock_timestamp() AT TIME ZONE 'Europe/London')::date
+      OR ctl->'intake_periods' ? a
+   THEN RAISE EXCEPTION 'CAMPAIGN_STABLE_OWNER_BATCH_INVALID'
+       USING ERRCODE='42501'; END IF;
+  ELSE
+   IF ctl->'intake_periods'->a->>'mode' IS DISTINCT FROM
+       'CAMPAIGN_FINITE_HISTORICAL_V1'
+      OR ctl->'intake_periods'->a->'max_runs' IS DISTINCT FROM '1'::jsonb
+      OR ctl->'intake_periods'->a->'campaign_batch' IS NULL
+   THEN RAISE EXCEPTION 'CAMPAIGN_STABLE_PERIOD_MISSING'
+       USING ERRCODE='42501'; END IF;
+   IF p->>'operation'='intake_capture'
+      AND (jsonb_array_length(p->'rows') IS DISTINCT FROM 1
+       OR p->'rows'->0->'subject'->>'council' IS DISTINCT FROM
+          (ctl->'intake_periods'->a->'campaign_batch'->>'council')
+       OR p->'rows'->0->'subject'->>'start' IS DISTINCT FROM
+          (ctl->'intake_periods'->a->'campaign_batch'->>'start')
+       OR p->'rows'->0->'subject'->>'end' IS DISTINCT FROM
+          (ctl->'intake_periods'->a->'campaign_batch'->>'end')
+       OR p->'rows'->0->'subject'->>'semantics' IS DISTINCT FROM
+          (ctl->'intake_periods'->a->'campaign_batch'->>'semantics'))
+   THEN RAISE EXCEPTION 'CAMPAIGN_STABLE_CAPTURE_INVALID'
+       USING ERRCODE='42501'; END IF;
+  END IF;
+  -- No release signature or production owner route has been reviewed.
+  -- This unconditional refusal cannot be toggled by environment or policy.
+  RAISE EXCEPTION 'CAMPAIGN_STABLE_MANIFEST_WITHHELD' USING ERRCODE='42501';
+"""
+
+
+def render_inactive_stable_campaign_issuer():
+    """One byte-stable, NEVER-INSTALLED issuer for every finite campaign batch.
+
+    Future review must separately prove the owner registration lifecycle,
+    actual production session ACL, and runtime binding. Do not install this
+    negative-only SQL and do not treat its syntax proof as operational approval.
+    """
+    source = _policy_source_bytes()
+    if hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source
+                    ).hexdigest() != PINNED_POLICY_GIT_BLOB:
+        raise ValueError("CAMPAIGN_STABLE_POLICY_SOURCE_DRIFT")
+    raw = policy_sql()
+    original = "CREATE OR REPLACE FUNCTION public.ingestion_register_bolton_exception("
+    if (raw.count(original) != 1 or raw.count("$register$;") != 1):
+        raise ValueError("CAMPAIGN_STABLE_POLICY_INVENTORY_DRIFT")
+    function = raw[raw.index(original):raw.index("$register$;") + len("$register$;")]
+    if any(function.count(anchor) != 1 for anchor in
+           (_ROLLING, _ENTRY_ANCHOR, _PERIOD_ANCHOR)):
+        raise ValueError("CAMPAIGN_STABLE_ISSUER_ANCHOR_DRIFT")
+    function = function.replace(original,
+        "CREATE OR REPLACE FUNCTION public." + CAMPAIGN_FUNCTION + "(", 1)
+    function = function.replace(_ENTRY_ANCHOR,
+        _ENTRY_GUARD.replace("TAMESIDE_FIRST_", "CAMPAIGN_STABLE_")
+        + _ENTRY_ANCHOR, 1)
+    function = function.replace(_ROLLING, _STABLE_CAPTURE_DATES, 1)
+    function = function.replace(_PERIOD_ANCHOR,
+        _PERIOD_ANCHOR + "\n" + _STABLE_OWNER_GUARD, 1)
+    result = (function + "\nREVOKE ALL ON FUNCTION public."
+              + CAMPAIGN_FUNCTION + "(jsonb) FROM PUBLIC;\n")
+    if (result.count("RAISE EXCEPTION 'CAMPAIGN_STABLE_MANIFEST_WITHHELD'") != 1
+            or "GRANT EXECUTE" in result
+            or "ingestion_register_disposable_catchup" in result
+            or _ROLLING in result):
+        raise ValueError("CAMPAIGN_STABLE_FAIL_CLOSED_DRIFT")
+    return result
+
+
+def prepare_inactive_campaign_owner_batch(as_of, council, start, end):
+    """One finite, source-pinned owner REVIEW payload; never registration.
+
+    There is no SQL connection, owner identity, release signature or worker
+    execution path here. An actual owner must later seal exactly one reviewed
+    batch using separately approved install/rollback and stop CAS authority.
+    """
+    from verification.discovery.ten_council_offline import select_finite_batch
+    selected = select_finite_batch(as_of, council, start, end)
+    if selected["current_day_partial"]:
+        raise ValueError("CAMPAIGN_STABLE_INCOMPLETE_DAY")
+    preview = render_inactive_campaign_issuer(as_of, council, start, end)
+    row = selected["selected_row"]
+    if preview["row"] != row or preview["source_plan_sha256"] != (
+            selected["selected_payload"]["finite_manifest_sha256"]):
+        raise ValueError("CAMPAIGN_STABLE_OWNER_SOURCE_DRIFT")
+    stable = render_inactive_stable_campaign_issuer()
+    return dict(schema="PA_D004_STABLE_OWNER_PREVIEW_V1",
+                period=preview["period"], campaign_batch=dict(row),
+                campaign_source_plan_sha256=preview["source_plan_sha256"],
+                mode=CAMPAIGN_MODE, max_runs=1, overlap_days=7,
+                expected_generation=16,
+                stable_issuer_sha256=hashlib.sha256(stable.encode()).hexdigest(),
+                manifest_status="WITHHELD", installed=False,
+                registered=False, live_collection_authorised=False)
