@@ -549,15 +549,10 @@ class Owner:
         if type(batch) is not dict or set(batch) != {
                 'council', 'start', 'end', 'semantics'}:
             raise ValueError('CAMPAIGN_OWNER_BATCH')
-        self.review_inactive_campaign_period(
-            as_of, batch['council'], batch['start'], batch['end'],
-            period=name, policy=policy,
-            observed_stop=policy.get('expected_stop'),
-            execution_binding=self.bindings)
         return self.register_intake_period(
-            name, policy, historical_campaign=True)
+            name, policy, historical_campaign=True, historical_as_of=as_of)
 
-    def register_intake_period(self,name,policy,*,disposable_catchup=False,historical_campaign=False):
+    def register_intake_period(self,name,policy,*,disposable_catchup=False,historical_campaign=False,historical_as_of=None):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
         Does not clear a stop, install SQL, provision a login or issue daily work.
@@ -620,7 +615,6 @@ class Owner:
                     raise Uncertain('INTAKE_CATCHUP_ISSUER_IDENTITY')
             self.expected_generation=policy['expected_stop']['hard_stop_generation']
             self.q(c,'BEGIN',effect=True)
-            self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             if historical_campaign:
                 # Compare installed function source/owner, not an arbitrary
                 # caller-provided SHA. This hard-pinned dormant body still
@@ -644,6 +638,28 @@ class Owner:
                               'ingestion_storage_owner',True,
                               ['search_path=pg_catalog']):
                     raise Uncertain('CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT')
+                # Read and lock the actual controller in this same verified
+                # owner session, before acquiring any temporary capability.
+                # A policy's expected_stop is a comparison target, not evidence.
+                rows=self.q(c,"SELECT outcome FROM public.ingestion_work_items "
+                              "WHERE key=repeat('0',64) FOR SHARE")
+                keys={'global_stop','manual_stop','last_hard_stop',
+                      'hard_stop_generation'}
+                if (len(rows)!=1 or len(rows[0])!=1
+                        or type(rows[0][0]) is not dict
+                        or not keys.issubset(rows[0][0])):
+                    raise Uncertain('CAMPAIGN_OWNER_CONTROLLER_NOT_OBSERVED')
+                observed_stop={k:rows[0][0][k] for k in keys}
+                batch=policy.get('campaign_batch')
+                if type(batch) is not dict or set(batch)!={
+                        'council','start','end','semantics'}:
+                    raise ValueError('CAMPAIGN_OWNER_BATCH')
+                self.review_inactive_campaign_period(
+                    historical_as_of, batch['council'], batch['start'],
+                    batch['end'], period=name, policy=policy,
+                    observed_stop=observed_stop,
+                    execution_binding=self.bindings)
+            self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             issuer=('ingestion_register_disposable_catchup' if disposable_catchup
                     else 'ingestion_register_campaign_once' if historical_campaign
                     else 'ingestion_register_bolton_exception')

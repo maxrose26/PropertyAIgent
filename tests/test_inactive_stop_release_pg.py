@@ -900,3 +900,112 @@ def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_
                      "GRANTED BY provisioning_bootstrap RESTRICT")
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
                      "NOBYPASSRLS PASSWORD NULL")
+
+
+@pytest.mark.parametrize('drift', [
+    'body', 'owner', 'search_path', 'security_definer',
+    'global_stop', 'manual_stop', 'generation', 'last_hard_stop',
+    'missing_controller', 'missing_stop_field', 'matching',
+])
+def test_historical_owner_preflight_before_grant_and_actual_stop(
+        isolated_world, monkeypatch, drift):
+    """Real disposable PG session/catalog/controller; no production contact.
+
+    Only current_database() is projected to the production name at the two
+    owner identity checks. Actual postgres login/flags, function body/owner,
+    controller read/lock, transaction rollback and membership are real PG.
+    Release flags are monkeypatched locally; shipped flags remain false.
+    """
+    from datetime import timedelta
+    from tests.e2e_pg_world import settings
+    from tests.test_inactive_tameside_first_issuer import _inactive_owner_policy_fixture
+    from verification.ingestion_storage.operational_owner import Owner
+    from verification.ingestion_storage.operational_publication import Uncertain
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        render_inactive_stable_campaign_issuer,
+    )
+    w=isolated_world
+    boot=w['boot']
+    as_of, period, policy, stop, binding=_inactive_owner_policy_fixture()
+    boot.execute(render_inactive_stable_campaign_issuer())
+    function='public.ingestion_register_campaign_once(jsonb)'
+    if drift=='body':
+        boot.execute("CREATE OR REPLACE FUNCTION public.ingestion_register_campaign_once(p jsonb)"+
+                     " RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER "
+                     "SET search_path=pg_catalog AS $$ BEGIN RETURN '{}'::jsonb; END $$")
+    elif drift=='owner':
+        boot.execute('ALTER FUNCTION '+function+' OWNER TO provisioning_bootstrap')
+    elif drift=='search_path':
+        boot.execute('ALTER FUNCTION '+function+' SET search_path=public')
+    elif drift=='security_definer':
+        boot.execute('ALTER FUNCTION '+function+' SECURITY INVOKER')
+    ctl=_control(w)
+    ctl.update(stop)
+    if drift in ('global_stop','manual_stop','last_hard_stop'):
+        ctl[drift]='UNEXPECTED_STOP'
+    elif drift=='generation':
+        ctl['hard_stop_generation']=15
+    elif drift=='missing_stop_field':
+        del ctl['manual_stop']
+    boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json "
+                 "WHERE key=repeat('0',64)",(json.dumps(ctl),))
+    if drift=='missing_controller':
+        boot.execute("DELETE FROM public.ingestion_work_items WHERE key=repeat('0',64)")
+    before=boot.execute('SELECT key,outcome FROM public.ingestion_work_items ORDER BY key').fetchall()
+    _,info,_,_=settings()
+    password=secrets.token_urlsafe(40)
+    boot.execute(sql.SQL('ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE '
+                         'CREATEDB BYPASSRLS INHERIT PASSWORD {}').format(sql.Literal(password)))
+    # Fixture-only read/lock permission, NOT a proposed production grant.
+    boot.execute('GRANT USAGE ON SCHEMA public TO postgres')
+    boot.execute('GRANT SELECT,UPDATE ON public.ingestion_work_items TO postgres')
+    monkeypatch.setattr(runtime,'LIVE_HISTORICAL_CAMPAIGN_RELEASE',True)
+    monkeypatch.setattr(runtime,'LIVE_PRIVATE_EVIDENCE_RELEASE',True)
+    owner=Owner(lambda:psycopg.connect(**{**info,'user':'postgres','password':password},
+                                      autocommit=True,prepare_threshold=None),
+                lambda *_:None,lambda:None,identity='postgres',
+                expiry=as_of+timedelta(hours=1),bindings=binding)
+    original_q=owner.q
+    statements=[]
+    class ReachedGrant(Exception):pass
+    def observed_q(c,statement,params=None,*,effect=False):
+        statements.append(statement)
+        if statement.startswith('GRANT '):
+            # Matching preflight alone reaches here. Verify the controller
+            # lock is held until this exact owner's transaction closes.
+            with psycopg.connect(**info,autocommit=True) as other:
+                other.execute("SET lock_timeout='50ms'")
+                with pytest.raises(psycopg.errors.LockNotAvailable):
+                    other.execute("UPDATE public.ingestion_work_items SET outcome=outcome "
+                                  "WHERE key=repeat('0',64)")
+            raise ReachedGrant()
+        result=original_q(c,statement,params,effect=effect)
+        if statement.startswith('SELECT current_database(),'):
+            assert result[0][0]=='ingestion_provisioning_test'
+            result=[('postgres',*result[0][1:])]
+        return result
+    monkeypatch.setattr(owner,'q',observed_q)
+    try:
+        expected=(ReachedGrant if drift=='matching' else
+                  Uncertain if drift in ('body','owner','search_path','security_definer',
+                                         'missing_controller','missing_stop_field') else ValueError)
+        with pytest.raises(expected):
+            owner.register_historical_campaign_period(period,policy,as_of=as_of)
+        grants=[s for s in statements if s.startswith('GRANT ')]
+        assert len(grants)==(1 if drift=='matching' else 0)
+        if drift=='matching':
+            catalog=next(i for i,s in enumerate(statements) if "'public.ingestion_register_campaign_once(jsonb)'" in s)
+            controller=next(i for i,s in enumerate(statements) if 'FOR SHARE' in s)
+            grant=next(i for i,s in enumerate(statements) if s.startswith('GRANT '))
+            assert catalog<controller<grant
+        assert owner.opened==owner.closed==1
+        assert boot.execute('SELECT key,outcome FROM public.ingestion_work_items ORDER BY key').fetchall()==before
+        assert boot.execute("SELECT count(*) FROM pg_auth_members WHERE member='postgres'::regrole "
+                            "AND roleid='ingestion_barrier_releaser'::regrole").fetchone()==(0,)
+        # Connection closure released the lock, including on every refusal.
+        boot.execute("UPDATE public.ingestion_work_items SET outcome=outcome WHERE key=repeat('0',64)")
+    finally:
+        boot.execute('REVOKE SELECT,UPDATE ON public.ingestion_work_items FROM postgres')
+        boot.execute('REVOKE USAGE ON SCHEMA public FROM postgres')
+        boot.execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
