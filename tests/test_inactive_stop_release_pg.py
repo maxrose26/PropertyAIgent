@@ -834,6 +834,16 @@ def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_
                 "SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),"
                 "pg_has_role(current_user,'ingestion_storage_owner','SET')"
             ).fetchone()==(False,False)
+            # Existing disposable fixture lacks owner-schema USAGE/CREATE.
+            # Prove refusal first; the temporary test-only grant below is
+            # intentionally NOT a proposed production permission change.
+            with pytest.raises(Exception,match="OWNER_CAMPAIGN_OWNER_SCHEMA_CAPABILITY"):
+                c.execute(script)
+            c.execute("ROLLBACK")
+        assert boot.execute("SELECT to_regprocedure(%s)",(name,)).fetchone()[0] is None
+        assert membership()==baseline and _control(w)==before
+        boot.execute("GRANT USAGE, CREATE ON SCHEMA public TO ingestion_storage_owner")
+        with owner() as c:
             c.execute(script.replace("\nCOMMIT;\n","\nROLLBACK;\n"))
         assert boot.execute("SELECT to_regprocedure(%s)",(name,)).fetchone()[0] is None
         assert membership()==baseline and _control(w)==before
@@ -856,17 +866,19 @@ def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_
         with owner() as c:
             c.execute(script)
         # Independent bootstrap readback, not self-reported by owner code.
-        import hashlib
         stable=render_inactive_stable_campaign_issuer()
-        expected_sql=stable.split("\nREVOKE ALL ON FUNCTION",1)[0]
-        # PostgreSQL stores the function BODY (prosrc), not all DDL; compare
-        # secure identity and stable function source via pg_get_functiondef.
+        # PostgreSQL stores the PL/pgSQL function BODY (prosrc), not DDL.
+        # Verify the installed function still carries the unconditional
+        # WITHHELD refusal, as well as its owner and SECURITY DEFINER flag.
         observed=boot.execute(
             "SELECT pg_get_userbyid(proowner),prosecdef,"
             "encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
             "FROM pg_proc WHERE oid=%s::regprocedure",(name,)).fetchone()
         assert observed[0:2]==("ingestion_storage_owner",True)
         assert len(observed[2])==64
+        assert boot.execute(
+            "SELECT position('CAMPAIGN_STABLE_MANIFEST_WITHHELD' in prosrc)>0 "
+            "FROM pg_proc WHERE oid=%s::regprocedure",(name,)).fetchone()[0] is True
         assert boot.execute(
             "SELECT has_function_privilege('ingestion_worker_login',%s,'EXECUTE')",
             (name,)).fetchone()[0] is False
@@ -881,6 +893,8 @@ def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_
                             "WHERE oid=%s::regprocedure",
                             (name,)).fetchone()[0]=="ingestion_storage_owner"
     finally:
+        boot.execute("REVOKE USAGE, CREATE ON SCHEMA public "
+                     "FROM ingestion_storage_owner")
         boot.execute("REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres")
         boot.execute("REVOKE ingestion_storage_owner FROM postgres "
                      "GRANTED BY provisioning_bootstrap RESTRICT")
