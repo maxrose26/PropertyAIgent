@@ -602,7 +602,9 @@ class Owner:
                     "pg_catalog.pg_has_role(current_user,"
                     "'ingestion_storage_owner','SET') "
                     "FROM pg_catalog.pg_roles r WHERE r.rolname=current_user")
-                if observed!=[('postgres','postgres','postgres',
+                expected_database=('ingestion_provisioning_test' if policy.get('test_evidence') is True
+                                   and policy.get('route')=='DISPOSABLE' and 'release_manifest_sha256' in policy else 'postgres')
+                if observed!=[(expected_database,'postgres','postgres',
                               False,True,True,True,False,False)]:
                     raise Uncertain('CAMPAIGN_OWNER_ACTUAL_SESSION_IDENTITY')
             self.verify_installed(c)
@@ -623,6 +625,9 @@ class Owner:
                     CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
                 )
                 issued=render_inactive_stable_campaign_issuer()
+                if 'release_manifest_sha256' in policy:
+                    from .release_candidate import installed_campaign_sql
+                    issued=installed_campaign_sql(name,policy,historical_as_of)
                 patterns=[m for m in self.FUNCTION_PATTERN.finditer(issued)
                           if m[1]==CAMPAIGN_FUNCTION]
                 if len(patterns)!=1:
@@ -634,7 +639,7 @@ class Owner:
                     "pg_get_userbyid(proowner),prosecdef,proconfig "
                     "FROM pg_proc WHERE oid="
                     "'public.ingestion_register_campaign_once(jsonb)'::regprocedure")[0]
-                if installed!=('postgres',expected_sha,
+                if installed!=(expected_database,expected_sha,
                               'ingestion_storage_owner',True,
                               ['search_path=pg_catalog']):
                     raise Uncertain('CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT')
@@ -661,9 +666,12 @@ class Owner:
                 if type(batch) is not dict or set(batch)!={
                         'council','start','end','semantics'}:
                     raise ValueError('CAMPAIGN_OWNER_BATCH')
+                review_policy=policy
+                if expected_database=='ingestion_provisioning_test':
+                    review_policy=dict(policy,test_evidence=False,route='DIRECT',hostaddr='192.0.2.1')
                 self.review_inactive_campaign_period(
                     historical_as_of, batch['council'], batch['start'],
-                    batch['end'], period=name, policy=policy,
+                    batch['end'], period=name, policy=review_policy,
                     observed_stop=observed_stop,
                     execution_binding=self.bindings)
                 locked=self.q(c,

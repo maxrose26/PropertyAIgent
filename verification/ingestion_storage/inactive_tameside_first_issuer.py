@@ -390,6 +390,10 @@ def review_inactive_campaign_owner_policy(
         "campaign_batch", "campaign_source_plan_sha256",
         "evidence_backend", "private_release",
     }
+    if type(policy) is dict and 'release_manifest_sha256' in policy:
+        if not re.fullmatch(r'[a-f0-9]{64}', str(policy['release_manifest_sha256'])):
+            raise ValueError('CAMPAIGN_OWNER_RELEASE_MANIFEST')
+        allowed.add('release_manifest_sha256')
     if type(policy) is not dict or set(policy) != allowed:
         raise ValueError("CAMPAIGN_OWNER_POLICY_SCHEMA")
     if period != preview["period"] or type(period) is not str:

@@ -2,7 +2,7 @@
 
 Identity projection is explicit: local database name/bootstrap executor in the
 release body only. Existing restricted-owner tests cover the unchanged lifecycle.
-These tests do NOT claim the connected recovery/runtime gate has passed.
+The joined test retains explicit synthetic identity/source projections.
 """
 import copy
 import json
@@ -33,7 +33,9 @@ def test_pinned_guard_actual_recovery_entrypoint(tmp_path):
     assert subprocess.check_output(['git', '-C', str(pin), 'rev-parse', 'HEAD'], text=True).strip() == 'f027ba28af69ae70208eab5ed047e4a8a81c6337'
     helper = tmp_path / 'guard_stage.py'
     helper.write_bytes(Path('tests/pinned_bolton_guard_stage.py').read_bytes())
-    env = dict(os.environ, PYTHONPATH=str(pin), S4_SUCCESSOR_ROOT=str(Path.cwd()))
+    from tests.test_daily_intake_runtime import _historical_salford_seed
+    env = dict(os.environ, PYTHONPATH=str(pin), S4_SUCCESSOR_ROOT=str(Path.cwd()),
+               S4_SALFORD_SEED=json.dumps(_historical_salford_seed()))
     result = subprocess.run([sys.executable, '-m', 'pytest', str(helper), '--rootdir', str(pin),
                              '--import-mode=importlib', '-q', '-p', 'no:cacheprovider',
                              '--basetemp', str(tmp_path/'pinned')], cwd=pin, env=env,
@@ -158,7 +160,7 @@ def test_disposition_preserves_originals_and_refuses_changed_preimage(isolated_w
     # projection differ, as in the original release fixture.
     source = original.replace(candidate._literal(proposal), candidate._literal(fixture))
     from verification.ingestion_storage.inactive_owner_writer_install import PRELUDE, EPILOGUE
-    source = source.removeprefix(PRELUDE).removesuffix(EPILOGUE)
+    source = source.removeprefix(candidate.data_owner_prelude()).removesuffix(EPILOGUE)
     source = 'BEGIN;\n' + source + '\nCOMMIT;\n'
     key = next(iter(before))
     w['boot'].execute("UPDATE ingestion_work_items SET reason='CHANGED' WHERE key=%s", (key,))
@@ -220,3 +222,141 @@ def test_candidate_installs_stopped_as_real_restricted_owner(isolated_world):
         w['boot'].execute('REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres')
         w['boot'].execute('REVOKE ingestion_storage_owner FROM postgres GRANTED BY provisioning_bootstrap RESTRICT')
         w['boot'].execute('ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB NOBYPASSRLS PASSWORD NULL')
+
+
+def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
+    from tests.test_daily_intake_runtime import policy as base_policy, env_and_sources
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    from verification.ingestion_storage.inactive_tameside_first_issuer import prepare_inactive_campaign_owner_batch
+    if not recovered:
+        _seed(w)
+    else:
+        from verification.ingestion_storage import intake_policy
+        with w['connect']('provisioning_migrator') as migrator:
+            migrator.execute(intake_policy.installation_script(disposable_catchup=True))
+        proposal=json.loads(Path('docs/design/pa-tam001-transport/release-proposal.json').read_text())
+        fixture=copy.deepcopy(proposal)
+        for key in proposal['prior_fingerprints']:
+            if key.startswith('d9d8'): continue
+            fixture['prior_fingerprints'][key]=w['boot'].execute(
+                "SELECT encode(sha256(convert_to(jsonb_build_object('work',to_jsonb(w),'attempts',(SELECT jsonb_agg(to_jsonb(a) ORDER BY fence) FROM ingestion_work_attempts a WHERE a.work_key=w.key))::text,'UTF8')),'hex') FROM ingestion_work_items w WHERE key=%s",(key,)).fetchone()[0]
+        fixture['review_sha256']=proposal['review_sha256']  # content binding, not operational acceptance
+        script=candidate.render_dispositions(proposal).replace(candidate._literal(proposal),candidate._literal(fixture))
+        script=script.replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+        with w['actor']() as actor:
+            try: actor.execute(script)
+            except Exception as error:
+                actor.execute('ROLLBACK')
+                states=w['boot'].execute("SELECT left(key,8),state,phase,fence,owner IS NULL,lease_until IS NULL,next_action,outcome->>'source_or_write_replay_authorised',(SELECT jsonb_agg(jsonb_build_object('phase',phase,'finished',finished_at IS NOT NULL)) FROM ingestion_work_attempts a WHERE a.work_key=w.key) FROM ingestion_work_items w WHERE key=ANY(%s) ORDER BY key",(list(proposal['prior_fingerprints']),)).fetchall()
+                raise AssertionError(str(error)+': '+json.dumps(states)) from error
+    writer=candidate.RELEASE_PATH.with_name('private_evidence_writer_transition.sql').read_text()
+    if recovered:
+        from verification.ingestion_storage.inactive_owner_writer_install import render_inactive_writer_install
+        # Explicit disposable capability baseline, not a production observation.
+        w['boot'].execute('GRANT USAGE,CREATE ON SCHEMA public TO postgres WITH GRANT OPTION')
+        with w['actor']() as actor:
+            actor.execute(render_inactive_writer_install(writer).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'"))
+    else:
+        w['boot'].execute(writer)
+    if recovered:
+        with w['actor']() as independent:
+            independent.execute('BEGIN READ ONLY')
+            manifest=candidate.manifest_from_readback(independent,proposal,
+                operational_review_ref='https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-6953476124')
+            independent.execute('ROLLBACK')
+        # The real comment is a component review only; fixture use is not a
+        # claim that it accepted operational release.
+        source=None
+    else: manifest, source = release_script(w, expiry=time.time()+3600)
+    now = datetime.now(timezone.utc)
+    preview = prepare_inactive_campaign_owner_batch(now, 'tameside', '2026-09-15', '2026-09-21')
+    period = preview['period']
+    policy = base_policy(w)
+    policy['expected_stop'].update(global_stop=None,manual_stop=None,hard_stop_generation=16)
+    policy['councils'] = {'tameside':policy['councils']['tameside']}
+    policy.update(max_runs=1,mode='CAMPAIGN_FINITE_HISTORICAL_V1',
+                  campaign_batch=preview['campaign_batch'],
+                  campaign_source_plan_sha256=preview['campaign_source_plan_sha256'],
+                  release_manifest_sha256=manifest['manifest_binding_sha256'],
+                  evidence_backend='POSTGRES_PILOT_V1',
+                  private_release=dict(schema='PA_D002_LIVE_PRIVATE_V1',
+                    revision=policy['execution_binding']['revision'], councils=['tameside'],semantics='RECEIVED'))
+    assert _control(w)['hard_stop_generation']==15
+    compiled=candidate.installed_campaign_sql(period,policy,now)
+    if recovered:
+        production_projection=dict(policy,test_evidence=False,route='DIRECT',hostaddr='192.0.2.1')
+        kwargs=dict(as_of=now,period=period,policy=production_projection,release_manifest_sha256=manifest['manifest_binding_sha256'])
+        install=candidate.render_campaign_install(**kwargs).replace(candidate.render_campaign(**kwargs),compiled)
+        install=install.replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+        with w['actor']() as actor: actor.execute(install)
+    else:
+        w['boot'].execute(compiled)
+        w['boot'].execute('ALTER FUNCTION ingestion_register_campaign_once(jsonb) OWNER TO ingestion_storage_owner')
+    w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO ingestion_worker')
+    assert _control(w)['hard_stop_generation']==15
+    if recovered:
+        release=candidate.render_release(manifest,expires_at=manifest['expires_at']).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+        with w['actor']() as actor: actor.execute(release)
+    else: _run(w, source)
+    if recovered: w['activate_restricted_fixture']()
+    from verification.ingestion_storage.tameside_candidate import enabled
+    with enabled(policy):
+        if recovered:
+            from verification.ingestion_storage.operational_owner import Owner
+            from datetime import timedelta
+            w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO postgres')
+            w['boot'].execute('GRANT ingestion_barrier_releaser TO postgres WITH ADMIN TRUE, INHERIT FALSE, SET FALSE GRANTED BY provisioning_bootstrap')
+            owner=Owner(w['actor'],lambda *_:None,lambda:None,identity='postgres',
+                        expiry=now+timedelta(hours=1),bindings=policy['execution_binding'])
+            owner.register_historical_campaign_period(period,policy,as_of=now)
+            assert owner.opened==owner.closed==1
+            assert w['boot'].execute("SELECT pg_has_role('postgres','ingestion_barrier_releaser','USAGE'),pg_has_role('postgres','ingestion_barrier_releaser','SET')").fetchone()==(False,False)
+        else:
+            w['boot'].execute('SELECT ingestion_register_campaign_once(%s::jsonb)',
+                              (json.dumps(dict(operation='intake_period',period=period,policy=policy)),))
+        env, sources = env_and_sources(w, tmp_path, count=1, catchup_window=candidate.BATCH)
+        for key, value in env.items(): monkeypatch.setenv(key,value)
+        output = tmp_path/'candidate-result'
+        status = runtime.main(['--period',period,'--output',str(output),
+                               '--disposable-sources',str(sources),'--disposable-archive',str(tmp_path/'archive')])
+        result = json.loads((output/'final-result.json').read_text())
+        assert status == 0, result
+        assert result['status'] == 'RETAINED_AND_SCREENED'
+        assert result['cleanup'] == 'CLOSED' and result['authority_closure'] == 'INVALIDATED'
+        assert len(result['backlog']['records']) == 1
+        assert result['backlog']['records'][0]['screening_state'] == 'COMPLETE'
+        assert result['admission_connected'] is False
+        with psycopg.connect(settings()[0], autocommit=True) as independent:
+            independent.execute('BEGIN READ ONLY')
+            artifacts=independent.execute("SELECT name,sha256=encode(sha256(body),'hex') FROM ingestion_run_evidence WHERE period=%s ORDER BY name",(period,)).fetchall()
+            assert len(artifacts)==3 and all(x[1] for x in artifacts)
+            assert independent.execute("SELECT count(*) FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(0,)
+            independent.execute('ROLLBACK')
+        return dict(status='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED',period=period,
+                    synthetic_listing_records=1,screening='COMPLETE',backlog_records=1,
+                    archive_hashes_independently_verified=True,cleanup='CLOSED',live_requests=0)
+
+
+def test_conditional_release_to_actual_historical_runtime(isolated_world, tmp_path, monkeypatch):
+    exercise_conditional_runtime(isolated_world,tmp_path,monkeypatch)
+
+
+def test_explicit_candidate_scope_and_restoration(monkeypatch):
+    from verification.ingestion_storage import tameside_candidate as executable
+    from verification.ingestion_storage import daily_intake_runtime as runtime
+    p=dict(campaign_batch=copy.deepcopy(candidate.BATCH),mode='CAMPAIGN_FINITE_HISTORICAL_V1',
+           max_runs=1,councils={'tameside':{}},expires_at=min(time.time()+600,executable.EXPIRY),
+           execution_binding=runtime.execution_binding(),release_manifest_sha256='a'*64)
+    for changed in (dict(max_runs=2),dict(expires_at=time.time()-1),dict(expires_at=executable.EXPIRY+1),
+                    dict(campaign_batch={**candidate.BATCH,'start':'2026-09-14'}),
+                    dict(execution_binding={}),dict(councils={'trafford':{}})):
+        with pytest.raises(ValueError,match='TAMESIDE_EXACT_CANDIDATE_REQUIRED'):
+            with executable.enabled({**p,**changed}): pytest.fail('scope admitted')
+    with pytest.raises(RuntimeError):
+        with executable.enabled(p):
+            assert runtime.LIVE_PRIVATE_EVIDENCE_RELEASE is True
+            with pytest.raises(ValueError,match='ALREADY_ENABLED'):
+                with executable.enabled(p): pytest.fail('nested enablement')
+            raise RuntimeError('synthetic failure')
+    assert runtime.LIVE_PRIVATE_EVIDENCE_RELEASE is False
+    assert runtime.LIVE_HISTORICAL_CAMPAIGN_RELEASE is False

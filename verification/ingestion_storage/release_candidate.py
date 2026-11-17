@@ -19,6 +19,36 @@ FOLLOW_ON = ('manchester', 'bolton', 'tameside', 'bury', 'oldham', 'rochdale',
              'salford', 'stockport', 'trafford', 'wigan')
 
 
+def installed_campaign_sql(period, policy, as_of):
+    """Common owner/runtime calculation of the exact policy-bound function.
+
+    Fixed disposable projection changes fixture data/database identity only;
+    it cannot install into postgres or qualify synthetic sources as live.
+    The existing live code gates still apply at both calling entry points.
+    """
+    import copy
+    projection = policy.get('test_evidence') is True
+    target = copy.deepcopy(policy)
+    for key in ('days', 'registered_at'):
+        target.pop(key, None)
+    if projection:
+        if target.get('route') != 'DISPOSABLE' or target.get('hostaddr') is not None:
+            raise ValueError('CAMPAIGN_DISPOSABLE_ROUTE')
+        target.update(test_evidence=False, route='DIRECT', hostaddr='192.0.2.1')
+    source = render_campaign(as_of=as_of, period=period, policy=target,
+                             release_manifest_sha256=target['release_manifest_sha256'])
+    if projection:
+        actual = copy.deepcopy(policy)
+        for key in ('days', 'registered_at'):
+            actual.pop(key, None)
+        source = source.replace(_literal(target), _literal(actual))
+        source = source.replace("e->'test_evidence' IS DISTINCT FROM 'false'::jsonb",
+                                "e->'test_evidence' IS DISTINCT FROM 'true'::jsonb")
+        source = source.replace("current_database() IS DISTINCT FROM 'postgres'",
+                                "current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
+    return source
+
+
 def _literal(value):
     return "'" + json.dumps(value, sort_keys=True, separators=(',', ':'),
                             allow_nan=False).replace("'", "''") + "'::jsonb"
@@ -211,8 +241,6 @@ BEGIN
   IF actual IS DISTINCT FROM manifest->'prior_fingerprints'->>w.key
    OR w.state IS DISTINCT FROM 'SAFETY_BLOCKED' OR w.phase IS DISTINCT FROM 'RECOVERED'
    OR w.owner IS NOT NULL OR w.lease_until IS NOT NULL OR w.fence<>2
-   OR w.next_action IS DISTINCT FROM 'RECONCILE'
-   OR w.outcome::jsonb->'source_or_write_replay_authorised' IS DISTINCT FROM 'false'::jsonb
    OR jsonb_array_length(attempts)<>1
    OR attempts->0->>'phase' IS DISTINCT FROM 'RECOVERED'
    OR attempts->0->>'finished_at' IS NULL
@@ -235,4 +263,56 @@ BEGIN
  THEN RAISE EXCEPTION 'DISPOSITION_INVENTORY'; END IF;
 END $preserve_dispositions$;
 """.replace('MANIFEST', _literal(manifest))
-    return PRELUDE + body + EPILOGUE
+    # Preservation changes data only. Requiring CREATE WITH GRANT OPTION here
+    # would invent an installation privilege prerequisite for a DML operation.
+    return data_owner_prelude() + body + EPILOGUE
+
+
+def data_owner_prelude():
+    from .inactive_owner_writer_install import PRELUDE
+    start='DO $owner_schema_preflight$'
+    end='END $owner_schema_preflight$;\n'
+    if PRELUDE.count(start)!=1 or PRELUDE.count(end)!=1:
+        raise ValueError('DISPOSITION_CAPABILITY_TEMPLATE_DRIFT')
+    return PRELUDE[:PRELUDE.index(start)]+PRELUDE[PRELUDE.index(end)+len(end):]
+
+
+def manifest_from_readback(connection, proposal, *, operational_review_ref):
+    """Seal observed post-recovery hashes, never predict them from old hashes.
+
+    Caller supplies a FRESH read-only transaction after the approved mutations.
+    This read is part of the proposed sequence, not an inspection authorisation.
+    The release transaction independently rechecks every hash under locks.
+    """
+    render_dispositions(proposal)  # validate frozen prior identities and decision refs
+    if not re.fullmatch(r'https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-[0-9]+', operational_review_ref):
+        raise ValueError('RELEASE_OPERATIONAL_REVIEW_REF')
+    if connection.execute('SHOW transaction_read_only').fetchone() != ('on',):
+        raise ValueError('RELEASE_READBACK_MUST_BE_READ_ONLY')
+    rows=connection.execute("""SELECT w.key,
+      encode(sha256(convert_to(to_jsonb(w)::text,'UTF8')),'hex'),
+      (SELECT encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(a) ORDER BY fence)::text,'[]'),'UTF8')),'hex')
+       FROM public.ingestion_work_attempts a WHERE a.work_key=w.key)
+      FROM public.ingestion_work_items w WHERE key=ANY(%s) ORDER BY key""",
+      (sorted(proposal['prior_fingerprints']),)).fetchall()
+    if [r[0] for r in rows] != sorted(proposal['prior_fingerprints']):
+        raise ValueError('RELEASE_READBACK_INVENTORY')
+    effects=[]
+    for key,work_sha,attempts_sha in rows:
+        effect=dict(key=key,prior_sha256=proposal['prior_fingerprints'][key],
+                    work_sha256=work_sha,attempts_sha256=attempts_sha,
+                    release_containment='ACCEPT',coverage='UNKNOWN',
+                    source_or_write_replay_authorised=False,
+                    source_decision_scope='EXPLICIT_OPERATIONAL_RELEASE_NOT_PRESERVATION_ONLY',
+                    review_ref=operational_review_ref)
+        if key.startswith(('21330c06','dc8ae276')):
+            effect.update(effect_state='UNKNOWN',risk_acceptance='OWNER_AND_DISTINCT_REVIEW_EXPLICIT_UNKNOWN',
+                risk_boundary='NO_REPLAY_ONE_GENERATION_NO_COVERAGE',owner_decision_ref=proposal['owner_risk_ref'])
+        effects.append(effect)
+    controller=connection.execute("SELECT encode(sha256(convert_to(outcome::jsonb::text,'UTF8')),'hex') FROM public.ingestion_work_items WHERE key=repeat('0',64)").fetchone()
+    if not controller: raise ValueError('RELEASE_READBACK_CONTROLLER')
+    result=dict(release_status='ACCEPTED_FOR_OPERATIONAL_RELEASE',review_sha256=proposal['review_sha256'],
+                expected_controller_sha256=controller[0],effects=effects,expires_at=proposal['expires_at'])
+    result['manifest_binding_sha256']=connection.execute("SELECT encode(sha256(convert_to(%s::jsonb::text,'UTF8')),'hex')",(json.dumps(result),)).fetchone()[0]
+    render_release(result,expires_at=proposal['expires_at'])
+    return result

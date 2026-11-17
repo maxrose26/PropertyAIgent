@@ -34,6 +34,10 @@ LIVE_PRIVATE_EVIDENCE_RELEASE = False
 LIVE_HISTORICAL_CAMPAIGN_RELEASE = False
 
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
+             'verification/ingestion_storage/release_candidate.py','verification/ingestion_storage/bolton_recovery_guard.py',
+             'verification/ingestion_storage/tameside_candidate.py',
+             'verification/ingestion_storage/inactive_tameside_first_issuer.py',
+             'verification/ingestion_storage/inactive_shared_stop_release_v1.sql',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
              'app/config.py','app/pipeline/discovery_contract.py','verification/ingestion_storage/scope_binding.py',
              'verification/discovery/finite_acceptance.py',
@@ -235,12 +239,17 @@ class Runtime:
             # and permanently unreachable while either code gate is FALSE.
             if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
                     or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
-                    or self.test or self.route_name not in ('POOLER','DIRECT')):
+                    or not ((not self.test and self.route_name in ('POOLER','DIRECT'))
+                            or (self.test and self.route_name=='DISPOSABLE'
+                                and 'release_manifest_sha256' in row.policy))):
                 raise Denied('INTAKE_MODE_NOT_RELEASED')
             from .inactive_tameside_first_issuer import (
                 CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
             )
             stable=render_inactive_stable_campaign_issuer()
+            if 'release_manifest_sha256' in row.policy:
+                from .release_candidate import installed_campaign_sql
+                stable=installed_campaign_sql(self.args.period,row.policy,datetime.now(timezone.utc))
             snippets=[m[3] for m in Owner.FUNCTION_PATTERN.finditer(stable)
                       if m[1]==CAMPAIGN_FUNCTION]
             if len(snippets)!=1:
@@ -257,7 +266,7 @@ class Runtime:
                 "AND p.proname='ingestion_register_campaign_once'"
             )).all()
             if [tuple(r) for r in observed]!=[
-                    ('postgres',expected_sha,'ingestion_storage_owner',True,
+                    ('ingestion_provisioning_test' if self.test else 'postgres',expected_sha,'ingestion_storage_owner',True,
                      ['search_path=pg_catalog'],True,False)]:
                 raise Denied('INTAKE_CAMPAIGN_INSTALLED_SQL_OR_ACL_DRIFT')
         self.durable_run=row.intake_run
@@ -275,7 +284,9 @@ class Runtime:
             # No disposable SQL substitution or rolling-issuer fallback.
             if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
                     or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
-                    or self.test or self.route_name not in ('POOLER','DIRECT')):
+                    or not ((not self.test and self.route_name in ('POOLER','DIRECT'))
+                            or (self.test and self.route_name=='DISPOSABLE'
+                                and 'release_manifest_sha256' in self.policy))):
                 raise Denied('INTAKE_MODE_NOT_RELEASED')
             return 'public.ingestion_register_campaign_once'
         if mode is not None:
@@ -648,7 +659,9 @@ class Runtime:
                 # Never borrow the disposable historical issuer.
                 if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
                         or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
-                        or self.test or self.route_name not in ('POOLER','DIRECT')):
+                        or not ((not self.test and self.route_name in ('POOLER','DIRECT'))
+                            or (self.test and self.route_name=='DISPOSABLE'
+                                and 'release_manifest_sha256' in self.policy))):
                     raise Denied('INTAKE_MODE_NOT_RELEASED')
                 rows=selected_historical_campaign_rows(
                     self.policy,self.args.period,datetime.now(timezone.utc))

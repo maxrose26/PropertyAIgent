@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -18,9 +20,27 @@ guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
 
 
-def test_guarded_real_recovery_and_lost_ack(failed_bolton):
+@pytest.fixture(autouse=True)
+def fixed_run(succeeded10, monkeypatch):
+    from verification.ingestion_storage.daily_intake_runtime import Runtime
+    original=Runtime.__init__
+    def initialise(self,args):
+        original(self,args)
+        if args.period==recovery.PERIOD:
+            self.run_id='ee7cf0d9bc714f56951527b940937054'
+    monkeypatch.setattr(Runtime,'__init__',initialise)
+
+
+def test_guarded_real_recovery_and_lost_ack(failed_bolton,tmp_path):
     w = failed_bolton
     boot = w['boot']
+    if 'S4_SALFORD_SEED' in os.environ:
+        seed=json.loads(os.environ['S4_SALFORD_SEED'])
+        boot.execute('INSERT INTO ingestion_work_items SELECT * FROM json_populate_record(NULL::ingestion_work_items,%s::json)',(json.dumps(seed),))
+    ctl=owner.control(boot)
+    for policy in ctl['intake_periods'].values():policy['expires_at']=0
+    boot.execute("UPDATE ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(ctl),))
+    w['all_other']=recovery.all_other_work_sha(boot)
     before = owner.ledger_sha(boot)
     # Previously missed state/phase, different authority: refuse under the
     # original table/controller locks, before any recovery write.
@@ -44,3 +64,16 @@ def test_guarded_real_recovery_and_lost_ack(failed_bolton):
     assert recovery.all_other_work_sha(boot) == w['all_other']
     assert boot.execute(owner.MEMBERS).fetchall() == w['members']
     assert boot.execute('SELECT period,run_id,name,body,sha256 FROM ingestion_run_evidence ORDER BY period,run_id,name').fetchall() == w['evidence_before']
+    if 'S4_SALFORD_SEED' in os.environ:
+        with w['actor']() as actor:
+            actor_info=actor.info.get_parameters();actor_info['password']=actor.info.password
+        with w['connect']('provisioning_migrator') as migrator:
+            migrator_info=migrator.info.get_parameters();migrator_info['password']=migrator.info.password
+        state=dict(owner=actor_info,migrator=migrator_info,urls=w['urls'],
+                   database_oid=boot.execute('SELECT oid FROM pg_database WHERE datname=current_database()').fetchone()[0])
+        root=Path(os.environ['S4_SUCCESSOR_ROOT'])
+        result=subprocess.run([sys.executable,'-m','tests.candidate_recovery_continuation',str(tmp_path/'candidate')],
+            cwd=root,env=dict(os.environ,PYTHONPATH=str(root)),input=json.dumps(state),
+            capture_output=True,text=True,timeout=90)
+        assert result.returncode==0,result.stdout[-14000:]+result.stderr[-5000:]
+        assert json.loads(result.stdout.splitlines()[-1])['status']=='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED'

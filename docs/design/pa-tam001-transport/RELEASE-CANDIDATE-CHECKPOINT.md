@@ -1,79 +1,143 @@
-# Release candidate implementation checkpoint — NOT an operational proposal
+# Conditional release candidate — offline integration checkpoint
 
-17 November 2026. Stage 4 OPEN. This is incomplete engineering work, not a new
-owner approval dependency. Production recovery, installation, stop clearance,
-deployment and collection remain on hold. v1.4 is consumed; v1.3 remains fenced.
+17 November 2026. MASTER STAGE 4 OPEN. Current gate: exact executable candidate;
+next gate: distinct REVIEW, then one owner operational decision. No production
+recovery, installation, deployment, STOP clearance or collection occurred.
+v1.4 remains consumed; v1.3 remains fenced. Reuse receipt #227/6952744510.
 
-## Implemented and exercised
+## Implemented
 
-- `bolton_recovery_guard.recover` wraps the unchanged #213 module at
-  `f027ba28af69ae70208eab5ed047e4a8a81c6337`, checking its source SHA256
+- `bolton_recovery_guard.recover` wraps unchanged #213 at
+  `f027ba28af69ae70208eab5ed047e4a8a81c6337`; source SHA256
   `5bd306a86bc8b273d3bd0d778e7fc7803e737d7a589828f9f0405bc844a18d4a`.
-  It strengthens only the existing OTHER_WORK query to include every unrelated
-  CLAIMED state, under the original table/controller locks. Actual pinned
-  recovery refused an unrelated CLAIMED/IDLE row, then recovered under STOP14.
-  Deliberately lost COMMIT acknowledgement was resolved by a fresh inspect at
-  STOP15 without repeating the mutation. Original evidence and permissions
-  remained intact.
-- Pure conditional release compiler retains the existing release SQL's locked
-  seven-effect/controller/ACL comparisons, requires exact manifest fingerprints,
-  and adds a manifest-bound finite expiry. PostgreSQL proved expiry refusal,
-  transaction rollback, STOP15→16, independent readback and duplicate refusal.
-- Conditional campaign compiler binds the entire policy and release-manifest
-  hash in SQL. Only Tameside RECEIVED 15–21 September 2026, max_runs=1, is admitted.
-  Direct SQL tests refused altered dates, council, expiry, build binding and a
-  well-formed but incorrect source-plan hash. Table-before-controller locks
-  protect the claim census, including the owner preflight path.
-- Stopped campaign installation was exercised as a real non-superuser postgres
-  login in the disposable database. CREATE on the schema is temporary, restored
-  before commit; owner membership is also restored. Worker EXECUTE remains absent.
-- Proposed six-item historical disposition SQL validates compound original
-  work/attempt fingerprints while stopped. It saves original rows and attempts
-  verbatim in checkpoints, changes no attempts or source evidence, preserves
-  UNKNOWN and permanent no-replay, and refuses changed preimages/repetition.
+  The original locked OTHER_WORK check now includes every unrelated CLAIMED
+  item. Original recovery checks, receipt, evidence and cleanup are retained.
+- `release_candidate.render_dispositions` binds six historical dispositions
+  to their original compound work/attempt hashes; the seventh is exact Bolton
+  recovery. Original rows/attempts are preserved, attempts are not rewritten,
+  UNKNOWN stays UNKNOWN, and all seven remain permanently barred from replay.
+  The two older Bolton fixture rows have OPERATOR_REVIEW, not RECONCILE, and no
+  original no-replay flag. The exact preimage hash remains mandatory; the new
+  no-replay prohibition does not fabricate an old flag or old cleanup outcome.
+- Disposition DML uses the existing temporary owner-role lifecycle but does not
+  unnecessarily require schema CREATE grant options. Actual installation still
+  requires and checks the schema grant capability. Campaign installation grants
+  storage-owner CREATE temporarily and verifies its removal before commit.
+- The campaign compiler binds the complete policy and canonical source-plan hash
+  in SQL, plus the release-manifest hash. Only Tameside RECEIVED 15–21 September
+  2026, max_runs=1, is accepted. Owner and runtime calculate that same installed
+  function. Owner registration checks the actual postgres session, installed
+  body/owner/search_path and the real controller before temporary capability.
+- `manifest_from_readback` seals the seven actual post-recovery/disposition row
+  and attempt hashes and controller hash through a separate read-only connection.
+  Release independently rechecks them under locks. Future hashes are not guessed
+  from old hashes. A review URL/content hash is a binding, not proof of approval.
+- `tameside_candidate` is an explicit executable entry point; imports leave both
+  live flags FALSE. Its enabled context accepts only the exact single batch,
+  current build binding, release hash and expiry no later than **18 November
+  2026 20:00 UTC**. It restores both flags on success or exception. The registered
+  SQL policy, STOP checks, expiry and max_runs remain independent enforcement.
 
-## Validation and precise limits
+## Connected validation and its boundaries
 
-Local disposable PostgreSQL **17.11**, loopback only, no production credentials or
-council requests. Six focused tests passed in 15.46 seconds, including the actual pinned
-#213 guard/recovery entry point; no skips. Forty-three existing pure issuer checks were
-also reused in the earlier 46-check run (three new PG checks at that point).
+Local PostgreSQL 17.11, loopback-only disposable database, no production secrets
+or council requests. Eight focused candidate tests plus 43 existing issuer
+checks pass (51 total). The joined test uses the actual pinned #213 failed-run
+fixture and guarded recovery; deliberately lost COMMIT acknowledgement is
+resolved by a fresh STOP15 read without repeating recovery.
 
-Release component fixtures substitute local database/principal identity and
-synthetic historical hashes. The restricted installation test keeps the actual
-postgres session identity and permission lifecycle. These are component proofs,
-NOT one joined production-candidate recovery→collection acceptance. The old
-unchanged recovery/retention/backlog proof remains evidence for its earlier
-synthetic assumptions; it does not close the new integration gap.
+In that SAME database the current candidate then executes six dispositions,
+writer installation, campaign installation while STOP15 remains set, separate
+manifest readback, conditional STOP16 release, actual
+`Owner.register_historical_campaign_period`, and the runtime under
+`tameside_candidate.enabled`. The actual non-superuser postgres owner executes
+those administrative paths. Temporary owner/barrier/schema privileges are
+restored. Independent evidence readback verifies all three stored artifact
+hashes and absence of worker/effect database sessions after closure.
 
-`release-proposal.json` records the seven original fingerprints and exact
-historical decision references, the single batch, all-ten follow-on inventory
-and a **proposed** expiry of 18 November 2026 20:00 UTC. It is not an accepted
-operational manifest. Its digest binds its content, not owner authentication.
-Post-recovery controller/work/attempt hashes are intentionally not fabricated.
+The result is ONE synthetic retained listing, COMPLETE metadata screening and
+one discoverable backlog record, with CLOSED cleanup and INVALIDATED authority.
+Application admission is disconnected: no verified qualification or saved
+scheme facts are claimed. No production population is evidenced.
 
-## Single remaining deliverable
+Explicit fixture projections: database name, historical fixture hashes,
+synthetic source evidence, local transport and bootstrap-provided owner schema
+and barrier ADMIN privileges. Existing fixture credentials are activated only
+for this disposable run and disabled afterward. These are NOT observations of
+present production grants, deployed runtime resources or credential restoration.
+The dedicated install test also proves transactional rollback/absence, duplicate
+installation refusal and original membership/schema baseline restoration.
+Negative tests retain expiry, changed fingerprints/state, wrong canonical source
+plan (including valid-looking wrong SHA), council/window/build drift, unrelated
+CLAIMED work, duplicate refusal and explicit enabled-context restoration.
 
-Complete the connected executable integration in this PR. Owner and runtime
-still calculate the inactive issuer fingerprint and both default live flags
-remain false. The new compilers are not yet selected by those entry points.
-The guarded recovery adapter also needs the final bounded command integration.
+## Ordered operational sequence for review — NOT authorised commands
 
-Wire the reviewed compiler into those existing entry points, produce the exact
-enabled build and complete policy/configuration, and define the mechanically
-verified post-recovery/disposition receipt-to-release-manifest binding. Do not
-fill required hashes with fixture values or obtain them by assuming an unchanged
-controller. Reuse the v1.4 observation; do not rerun an inspection. Validate the
-actual guarded #213 recovery, fresh STOP15 readback, stopped installation,
-six dispositions, conditional STOP16 release, exact historical campaign issuer,
-synthetic capture/retention/screening/backlog and cleanup on the same disposable
-database, without manufacturing intermediate production states.
+1. Existing owner route reconciles overlap, consumed/fenced invocations and
+   unchanged accepted provider containment. Verify pinned checkout, owner
+   identity, exact existing private runtime configuration and all necessary
+   capabilities before any mutation; mismatch stops the sequence.
+2. Load unchanged #213 module and binding through existing owner adapter; invoke
+   `bolton_recovery_guard.recover(connection,binding,pinned_module=module)` once
+   under STOP14. On uncertain acknowledgement: fresh `module.inspect`, never
+   blind retry. Require exact COMMITTED_STATE_VERIFIED_READ_ONLY and STOP15,
+   original marker/journal/attempt/evidence preserved and no replay authority.
+3. Execute `render_dispositions(release-proposal.json)` once while stopped.
+   Install pinned writer and `render_campaign_install` while STOP15 remains.
+   Read back function bodies/owners/ACLs, role memberships and schema privileges.
+   Failure rolls back the current transaction, leaves STOP in place, and stops.
+4. A fresh READ ONLY transaction invokes `manifest_from_readback` with the final
+   distinct operational REVIEW reference, retaining its exact output. Compile
+   `render_release` from that output. Execute once; fresh readback must show
+   STOP16, both stops clear, same manifest hash and restored temporary privileges.
+   Unknown commit means independent reconciliation before any further phase.
+5. Under `tameside_candidate.enabled(policy)`, use the existing owner registration
+   entry point once. It rechecks the actual session, installed function and STOP
+   before temporary capability, then independently reads back restored grants.
+6. Existing restricted runtime only (no owner credential in worker environment):
+   `timeout --signal=INT --kill-after=5s 960s python -m
+   verification.ingestion_storage.tameside_candidate --policy <sealed-policy>
+   --period <canonical-period> --output <fresh-directory> --hostaddr <bound-address>`.
+   These named files/values MUST be sealed from the existing owner checkpoint;
+   this displayed command is not yet a dispatchable pinned operational command.
+7. Separately read committed capture, screening and backlog records, distinguish
+   new unique listings/updates/rejections/unresolved outcomes, and verify artifact
+   hashes. Qualification, admitted Applications and saved facts are separate,
+   only reported if evidenced. Verify authority invalidation, sessions, original
+   restricted-role settings and provider/process cleanup. A failed/uncertain
+   run stops; expiry and an empty session list alone do not prove process closure.
 
-Then return exact executable/configuration/manifest pins and ordered commands
-for distinct REVIEW and one owner operational decision. Current recommendation:
-**NO-GO for that decision; no additional owner scope approval needed for finishing
-this offline integration.** Manchester, Bolton and Tameside remain explicit with
-Bury, Oldham, Rochdale, Salford, Stockport, Trafford and Wigan in follow-on scope.
-Trafford remains unqualified for execution; no dummy source qualification added.
+Limits remain: one batch/run; source 10 requests, zero retries, six pages/five
+rows per page, 3 MB, 45s source worker/60s supervisor; existing aggregate runtime
+960s including closure reserve, database, memory, byte and publication limits.
+Do not widen the window, manufacture a qualification target or infer completion
+from a successful job. Preserve partial coverage and failed captures.
 
-No new production population, qualification, saved facts or backlog is evidenced.
+## Remaining binding dependency / recommendation
+
+**GO for distinct review of this offline integration; NO-GO for an operational
+approval or dispatch.** The available v1.4 receipt pins database identity and
+Bolton STOP14 state, not the existing owner-side restricted runtime configuration.
+The final policy needs the real retained route/address, browser/resource profile,
+restricted credential lifecycle and intended runtime target/build binding. The
+joined test supplies those as explicit fixtures; it does not resolve them live.
+The frozen #213 owner launcher also names its original period/job command, so it
+must not be dispatched unchanged for this new period.
+
+Single next dependency: recover the existing private owner checkpoint's non-secret
+runtime binding through the existing owner route, then finish its narrow command
+adaptation and seal the policy/manifest recipe and dispatch command against this
+candidate. Do not invent a new credential/store, repeat the consumed inspection,
+or request generic offline approval. If the checkpoint is unavailable, report
+that exact access limitation and retain NO-GO. No owner operational decision is
+requested on this incomplete binding.
+
+The final owner decision must cover the complete pinned sequence above, including
+mechanical post-recovery manifest sealing, existing restricted access activation
+and restoration, one Tameside batch and independent readbacks; it must not be
+misrepresented as already granted by the historical risk acceptances.
+
+Follow-on scope remains all ten: Manchester, Bolton, Tameside, Bury, Oldham,
+Rochdale, Salford, Stockport, Trafford and Wigan. Initial fallback 15 September
+2026 through the bound London execution date, <=7-day windows, current day partial.
+Trafford remains required but unqualified for live execution; no dummy contract.
