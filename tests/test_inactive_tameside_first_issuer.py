@@ -298,3 +298,75 @@ def test_inactive_owner_runtime_policy_refuses_replayed_period():
             as_of, "tameside", "2026-09-15", "2026-09-21",
             period="unbound-replay", policy=policy, observed_stop=stop,
             execution_binding=binding)
+
+
+def test_inactive_runtime_batch_matches_owner_and_source_without_grant():
+    """One canonical finite Tameside scope, checked at both proposed boundaries.
+
+    The existing positive disposable PG collector is a DIFFERENT, test-only
+    issuer: this review must never enable the stable production candidate.
+    """
+    from verification.ingestion_storage.daily_intake_runtime import (
+        Runtime, review_inactive_campaign_runtime_batch,
+    )
+    from app.ingestion.ledger import Denied
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    reviewed = review_inactive_campaign_runtime_batch(
+        as_of, period=period, policy=policy, observed_stop=stop,
+        execution_binding=binding)
+    expected = candidate.prepare_inactive_campaign_owner_batch(
+        as_of, "tameside", "2026-09-15", "2026-09-21")
+    assert reviewed["schema"] == "PA_D004_INACTIVE_RUNTIME_BATCH_REVIEW_V1"
+    assert reviewed["period"] == expected["period"]
+    assert reviewed["scope"] == expected["campaign_batch"]
+    assert reviewed["source_plan_sha256"] == expected[
+        "campaign_source_plan_sha256"]
+    assert reviewed["proposed_issuer_sha256"] == expected[
+        "stable_issuer_sha256"]
+    assert len(reviewed["owner_policy_sha256"]) == 64
+    assert reviewed["manifest_status"] == "WITHHELD"
+    assert not reviewed["owner_registration_authorised"]
+    assert not reviewed["runtime_enabled"] and not reviewed[
+        "collection_authorised"]
+    runtime = object.__new__(Runtime)
+    runtime.policy = policy
+    runtime.test = False
+    runtime.route_name = "POOLER"
+    with pytest.raises(Denied, match="INTAKE_MODE_NOT_RELEASED"):
+        runtime.intake_issuer()
+    runtime.test = True
+    runtime.route_name = "DISPOSABLE"
+    with pytest.raises(Denied, match="INTAKE_MODE_NOT_RELEASED"):
+        runtime.intake_issuer()
+
+
+@pytest.mark.parametrize("mutation,refusal", [
+    ("mode", "INTAKE_CAMPAIGN_REVIEW_MODE"),
+    ("scope", "INTAKE_CAMPAIGN_REVIEW_SCOPE"),
+    ("stop", "CAMPAIGN_OWNER_STOP_NOT_RELEASED"),
+    ("sha", "CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT"),
+    ("semantics", "INTAKE_CAMPAIGN_RUNTIME_SEMANTICS_DRIFT"),
+])
+def test_inactive_runtime_review_refuses_drift(monkeypatch, mutation, refusal):
+    from types import SimpleNamespace
+    from verification.ingestion_storage import daily_intake_runtime
+    as_of, period, policy, stop, binding = _inactive_owner_policy_fixture()
+    if mutation == "mode":
+        policy["mode"] = None
+    elif mutation == "scope":
+        policy["campaign_batch"]["unbounded"] = True
+    elif mutation == "stop":
+        stop["hard_stop_generation"] = 14
+        policy["expected_stop"]["hard_stop_generation"] = 14
+    elif mutation == "sha":
+        policy["campaign_source_plan_sha256"] = "f" * 64
+    else:
+        monkeypatch.setattr(daily_intake_runtime, "binding_for",
+                            lambda council: SimpleNamespace(
+                                semantics="VALIDATED"))
+    with pytest.raises((ValueError, daily_intake_runtime.Denied),
+                       match=refusal):
+        daily_intake_runtime.review_inactive_campaign_runtime_batch(
+            as_of, period=period, policy=policy,
+            observed_stop=stop, execution_binding=binding)
+
