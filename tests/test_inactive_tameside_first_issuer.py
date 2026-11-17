@@ -399,3 +399,30 @@ def test_inactive_runtime_review_refuses_drift(monkeypatch, mutation, refusal):
             as_of, period=period, policy=policy,
             observed_stop=stop, execution_binding=binding)
 
+
+
+def test_historical_owner_pregrant_observation_requires_no_update_privilege():
+    """Source-level regression: production postgres has no proven UPDATE.
+
+    This is a negative boundary check, NOT a connected PostgreSQL result.
+    The advisory snapshot must be read-only; the *issuer* does the locked
+    expected_stop comparison after temporary capability is acquired.
+    """
+    import inspect
+    from verification.ingestion_storage.operational_owner import Owner
+
+    source = inspect.getsource(Owner.register_intake_period)
+    start = source.index("rows=self.q(c,\"SELECT outcome FROM public.ingestion_work_items \"")
+    grant = source.index("self.q(c,'GRANT ingestion_barrier_releaser", start)
+    pregrant = source[start:grant]
+    assert '"WHERE key=repeat(\'0\',64)")' in pregrant
+    assert "FOR SHARE" not in pregrant and "FOR UPDATE" not in pregrant
+    # This assertion prevents incorrectly replacing the issuer's protective
+    # locking CAS with only an unlocked owner-side SELECT.
+    stable = candidate.render_inactive_stable_campaign_issuer()
+    assert ("SELECT outcome::jsonb INTO STRICT ctl FROM "
+            "public.ingestion_work_items WHERE key=repeat('0',64) "
+            "FOR UPDATE;") in stable
+    assert "e->'expected_stop' IS DISTINCT FROM" in stable
+    assert "CAMPAIGN_STABLE_MANIFEST_WITHHELD" in stable
+    assert "ingestion_register_campaign_once" not in intake_policy.installation_script()
