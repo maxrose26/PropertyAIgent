@@ -183,7 +183,7 @@ class StoppedDeployment:
             require(self.clock()+2100<=EXPIRY,'PREPARATION_EXPIRY_RESERVE')
             current_service=self.call('GET')
             current_guard=pinned.service_guard(current_service)
-            require(current_service == baseline['service']
+            require(current_guard == original.get('original_guard',pinned.service_guard(baseline['service']))
                     and self.environment() == baseline['environment'], 'PREPARATION_PROVIDER_BASELINE_DRIFT')
             if 'original_guard' in original:
                 require(current_guard==original['original_guard'],'PREPARATION_RETAINED_GUARD_DRIFT')

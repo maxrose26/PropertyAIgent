@@ -74,6 +74,7 @@ def exercise(w, recovery, tmp_path):
     old=pinned.Journal(db,period=pinned.PERIOD);old.period=recovery.PERIOD;old.owner_period=old.period+'_owner'
     old.owner_run=hashlib.sha256(old.owner_period.encode()).hexdigest()[:32]
     state=dict(period=old.period,status='CLOSED',original_service=service,original_environment=environment,
+        original_guard=pinned.service_guard(service),
         cleanup_reserve=dict(pinned.cleanup_reserve_policy(),cleanup_writes=0))
     for n in range(48):
         state['sequence']=n;old.save(copy.deepcopy(state))
@@ -134,7 +135,9 @@ def exercise(w, recovery, tmp_path):
             if path=='/env-vars?limit=100':return [{'envVar':dict(key=k,value=v)} for k,v in self.env.items()]
             if path=='/deploys?limit=100':return copy.deepcopy(self.deploys)
             if path=='/jobs?limit=100':return []
-            return copy.deepcopy(self.service)
+            observed=copy.deepcopy(self.service)
+            observed['updatedAt']='2026-11-17T20:30:00Z'  # not a configuration field
+            return observed
     def new(api,hook=lambda _:None):
         return prep.StoppedDeployment(pinned,db,lambda:api,revision=revision,
             checkpoint=checkpoint,baseline=baseline,interrupt=hook)
