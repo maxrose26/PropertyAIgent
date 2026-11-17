@@ -77,6 +77,55 @@ def registration_payload(period,reg,binding,*,run_id=None):
                 identity_json={r['key']:canonical({k:r[k] for k in ('subject','task','contract','revision')}).decode() for r in rows})
 
 
+
+def review_inactive_campaign_runtime_batch(
+        as_of, *, period, policy, observed_stop, execution_binding):
+    """Pure owner-to-runtime scope review, with NO executable authority.
+
+    This binds the runtime's existing source semantics to the owner's
+    canonical, source-recomputed one-batch approval proposal. It deliberately
+    cannot issue a grant or change Runtime.execute/intake_issuer, which still
+    refuse CAMPAIGN_FINITE_HISTORICAL_V1 in every environment. The live owner
+    registration, production identity/ACL and generation-14 recovery are NOT
+    established by a reviewed policy shape.
+    """
+    from .inactive_tameside_first_issuer import CAMPAIGN_MODE
+
+    if type(policy) is not dict or policy.get('mode') != CAMPAIGN_MODE:
+        raise Denied('INTAKE_CAMPAIGN_REVIEW_MODE')
+    batch=policy.get('campaign_batch')
+    if (type(batch) is not dict
+            or set(batch)!={'council','start','end','semantics'}
+            or any(type(v) is not str for v in batch.values())):
+        raise Denied('INTAKE_CAMPAIGN_REVIEW_SCOPE')
+    reviewed=Owner.review_inactive_campaign_period(
+        as_of,batch['council'],batch['start'],batch['end'],
+        period=period,policy=policy,observed_stop=observed_stop,
+        execution_binding=execution_binding)
+    # The canonical owner review is not sufficient by itself: the actual
+    # runtime source selector must agree on date semantics for this council.
+    if binding_for(batch['council']).semantics!=batch['semantics']:
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_SEMANTICS_DRIFT')
+    if (reviewed['period']!=period
+            or reviewed['campaign_batch']!=batch
+            or reviewed['manifest_status']!='WITHHELD'
+            or any(reviewed[flag] is not False for flag in (
+                'actual_role_acl_verified','live_stop_observed',
+                'source_contract_qualified','installer_authorised',
+                'owner_registration_authorised','runtime_enabled',
+                'collection_authorised'))):
+        raise Denied('INTAKE_CAMPAIGN_RUNTIME_REVIEW_DRIFT')
+    return dict(
+        schema='PA_D004_INACTIVE_RUNTIME_BATCH_REVIEW_V1',
+        period=period,scope=dict(batch),
+        source_plan_sha256=reviewed['campaign_source_plan_sha256'],
+        owner_policy_sha256=reviewed['policy_sha256'],
+        proposed_issuer_sha256=reviewed['stable_issuer_sha256'],
+        manifest_status='WITHHELD',owner_registration_authorised=False,
+        runtime_enabled=False,collection_authorised=False)
+
+
+
 class Runtime:
     def __init__(self,args):
         self.args=args;self.root=Path(args.output);self.run_id=__import__('uuid').uuid4().hex
