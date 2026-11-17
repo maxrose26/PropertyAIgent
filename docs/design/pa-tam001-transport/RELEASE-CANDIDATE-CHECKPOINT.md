@@ -1,3 +1,15 @@
+# Current update — corrected PA-TAM002 v1.1, 17 November 2026 19:32 London
+
+[Complete inactive package](TAMESIDE-OPERATIONAL-PACKAGE.md) and [artifact hashes](artifact-pins.json).
+Source **d9a2242bc5bcccb2d78a3aa04e1082635ed8933e**, tree **15aa183980ad6bc9f77138296fdd8b8828974c98**.
+Both review findings are corrected: canonical runtime screening digest/V3 boundary, and Tameside-only HTTP handoff without a browser profile with strict filtering and restoration. The existing encrypted journal is now exercised through activation, closure, capacity limits and independent read-only reconciliation after lost acknowledgement.
+
+Final source validation: **279 local focused tests passed**, then **one affected integrated test passed** after the final read-only transaction refinement. [Required hosted Stage4 run 44158175273](https://github.com/maxrose26/PropertyAIgent/actions/runs/44158175273): **8/8 jobs SUCCESS**, including **30 package tests** and the repaired boundary within the **1078-test safety matrix**. AH/reusable checks succeeded. Provider I/O remains mocked; connected database evidence uses disposable PostgreSQL, not production.
+
+Expiry remains **18 November 2026 20:00 London**, latest binding **19:25** that day; no extension. **GO for distinct independent REVIEW; NO-GO for production until the single operational decision.** No production records or opportunities were produced. Stage4 OPEN. v1.4/v1.5 consumed, v1.3 fenced. Earlier entries below are preserved history and do not override this corrected checkpoint.
+
+---
+
 # Current update — final inactive operational review package
 
 See [PA-TAM002 v1.0](TAMESIDE-OPERATIONAL-PACKAGE.md) and [exact artifact pins](artifact-pins.json).

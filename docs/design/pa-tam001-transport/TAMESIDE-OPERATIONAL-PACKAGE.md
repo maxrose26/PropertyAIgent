@@ -1,9 +1,28 @@
-# PA-TAM002 v1.0 — one inactive recovery/release/Tameside package
+# PA-TAM002 v1.1 — one inactive recovery/release/Tameside package
 
 17 November 2026. **Stage 4 OPEN. Prepared for independent REVIEW; not authority
 for execution.** Current gate: review this exact integrated package. Next gate:
-one explicit owner operational decision. Source revision: bd292e8110e9098f344d0ef2176d632988706c7a;
-source tree: e6dbe3816c2474ed3dd7016d125b4cbc7a829751. The documentation commit is not the enabled build.
+one explicit owner operational decision. Source revision: d9a2242bc5bcccb2d78a3aa04e1082635ed8933e;
+source tree: 15aa183980ad6bc9f77138296fdd8b8828974c98. The documentation commit is not the enabled build.
+
+## Corrected candidate
+
+This supersedes v1.0's failed build. It reuses the corrective worker's five
+commits through d66fed0601c4b0dee12d06f1c6224f5a7880de6b. That worker released its
+claim at PR227/6958238955 and completed at 19:15:20.380290Z before this session
+edited. Its build passed eight Stage4 jobs in run 44155820947. The final build's
+results are separately required below, not inherited.
+
+The sealer calls `daily_intake_runtime.runtime_screening_config_sha256()` without
+importing/selecting V3. The reviewed consumer list/scanner remain unchanged. The
+sealed digest is tested against the runtime's exact rule.
+
+The Tameside-only handoff succeeds without browser profile/path; a bound stale
+profile refuses before a provider write. Old browser environment keys are removed
+for the finite HTTP job and restored exactly afterwards. Only four harmless
+names and two restricted DSNs enter the mapping. Wrong period or missing finite
+timing refuses before any provider call. Pinned #213's Manchester path is
+unchanged. Provider tests use mocks; they are not production connectivity proof.
 
 ## Outcome and scope
 
@@ -40,7 +59,7 @@ neither the shutdown-gap campaign nor Stage 4 completion.
 
 ## Exact pins and finite values
 
-The build is bd292e8110e9098f344d0ef2176d632988706c7a. `artifact-pins.json` lists the source hashes and
+The build is d9a2242bc5bcccb2d78a3aa04e1082635ed8933e. `artifact-pins.json` lists the source hashes and
 execution binding; #213 owner adapter remains
 `f027ba28af69ae70208eab5ed047e4a8a81c6337`. Guarded Bolton recovery source is
 `5bd306a86bc8b273d3bd0d778e7fc7803e737d7a589828f9f0405bc844a18d4a`.
@@ -121,7 +140,10 @@ environment and stable credential data needed for restoration; do not copy all
 old phase history or any old pending intents. Validate actual encrypted capacity
 before effects, with the existing cleanup-reserve policy and sixteen reserved
 snapshots. Persist a prepared activation state before activation. Unknown journal
-acknowledgement requires `load()` and exact comparison; never repeat blindly.
+acknowledgement requires `tameside_owner_journal.reconcile(pinned_owner_module, db)`
+and exact comparison with the retained intent. It opens a separate READ ONLY
+transaction, decrypts with the existing codec, rolls back and closes; no write
+is repeated. Missing state is UNKNOWN; fresh() refuses a used namespace.
 
 ## Ordered execution contract — only after separate REVIEW and owner approval
 
@@ -195,7 +217,9 @@ never permits proceeding to the next phase merely because its timeout expired.
 
 ## Validation and acceptance limits
 
-Focused result: **26 passed / 0 skipped in 24.44s**. PostgreSQL17.11 on loopback, no live sources.
+Focused result: **279 passed / 0 skipped in 29.21s**. After the final READ ONLY
+reconciliation refinement, the affected integrated test passed again in 25.09s;
+unchanged passing evidence is reused. PostgreSQL 17.11 on loopback, no live sources.
 The joined actual-entrypoint test covers guarded recovery/lost-COMMIT readback,
 STOP15 dispositions, actual restricted-owner stopped installations, new journal
 namespace/CAS/duplicate refusal, independent manifest, STOP16 release, actual
@@ -208,19 +232,27 @@ provider handoff, duplicate submission, restoration and lost-ack reconciliation.
 
 Fixture projections remain explicit: local database/route, synthetic historical
 rows/source and credential values, bootstrap-provided installation capabilities,
-and mocked provider I/O. Journal SQL uses opaque synthetic bytes in its connected
-CAS test; unchanged pinned Vault codec/reserve tests are reused, not represented
-as a new production encryption test. Newly enabled production code, actual schema
+and mocked provider I/O. The actual pinned encrypted journal callback now records activation and closure
+in the integrated sequence, with independently decrypted readback at each call.
+A committed journal write with deliberately lost acknowledgement is recovered
+without repeating it. Missing state, duplicate operation and stale CAS refuse.
+Original evidence rows' stored and calculated hashes are compared before/after.
+Installation is tested with transaction rollback and a lost post-COMMIT
+acknowledgement resolved by separate installed-body/privilege readback. Normal
+writes stop at ordinal 47; all sixteen cleanup snapshots succeed through ordinal 63, then further
+writes refuse. The byte reserve is preserved. After the capacity stress proof,
+ONLY its synthetic namespace is reset in disposable PostgreSQL before testing
+actual activation/closure callbacks. No original namespace changes; this is not
+a proposed production deletion/reset. Newly enabled production code, actual schema
 rights, deployment, authentication, process closure and population remain unproven
 until the separately authorised operation and its readbacks. Earlier passing
-recovery/readback/issuer evidence is reused where unchanged. Exact-head hosted Stage4 run 44142150832 was in progress at publication;
-no final hosted pass is claimed. Final aggregate
+recovery/readback/issuer evidence is reused where unchanged. Final source d9a2242 passed **8/8 required Stage4 jobs** in [run 44158175273](https://github.com/maxrose26/PropertyAIgent/actions/runs/44158175273). The expanded actual-entrypoint/package step passed **30 tests in 31.11s**. The repaired V3 boundary passed within the **1078-test safety matrix**. AH and reusable workflows also succeeded. These counts describe their named checks; unrelated workflow steps retain their documented skips. Final aggregate
 review must assess these new adapters and journal delta, not inherit an earlier
 component acceptance automatically.
 
 ## One proposed decision, after independent REVIEW
 
-**PA-TAM002 v1.0 — recommend approval only after exact-head REVIEW accepts this
+**PA-TAM002 v1.1 — recommend approval only after exact-head REVIEW accepts this
 package and required checks.** It would authorise the entire finite sequence:
 existing-service candidate deployment while stopped; exact Bolton recovery and
 historical dispositions; stopped writer/campaign/journal installation; mechanical
@@ -233,6 +265,13 @@ to remain stopped; optional browser, deletion, WhatsApp or publication work woul
 not resolve this gate. Excludes wider collection, retries/replay, extra spend,
 new credentials/services, Application admission, Stage5 activation and Stage4
 closure. No approval is requested before independent REVIEW is complete.
+
+## Expiry check
+
+Checked **17 November 2026 19:32 London**: 24h28m remains to the fixed expiry, and 23h53m to the latest binding time. This is practical for review and approval now, but must be checked again at execution. Latest permitted bound_at is **18 November 2026 19:25 London**
+(20:00 minus 2100s). Preflight/build preparation must also fit. This is not a
+scheduled dispatch. An expired/insufficient window refuses; a later expiry
+requires a revised owner decision, never an automatic extension.
 
 **Recommendation now: GO for independent REVIEW of this inactive package;
 NO-GO for production execution until explicit acceptance/operational approval.**

@@ -1,18 +1,51 @@
 {
   "decision_id": "PA-TAM002",
   "execution_binding": {
-    "manifest_sha256": "90c04b7d9bc2012273d5244cf30b038fa1ca16555613272f761452a6acb7c5be",
-    "revision": "bd292e8110e9098f344d0ef2176d632988706c7a",
-    "workflow_sha256": "0093eaea8d509067950598e35279a739af716f8576640dc5f59b2914194383a8"
+    "manifest_sha256": "24fa319f7ba91c683917c3bbe78c0a9e62f676354b2978e230541f35c31743ce",
+    "revision": "d9a2242bc5bcccb2d78a3aa04e1082635ed8933e",
+    "workflow_sha256": "ca9d052e4779d34e5d725c98cf629c6acf9184185cf7bc5740d915da0edc0268"
   },
+  "expiry_ceiling": "2026-11-18T20:00:00+00:00",
   "files": {
+    ".github/workflows/stage4-discovery-offline.yml": {
+      "bytes": 54270,
+      "sha256": "ca9d052e4779d34e5d725c98cf629c6acf9184185cf7bc5740d915da0edc0268"
+    },
     "docs/design/pa-tam001-transport/release-proposal.json": {
       "bytes": 2152,
       "sha256": "b76a85f17bac08326de0877807ba646b52734d4fdbe1bb417d30020f069859c9"
     },
+    "tests/candidate_recovery_continuation.py": {
+      "bytes": 11601,
+      "sha256": "0adf4f9f761f9a02d931b3733ea348d90582715b76054f592014aeaba61a4d21"
+    },
+    "tests/tameside_journal_proof.py": {
+      "bytes": 6042,
+      "sha256": "7a87524a7d4fea297f8d2b2c8f196498624774eb3499f9299bd105b360b331a0"
+    },
+    "tests/test_release_candidate_pg.py": {
+      "bytes": 25105,
+      "sha256": "98ec68d46c73260c01b1e08cd375f06fe49fd4ae04d590b20e9c8a60b73abd3f"
+    },
+    "tests/test_tameside_job_boundary.py": {
+      "bytes": 1394,
+      "sha256": "7cf12b2d44baa3079200195cc51dc61b6d30987d3f96224f26dc28d2fbdeaf0d"
+    },
+    "tests/test_tameside_owner_io.py": {
+      "bytes": 4822,
+      "sha256": "dd6fec8f51024b8843fab082a6757511b229eff4d9f0683dee736042b1cc3749"
+    },
+    "tests/test_tameside_package.py": {
+      "bytes": 1631,
+      "sha256": "35e2e1763a5b4ef7edbfe84870dbc2e07b80acc5a4f9e3730b0fd3c94f468140"
+    },
     "verification/ingestion_storage/bolton_recovery_guard.py": {
       "bytes": 1199,
       "sha256": "fe2b30085a0c2fa81ddcfcebb5fc6407655281c0de6e2351d25cb6413982bae5"
+    },
+    "verification/ingestion_storage/daily_intake_runtime.py": {
+      "bytes": 59706,
+      "sha256": "9e57e46563ed09130fd20b270f0f3c5dfe22d757a2ee8d2151897e59c4824edc"
     },
     "verification/ingestion_storage/inactive_shared_stop_release_v1.sql": {
       "bytes": 18502,
@@ -31,26 +64,28 @@
       "sha256": "896986207cb1c96a7cd0166cab27977362e10e48f8a883c4b2e0ce00b3e0745e"
     },
     "verification/ingestion_storage/tameside_owner_access.py": {
-      "bytes": 13193,
-      "sha256": "3852d80b8768805cc2562aa2e451044aa93460b40767924fa51484b13a295279"
+      "bytes": 14759,
+      "sha256": "c5d38d156035daac5aab2983d5b7fc2ed345ae9acb44864cf3312d9b8e53615c"
     },
     "verification/ingestion_storage/tameside_owner_journal.py": {
-      "bytes": 3625,
-      "sha256": "e1a09d27ed7a87da7a10b9c468718743f9885f41fd6d922871cbbb6fa80dc7e6"
+      "bytes": 4589,
+      "sha256": "1ed75e2c31c9e2f705afb4877c299b9488de5d2b6d2240546dccafb272c0885a"
     },
     "verification/ingestion_storage/tameside_package.py": {
-      "bytes": 5620,
-      "sha256": "2e812dc7f5e5c7edea6449fbd8eb2346782a8820f291a37c759ddd5c38f031f0"
+      "bytes": 5503,
+      "sha256": "a57e4a5e7429ae6c0c2f18d82a5cadf538da8c2354ca865c7a0c40f61d3d3e3d"
     }
   },
+  "latest_bound_at": "2026-11-18T19:25:00+00:00",
   "owner_journal": {
     "period": "S4_FINITE_677f555670666bcf21f45860_owner",
     "run": "416cdc40d6837dbb772e2bcce514bf39"
   },
   "owner_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
-  "proposal_version": "1.0",
-  "revision": "bd292e8110e9098f344d0ef2176d632988706c7a",
+  "proposal_version": "1.1",
+  "revision": "d9a2242bc5bcccb2d78a3aa04e1082635ed8933e",
+  "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "e6dbe3816c2474ed3dd7016d125b4cbc7a829751",
+  "tree": "15aa183980ad6bc9f77138296fdd8b8828974c98",
   "version": 1
 }
