@@ -529,13 +529,53 @@ class Owner:
         return self.register_intake_period(
             name, policy, disposable_catchup=True)
 
-    def register_intake_period(self,name,policy,*,disposable_catchup=False):
+    def register_historical_campaign_period(self, name, policy, *, as_of):
+        """Production-intended one-batch owner seam, code-sealed INACTIVE.
+
+        This is NOT the disposable issuer. The only future positive path
+        requires exact source-derived owner policy, a separate reviewed
+        release change, actual production SQL/ACL verification and STOP=16.
+        With current code flags FALSE, refuses before opening a connection.
+        """
+        from .daily_intake_runtime import (
+            LIVE_PRIVATE_EVIDENCE_RELEASE, LIVE_HISTORICAL_CAMPAIGN_RELEASE,
+        )
+        if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
+                or LIVE_PRIVATE_EVIDENCE_RELEASE is not True):
+            raise ValueError('CAMPAIGN_OWNER_OPERATIONAL_RELEASE_WITHHELD')
+        if self.identity != 'postgres' or type(policy) is not dict:
+            raise ValueError('CAMPAIGN_OWNER_IDENTITY_OR_POLICY')
+        batch = policy.get('campaign_batch')
+        if type(batch) is not dict or set(batch) != {
+                'council', 'start', 'end', 'semantics'}:
+            raise ValueError('CAMPAIGN_OWNER_BATCH')
+        self.review_inactive_campaign_period(
+            as_of, batch['council'], batch['start'], batch['end'],
+            period=name, policy=policy,
+            observed_stop=policy.get('expected_stop'),
+            execution_binding=self.bindings)
+        return self.register_intake_period(
+            name, policy, historical_campaign=True)
+
+    def register_intake_period(self,name,policy,*,disposable_catchup=False,historical_campaign=False):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
         Does not clear a stop, install SQL, provision a login or issue daily work.
         The SQL boundary verifies expiry, council list and expected stop snapshot.
         """
-        if not disposable_catchup and any(k in policy for k in ('catchup_scope','mode')):
+        if historical_campaign and disposable_catchup:
+            raise ValueError('CAMPAIGN_OWNER_MODE_CONFLICT')
+        if historical_campaign:
+            from .daily_intake_runtime import (
+                LIVE_PRIVATE_EVIDENCE_RELEASE, LIVE_HISTORICAL_CAMPAIGN_RELEASE,
+            )
+            if (LIVE_HISTORICAL_CAMPAIGN_RELEASE is not True
+                    or LIVE_PRIVATE_EVIDENCE_RELEASE is not True
+                    or self.identity != 'postgres'
+                    or type(policy) is not dict
+                    or policy.get('mode') != 'CAMPAIGN_FINITE_HISTORICAL_V1'):
+                raise ValueError('CAMPAIGN_OWNER_OPERATIONAL_RELEASE_WITHHELD')
+        if not disposable_catchup and not historical_campaign and any(k in policy for k in ('catchup_scope','mode')):
             # The frozen rolling issuer has no catch-up interpretation. Reject
             # foreign metadata at the owner seam without altering its SQL body.
             raise ValueError('INTAKE_ROLLING_SCOPE_ONLY')
@@ -565,7 +605,32 @@ class Owner:
             self.expected_generation=policy['expected_stop']['hard_stop_generation']
             self.q(c,'BEGIN',effect=True)
             self.q(c,'GRANT ingestion_barrier_releaser TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
-            issuer='ingestion_register_disposable_catchup' if disposable_catchup else 'ingestion_register_bolton_exception'
+            if historical_campaign:
+                # Compare installed function source/owner, not an arbitrary
+                # caller-provided SHA. This hard-pinned dormant body still
+                # raises CAMPAIGN_STABLE_MANIFEST_WITHHELD unconditionally.
+                from .inactive_tameside_first_issuer import (
+                    CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
+                )
+                issued=render_inactive_stable_campaign_issuer()
+                patterns=[m for m in self.FUNCTION_PATTERN.finditer(issued)
+                          if m[1]==CAMPAIGN_FUNCTION]
+                if len(patterns)!=1:
+                    raise Uncertain('CAMPAIGN_OWNER_STABLE_INVENTORY')
+                expected_sha=hashlib.sha256(patterns[0][3].encode()).hexdigest()
+                installed=self.q(c,
+                    "SELECT current_database(),"
+                    "encode(sha256(convert_to(prosrc,'UTF8')),'hex'),"
+                    "pg_get_userbyid(proowner),prosecdef,proconfig "
+                    "FROM pg_proc WHERE oid="
+                    "'public.ingestion_register_campaign_once(jsonb)'::regprocedure")[0]
+                if installed!=('postgres',expected_sha,
+                              'ingestion_storage_owner',True,
+                              ['search_path=pg_catalog']):
+                    raise Uncertain('CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT')
+            issuer=('ingestion_register_disposable_catchup' if disposable_catchup
+                    else 'ingestion_register_campaign_once' if historical_campaign
+                    else 'ingestion_register_bolton_exception')
             result=self.q(c,'SELECT public.'+issuer+'(%s::jsonb)',
                           (json.dumps(dict(operation='intake_catchup_period' if disposable_catchup else 'intake_period',period=name,policy=policy)),),effect=True)[0][0]
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
