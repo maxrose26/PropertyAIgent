@@ -199,7 +199,7 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
           S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
-        run: timeout --kill-after=2s 160s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_release_candidate_pg.py tests/test_tameside_owner_io.py tests/test_tameside_package.py tests/test_tameside_job_boundary.py -q --junitxml="$RUNNER_TEMP/candidate-components.xml"
+        run: timeout --kill-after=2s 160s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_release_candidate_pg.py tests/test_tameside_owner_io.py tests/test_tameside_owner_database.py tests/test_tameside_package.py tests/test_tameside_job_boundary.py -q --junitxml="$RUNNER_TEMP/candidate-components.xml"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'
