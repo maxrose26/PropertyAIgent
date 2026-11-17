@@ -334,3 +334,121 @@ def prepare_inactive_campaign_owner_batch(as_of, council, start, end):
                 manifest_status="WITHHELD", installed=False,
                 registered=False, live_collection_authorised=False)
 
+
+
+def review_inactive_campaign_owner_policy(
+        as_of, council, start, end, *,
+        period, policy, observed_stop, execution_binding):
+    """Check one proposed owner->runtime historical policy, without registering it.
+
+    The stable SQL currently checks only the *shape* of the source digest.
+    This independent owner-side canonical recomputation must precede any
+    separately approved registration. It does NOT prove actual source
+    qualification, database role, live controller state, or release approval.
+    Nothing here connects or clears STOP; the stable issuer still always
+    raises CAMPAIGN_STABLE_MANIFEST_WITHHELD.
+    """
+    import ipaddress
+    import json
+    import re
+    from datetime import datetime
+    from math import isfinite
+
+    preview = prepare_inactive_campaign_owner_batch(as_of, council, start, end)
+    allowed = {
+        "expires_at", "max_runs", "overlap_days", "councils",
+        "expected_stop", "execution_binding", "test_evidence",
+        "screening_config", "hostaddr", "route", "mode",
+        "campaign_batch", "campaign_source_plan_sha256",
+        "evidence_backend", "private_release",
+    }
+    if type(policy) is not dict or set(policy) != allowed:
+        raise ValueError("CAMPAIGN_OWNER_POLICY_SCHEMA")
+    if period != preview["period"] or type(period) is not str:
+        raise ValueError("CAMPAIGN_OWNER_PERIOD_NOT_CANONICAL")
+    if (policy["mode"] != CAMPAIGN_MODE
+            or policy["campaign_batch"] != preview["campaign_batch"]
+            or policy["campaign_source_plan_sha256"] !=
+            preview["campaign_source_plan_sha256"]
+            or type(policy["max_runs"]) is not int or policy["max_runs"] != 1
+            or type(policy["overlap_days"]) is not int or
+            policy["overlap_days"] != 7
+            or policy["test_evidence"] is not False):
+        raise ValueError("CAMPAIGN_OWNER_SOURCE_OR_SCOPE_DRIFT")
+    control_keys = {
+        "global_stop", "manual_stop", "last_hard_stop",
+        "hard_stop_generation",
+    }
+    if (type(observed_stop) is not dict
+            or set(observed_stop) != control_keys
+            or observed_stop["global_stop"] is not None
+            or observed_stop["manual_stop"] is not None
+            or type(observed_stop["hard_stop_generation"]) is not int
+            or observed_stop["hard_stop_generation"] != 16
+            or policy["expected_stop"] != observed_stop):
+        raise ValueError("CAMPAIGN_OWNER_STOP_NOT_RELEASED")
+    if (type(execution_binding) is not dict
+            or set(execution_binding) != {
+                "revision", "workflow_sha256", "manifest_sha256"}
+            or any(type(execution_binding[k]) is not str
+                   or not re.fullmatch(r"[0-9a-f]{" +
+                       str(40 if k == "revision" else 64) + r"}",
+                       execution_binding[k])
+                   for k in execution_binding)
+            or policy["execution_binding"] != execution_binding):
+        raise ValueError("CAMPAIGN_OWNER_RUNTIME_BINDING")
+    if (type(policy["expires_at"]) not in (int, float)
+            or not isfinite(policy["expires_at"])
+            or type(as_of) is not datetime
+            or as_of.utcoffset() is None
+            or not as_of.timestamp() < policy["expires_at"]
+            <= as_of.timestamp() + 604800):
+        raise ValueError("CAMPAIGN_OWNER_EXPIRY")
+    if (policy["route"] not in ("POOLER", "DIRECT")
+            or type(policy["hostaddr"]) is not str):
+        raise ValueError("CAMPAIGN_OWNER_ROUTE_UNVERIFIED")
+    try:
+        addr = ipaddress.ip_address(policy["hostaddr"])
+    except ValueError:
+        raise ValueError("CAMPAIGN_OWNER_ROUTE_UNVERIFIED") from None
+    if addr.version != 4 or addr.is_loopback:
+        raise ValueError("CAMPAIGN_OWNER_ROUTE_UNVERIFIED")
+    contract = policy["councils"]
+    if type(contract) is not dict or set(contract) != {council}:
+        raise ValueError("CAMPAIGN_OWNER_SINGLE_COUNCIL")
+    qualified = contract[council]
+    if (type(qualified) is not dict
+            or set(qualified) != {"contract", "qualification_sha256"}
+            or type(qualified["contract"]) is not str
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}",
+                                qualified["contract"])
+            or type(qualified["qualification_sha256"]) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}",
+                                qualified["qualification_sha256"])
+            or type(policy["screening_config"]) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}",
+                                policy["screening_config"])):
+        raise ValueError("CAMPAIGN_OWNER_CONTRACT_OR_SCREENING")
+    if (policy["evidence_backend"] != "POSTGRES_PILOT_V1"
+            or policy["private_release"] != {
+                "schema": "PA_D002_LIVE_PRIVATE_V1",
+                "revision": execution_binding["revision"],
+                "councils": [council],
+                "semantics": preview["campaign_batch"]["semantics"],
+            }):
+        raise ValueError("CAMPAIGN_OWNER_PRIVATE_RELEASE_NOT_BOUND")
+
+    fingerprint = hashlib.sha256(json.dumps(
+        dict(period=period, policy=policy), sort_keys=True,
+        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    return dict(
+        schema="PA_D004_OWNER_RUNTIME_POLICY_OFFLINE_REVIEW_V1",
+        period=period, campaign_batch=dict(preview["campaign_batch"]),
+        campaign_source_plan_sha256=preview["campaign_source_plan_sha256"],
+        stable_issuer_sha256=preview["stable_issuer_sha256"],
+        policy_sha256=fingerprint,
+        manifest_status="WITHHELD",
+        actual_role_acl_verified=False, live_stop_observed=False,
+        source_contract_qualified=False, installer_authorised=False,
+        owner_registration_authorised=False,
+        runtime_enabled=False, collection_authorised=False)
