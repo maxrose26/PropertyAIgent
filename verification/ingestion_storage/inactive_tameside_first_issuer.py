@@ -235,9 +235,9 @@ _STABLE_OWNER_GUARD = r"""
          ('bolton','bury','manchester','oldham','rochdale',
           'salford','stockport','tameside','wigan')
       OR (e->'campaign_batch'->>'semantics') IS DISTINCT FROM
-         CASE WHEN e->'campaign_batch'->>'council'
+         (CASE WHEN e->'campaign_batch'->>'council'
              IN ('manchester','rochdale','salford','stockport')
-              THEN 'VALIDATED' ELSE 'RECEIVED' END
+              THEN 'VALIDATED' ELSE 'RECEIVED' END)
       OR (e->'campaign_batch'->>'start')::date < '2026-09-15'::date
       OR ((e->'campaign_batch'->>'start')::date-'2026-09-15'::date)%7<>0
       OR (e->'campaign_batch'->>'end')::date-
