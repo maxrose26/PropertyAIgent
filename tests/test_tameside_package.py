@@ -6,6 +6,9 @@ def test_exact_policy_recipe():
  policy=p.seal_policy(manifest_sha256='a'*64,bound_at=1794934800)
  assert policy['expires_at']==1794936715 and policy['max_runs']==1
  assert policy['expected_stop']['hard_stop_generation']==16
+ from app.ingestion.ledger import digest
+ from app.ingestion.listing_screening import ScreeningRule,RULE_V3
+ assert policy['screening_config']==digest(ScreeningRule(RULE_V3,unit_threshold=10,link_related=False).config())
  assert policy['councils']['tameside']['contract']=='tameside-screening-metadata-five-v1'
  command=p.job_command(policy,policy_path='/tmp/tameside-policy.json',output='/tmp/tameside-result')
  assert hashlib.sha256(p.encode_policy(policy)).hexdigest() in command
