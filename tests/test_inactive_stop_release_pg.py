@@ -770,3 +770,119 @@ def test_v13_stable_campaign_sql_pg17_withheld_non_superuser_call(isolated_world
                             "'postgres','public','USAGE')").fetchone()[0] is False
         boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
                      "NOBYPASSRLS PASSWORD NULL")
+
+
+def test_v13_static_campaign_owner_install_transactional_non_superuser(isolated_world):
+    """Focused REAL PostgreSQL role proof in disposable DB only.
+
+    Reuses the writer owner's existing transaction/acquisition/restoration,
+    rather than inventing a second credential or permanent broad grant. It
+    installs one stable, permanently WITHHELD SQL body after review-only
+    rendering, verifies rollback, and independently checks owner/function
+    identity and ACL after commit. NO historical registration or source grant.
+    """
+    from tests.e2e_pg_world import settings
+    from verification.ingestion_storage.inactive_owner_writer_install import (
+        render_inactive_stable_campaign_owner_install,
+    )
+    from verification.ingestion_storage.inactive_tameside_first_issuer import (
+        CAMPAIGN_FUNCTION, render_inactive_stable_campaign_issuer,
+    )
+    w=isolated_world
+    boot=w["boot"]
+    before=_control(w)
+    name="public."+CAMPAIGN_FUNCTION+"(jsonb)"
+    assert boot.execute("SELECT to_regprocedure(%s)",(name,)).fetchone()[0] is None
+    script=render_inactive_stable_campaign_owner_install()
+    assert script.count("SET LOCAL ROLE ingestion_storage_owner;")==1
+    assert script.count("RESET ROLE;")==1
+    assert script.count("GRANT ingestion_storage_owner TO postgres")==1
+    assert "CAMPAIGN_STABLE_MANIFEST_WITHHELD" in script
+    assert "GRANT EXECUTE" not in script
+    assert script.count("\nCOMMIT;\n")==1
+    # TEST-ONLY database substitution; the literal owner session postgres
+    # identity, membership baseline and target SQL function stay unchanged.
+    script=script.replace(
+        "current_database() IS DISTINCT FROM 'postgres'",
+        "current_database() NOT IN ('postgres','ingestion_provisioning_test')",1)
+    _,info,_,_=settings()
+    password=secrets.token_urlsafe(40)
+    boot.execute(sql.SQL("ALTER ROLE postgres LOGIN NOSUPERUSER CREATEROLE "
+                         "CREATEDB BYPASSRLS INHERIT PASSWORD {}").format(
+                             sql.Literal(password)))
+    boot.execute("GRANT ingestion_storage_owner TO postgres "
+                 "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                 "GRANTED BY provisioning_bootstrap")
+    boot.execute("GRANT USAGE, CREATE ON SCHEMA public TO postgres WITH GRANT OPTION")
+    def owner():
+        return psycopg.connect(**{**info,"user":"postgres","password":password},
+                               autocommit=True,prepare_threshold=None)
+    def membership():
+        return boot.execute(
+            "SELECT grantor::regrole::text,admin_option,inherit_option,set_option "
+            "FROM pg_auth_members WHERE member='postgres'::regrole "
+            "AND roleid='ingestion_storage_owner'::regrole ORDER BY grantor"
+        ).fetchall()
+    baseline=[("provisioning_bootstrap",True,False,False)]
+    try:
+        assert membership()==baseline
+        with owner() as c:
+            assert c.execute(
+                "SELECT current_user,session_user,rolsuper FROM pg_roles "
+                "WHERE rolname=current_user").fetchone()==("postgres","postgres",False)
+            assert c.execute(
+                "SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),"
+                "pg_has_role(current_user,'ingestion_storage_owner','SET')"
+            ).fetchone()==(False,False)
+            c.execute(script.replace("\nCOMMIT;\n","\nROLLBACK;\n"))
+        assert boot.execute("SELECT to_regprocedure(%s)",(name,)).fetchone()[0] is None
+        assert membership()==baseline and _control(w)==before
+
+        # Missing exact admin-only baseline fails CLOSED before installation.
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        try:
+            with owner() as c:
+                with pytest.raises(Exception,match="OWNER_WRITER_ADMIN_ONLY_BASELINE"):
+                    c.execute(script)
+                c.execute("ROLLBACK")
+        finally:
+            boot.execute("GRANT ingestion_storage_owner TO postgres "
+                         "WITH ADMIN TRUE, INHERIT FALSE, SET FALSE "
+                         "GRANTED BY provisioning_bootstrap")
+        assert boot.execute("SELECT to_regprocedure(%s)",(name,)).fetchone()[0] is None
+        assert membership()==baseline and _control(w)==before
+
+        with owner() as c:
+            c.execute(script)
+        # Independent bootstrap readback, not self-reported by owner code.
+        import hashlib
+        stable=render_inactive_stable_campaign_issuer()
+        expected_sql=stable.split("\nREVOKE ALL ON FUNCTION",1)[0]
+        # PostgreSQL stores the function BODY (prosrc), not all DDL; compare
+        # secure identity and stable function source via pg_get_functiondef.
+        observed=boot.execute(
+            "SELECT pg_get_userbyid(proowner),prosecdef,"
+            "encode(sha256(convert_to(prosrc,'UTF8')),'hex') "
+            "FROM pg_proc WHERE oid=%s::regprocedure",(name,)).fetchone()
+        assert observed[0:2]==("ingestion_storage_owner",True)
+        assert len(observed[2])==64
+        assert boot.execute(
+            "SELECT has_function_privilege('ingestion_worker_login',%s,'EXECUTE')",
+            (name,)).fetchone()[0] is False
+        assert membership()==baseline and _control(w)==before
+        # A second install must NEVER silently replace a reviewed function.
+        with owner() as c:
+            with pytest.raises(Exception,match="OWNER_CAMPAIGN_ALREADY_INSTALLED"):
+                c.execute(script)
+            c.execute("ROLLBACK")
+        assert membership()==baseline and _control(w)==before
+        assert boot.execute("SELECT pg_get_userbyid(proowner) FROM pg_proc "
+                            "WHERE oid=%s::regprocedure",
+                            (name,)).fetchone()[0]=="ingestion_storage_owner"
+    finally:
+        boot.execute("REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres")
+        boot.execute("REVOKE ingestion_storage_owner FROM postgres "
+                     "GRANTED BY provisioning_bootstrap RESTRICT")
+        boot.execute("ALTER ROLE postgres NOLOGIN NOCREATEROLE NOCREATEDB "
+                     "NOBYPASSRLS PASSWORD NULL")
