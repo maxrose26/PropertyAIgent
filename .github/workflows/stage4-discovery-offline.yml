@@ -194,6 +194,12 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
         run: timeout --kill-after=2s 90s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_inactive_stop_release_pg.py tests/test_pa_tam001_rollback.py -q --junitxml="$RUNNER_TEMP/inactive-release.xml"
+      - name: Conditional release components and guarded pinned recovery (disposable only)
+        env:
+          DATABASE_URL: 'sqlite:///:memory:'
+          INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
+          S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
+        run: timeout --kill-after=2s 160s "$RUNNER_TEMP/daily-intake-venv/bin/python" -m pytest tests/test_release_candidate_pg.py -q --junitxml="$RUNNER_TEMP/candidate-components.xml"
       - name: Targeted B readback, fixed disposable PostgreSQL only
         env:
           DATABASE_URL: 'sqlite:///:memory:'

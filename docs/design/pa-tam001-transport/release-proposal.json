@@ -1,0 +1,45 @@
+{
+  "approval_consumption": {
+    "v1_3": "FENCED_UNRESOLVED",
+    "v1_4": "CONSUMED"
+  },
+  "batch": {
+    "council": "tameside",
+    "end": "2026-09-21",
+    "max_runs": 1,
+    "semantics": "RECEIVED",
+    "start": "2026-09-15"
+  },
+  "bolton_receipt_ref": "https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-6952744510",
+  "expires_at": 1795032000.0,
+  "expiry_utc": "2026-11-18T20:00:00Z",
+  "follow_on": [
+    "manchester",
+    "bolton",
+    "tameside",
+    "bury",
+    "oldham",
+    "rochdale",
+    "salford",
+    "stockport",
+    "trafford",
+    "wigan"
+  ],
+  "historical_coverage": "UNKNOWN",
+  "historical_replay": false,
+  "owner_risk_ref": "https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-6950521818",
+  "preservation_review_ref": "https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-6903568187",
+  "prior_fingerprints": {
+    "21330c060171f6f95286a8f31131bda00fa3c081a21ebfc0f418b10706e510e4": "a39ce8681bb35059de626ef0bf9a8196af4e8bfded50d5af6d0b67c826c81fd7",
+    "3f0dba235de9b9efcd52ef3b281ba8c967491f57824404c695ed2b32fae4c045": "117eda0e1a2185f0d158c9c27e677d265c308714cf5967a2286a5aca3e35ae1e",
+    "a22bac9985d0141d82a4adceaba2354eb3808280413bf7c3aad44d34de8515ad": "6d30c20b8e7fa0e3ea20f60af9115922ae78299208d16055b74e0b9fe2f10c76",
+    "d9d8d667eef5fb012c74cdd28f5c55c6b577f749e7dc69d9179a6c032853d252": "37307a3af9253d7b1e44501c0cbd3b3ff75b3a9aed4345bae76606bb3eb4b442",
+    "dc8ae276a9c3f697b9905adf0ec8835398009769b69e788e4fd70e13216ee6fc": "dff707aa0a40de896369aafa23ef2f243c84b0ebf249544109d7aecc91f67a09",
+    "e92a8e220bbbbcefb2425d6f97a60920bc447bc1fe097d600ea28e3e9d87588e": "aa36a1c191073dd87d3ab1eaad326b150189fe451d0334744f886032399171eb",
+    "ef5afe887f3e5162212fc33f2cf4429d5cbb19cf11bede34e2d1156b09741bc5": "0863af12b15f9272a5450fff1309b4ff4bc6479ac8060f88541ae412c72e26f8"
+  },
+  "review_risk_ref": "https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-6951000467",
+  "review_sha256": "b39ca38c0b65e2bc8fa20931bd7dae7cfac506a2cae6400f9036afbdd3e49c50",
+  "schema": "PA_TAM_RELEASE_PROPOSAL_V1",
+  "status": "PROPOSED_NOT_OPERATIONALLY_APPROVED"
+}
