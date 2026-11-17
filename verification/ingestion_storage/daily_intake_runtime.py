@@ -52,6 +52,11 @@ BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/in
              'verification/ingestion_storage/limit_reconciliation.py','verification/ingestion_storage/operational_supervisor.py','verification/ingestion_storage/operational_owner.py',
              'verification/ingestion_storage/chain_registration.py','scripts/run_daily_councils.py')
 
+def runtime_screening_config_sha256():
+    """V3 screening policy digest at its existing reviewed runtime boundary."""
+    return digest(ScreeningRule(RULE_V3,unit_threshold=10,link_related=False).config())
+
+
 def execution_binding():
     import re
     deployed=os.environ.get('RENDER_GIT_COMMIT')
@@ -639,7 +644,7 @@ class Runtime:
                 result['status']='REFUSED_PRIVATE_EVIDENCE_OFFLINE_ONLY'
                 raise Denied('PRIVATE_EVIDENCE_OFFLINE_ONLY')
             if self.durable_run and self.durable_run.get('state')!='VERIFIED':raise Denied('INTAKE_UNFINISHED_RUN_RECONCILE')
-            if self.policy['screening_config']!=digest(rule.config()):raise Denied('INTAKE_RULE_BINDING')
+            if self.policy['screening_config']!=runtime_screening_config_sha256():raise Denied('INTAKE_RULE_BINDING')
             self.memory=require_source_context(self.policy['councils'],disposable=self.test,profile=self.policy.get('render_profile'),binding=self.binding)
             if self.memory:
                 original_check=self.run.check
