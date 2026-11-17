@@ -482,6 +482,51 @@ class Owner:
             observed_stop=observed_stop,
             execution_binding=execution_binding)
 
+    def register_disposable_finite_campaign_batch(
+            self, name, policy, *, as_of, council, start, end):
+        """Actually register ONE canonical finite batch in disposable PostgreSQL.
+
+        This is a positive owner->SQL->restricted-runtime *test route* only.
+        It deliberately calls the existing disposable issuer, never the
+        WITHHELD campaign issuer; no production role or SQL is enabled.
+        The source date/semantic manifest is checked before any connection.
+        """
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from .inactive_tameside_first_issuer import (
+            prepare_inactive_campaign_owner_batch,
+        )
+        if (self.identity != 'provisioning_migrator'
+                or type(policy) is not dict
+                or policy.get('route') != 'DISPOSABLE'
+                or policy.get('hostaddr') is not None
+                or policy.get('test_evidence') is not True
+                or any(field in policy for field in (
+                    'mode', 'campaign_batch', 'private_release',
+                    'campaign_source_plan_sha256'))):
+            raise ValueError('CAMPAIGN_DISPOSABLE_OWNER_ONLY')
+        if (type(as_of) is not datetime or as_of.utcoffset() is None):
+            raise ValueError('CAMPAIGN_DISPOSABLE_ASOF')
+        candidate = prepare_inactive_campaign_owner_batch(
+            as_of, council, start, end)
+        expected_scope = dict(
+            start=candidate['campaign_batch']['start'],
+            end=candidate['campaign_batch']['end'],
+            execution_day=as_of.astimezone(
+                ZoneInfo('Europe/London')).date().isoformat(),
+            source_plan_sha256=candidate['campaign_source_plan_sha256'])
+        councils = policy.get('councils')
+        if (policy.get('catchup_scope') != expected_scope
+                or type(councils) is not dict
+                or set(councils) != {council}
+                or type(policy.get('max_runs')) is not int
+                or policy['max_runs'] != 1
+                or type(policy.get('overlap_days')) is not int
+                or policy['overlap_days'] != 7):
+            raise ValueError('CAMPAIGN_DISPOSABLE_BATCH_DRIFT')
+        return self.register_intake_period(
+            name, policy, disposable_catchup=True)
+
     def register_intake_period(self,name,policy,*,disposable_catchup=False):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
