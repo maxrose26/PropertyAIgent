@@ -594,6 +594,22 @@ class Owner:
         self.permitted_policy_states={'DAILY_INTAKE_APPLIED'}
         self.expected_generation=policy['expected_stop']['hard_stop_generation']
         with self.connection() as c:
+            if historical_campaign:
+                # The string Owner.identity is NOT evidence of the actual
+                # PostgreSQL/pooler session. Reconcile it independently before
+                # beginning the role-grant transaction or issuing any source
+                # authority. A Supabase pooler identity mismatch is NO-GO.
+                observed=self.q(c,
+                    "SELECT current_database(),session_user,current_user,"
+                    "r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,"
+                    "pg_catalog.pg_has_role(current_user,"
+                    "'ingestion_storage_owner','USAGE'),"
+                    "pg_catalog.pg_has_role(current_user,"
+                    "'ingestion_storage_owner','SET') "
+                    "FROM pg_catalog.pg_roles r WHERE r.rolname=current_user")
+                if observed!=[('postgres','postgres','postgres',
+                              False,True,True,True,False,False)]:
+                    raise Uncertain('CAMPAIGN_OWNER_ACTUAL_SESSION_IDENTITY')
             self.verify_installed(c)
             if disposable_catchup:
                 from .intake_policy import policy_sql
