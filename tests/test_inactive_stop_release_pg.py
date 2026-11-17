@@ -930,6 +930,7 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
     as_of, period, policy, stop, binding=_inactive_owner_policy_fixture()
     boot.execute(render_inactive_stable_campaign_issuer())
     function='public.ingestion_register_campaign_once(jsonb)'
+    boot.execute('ALTER FUNCTION '+function+' OWNER TO ingestion_storage_owner')
     if drift=='body':
         boot.execute("CREATE OR REPLACE FUNCTION public.ingestion_register_campaign_once(p jsonb)"+
                      " RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER "
@@ -990,7 +991,11 @@ def test_historical_owner_preflight_before_grant_and_actual_stop(
         expected=(ReachedGrant if drift=='matching' else
                   Uncertain if drift in ('body','owner','search_path','security_definer',
                                          'missing_controller','missing_stop_field') else ValueError)
-        with pytest.raises(expected):
+        reason=(None if drift=='matching' else
+                'CAMPAIGN_OWNER_STABLE_SQL_OR_ACL_DRIFT' if drift in ('body','owner','search_path','security_definer') else
+                'CAMPAIGN_OWNER_CONTROLLER_NOT_OBSERVED' if drift in ('missing_controller','missing_stop_field') else
+                'CAMPAIGN_OWNER_STOP_NOT_RELEASED')
+        with pytest.raises(expected,match=reason):
             owner.register_historical_campaign_period(period,policy,as_of=as_of)
         grants=[s for s in statements if s.startswith('GRANT ')]
         assert len(grants)==(1 if drift=='matching' else 0)
