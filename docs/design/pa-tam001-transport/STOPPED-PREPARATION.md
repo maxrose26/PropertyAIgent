@@ -1,8 +1,8 @@
 # PA-TAM002 v1.3: checkpoint/deployment correction
 
 Stage 4 OPEN. Inactive until independent REVIEW and acceptance of the amended
-executable/order. Source: `e1e17e9033a6f95e0a8754d0b3f177b28eb9852f`; tree:
-`5c6a4807a9850d6aee6f0e8a1e9c46c8e40e132b`. Package pin is the documentation commit
+executable/order. Source: `310eaa19e396d82b4a4caca73be749a9c504e338`; tree:
+`3f994e2529e368d61fe10a368f45028e5cb74a4e`. Package pin is the documentation commit
 containing this file and artifact-pins.json. Existing v1.2 scope and expiry remain.
 
 ## Choice and exact ordering delta
@@ -37,7 +37,7 @@ Use the corrected source checkout as cwd with the existing owner runtime, and th
 separate clean #213 checkout at f027ba28af69ae70208eab5ed047e4a8a81c6337. The existing
 short-command/receipt route may call the following entry points; it must not call
 old Pilot.run/build. Verify the candidate checkout and immutable remote ref
-`pa-tam002/e1e17e9033a6f95e0a8754d0b3f177b28eb9852f` both resolve to that full SHA
+`pa-tam002/310eaa19e396d82b4a4caca73be749a9c504e338` both resolve to that full SHA
 before effects. No moving PR branch is a deployment pin.
 
 ```python
@@ -67,7 +67,7 @@ assert environment == original['original_environment']
 state = prepare_stopped(
     db, pinned=pinned, recovery=recovery, binding=binding,
     journal_source=journal_source, api_factory=api_factory,
-    revision='e1e17e9033a6f95e0a8754d0b3f177b28eb9852f',
+    revision='310eaa19e396d82b4a4caca73be749a9c504e338',
     checkpoint={'ordinal':55, 'sha256':CHECKPOINT_SHA},
     baseline={'service':original['original_service'], 'environment':environment,
               'deploy_ids':[d['id'] for d in deployments]},
@@ -139,7 +139,7 @@ independent reads, no duplicate build, exact restoration and unchanged old histo
 and permissions. The same database/new journal then continues through dispositions,
 writer/campaign installation, manifest/STOP16, registration, activation, synthetic
 Tameside capture/retention/screening/backlog, private evidence and actual closure.
-37 focused regressions passed, zero skips, in0.88s. Required hosted results are
+37 focused regressions passed, zero skips, in0.88s. Hosted run44175111923 passed all45 changed component/connected tests in74.86s, but its later broad regression step reached the180s test timeout without an assertion failure. The final workflow separates that existing runtime test file into its own180s step and preserves every test and all production bounds. Required final hosted results are
 linked in the PR handoff; they must pass for final REVIEW acceptance.
 
 Explicit fixture projections: disposable localhost database/credentials, synthetic

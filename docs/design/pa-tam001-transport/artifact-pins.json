@@ -2,14 +2,14 @@
   "decision_id": "PA-TAM002",
   "execution_binding": {
     "manifest_sha256": "15cd25a3d2828bcd9ef122a62f0c49223770d3bb1f76a5ecabf1e8c3d258f22a",
-    "revision": "e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
-    "workflow_sha256": "ab766bfe702448220b2d4d13ce7af266db8c3d9ef45c5a2d255f61bdea765b48"
+    "revision": "310eaa19e396d82b4a4caca73be749a9c504e338",
+    "workflow_sha256": "2c19163ed96d534eb41fe6d1ba8e556c26ee364e45d94e15e45a9559057977de"
   },
   "expiry_ceiling": "2026-11-18T20:00:00+00:00",
   "files": {
     ".github/workflows/stage4-discovery-offline.yml": {
-      "bytes": 54308,
-      "sha256": "ab766bfe702448220b2d4d13ce7af266db8c3d9ef45c5a2d255f61bdea765b48"
+      "bytes": 54771,
+      "sha256": "2c19163ed96d534eb41fe6d1ba8e556c26ee364e45d94e15e45a9559057977de"
     },
     "docs/design/pa-tam001-transport/release-proposal.json": {
       "bytes": 2152,
@@ -121,7 +121,7 @@
   "preparation": {
     "cleanup_snapshots": 16,
     "entry_point": "tameside_preparation.prepare_stopped",
-    "immutable_build_ref": "pa-tam002/e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
+    "immutable_build_ref": "pa-tam002/310eaa19e396d82b4a4caca73be749a9c504e338",
     "old_checkpoint_ordinal": 55,
     "old_normal_limit": 47,
     "order": [
@@ -135,9 +135,9 @@
     ]
   },
   "proposal_version": "1.3",
-  "revision": "e1e17e9033a6f95e0a8754d0b3f177b28eb9852f",
+  "revision": "310eaa19e396d82b4a4caca73be749a9c504e338",
   "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "5c6a4807a9850d6aee6f0e8a1e9c46c8e40e132b",
+  "tree": "3f994e2529e368d61fe10a368f45028e5cb74a4e",
   "version": 1
 }
