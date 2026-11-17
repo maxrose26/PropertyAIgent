@@ -463,6 +463,25 @@ class Owner:
         worker={m[1]:m[3] for m in cls.FUNCTION_PATTERN.finditer(worker_text())}
         return {**cls.screening_v3_inventory(),**modified,'ingestion_worker_step':worker['ingestion_worker_step']}
 
+    @staticmethod
+    def review_inactive_campaign_period(
+            as_of, council, start, end, *, period, policy,
+            observed_stop, execution_binding):
+        """Review proposed historical registration WITHOUT owner SQL or grants.
+
+        No connector is opened; this does not call register_intake_period.
+        Live issuer/owner installation and STOP release remain WITHHELD.
+        It binds the existing Owner facade to the source-recomputed
+        campaign owner/runtime policy before a future distinct review.
+        """
+        from .inactive_tameside_first_issuer import (
+            review_inactive_campaign_owner_policy,
+        )
+        return review_inactive_campaign_owner_policy(
+            as_of, council, start, end, period=period, policy=policy,
+            observed_stop=observed_stop,
+            execution_binding=execution_binding)
+
     def register_intake_period(self,name,policy,*,disposable_catchup=False):
         """Owner-only preauthorisation through the existing issuer, never runtime.
 
