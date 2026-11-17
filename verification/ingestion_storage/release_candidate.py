@@ -182,7 +182,9 @@ BEGIN
  THEN RAISE EXCEPTION 'CAMPAIGN_INSTALL_NOT_STOPPED'; END IF;
 END $candidate_stopped_install$;
 """
-    return source.replace(old, stopped + compiled + '\nGRANT EXECUTE ON FUNCTION ' + name + ' TO postgres;\n', 1)
+    # The dormant worker capability must be installed here, not supplied by a
+    # fixture. Login access remains controlled by the existing finite lifecycle.
+    return source.replace(old, stopped + compiled + '\nGRANT EXECUTE ON FUNCTION ' + name + ' TO postgres, ingestion_worker;\n', 1)
 
 
 def render_dispositions(manifest):

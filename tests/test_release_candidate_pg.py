@@ -207,6 +207,7 @@ def test_candidate_installs_stopped_as_real_restricted_owner(isolated_world):
     _, info, _, _ = settings()
     def connect():
         return psycopg.connect(**{**info, 'user':'postgres', 'password':password}, autocommit=True)
+    login_before=w['boot'].execute("SELECT rolname,rolcanlogin FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login') ORDER BY 1").fetchall()
     try:
         assert w['boot'].execute("SELECT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone() == (False,)
         before = _control(w)
@@ -219,7 +220,10 @@ def test_candidate_installs_stopped_as_real_restricted_owner(isolated_world):
         assert w['boot'].execute("SELECT has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone() == (False,)
         assert w['boot'].execute("SELECT pg_has_role('postgres','ingestion_storage_owner','USAGE'),pg_has_role('postgres','ingestion_storage_owner','SET')").fetchone() == (False, False)
         assert w['boot'].execute("SELECT has_function_privilege('postgres',%s,'EXECUTE')", (name,)).fetchone() == (True,)
-        assert w['boot'].execute("SELECT has_function_privilege('ingestion_worker_login',%s,'EXECUTE')", (name,)).fetchone() == (False,)
+        assert w['boot'].execute("SELECT has_function_privilege('ingestion_worker',%s,'EXECUTE')", (name,)).fetchone() == (True,)
+        assert w['boot'].execute("SELECT has_function_privilege('ingestion_effect_broker',%s,'EXECUTE')", (name,)).fetchone() == (False,)
+        assert w['boot'].execute("SELECT pg_get_userbyid(x.grantee),x.privilege_type,x.is_grantable FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) x WHERE p.oid=%s::regprocedure AND x.grantee<>p.proowner ORDER BY 1", (name,)).fetchall() == [('ingestion_worker','EXECUTE',False),('postgres','EXECUTE',False)]
+        assert w['boot'].execute("SELECT rolname,rolcanlogin FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login') ORDER BY 1").fetchall() == login_before
     finally:
         w['boot'].execute('REVOKE EXECUTE ON FUNCTION '+name+' FROM postgres')
         w['boot'].execute('REVOKE ALL PRIVILEGES ON SCHEMA public FROM postgres')
@@ -316,7 +320,8 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
     else:
         w['boot'].execute(compiled)
         w['boot'].execute('ALTER FUNCTION ingestion_register_campaign_once(jsonb) OWNER TO ingestion_storage_owner')
-    w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO ingestion_worker')
+    if not recovered:
+        w['boot'].execute('GRANT EXECUTE ON FUNCTION ingestion_register_campaign_once(jsonb) TO ingestion_worker')
     assert _control(w)['hard_stop_generation']==15
     if recovered:
         release=package['conditional-release.sql'].decode().replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
