@@ -123,6 +123,8 @@ def test_single_stable_inactive_issuer_body_shared_by_multiple_weeks():
     assert "FROM PUBLIC;" in stable and "GRANT EXECUTE" not in stable
     assert "2026-09-15" in stable  # fixed campaign fallback, not per-week SQL
     assert "2026-09-21" not in stable
+    assert "OR (e->\'councils\')-ARRAY[\'tameside\',\'manchester\']" not in stable
+    assert "campaign_batch\'->>\'semantics\')" in stable
     assert "OR item->'subject'->>'end' IS DISTINCT FROM" in stable
     assert "ctl->'intake_periods'->a->'campaign_batch'" in stable
     assert candidate.CAMPAIGN_FUNCTION not in intake_policy.installation_script()
@@ -148,7 +150,7 @@ def test_single_stable_inactive_issuer_body_shared_by_multiple_weeks():
 @pytest.mark.parametrize("council,start,end,error",[
     ("trafford","2026-09-15","2026-09-21","TRAFFORD_SOURCE_NOT_QUALIFIED"),
     ("tameside","2026-09-15","2026-09-22","TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
-    ("tameside","2026-11-16","2026-11-16","CAMPAIGN_STABLE_INCOMPLETE_DAY"),
+    ("tameside","2026-11-16","2026-11-16","CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL"),
 ])
 def test_stable_owner_preview_refuses_unqualified_or_partial(council,start,end,error):
     with pytest.raises(ValueError,match=error):
