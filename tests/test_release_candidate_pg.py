@@ -259,6 +259,7 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
     else:
         w['boot'].execute(writer)
     if recovered:
+        w['install_journal_fixture']()
         with w['actor']() as independent:
             independent.execute('BEGIN READ ONLY')
             manifest=candidate.manifest_from_readback(independent,proposal,
@@ -266,12 +267,22 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
             independent.execute('ROLLBACK')
         # The real comment is a component review only; fixture use is not a
         # claim that it accepted operational release.
+        from verification.ingestion_storage.tameside_package import compile_package
+        journal_source=subprocess.run([sys.executable,'-c','from verification.ingestion_storage.intake_successor import owner_sql;print(owner_sql(),end="")'],cwd=os.environ['S4_BOLTON_PINNED_CHECKOUT'],capture_output=True,text=True,check=True).stdout
+        package=compile_package(manifest,bound_at=time.time(),owner_journal_source=journal_source)
+        import hashlib,base64,shlex
+        index=json.loads(package['package.json'])
+        assert len(package)==8
+        assert all(hashlib.sha256(package[n]).hexdigest()==v['sha256'] for n,v in index['files'].items())
+        command=shlex.split(package['job-command.txt'].decode())
+        assert base64.b64decode(command[command.index('--policy-base64')+1])==package['policy.json']
         source=None
     else: manifest, source = release_script(w, expiry=time.time()+3600)
     now = datetime.now(timezone.utc)
     preview = prepare_inactive_campaign_owner_batch(now, 'tameside', '2026-09-15', '2026-09-21')
     period = preview['period']
     policy = base_policy(w)
+    if recovered: policy['expires_at']=time.time()+1800
     policy['expected_stop'].update(global_stop=None,manual_stop=None,hard_stop_generation=16)
     policy['councils'] = {'tameside':policy['councils']['tameside']}
     policy.update(max_runs=1,mode='CAMPAIGN_FINITE_HISTORICAL_V1',
@@ -298,7 +309,6 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
         release=candidate.render_release(manifest,expires_at=manifest['expires_at']).replace("current_database() IS DISTINCT FROM 'postgres'","current_database() IS DISTINCT FROM 'ingestion_provisioning_test'")
         with w['actor']() as actor: actor.execute(release)
     else: _run(w, source)
-    if recovered: w['activate_restricted_fixture']()
     from verification.ingestion_storage.tameside_candidate import enabled
     with enabled(policy):
         if recovered:
@@ -314,6 +324,7 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
         else:
             w['boot'].execute('SELECT ingestion_register_campaign_once(%s::jsonb)',
                               (json.dumps(dict(operation='intake_period',period=period,policy=policy)),))
+        if recovered: w['activate_restricted_fixture'](policy,manifest)
         env, sources = env_and_sources(w, tmp_path, count=1, catchup_window=candidate.BATCH)
         for key, value in env.items(): monkeypatch.setenv(key,value)
         output = tmp_path/'candidate-result'
@@ -332,6 +343,7 @@ def exercise_conditional_runtime(w, tmp_path, monkeypatch, *, recovered=False):
             assert len(artifacts)==3 and all(x[1] for x in artifacts)
             assert independent.execute("SELECT count(*) FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()==(0,)
             independent.execute('ROLLBACK')
+        if recovered: w['close_restricted_fixture']()
         return dict(status='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED',period=period,
                     synthetic_listing_records=1,screening='COMPLETE',backlog_records=1,
                     archive_hashes_independently_verified=True,cleanup='CLOSED',live_requests=0)

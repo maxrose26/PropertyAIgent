@@ -36,6 +36,7 @@ LIVE_HISTORICAL_CAMPAIGN_RELEASE = False
 BOUND_FILES=('app/ingestion/daily_intake.py','app/ingestion/batching.py','app/ingestion/private_evidence.py','app/ingestion/public_evidence.py','app/ingestion/coordinator.py','app/ingestion/sql_ledger.py',
              'verification/ingestion_storage/release_candidate.py','verification/ingestion_storage/bolton_recovery_guard.py',
              'verification/ingestion_storage/tameside_candidate.py',
+             'verification/ingestion_storage/tameside_owner_access.py','verification/ingestion_storage/tameside_owner_journal.py','verification/ingestion_storage/tameside_package.py',
              'verification/ingestion_storage/inactive_tameside_first_issuer.py',
              'verification/ingestion_storage/inactive_shared_stop_release_v1.sql',
              'app/ingestion/arcus_adapter.py','app/ingestion/idox_adapter.py','app/ingestion/listing_screening.py',
