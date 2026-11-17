@@ -356,7 +356,9 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
     p['councils']={'tameside':p['councils']['tameside']}
     p['max_runs']=1
     name='finite-tameside-only-synthetic'
-    grant=_catchup_owner(world).register_intake_period(name,p,disposable_catchup=True)
+    grant=_catchup_owner(world).register_disposable_finite_campaign_batch(
+        name, p, as_of=now, council='tameside',
+        start='2026-09-15', end='2026-09-21')
     assert grant['mode']=='DISPOSABLE_SHUTDOWN_GAP_V1'
     run,result,_=invoke(world,tmp_path,name,catchup_window=scope)
     assert run.returncode==0,(run.stderr,result)
@@ -381,6 +383,57 @@ def test_one_tameside_campaign_batch_actual_disposable_command_and_sql_readback(
     assert world['boot'].execute(
         "SELECT count(*) FROM ingestion_work_items "
         "WHERE key<>repeat('0',64) AND subject->>'council'='manchester'").fetchone()[0]==0
+
+@pytest.mark.parametrize("mutation", [
+    "wrong_start", "wrong_end", "wrong_digest", "wrong_day",
+    "wrong_council", "two_councils", "max_runs", "wrong_route",
+    "live_policy", "historical_mode", "wrong_owner",
+])
+def test_disposable_campaign_owner_refuses_unbound_batch_before_sql(
+        world, mutation):
+    """A reviewed finite batch cannot become a different SQL registration.
+
+    The existing test-only issuer is the ONLY positive route; negative cases
+    must refuse BEFORE opening a PostgreSQL owner connection or writing rows.
+    """
+    reset(world)
+    p, scope = _catchup_fixture(world)
+    p['councils'] = {'tameside': p['councils']['tameside']}
+    p['max_runs'] = 1
+    owner = _catchup_owner(world)
+    council = 'tameside'
+    if mutation == 'wrong_start':
+        scope['start'] = '2026-09-22'
+    elif mutation == 'wrong_end':
+        scope['end'] = '2026-09-28'
+    elif mutation == 'wrong_digest':
+        scope['source_plan_sha256'] = 'f' * 64
+    elif mutation == 'wrong_day':
+        scope['execution_day'] = '2026-09-21'
+    elif mutation == 'wrong_council':
+        council = 'manchester'
+    elif mutation == 'two_councils':
+        p['councils']['manchester'] = dict(
+            contract='daily-intake-manchester',
+            qualification_sha256=TEST_QUALIFICATION)
+    elif mutation == 'max_runs':
+        p['max_runs'] = 2
+    elif mutation == 'wrong_route':
+        p['route'] = 'POOLER'
+    elif mutation == 'live_policy':
+        p['test_evidence'] = False
+    elif mutation == 'historical_mode':
+        p['mode'] = 'CAMPAIGN_FINITE_HISTORICAL_V1'
+    else:
+        owner.identity = 'postgres'
+    with pytest.raises(ValueError, match='CAMPAIGN_DISPOSABLE_'):
+        owner.register_disposable_finite_campaign_batch(
+            'refused-campaign', p, as_of=datetime.now(timezone.utc),
+            council=council, start='2026-09-15', end='2026-09-21')
+    assert owner.connections == 0
+    assert world['boot'].execute(
+        "SELECT count(*) FROM ingestion_work_items").fetchone()[0] == 1
+
 
 def test_disposable_catchup_installed_sql_refuses_other_database_identity(world):
     """Read the effective installed SQL issuer, not just the Python source.
