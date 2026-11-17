@@ -120,7 +120,17 @@ def render_inactive_stable_campaign_owner_install() -> str:
         " END IF;\n"
         "END $campaign_owner_one_shot$;\n"
     )
-    result = (PRELUDE + one_shot
+    owner_schema = (
+        "DO $campaign_owner_schema$ BEGIN\n"
+        " IF NOT pg_catalog.has_schema_privilege("
+        "'ingestion_storage_owner','public','USAGE')\n"
+        " OR NOT pg_catalog.has_schema_privilege("
+        "'ingestion_storage_owner','public','CREATE')\n"
+        " THEN RAISE EXCEPTION 'OWNER_CAMPAIGN_OWNER_SCHEMA_CAPABILITY' "
+        "USING ERRCODE='42501'; END IF;\n"
+        "END $campaign_owner_schema$;\n"
+    )
+    result = (PRELUDE + one_shot + owner_schema
               + "SET LOCAL ROLE ingestion_storage_owner;\n"
               + stable
               + "RESET ROLE;\n" + EPILOGUE)
