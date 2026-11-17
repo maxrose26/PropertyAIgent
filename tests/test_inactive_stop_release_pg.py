@@ -740,9 +740,12 @@ def test_v13_stable_campaign_sql_pg17_withheld_non_superuser_call(isolated_world
             actual=c.execute("SELECT current_user,session_user,rolsuper "
                              "FROM pg_roles WHERE rolname=current_user").fetchone()
             assert actual==("postgres","postgres",False)
-            assert c.execute("SELECT has_function_privilege("
-                             "'ingestion_worker_login',%s,'EXECUTE')",
-                             (name,)).fetchone()[0] is False
+            # The test-only postgres identity cannot resolve a function in
+            # public without schema USAGE. Verify the restricted worker's
+            # EXECUTE ACL via the existing bootstrap observer, not a new grant.
+            assert boot.execute("SELECT has_function_privilege("
+                                "'ingestion_worker_login',%s,'EXECUTE')",
+                                (name,)).fetchone()[0] is False
             with pytest.raises(Exception,match="CAMPAIGN_STABLE_NO_LEGACY_OPERATION"):
                 c.execute("SELECT public."+CAMPAIGN_FUNCTION+"(%s::jsonb)",
                           (json.dumps(dict(operation="bolton_exception",
