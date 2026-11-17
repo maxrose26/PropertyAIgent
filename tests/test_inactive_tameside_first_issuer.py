@@ -147,6 +147,35 @@ def test_single_stable_inactive_issuer_body_shared_by_multiple_weeks():
                for x in (first,second))
 
 
+
+def test_stable_campaign_owner_sql_never_accepts_unbound_private_evidence():
+    """Future campaign issuer may only accept exact retained-evidence shape.
+
+    This source-level boundary does NOT prove a live owner role or active
+    registrar. Actual PostgreSQL installation and independent operational
+    acceptance remain withheld; the always-deny sentinel must survive.
+    """
+    sql = candidate.render_inactive_stable_campaign_issuer()
+    required = (
+        "jsonb_typeof(e->'campaign_source_plan_sha256') IS DISTINCT FROM 'string'",
+        "coalesce(e->>'campaign_source_plan_sha256','') !~ '^[0-9a-f]{64}$'",
+        "e->>'evidence_backend' IS DISTINCT FROM 'POSTGRES_PILOT_V1'",
+        "jsonb_typeof(e->'private_release') IS DISTINCT FROM 'object'",
+        "e->'private_release'->>'schema' IS DISTINCT FROM 'PA_D002_LIVE_PRIVATE_V1'",
+        "e->'private_release'->>'revision' IS DISTINCT FROM e->'execution_binding'->>'revision'",
+        "e->'private_release'->>'semantics' IS DISTINCT FROM e->'campaign_batch'->>'semantics'",
+        "e->'private_release'->'councils' IS DISTINCT FROM jsonb_build_array(e->'campaign_batch'->>'council')",
+        "(e->'campaign_batch'->>'start')::date NOT BETWEEN 0 AND 6",
+        "RAISE EXCEPTION 'CAMPAIGN_STABLE_MANIFEST_WITHHELD'",
+    )
+    for fragment in required:
+        assert fragment in sql
+    assert "GRANT EXECUTE" not in sql
+    assert candidate.CAMPAIGN_FUNCTION not in intake_policy.installation_script()
+
+
+
+
 @pytest.mark.parametrize("council,start,end,error",[
     ("trafford","2026-09-15","2026-09-21","TRAFFORD_SOURCE_NOT_QUALIFIED"),
     ("tameside","2026-09-15","2026-09-22","TEN_COUNCIL_BATCH_OUTSIDE_CAMPAIGN"),
