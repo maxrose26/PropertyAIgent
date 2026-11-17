@@ -459,7 +459,7 @@ def main(argv=None):
                 roles=c.execute("SELECT rolname,rolcanlogin FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login') ORDER BY 1").fetchall()
                 sessions=c.execute("SELECT count(*) FROM pg_stat_activity WHERE usename IN ('ingestion_worker_login','ingestion_effect_login')").fetchone()[0]
                 return dict(stop={k:ctl.get(k) for k in ('global_stop','manual_stop','last_hard_stop','hard_stop_generation')},roles=roles,sessions=sessions,run_state=(ctl.get('intake_run') or {}).get('state'))
-            print(json.dumps(dict(status='CONTINUATION_INSPECTED_READ_ONLY',ordinal=journal.ordinal,sha256=journal.previous,intents={k:v['state'] for k,v in state['intents'].items()},database=runner.read(current))))
+            print(json.dumps(dict(status='CONTINUATION_INSPECTED_READ_ONLY',ordinal=journal.ordinal,sha256=journal.previous,intents={k:v['state'] for k,v in state['intents'].items()},checkpoint_state=state.get('status'),first_failure=state.get('first_failure'),closure_failure=state.get('closure_failure'),closure_verification=state.get('closure_verification'),independent_result=state.get('independent_result'),database=runner.read(current))))
         else:
             runner.inspect();print(json.dumps(dict(status='STOP15_RECONCILED_READ_ONLY',ordinal=journal.ordinal,sha256=journal.previous)))
     elif args.action=='cleanup':
@@ -473,7 +473,9 @@ def main(argv=None):
         runner.bind();runner.replacement()
         print(json.dumps(dict(status='STOP15_PREPARED_READBACK',ordinal=runner.journal.ordinal,sha256=runner.journal.previous,deployment=runner.state['deployment'],latest_submission=runner.state['bound_at']+600)))
     else:
-        runner.prepared();result=runner.run();print(json.dumps(result,sort_keys=True))
+        runner.prepared();result=runner.run()
+        result.update(owner_cleanup=runner.state.get('closure_verification'),checkpoint=dict(ordinal=runner.journal.ordinal,sha256=runner.journal.previous,status=runner.state['status']))
+        print(json.dumps(result,sort_keys=True))
 
 
 if __name__=='__main__':
