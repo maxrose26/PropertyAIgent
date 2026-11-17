@@ -116,6 +116,21 @@ CAMPAIGN_FUNCTION = "ingestion_register_campaign_once"
 CAMPAIGN_MODE = "CAMPAIGN_FINITE_HISTORICAL_V1"
 
 
+def _canonical_campaign_identity(as_of, council, start, end):
+    """One canonical data-only selected period; never a per-batch SQL version."""
+    import json
+    from verification.discovery.ten_council_offline import select_finite_batch
+    selected = select_finite_batch(as_of, council, start, end)
+    if selected["current_day_partial"]:
+        raise ValueError("CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL")
+    row = selected["selected_row"]
+    full_sha = selected["selected_payload"]["finite_manifest_sha256"]
+    token = hashlib.sha256(json.dumps(
+        dict(row=row, full_manifest_sha256=full_sha),
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:24]
+    return selected, row, "S4_FINITE_" + token, full_sha
+
+
 def render_inactive_campaign_issuer(as_of, council, start, end):
     """Render a single selected campaign batch; never install or authorise it.
 
@@ -128,19 +143,8 @@ def render_inactive_campaign_issuer(as_of, council, start, end):
     This artifact is WITHHELD regardless of its inputs and is NOT a live path.
     """
     import json
-    from verification.discovery.ten_council_offline import select_finite_batch
-
-    selected = select_finite_batch(as_of, council, start, end)
-    row = selected["selected_row"]
-    if selected["current_day_partial"]:
-        # Today's incomplete endpoint is planning-only; never certify it as
-        # a complete historical capture under the same batch authority.
-        raise ValueError("CAMPAIGN_FINITE_CURRENT_DAY_PARTIAL")
-    full_sha = selected["selected_payload"]["finite_manifest_sha256"]
-    token = hashlib.sha256(json.dumps(
-        dict(row=row, full_manifest_sha256=full_sha),
-        sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:24]
-    period_id = "S4_FINITE_" + token
+    selected, row, period_id, full_sha = _canonical_campaign_identity(
+        as_of, council, start, end)
     expected_first = '{"start":"2026-09-15","end":"2026-09-21","council":"tameside","semantics":"RECEIVED","max_runs":1,"status":"WITHHELD"}'
     first = json.dumps(dict(start=start, end=end, council=council,
                             semantics=row["semantics"], max_runs=1,
@@ -311,19 +315,12 @@ def prepare_inactive_campaign_owner_batch(as_of, council, start, end):
     execution path here. An actual owner must later seal exactly one reviewed
     batch using separately approved install/rollback and stop CAS authority.
     """
-    from verification.discovery.ten_council_offline import select_finite_batch
-    selected = select_finite_batch(as_of, council, start, end)
-    if selected["current_day_partial"]:
-        raise ValueError("CAMPAIGN_STABLE_INCOMPLETE_DAY")
-    preview = render_inactive_campaign_issuer(as_of, council, start, end)
-    row = selected["selected_row"]
-    if preview["row"] != row or preview["source_plan_sha256"] != (
-            selected["selected_payload"]["finite_manifest_sha256"]):
-        raise ValueError("CAMPAIGN_STABLE_OWNER_SOURCE_DRIFT")
+    selected, row, period_id, full_sha = _canonical_campaign_identity(
+        as_of, council, start, end)
     stable = render_inactive_stable_campaign_issuer()
     return dict(schema="PA_D004_STABLE_OWNER_PREVIEW_V1",
-                period=preview["period"], campaign_batch=dict(row),
-                campaign_source_plan_sha256=preview["source_plan_sha256"],
+                period=period_id, campaign_batch=dict(row),
+                campaign_source_plan_sha256=full_sha,
                 mode=CAMPAIGN_MODE, max_runs=1, overlap_days=7,
                 expected_generation=16,
                 stable_issuer_sha256=hashlib.sha256(stable.encode()).hexdigest(),
