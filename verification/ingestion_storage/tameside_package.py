@@ -5,11 +5,9 @@ import json
 import shlex
 from datetime import datetime,timezone
 from pathlib import Path
-from .daily_intake_runtime import execution_binding
+from .daily_intake_runtime import execution_binding,runtime_screening_config_sha256
 from .inactive_tameside_first_issuer import prepare_inactive_campaign_owner_batch,review_inactive_campaign_owner_policy
 from .tameside_candidate import EXPIRY
-from app.ingestion.ledger import digest
-from app.ingestion.listing_screening import ScreeningRule,RULE_V3
 
 PERIOD='S4_FINITE_677f555670666bcf21f45860'
 HOSTADDR='18.169.28.97'
@@ -36,7 +34,7 @@ def seal_policy(*,manifest_sha256,bound_at,hostaddr=HOSTADDR):
             qualification_sha256=hashlib.sha256(Path('docs/design/tameside-b-connection-20261101/tameside-qualification.json').read_bytes()).hexdigest())},
         expected_stop=dict(global_stop=None,manual_stop=None,last_hard_stop='ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP',hard_stop_generation=16),
         execution_binding=binding,test_evidence=False,
-        screening_config=digest(ScreeningRule(RULE_V3,unit_threshold=10,link_related=False).config()),
+        screening_config=runtime_screening_config_sha256(),
         hostaddr=hostaddr,route='POOLER',mode='CAMPAIGN_FINITE_HISTORICAL_V1',
         campaign_batch=preview['campaign_batch'],campaign_source_plan_sha256=preview['campaign_source_plan_sha256'],
         release_manifest_sha256=manifest_sha256,evidence_backend='POSTGRES_PILOT_V1',
