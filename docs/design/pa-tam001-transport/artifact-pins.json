@@ -2,14 +2,14 @@
   "decision_id": "PA-TAM002",
   "execution_binding": {
     "manifest_sha256": "24fa319f7ba91c683917c3bbe78c0a9e62f676354b2978e230541f35c31743ce",
-    "revision": "d9a2242bc5bcccb2d78a3aa04e1082635ed8933e",
-    "workflow_sha256": "ca9d052e4779d34e5d725c98cf629c6acf9184185cf7bc5740d915da0edc0268"
+    "revision": "8b5f4e2e843ec42de37fce5a3827e0de475ba24a",
+    "workflow_sha256": "c5ae5b0cf77b162fb57e9af6d54251b23ba9c9d76c63eb5269a3b5bdd9776524"
   },
   "expiry_ceiling": "2026-11-18T20:00:00+00:00",
   "files": {
     ".github/workflows/stage4-discovery-offline.yml": {
-      "bytes": 54270,
-      "sha256": "ca9d052e4779d34e5d725c98cf629c6acf9184185cf7bc5740d915da0edc0268"
+      "bytes": 54308,
+      "sha256": "c5ae5b0cf77b162fb57e9af6d54251b23ba9c9d76c63eb5269a3b5bdd9776524"
     },
     "docs/design/pa-tam001-transport/release-proposal.json": {
       "bytes": 2152,
@@ -30,6 +30,10 @@
     "tests/test_tameside_job_boundary.py": {
       "bytes": 1394,
       "sha256": "7cf12b2d44baa3079200195cc51dc61b6d30987d3f96224f26dc28d2fbdeaf0d"
+    },
+    "tests/test_tameside_owner_database.py": {
+      "bytes": 4809,
+      "sha256": "fb0b4f0edd0cb7474d13cc4289d9c6d8f3d335ac51e8bb41b5d3d690b47d6bf8"
     },
     "tests/test_tameside_owner_io.py": {
       "bytes": 4822,
@@ -67,6 +71,10 @@
       "bytes": 14759,
       "sha256": "c5d38d156035daac5aab2983d5b7fc2ed345ae9acb44864cf3312d9b8e53615c"
     },
+    "verification/ingestion_storage/tameside_owner_database.py": {
+      "bytes": 3715,
+      "sha256": "e1adfa1979b69a217de42bf07067b40f2102459b670cfffd91bc72b6037a2ba4"
+    },
     "verification/ingestion_storage/tameside_owner_journal.py": {
       "bytes": 4589,
       "sha256": "1ed75e2c31c9e2f705afb4877c299b9488de5d2b6d2240546dccafb272c0885a"
@@ -77,15 +85,27 @@
     }
   },
   "latest_bound_at": "2026-11-18T19:25:00+00:00",
+  "owner_database_adaptation": {
+    "approved_address": "18.169.28.97",
+    "dns_timeout_seconds": 3,
+    "factory": "database_type(pinned_root)",
+    "fallback": false,
+    "hostname": "aws-0-eu-west-2.pooler.supabase.com",
+    "max_dns_answers": 32,
+    "max_dns_result_bytes": 4096,
+    "port": 5432,
+    "selection": "APPROVED_ADDRESS_PRESENT",
+    "source": "verification/ingestion_storage/tameside_owner_database.py"
+  },
   "owner_journal": {
     "period": "S4_FINITE_677f555670666bcf21f45860_owner",
     "run": "416cdc40d6837dbb772e2bcce514bf39"
   },
   "owner_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
-  "proposal_version": "1.1",
-  "revision": "d9a2242bc5bcccb2d78a3aa04e1082635ed8933e",
+  "proposal_version": "1.2",
+  "revision": "8b5f4e2e843ec42de37fce5a3827e0de475ba24a",
   "screening_config": "58e2a1a1dae30a21b8fa150a27d223793d4601e8d400a686c4f8e17d999e1b7e",
   "status": "INACTIVE_REVIEW_CANDIDATE",
-  "tree": "15aa183980ad6bc9f77138296fdd8b8828974c98",
+  "tree": "aa9fee6b9d7fbe09dea42c5bb033d25d03d8a0a9",
   "version": 1
 }

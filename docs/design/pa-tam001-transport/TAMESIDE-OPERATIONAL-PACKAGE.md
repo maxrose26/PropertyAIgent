@@ -1,17 +1,38 @@
-# PA-TAM002 v1.1 — one inactive recovery/release/Tameside package
+# PA-TAM002 v1.2 — one inactive recovery/release/Tameside package
 
 17 November 2026. **Stage 4 OPEN. Prepared for independent REVIEW; not authority
-for execution.** Current gate: review this exact integrated package. Next gate:
-one explicit owner operational decision. Source revision: d9a2242bc5bcccb2d78a3aa04e1082635ed8933e;
-source tree: 15aa183980ad6bc9f77138296fdd8b8828974c98. The documentation commit is not the enabled build.
+for execution.** Current gate: independent acceptance of this DNS-only delta. Next gate:
+owner acceptance of the exact pin amendment to the already-approved operation. Source revision: 8b5f4e2e843ec42de37fce5a3827e0de475ba24a;
+source tree: aa9fee6b9d7fbe09dea42c5bb033d25d03d8a0a9. The documentation commit is not the enabled build.
 
-## Corrected candidate
+## DNS-only pin amendment — v1.2, preparation only
+
+Owner approval #214/6958893399 and independent REVIEW #227/6958965414 accept the prior v1.1 sequence. The operational preflight #227/6959099227 stopped before any database connection because the frozen first-answer selector chose another valid pooler address. This v1.2 amendment changes only that selection dependency and its code/workflow pins. Production awaits acceptance of the changed pin; the original one collection submission is unused.
+
+Construct the owner route from the corrected source checkout (never moving HEAD):
+
+```python
+from verification.ingestion_storage.tameside_owner_database import database_type
+from verification.ingestion_storage.tameside_package import HOSTADDR
+Database = database_type('/path/to/verified-f027ba28-checkout')
+db = Database()  # existing DATABASE_URL remains private; no connection yet
+assert db.address == HOSTADDR == '18.169.28.97'
+```
+
+The path above is the operator's existing verified pinned checkout, not a new credential/route. The adapter verifies the whole frozen owner_pilot.py SHA256 f33439807df02e14fec167e7f3782a36af5e12e52949404c2388b610d1e61981 and Database class SHA256 4959d79558bd5c4a5aabb8ec6c5dd6f05c02720c23bcefa9bf6985507673b36f. It replaces exactly one source anchor in that class; the original source is not edited. Current TLS trust source must match frozen SHA256 5b6e3dac999ad4b23efe148bb07ab43f64d4776e0c521d7303cecb9a2d47060d. The unchanged connection method retains the original hostname, certificate verification, CA, port 5432, timeouts and single hostaddr. No global socket override, address failover or retry is introduced.
+
+Resolution runs in an isolated Python child, once per new owner Database construction, with a 3s parent timeout, maximum 32 answers/4096 result bytes and no credential environment. Require approved-address membership; never loop for a preferred DNS ordering. Use this same adapted db for owner preflight/recovery/readback/journal/access. A separate readback connection may reuse this db and its selected address; any newly constructed db must repeat the bounded presence check. Do not call the old unadapted Database for later phases.
+
+Set owner binding hostaddr AND owner_hostaddr to db.address; require equality with the sealed policy hostaddr and compiled job --hostaddr. compile_package preserves the same fixed HOSTADDR. Existing owner validate_binding, restricted validate_job and runtime equality checks remain unchanged. If any binding differs, stop before effects rather than rebind it. The connection failure path makes one driver attempt and propagates failure; it never chooses another answer.
+
+Focused offline results: **37 passed / 0 skipped in 0.90s**, including 15 DNS adapter cases plus existing provider/package/runtime checks. Actual hash-verified frozen class is exercised with mocked DNS and driver: reordered/additional/absent answers, timeout/error, source/route drift, unchanged TLS arguments, one failed connection/no fallback, owner-to-policy-to-runtime equality and different runtime address refusal. No live DNS/database/source calls occurred during this correction. Existing d9a2242 Stage4 8/8, 279 local and journal/recovery connected evidence is reused only for unchanged paths; it is not represented as validation of the new source. Final hosted delta status and distinct review are recorded in the publication handoff.
+
+## Earlier corrections preserved
 
 This supersedes v1.0's failed build. It reuses the corrective worker's five
 commits through d66fed0601c4b0dee12d06f1c6224f5a7880de6b. That worker released its
 claim at PR227/6958238955 and completed at 19:15:20.380290Z before this session
-edited. Its build passed eight Stage4 jobs in run 44155820947. The final build's
-results are separately required below, not inherited.
+edited. Its build passed eight Stage4 jobs in run 44155820947. The v1.1 results below are retained unchanged-path evidence; v1.2 delta evidence is identified separately above.
 
 The sealer calls `daily_intake_runtime.runtime_screening_config_sha256()` without
 importing/selecting V3. The reviewed consumer list/scanner remain unchanged. The
@@ -59,7 +80,7 @@ neither the shutdown-gap campaign nor Stage 4 completion.
 
 ## Exact pins and finite values
 
-The build is d9a2242bc5bcccb2d78a3aa04e1082635ed8933e. `artifact-pins.json` lists the source hashes and
+The build is 8b5f4e2e843ec42de37fce5a3827e0de475ba24a. `artifact-pins.json` lists the source hashes and
 execution binding; #213 owner adapter remains
 `f027ba28af69ae70208eab5ed047e4a8a81c6337`. Guarded Bolton recovery source is
 `5bd306a86bc8b273d3bd0d778e7fc7803e737d7a589828f9f0405bc844a18d4a`.
@@ -71,9 +92,8 @@ Source-plan SHA is
 `d90fe1a7effd84d05593a8cbdc782d97c9b42fa904c45b29312c5fc03d6dae06`.
 
 Actual owner SQL identity must be `session_user=current_user=postgres`, database
-`postgres`, using existing #213 `owner_pilot.Database` session route. The pooler
-account name is not proof of SQL identity. Current IPv4 must match **18.169.28.97**;
-a different DNS result refuses this package. No alternative address or credential
+`postgres`, using the explicit hash-verified adaptation of the existing #213 `owner_pilot.Database` session route described below. The pooler
+account name is not proof of SQL identity. Select **18.169.28.97** only when a fresh bounded DNS answer for the exact configured hostname includes it; answer order/additional addresses do not change selection. Absence, timeout or malformed answers refuse before connection. No alternative address or credential
 is invented. Retained stable restricted passwords/verifiers remain private and
 must match current state. Worker receives only worker/effect credentials, no
 owner/database administration, provider, GitHub or model tokens.
@@ -246,14 +266,14 @@ actual activation/closure callbacks. No original namespace changes; this is not
 a proposed production deletion/reset. Newly enabled production code, actual schema
 rights, deployment, authentication, process closure and population remain unproven
 until the separately authorised operation and its readbacks. Earlier passing
-recovery/readback/issuer evidence is reused where unchanged. Final source d9a2242 passed **8/8 required Stage4 jobs** in [run 44158175273](https://github.com/maxrose26/PropertyAIgent/actions/runs/44158175273). The expanded actual-entrypoint/package step passed **30 tests in 31.11s**. The repaired V3 boundary passed within the **1078-test safety matrix**. AH and reusable workflows also succeeded. These counts describe their named checks; unrelated workflow steps retain their documented skips. Final aggregate
+recovery/readback/issuer evidence is reused where unchanged. Prior v1.1 source d9a2242 passed **8/8 required Stage4 jobs** in [run 44158175273](https://github.com/maxrose26/PropertyAIgent/actions/runs/44158175273). The expanded actual-entrypoint/package step passed **30 tests in 31.11s**. The repaired V3 boundary passed within the **1078-test safety matrix**. AH and reusable workflows also succeeded. These counts describe their named checks; unrelated workflow steps retain their documented skips. Final aggregate
 review must assess these new adapters and journal delta, not inherit an earlier
 component acceptance automatically.
 
-## One proposed decision, after independent REVIEW
+## One proposed pin amendment, after independent delta REVIEW
 
-**PA-TAM002 v1.1 — recommend approval only after exact-head REVIEW accepts this
-package and required checks.** It would authorise the entire finite sequence:
+**PA-TAM002 v1.2 — recommend approval only after exact-head REVIEW accepts this
+package and required checks.** The owner has already approved the finite sequence below at v1.1. The requested v1.2 amendment replaces only the executable/package pins and DNS selection binding, retaining that same authority:
 existing-service candidate deployment while stopped; exact Bolton recovery and
 historical dispositions; stopped writer/campaign/journal installation; mechanical
 manifest/policy binding and conditional STOP release; temporary existing restricted

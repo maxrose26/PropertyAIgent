@@ -1,3 +1,15 @@
+# Current update — PA-TAM002 v1.2 DNS-only pin amendment
+
+Source **8b5f4e2e843ec42de37fce5a3827e0de475ba24a**, tree **aa9fee6b9d7fbe09dea42c5bb033d25d03d8a0a9**. [Updated operational package](TAMESIDE-OPERATIONAL-PACKAGE.md), [exact pins](artifact-pins.json).
+
+The v1.1 preflight stopped before any database connection because frozen owner DNS selection used the first answer. The explicit hash-verified adapter now selects only approved18.169.28.97 when fresh bounded DNS includes it, refusing absence/timeout/malformed answers. Frozen TLS/hostname/port/one-address connection is unchanged; no fallback or retry. Use database_type(pinned_root) and carry db.address unchanged through owner binding/policy/runtime.
+
+Focused validation: **37 passed, zero skipped in0.90s**. Distinct read-only reviewer accepted the exact source delta with no blocking finding, conditional on final hosted checks and owner pin acceptance; see publication review/handoff for the attributable decision. [Exact-head hosted run44164589772](https://github.com/maxrose26/PropertyAIgent/actions/runs/44164589772) was in progress at this documentation publication; terminal results belong in the final PR handoff. Prior8/8 evidence below is only reused for unchanged paths.
+
+**Production remains paused until the changed pin is accepted.** Owner authority for the original sequence is #214/6958893399, prior independent REVIEW #227/6958965414. No new objective, collection submission, address, credentials, limits or expiry. Fixed expiry18 November2026 20:00London, latest binding19:25; recheck available phase/cleanup time before effects. Stage4OPEN. All-ten follow-on/no-replay remain.
+
+---
+
 # Current update — corrected PA-TAM002 v1.1, 17 November 2026 19:32 London
 
 [Complete inactive package](TAMESIDE-OPERATIONAL-PACKAGE.md) and [artifact hashes](artifact-pins.json).
