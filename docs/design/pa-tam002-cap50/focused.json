@@ -1,0 +1,9 @@
+{
+  "tests": 6,
+  "passed": 6,
+  "failed": 0,
+  "skipped": 0,
+  "command": "S4_BOLTON_PINNED_CHECKOUT=/tmp/pa-frozen python -m pytest tests/test_tameside_journal_capacity.py -q",
+  "kind": "OFFLINE_FROZEN_CODEC",
+  "worker_changed": false
+}

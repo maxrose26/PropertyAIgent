@@ -1,0 +1,332 @@
+{
+  "backlog_records": 1,
+  "capacity": {
+    "actual_report_serialized_bytes": 518,
+    "actual_saved_states": [
+      {
+        "ciphertext_bytes": 16200,
+        "cleanup_writes": 0,
+        "ordinal": 18,
+        "serialized_bytes": 12066
+      },
+      {
+        "ciphertext_bytes": 16924,
+        "cleanup_writes": 0,
+        "ordinal": 19,
+        "serialized_bytes": 12611
+      },
+      {
+        "ciphertext_bytes": 17244,
+        "cleanup_writes": 0,
+        "ordinal": 20,
+        "serialized_bytes": 12860
+      },
+      {
+        "ciphertext_bytes": 19356,
+        "cleanup_writes": 0,
+        "ordinal": 21,
+        "serialized_bytes": 14433
+      },
+      {
+        "ciphertext_bytes": 19892,
+        "cleanup_writes": 0,
+        "ordinal": 22,
+        "serialized_bytes": 14845
+      },
+      {
+        "ciphertext_bytes": 19996,
+        "cleanup_writes": 0,
+        "ordinal": 23,
+        "serialized_bytes": 14926
+      },
+      {
+        "ciphertext_bytes": 20020,
+        "cleanup_writes": 0,
+        "ordinal": 24,
+        "serialized_bytes": 14932
+      },
+      {
+        "ciphertext_bytes": 20124,
+        "cleanup_writes": 0,
+        "ordinal": 25,
+        "serialized_bytes": 15016
+      },
+      {
+        "ciphertext_bytes": 20124,
+        "cleanup_writes": 0,
+        "ordinal": 26,
+        "serialized_bytes": 15022
+      },
+      {
+        "ciphertext_bytes": 20232,
+        "cleanup_writes": 0,
+        "ordinal": 27,
+        "serialized_bytes": 15103
+      },
+      {
+        "ciphertext_bytes": 20252,
+        "cleanup_writes": 0,
+        "ordinal": 28,
+        "serialized_bytes": 15109
+      },
+      {
+        "ciphertext_bytes": 20340,
+        "cleanup_writes": 0,
+        "ordinal": 29,
+        "serialized_bytes": 15182
+      },
+      {
+        "ciphertext_bytes": 20360,
+        "cleanup_writes": 0,
+        "ordinal": 30,
+        "serialized_bytes": 15188
+      },
+      {
+        "ciphertext_bytes": 20468,
+        "cleanup_writes": 0,
+        "ordinal": 31,
+        "serialized_bytes": 15279
+      },
+      {
+        "ciphertext_bytes": 20488,
+        "cleanup_writes": 0,
+        "ordinal": 32,
+        "serialized_bytes": 15285
+      },
+      {
+        "ciphertext_bytes": 20596,
+        "cleanup_writes": 0,
+        "ordinal": 33,
+        "serialized_bytes": 15375
+      },
+      {
+        "ciphertext_bytes": 20616,
+        "cleanup_writes": 0,
+        "ordinal": 34,
+        "serialized_bytes": 15381
+      },
+      {
+        "ciphertext_bytes": 20596,
+        "cleanup_writes": 0,
+        "ordinal": 35,
+        "serialized_bytes": 15375
+      },
+      {
+        "ciphertext_bytes": 20744,
+        "cleanup_writes": 0,
+        "ordinal": 36,
+        "serialized_bytes": 15476
+      },
+      {
+        "ciphertext_bytes": 20892,
+        "cleanup_writes": 0,
+        "ordinal": 37,
+        "serialized_bytes": 15598
+      },
+      {
+        "ciphertext_bytes": 20956,
+        "cleanup_writes": 0,
+        "ordinal": 38,
+        "serialized_bytes": 15639
+      },
+      {
+        "ciphertext_bytes": 21916,
+        "cleanup_writes": 0,
+        "ordinal": 39,
+        "serialized_bytes": 16353
+      },
+      {
+        "ciphertext_bytes": 21916,
+        "cleanup_writes": 0,
+        "ordinal": 40,
+        "serialized_bytes": 16353
+      },
+      {
+        "ciphertext_bytes": 22300,
+        "cleanup_writes": 0,
+        "ordinal": 41,
+        "serialized_bytes": 16641
+      },
+      {
+        "ciphertext_bytes": 22280,
+        "cleanup_writes": 0,
+        "ordinal": 42,
+        "serialized_bytes": 16629
+      },
+      {
+        "ciphertext_bytes": 22324,
+        "cleanup_writes": 0,
+        "ordinal": 43,
+        "serialized_bytes": 16661
+      },
+      {
+        "ciphertext_bytes": 22472,
+        "cleanup_writes": 0,
+        "ordinal": 44,
+        "serialized_bytes": 16777
+      },
+      {
+        "ciphertext_bytes": 22644,
+        "cleanup_writes": 0,
+        "ordinal": 45,
+        "serialized_bytes": 16911
+      },
+      {
+        "ciphertext_bytes": 23068,
+        "cleanup_writes": 0,
+        "ordinal": 46,
+        "serialized_bytes": 17223
+      },
+      {
+        "ciphertext_bytes": 23156,
+        "cleanup_writes": 1,
+        "ordinal": 47,
+        "serialized_bytes": 17283
+      },
+      {
+        "ciphertext_bytes": 23176,
+        "cleanup_writes": 2,
+        "ordinal": 48,
+        "serialized_bytes": 17303
+      },
+      {
+        "ciphertext_bytes": 23156,
+        "cleanup_writes": 3,
+        "ordinal": 49,
+        "serialized_bytes": 17287
+      },
+      {
+        "ciphertext_bytes": 23196,
+        "cleanup_writes": 4,
+        "ordinal": 50,
+        "serialized_bytes": 17327
+      },
+      {
+        "ciphertext_bytes": 22876,
+        "cleanup_writes": 5,
+        "ordinal": 51,
+        "serialized_bytes": 17083
+      },
+      {
+        "ciphertext_bytes": 23048,
+        "cleanup_writes": 6,
+        "ordinal": 52,
+        "serialized_bytes": 17203
+      }
+    ],
+    "cleanup_ciphertext_bytes": [
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332,
+      33332
+    ],
+    "cleanup_reserved": 16,
+    "complete_projection_verified": true,
+    "normal_remaining": 27,
+    "projected_ciphertext_bytes": [
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692,
+      24692
+    ],
+    "projected_last_cleanup_ordinal": 63,
+    "projected_last_normal_ordinal": 47,
+    "projected_normal_writes": 27,
+    "start_ordinal": 20,
+    "total_remaining_normal_projections": 29,
+    "upgrade_normal_projections": [
+      {
+        "ciphertext_bytes": 16924,
+        "ordinal": 19
+      },
+      {
+        "ciphertext_bytes": 17244,
+        "ordinal": 20
+      }
+    ]
+  },
+  "cleanup": "CLOSED",
+  "cleanup_writes": 6,
+  "continuation": "ACTUAL_STOP15_RUNNER",
+  "evidence_kind": "DISPOSABLE_POSTGRES_SIMULATED_PROVIDER_SOURCE",
+  "fault": "none",
+  "final_ordinal": 52,
+  "live_requests": 0,
+  "old_intent_plaintext_bytes": 12611,
+  "original_history_preserved": true,
+  "owner_revision": "d79d29c138a8414ab40b52e02f9f8c749b6b695a",
+  "package_cli": "ACTUAL_CLI_DISPOSABLE_TRANSPORT_ONLY",
+  "partial_start_ordinal": 18,
+  "period": "S4_FINITE_677f555670666bcf21f45860",
+  "preparation": {
+    "boundaries": 0,
+    "deployment_submissions": 1,
+    "drift_refusals": 0,
+    "live_requests": 0,
+    "normal_last_ordinal": 47,
+    "old_ordinal": 55,
+    "original_history_preserved": true,
+    "provider_submissions": 0,
+    "recovery_commits": 1,
+    "recovery_readback": {
+      "period": "b-bolton-20261103-1105-01",
+      "receipt_sha256": "54b648d032a6618c103d2485f9d9249aafa5aa5da49e785ef54e6414c64126f1",
+      "retry": false,
+      "run_id": "ee7cf0d9bc714f56951527b940937054",
+      "status": "COMMITTED_STATE_VERIFIED_READ_ONLY",
+      "stop": {
+        "global_stop": {
+          "reason": "DAILY_INTAKE_SHARED_FAILURE"
+        },
+        "hard_stop_generation": 15,
+        "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+        "manual_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP"
+      },
+      "transaction": "ROLLED_BACK"
+    }
+  },
+  "private_final_refusals": 5,
+  "provider_handoff_restore": "ACTUAL_ADAPTER_SIMULATED_RENDER",
+  "provider_posts": 1,
+  "screening": "COMPLETE",
+  "status": "SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED",
+  "synthetic_listing_records": 1,
+  "upgrade_ack_lost_reconciled": true,
+  "upgrade_sql_calls": 1,
+  "worker_revision": "dd36ba711932e9f831daf7e885e40447be43d41d"
+}

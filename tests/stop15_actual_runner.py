@@ -285,9 +285,11 @@ def exercise(w, prior, manifest, root):
     runner.access.close=close_count
     if fault=='submission_restore':
         with pytest.raises(RuntimeError,match='DISPOSABLE_RESTORE_ACK_LOST'):runner.run()
+        prepared_files=runner.files
         reopened,retained=ja.reconcile(pinned,db,capacity50=True)
         assert cap.observe(db,source);reopened.capacity_verified=True
         runner=run.Continuation(db,pinned,reopened,retained,runtime_root=os.environ['S4_TAMESIDE_RUNTIME_CHECKOUT'],frozen_root=os.environ['S4_BOLTON_PINNED_CHECKOUT'],api_factory=lambda:provider,observation=observation,approval_ref=runner.approval_ref,review_ref=runner.review_ref,sleep=lambda _:None)
+        runner.files=prepared_files  # retain exact prior package only to prove duplicate refusal
         runner.access=get_access()  # same explicit disposable source-derived inventory
         runner.io=access_mod.provider_io(runner.frozen_root,runner.access)
         actual_outcome=runner.outcome;runner.outcome=readback

@@ -1,0 +1,110 @@
+{
+  "approval_ref": "https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-6970516113",
+  "batch": {
+    "council": "tameside",
+    "end": "2026-09-21",
+    "max_runs": 1,
+    "pages": 6,
+    "records_per_page": 5,
+    "requests": 10,
+    "retries": 0,
+    "semantics": "RECEIVED",
+    "source_bytes": 3000000,
+    "source_seconds": 45,
+    "start": "2026-09-15",
+    "supervisor_seconds": 60
+  },
+  "binding": {
+    "automatic_extension": false,
+    "cleanup_offset_seconds": 2100,
+    "latest_bound_at": "2026-11-18T19:25:00+00:00",
+    "outer_expiry": "2026-11-18T20:00:00+00:00",
+    "runtime_offset_seconds": 1915,
+    "submission_offset_seconds": 600
+  },
+  "checkpoint_ciphertext_limit": 51200,
+  "decision_id": "PA-TAM002",
+  "elapsed_manifest_sha256": "dd4d381be32c592bf8346172c538305662953beb259b1fe7b6d880acd2f46e54",
+  "files": {
+    "docs/design/pa-tam002-cap50/README.md": {
+      "bytes": 8954,
+      "sha256": "423c74ec07951a1ea5d55c777cd4c7627f50366b483d9f80a8214c309284c718"
+    },
+    "docs/design/pa-tam002-cap50/focused.json": {
+      "bytes": 241,
+      "sha256": "24ca783b7b9df1037c58b35e9219e63d75789780474d1df49a00a70801b32447"
+    },
+    "docs/design/pa-tam002-cap50/missing_job.json": {
+      "bytes": 1308,
+      "sha256": "ea585cf8e1f733032447ab89f19141745b4bcc252a38f81aa0551702e22eea3d"
+    },
+    "docs/design/pa-tam002-cap50/none.json": {
+      "bytes": 7828,
+      "sha256": "e3c1b219e68de98561c3a10a8d0bd36185f9babf5d7b8680c9e192076f1c829c"
+    },
+    "docs/design/pa-tam002-cap50/submission_restore.json": {
+      "bytes": 7980,
+      "sha256": "e2a4316043824a381ec229a281d472e6b2cf2ec2ff00c4d7493b0cc4fd4361b2"
+    },
+    "docs/design/pa-tam002-cap50/upgrade-template.sql": {
+      "bytes": 8201,
+      "sha256": "f5519def39d4ff85d86ba05ed36b7948969e958d76fe0510009d8f40eff48e34"
+    },
+    "tests/stop15_actual_runner.py": {
+      "bytes": 26166,
+      "sha256": "42ccc25f07d3953eab2318e2fa5741f5b567e773ba9af1befb74fc5c29d34d0f"
+    },
+    "tests/test_tameside_journal_capacity.py": {
+      "bytes": 4447,
+      "sha256": "11f10eb50ceef7e85d4229ceea711d1e0b30498a763087cbfc7beb1f855cfa08"
+    }
+  },
+  "frozen_owner_revision": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+  "hosted_workflow": 44250195581,
+  "namespace": "S4_FINITE_677f555670666bcf21f45860_owner",
+  "old_owner_function_sha256": "58cb6c34ca11c3aac50de1a0a51cdcf5a3ea5cdf8f3607075a25811f856f3dbd",
+  "owner_files": {
+    "release_candidate.py": "5833a1d87d15b4f2984160e9d00e1bc6740f79cac74de134d7601b655ad40dad",
+    "stop15_replacement.py": "4965090ea9b93e906125ac4d74bea0c9865055942de5a30c534b388be76d2a31",
+    "tameside_journal_capacity.py": "613e3f81e75c63dcf7fcd2ebc51cc3719d5ee713e795991e9e25a836e576ae71",
+    "tameside_owner_access.py": "4263fc180e3d782e15b97ead8a653dc05b98dc051df9adcfefdd3fc6871adba6",
+    "tameside_owner_journal.py": "19ae9c92a2b052a7bf97e947b345d53fdc6521a0d8d8c88a834ba6f11ca0d06a",
+    "tameside_stop15.py": "772b77ceaa596338227a6e4692b43840941a859a292cfb27478d5447a3d4ab18",
+    "tameside_stop15_run.py": "cee78a12c715c2d54e27540bd5788e289229c8e45b459394c2db4f69e0f79da7"
+  },
+  "owner_revision": "d79d29c138a8414ab40b52e02f9f8c749b6b695a",
+  "prior_checkpoint_ordinal": 18,
+  "prior_checkpoint_sha256": "0e6d08aa0b6e04c669998a828924e30322bab4ac73a0cf157a9d63b5fac955af",
+  "prior_runtime_revision": "9524503fa90228f31d48d16a58121c45d3eb90b8",
+  "reserve_policy": {
+    "growth_bytes": 6937,
+    "margin_bytes": 1024,
+    "normal_plaintext_ceiling": 30358,
+    "record_limits": {
+      "closure_failure": 512,
+      "closure_receipt": 2048,
+      "closure_verification": 1024,
+      "failure": 512,
+      "final_service": 128,
+      "first_failure": 512,
+      "restoration_failure": 512,
+      "restoration_receipt": 1024
+    },
+    "reserved_snapshots": 16,
+    "version": "CLEANUP_RESERVE_V1"
+  },
+  "review_ref": "PENDING_EXACT_PACKAGE_ACCEPTANCE",
+  "row_accounting": {
+    "cleanup": 16,
+    "from": 18,
+    "last_cleanup": 63,
+    "last_normal": 47,
+    "remaining_normal_projections": 27,
+    "total_normal": 29,
+    "upgrade_rows": 2
+  },
+  "runtime_revision": "dd36ba711932e9f831daf7e885e40447be43d41d",
+  "state": "REQUIRES_EXACT_INDEPENDENT_REVIEW_THEN_EXISTING_OWNER_AUTHORITY",
+  "upgraded_owner_function_sha256": "7bb4dbcc153364bf238394ce5c3f28ddec24121730297bdb6c5a4dcde8fd9b03",
+  "version": "SCOPED_50K_V1"
+}
