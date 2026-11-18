@@ -277,6 +277,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/e2e-venv"
+      - name: Bounded end-to-end connection and owner-side preparation, Idox and Arcus, restricted disposable roles, local fixtures and test publisher only
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e-connection"
+          timeout --kill-after=2s 540s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test CLOSED_IDOX_COST_PATH="$RUNNER_TEMP/e2e-connection/closed-idox-costs.json" OLDHAM_AUTHORITY_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-authority-costs.json" OLDHAM_WRAPPER_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-wrapper-costs.json" OLDHAM_TRANSITION_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-transition-costs.json" OLDHAM_REUSE_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-reuse-costs.json" "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py tests/test_owner_caller_pg.py tests/test_closed_idox_pg.py tests/test_oldham_authority_pg.py tests/test_oldham_wrapper_pg.py tests/test_oldham_transition_pg.py tests/test_oldham_activation_boundary_pg.py tests/test_oldham_reuse_pg.py tests/test_owner_acceptance_pg.py tests/test_owner_acceptance_real_evidence.py tests/test_oldham_inspection_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
       - name: Immutable historical Bolton checkout (STOP15 disposable proof only)
         uses: actions/checkout@v4
         with:
@@ -289,12 +294,8 @@ jobs:
           ref: dd36ba711932e9f831daf7e885e40447be43d41d
           path: .s4-pinned-tameside
           persist-credentials: false
-      - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/e2e-venv"
-      - name: Bounded end-to-end connection and owner-side preparation, Idox and Arcus, restricted disposable roles, local fixtures and test publisher only
-        run: |
-          mkdir -p "$RUNNER_TEMP/e2e-connection"
-          timeout --kill-after=2s 540s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test CLOSED_IDOX_COST_PATH="$RUNNER_TEMP/e2e-connection/closed-idox-costs.json" OLDHAM_AUTHORITY_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-authority-costs.json" OLDHAM_WRAPPER_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-wrapper-costs.json" OLDHAM_TRANSITION_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-transition-costs.json" OLDHAM_REUSE_COST_PATH="$RUNNER_TEMP/e2e-connection/oldham-reuse-costs.json" "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_e2e_connection_pg.py tests/test_owner_caller_pg.py tests/test_closed_idox_pg.py tests/test_oldham_authority_pg.py tests/test_oldham_wrapper_pg.py tests/test_oldham_transition_pg.py tests/test_oldham_activation_boundary_pg.py tests/test_oldham_reuse_pg.py tests/test_owner_acceptance_pg.py tests/test_owner_acceptance_real_evidence.py tests/test_oldham_inspection_pg.py -q -p no:cacheprovider --junitxml="$RUNNER_TEMP/e2e-connection/junit.xml"
       - name: Retained STOP15 full continuation — 78 deployments, 29 normal and 16 reserved cleanup snapshots (disposable only)
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: 'sqlite:///:memory:'
           INGESTION_PROVISIONING_TEST_URL: postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test
