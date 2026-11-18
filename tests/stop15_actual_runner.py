@@ -49,6 +49,11 @@ def exercise(w, prior, manifest, root):
         state['intents'][name]['state']='ACKNOWLEDGED';journal.save(copy.deepcopy(state))
     old_bound=time.time()-3600
     old=plan.compile_remaining(os.environ['S4_TAMESIDE_RUNTIME_CHECKOUT'],manifest,bound_at=old_bound,owner_journal_source=source)
+    # Retained production had a large historical deployment inventory, unlike
+    # the former one-deployment disposable projection. Preserve 77 prior IDs
+    # plus the current accepted deployment in the provider's 78-item inventory.
+    history_ids=['dep-'+hashlib.sha256(('historic-'+str(i)).encode()).hexdigest()[:20] for i in range(77)]
+    state['original_deploy_ids']=copy.deepcopy(history_ids)
     state.update(status='STOPPED_PACKAGE_SEALED',bound_at=old_bound,manifest=manifest,policy=json.loads(old['policy.json']),package_index=json.loads(old['continuation.json']))
     journal.save(copy.deepcopy(state))
     assert journal.ordinal==18,journal.ordinal
@@ -70,7 +75,11 @@ def exercise(w, prior, manifest, root):
     class Provider:
         calls=0;posts=0;puts=0;restore_lost=False;pending_reads=0
         service=copy.deepcopy(fixture['service']);env=copy.deepcopy(fixture['environment']);jobs=[]
-        deployments=[dict(deploy=dict(id='dep-synthetic',status='live',commit=dict(id=plan.BASE_RUNTIME),createdAt='2026-11-17T22:26:23Z',finishedAt='2026-11-17T22:27:13Z'))]
+        deployments=([dict(deploy=dict(id=item,status='deactivated',commit=dict(id='historic-revision'),
+                        createdAt='2026-11-16T21:00:00Z',finishedAt='2026-11-16T21:01:00Z'))
+                     for item in history_ids]
+                     +[dict(deploy=dict(id='dep-synthetic',status='live',commit=dict(id=plan.BASE_RUNTIME),
+                        createdAt='2026-11-17T22:26:23Z',finishedAt='2026-11-17T22:27:13Z'))])
         def close(self):pass
         def call(self,method,path='',body=None):
             self.calls+=1
@@ -79,7 +88,7 @@ def exercise(w, prior, manifest, root):
                 return copy.deepcopy(self.service)
             if method=='POST' and path=='/resume':
                 self.service['suspended']='not_suspended'
-                self.deployments[0]['deploy']['status']='deactivated'
+                next(item for item in self.deployments if item['deploy']['status']=='live')['deploy']['status']='deactivated'
                 self.deployments.append(dict(deploy=dict(id='dep-corrected',status='live',commit=dict(id=plan.RUNTIME),createdAt='2026-11-17T23:45:00Z',finishedAt='2026-11-17T23:46:00Z')))
                 return None
             if method=='POST' and path=='/suspend':self.service['suspended']='suspended';return None
@@ -124,6 +133,12 @@ def exercise(w, prior, manifest, root):
     runner.bind()
     runner.replacement()
     runner.state=plan.read_journal(runner.journal)
+    historical=runner.state['replacement_deployment']
+    assert 'prior_deploy_ids' not in historical
+    assert historical['prior_deploy_ids_ref']==dict(
+        ordinal=18,checkpoint_sha256=plan.CHECKPOINT,count=len(history_ids),
+        members_sha256=hashlib.sha256(pinned.canonical(history_ids)).hexdigest())
+    assert len(runner.state['original_deploy_ids'])==78
     runner.prepared()
     capacity=copy.deepcopy(runner.state['continuation_capacity'])
     production_policy=copy.deepcopy(runner.state['policy'])
