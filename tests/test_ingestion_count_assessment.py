@@ -163,6 +163,8 @@ def test_only_the_slice_one_files_select_or_read_v3_and_nothing_re_screens():
     """Phase A: nothing selected v3. Slice 1 (PR #171) adds exactly one explicit consumer set; this test pins it, and the held production paths are pinned in tests/test_ingestion_screening_v3_slice1.py."""
     # Owner-authorised inactive daily intake reads frozen v3 outcomes; no rule or live activation change.
     allowed={'verification/ingestion_storage/daily_intake_runtime.py','app/ingestion/daily_intake.py','app/ingestion/nomination.py','verification/ingestion_storage/operational_controller.py','verification/ingestion_storage/v3_admission.py', 'verification/ingestion_storage/observation_worker_sql.py','app/ingestion/coordinator.py','app/ingestion/screening_projection.py','verification/ingestion_storage/screening_v3_grant.py','verification/ingestion_storage/screening_v3_worker_sql.py','verification/ingestion_storage/screening_v3_hosted.py','verification/ingestion_storage/policy_screening_v3.py','verification/ingestion_storage/retained_world.py','verification/ingestion_storage/operational_runner.py','verification/ingestion_storage/oldham_authority.py','verification/ingestion_storage/oldham_owner_once.py', 'verification/ingestion_storage/chain_registration.py'}
+    # STOP15 continuation independently reads existing frozen outcomes; it never re-screens.
+    allowed.add('verification/ingestion_storage/tameside_stop15_run.py')
     offenders=set()
     for path in list((ROOT/'app').rglob('*.py'))+list((ROOT/'verification').rglob('*.py')):
         if path.name in ('listing_screening.py','count_assessment.py','count_evidence.py'):continue
@@ -506,3 +508,10 @@ def test_a_wrapped_keyword_phrase_still_classifies_an_amendment_discharge_or_res
 def test_each_unicode_line_break_character_is_a_boundary_between_two_counts():
     for brk in ('\n','\r','\x0b','\x0c','\x85','\u2028','\u2029','\r\n'):
         got=_a('Demolition of 12 flats'+brk+'18 new flats');assert (got['proposed_total'],got['lost']) == (18,12),repr(brk)
+
+
+def test_stop15_outcome_readback_does_not_screen_or_rescreen():
+    import ast
+    tree=ast.parse((ROOT/'verification/ingestion_storage/tameside_stop15_run.py').read_text())
+    forbidden={'screen','screen_row','rescreen','re_screen','assess_proposal'}
+    assert not [n for n in ast.walk(tree) if isinstance(n,ast.Call) and ((isinstance(n.func,ast.Attribute) and n.func.attr in forbidden) or (isinstance(n.func,ast.Name) and n.func.id in forbidden))]
