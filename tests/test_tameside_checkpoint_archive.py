@@ -67,3 +67,29 @@ def test_refusal_precedes_any_recovery_or_provider_effect(change):
     if change in ('reference','missing','duplicate','oversize','stored_hash','ciphertext','permission'):
         assert not decodes
     assert all(q in ('BEGIN READ ONLY','ROLLBACK') or 'WITH matches' in q for q in calls)
+
+
+def test_stop15_replacement_references_immutable_row18_without_copying_77_ids():
+    from verification.ingestion_storage import stop15_replacement, tameside_stop15 as plan
+    canonical=lambda v:json.dumps(v,sort_keys=True,separators=(',',':')).encode()
+    ids=['dep-'+hashlib.sha256(str(i).encode()).hexdigest()[:20] for i in range(77)]
+    state=dict(elapsed_package=dict(ordinal=18,sha256=plan.CHECKPOINT),
+               original_deploy_ids=ids)
+    ref=stop15_replacement.prior_deploy_reference(state,SimpleNamespace(canonical=canonical))
+    assert ref==dict(ordinal=18,checkpoint_sha256=plan.CHECKPOINT,count=77,
+                     members_sha256=hashlib.sha256(canonical(ids)).hexdigest())
+    assert all(item not in json.dumps(ref) for item in ids)
+    assert state['original_deploy_ids']==ids
+
+
+@pytest.mark.parametrize('mutation',['ordinal','sha256','malformed'])
+def test_stop15_replacement_rejects_untrusted_deploy_history_reference(mutation):
+    from verification.ingestion_storage import stop15_replacement, tameside_stop15 as plan
+    state=dict(elapsed_package=dict(ordinal=18,sha256=plan.CHECKPOINT),
+               original_deploy_ids=['dep-prior'])
+    if mutation=='ordinal':state['elapsed_package']['ordinal']=19
+    if mutation=='sha256':state['elapsed_package']['sha256']='0'*64
+    if mutation=='malformed':state['original_deploy_ids']='dep-prior'
+    with pytest.raises(ValueError,match='STOP15_OLD_DEPLOYMENT_'):
+        stop15_replacement.prior_deploy_reference(state,SimpleNamespace(
+            canonical=lambda v:json.dumps(v,sort_keys=True,separators=(',',':')).encode()))
