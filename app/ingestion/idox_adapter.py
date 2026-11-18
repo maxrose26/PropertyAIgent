@@ -82,6 +82,13 @@ class IdoxListingContract:
         if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
         validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
+        mode=source.get('pagination_mode');profile=source.get('collection_profile',{})
+        if mode is not None or profile.get('idox_pagination') is not None or self.name=='tameside-screening-metadata-five-v1':
+            if (mode!='TAMESIDE_FIVE_COUNT_V1' or profile.get('idox_pagination')!=mode or profile.get('page_size')!=5
+                or c.council!='tameside' or c.semantics!='RECEIVED' or self.name!='tameside-screening-metadata-five-v1'
+                or (source.get('pagination_evidence') or {}).get('state')!='COUNT_RECONCILED'
+                or (source.get('pagination_evidence') or {}).get('criteria_verified') is not True
+                or any(p.get('page_size')!=5 for p in source.get('pages',[]))):raise Denied('IDOX_PAGINATION_PROFILE_BINDING')
         # Owner acceptance (specification 037) is consulted ONLY for a TOTAL_UNKNOWN source and ONLY by a contract constructed with a registry key; it must be the exact bound audit. A source with a count signal uses the normal rule.
         accepted=owner_acceptance.require(self.owner_acceptance).verify_source(source,c) if (self.owner_acceptance is not None and source.get('enumeration_evidence')=='TOTAL_UNKNOWN') else None
         if (source.get('council')!=c.council or source.get('date_semantics')!=c.semantics
@@ -122,7 +129,7 @@ class IdoxListingContract:
             url,key,fields=self._row(row,keys,refs)
             segment=pages[0] if accepted is not None else next(p for p in pages if p['first']<=len(projected)+1<=p['last'])
             projected.append(dict(reference=row['reference'],source_record_id=key,source_url=url,fields=fields,
-                provenance=dict(parser='app.scrapers.discovery_idox.parse_page',body_sha256=segment['body_sha256'],row_ordinal=len(projected)+1),
+                provenance=dict(parser='verification.discovery.pagination_calibration.observe' if mode else 'app.scrapers.discovery_idox.parse_page',body_sha256=segment['body_sha256'],row_ordinal=len(projected)+1),
                 field_capture_scope=['reference',*fields]))
         window=WindowEvidence(c.council,'coordinator-retained',c.start,c.end,c.start,c.end,c.semantics,
             self.name,source['applied_evidence_sha256'],pages[-1]['terminal'],len(pages),len(projected),r['requests_attempted'],r['received_bytes'],r['elapsed_seconds'],explicit_zero=zero,
@@ -132,6 +139,7 @@ class IdoxListingContract:
             segments=pages,source_sha256=digest(source),qualification_sha256=self.qualification_sha256,
             applied_interval=interval,cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer,
             resources=dict(metric='EXISTING_IDOX_RECEIVED_BODY_BYTES',**r),window=window.receipt_dict())
+        if mode is not None:receipt['pagination_mode']=mode
         if accepted is not None:receipt.update(completeness_basis=owner_acceptance.BASIS,owner_acceptance=accepted.binding())      # separate evidence: the segments above keep the source's own pagination facts (terminal is null)
         if c.semantics!='RECEIVED':receipt['date_semantics']=c.semantics      # historical receipts carry no date basis and their digests are pinned, so only a non-default basis (Stockport VALIDATED) is named here; retained_capture always names it
         return receipt

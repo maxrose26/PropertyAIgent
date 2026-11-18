@@ -50,7 +50,7 @@ def capture_registration(owner, binding, contract, start, end, *, revision, item
     return Registration('CAPTURE', authority_name(binding, 'CAPTURE', revision), [root], [root], grant, bindings, root['key'])
 
 
-def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, allow_test_evidence=False, other_receipts=(), _pending_admission=False):
+def chain_registration(owner, binding, contract, root, receipt, nominees, rule, detail_targets, *, revision, item_limits, allow_test_evidence=False, other_receipts=(), _pending_admission=False,capture_bound=False):
     """The batch, screening and factual items and the one grant covering them, for exactly the nominees the receipt yields.
 
     `detail_targets` maps reference -> the fresh-detail case target; each must name exactly the nominated record (`check_detail_target`). Refuses before preparing anything when the
@@ -62,10 +62,10 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
     if binding.council in COUNCILS and detail_targets is not None and (not isinstance(detail_targets,dict) or set(detail_targets)!={n.reference for n in nominees}):raise Denied('CLOSED_IDOX_TARGET_SET')
     # `other_receipts` are further saved captures of the same council, supplied only so that a reference observed differently elsewhere is withheld; the nominees registered here are
     # exactly those the derivation binds to THIS capture.
-    derived = derive_nominees([receipt, *other_receipts], rule, allow_test_evidence=allow_test_evidence)
+    derived = derive_nominees([receipt, *other_receipts], rule, allow_test_evidence=allow_test_evidence,capture_bound=capture_bound)
     if tuple(nominees) != tuple(n for n in derived.nominees if n.capture_sha256 == digest(receipt)):
         raise Denied('CHAIN_NOMINEES_NOT_DERIVED')
-    batches,screens = _screen_items(binding,root,receipt,rule,item_limits)
+    batches,screens = _screen_items(binding,root,receipt,rule,item_limits,capture_bound=capture_bound)
     by_reference = {r['reference']: r for r in receipt['records']}
     from .idox_target import COUNCILS,derive
     factory = getattr(new_identity_contract, binding.detail_factory)
@@ -85,6 +85,344 @@ def chain_registration(owner, binding, contract, root, receipt, nominees, rule, 
     bindings, grant = owner.build_grant(rows, [], capture_key=root['key'], source_calls=len(nominees), capture_only=False, screening=rule, writes=2 * len(nominees),
                                         detail_source_keys=[f['key'] for f in facts.values()], extra_outcomes={'FACTUAL_REFRESH': FACTUAL_OUTCOMES})
     return Registration('CHAIN', authority_name(binding, 'CHAIN', revision), rows, [*batches, *facts.values()], grant, bindings, root['key'], contracts, batches, screens, facts)
+
+
+
+def persisted_council_capture_inventory(connection, council, *, max_roots=128):
+    """Owner-side READ-ONLY inventory of *stored* discovery roots in one SQL snapshot.
+
+    This is an offline preparation/readback aid, NOT a new restricted-worker
+    capability, source-completeness proof, permission to issue grants, or proof
+    that historical R0 receipts were persisted. The caller owns and independently
+    authenticates the existing connection; this helper neither obtains credentials
+    nor changes the database. Every known unfinished root refuses nomination,
+    rather than silently omitting a possibly conflicting observation.
+    """
+    from app.config import load_councils
+    # Read-only inventory recognises all ten configured GM councils, including
+    # Trafford; configuration is NOT source qualification or an execution grant.
+    if council not in load_councils() or type(max_roots) is not int or not 1 <= max_roots <= 128:
+        raise Denied('CAPTURE_INVENTORY_SCOPE')
+    raw = connection.execute(
+        "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+        "WHERE w.task='DISCOVERY' AND w.subject->>'council'=%s "
+        "ORDER BY w.key LIMIT %s",
+        (council, max_roots + 1),
+    ).fetchall()
+    if not raw or len(raw) > max_roots:
+        raise Denied('CAPTURE_INVENTORY_EMPTY_OR_BOUND')
+    roots = [r[0] for r in raw]
+    # Reuse the existing 2 MiB readback ceiling; 128 small roots is not a
+    # licence to materialise unbounded private captures in this process.
+    from app.ingestion.ledger import bounded
+    bounded(roots, 2 * 1024 ** 2)
+    if len({r.get('key') for r in roots}) != len(roots):
+        raise Denied('CAPTURE_INVENTORY_DUPLICATE')
+    for root in roots:
+        subject = root.get('subject')
+        receipt = root.get('checkpoint')
+        if (root.get('state') != 'COMPLETE' or not isinstance(subject, dict)
+                or not isinstance(receipt, dict)):
+            raise Denied('CAPTURE_INVENTORY_UNRESOLVED')
+        archive = receipt.get('durable_archive')
+        outcome = root.get('outcome')
+        source_sha = receipt.get('source_sha256')
+        # A COMPLETE status and a claimed archive readback are not sufficient:
+        # tie the stored root's terminal outcome, retained receipt and archive
+        # to the SAME source digest. This does not independently fetch bytes or
+        # establish portal completeness, which remain separate review gates.
+        from re import fullmatch
+        digest_bound = (
+            isinstance(source_sha, str)
+            and fullmatch('[a-f0-9]{64}', source_sha) is not None
+            and isinstance(archive, dict)
+            and archive.get('sha256') == source_sha
+            and isinstance(outcome, dict)
+            and outcome.get('outcome') == 'ENUMERATED_METADATA_RETAINED'
+            and outcome.get('source_sha256') == source_sha
+        )
+        # The immutable Bolton RECEIVED-v1 contract predates the explicit
+        # date_semantics receipt field. The stored root must itself bind
+        # RECEIVED; any explicit contradictory value remains a hard refusal.
+        # This exception is read-only historical compatibility, not source
+        # completeness or permission to re-screen/admit the old observations.
+        legacy_received_basis = (
+            council == 'bolton'
+            and root.get('contract') == 'bolton-received-idox-coordinator-v1'
+            and subject.get('semantics') == 'RECEIVED'
+            and 'date_semantics' not in receipt
+        )
+        if (not digest_bound
+                or receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                or receipt.get('council') != council
+                or receipt.get('contract') != root.get('contract')
+                or receipt.get('interval') != [subject.get('start'), subject.get('end')]
+                or (receipt.get('date_semantics') != subject.get('semantics')
+                    and not legacy_received_basis)
+                or receipt.get('accounting_complete') is not True
+                or receipt.get('cleanup') != 'CLOSED'
+                or not isinstance(archive, dict)
+                or archive.get('readback_verified') is not True):
+            raise Denied('CAPTURE_INVENTORY_UNVERIFIED')
+    # DB membership alone does not prove independent historical/source coverage:
+    # use these receipts for overlap/conflict checks, never as a coverage gate.
+    return tuple(roots)
+
+
+
+
+def shutdown_gap_sql_readback(connection, as_of):
+    """Read-only, bounded per-council/window SQL checkpoint for PA-D004 v1.2.
+
+    This checks persisted capture and saved screening *only*. It does not
+    authenticate official-source enumeration, mark dates covered, determine
+    qualification, count new changes, or establish buyer-facing facts. The
+    caller owns its SQL connection/transaction; this function grants nothing.
+    Every required council/window remains visible when no trusted SQL rows
+    exist, including unqualified Trafford and historical UNKNOWN Bolton.
+    """
+    from datetime import date
+    from app.ingestion.listing_screening import RULE_V3, ScreeningRule
+    from .scope_binding import binding_for
+    from app.ingestion.ledger import bounded
+    from verification.discovery.campaign_manifest import shutdown_gap_source_packages
+    plan = shutdown_gap_source_packages(as_of)
+    rule = ScreeningRule(RULE_V3, unit_threshold=10, link_related=False)
+    entries = []
+    persisted_receipt_inventory = []
+    for council in plan['required_councils']:
+        raw = connection.execute(
+            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+            "WHERE w.task='DISCOVERY' AND w.subject->>'council'=%s "
+            "ORDER BY w.key LIMIT 129", (council,),
+        ).fetchall()
+        if len(raw) > 128:
+            raise Denied('SHUTDOWN_SQL_READBACK_ROOT_BOUND')
+        roots = [row[0] for row in raw]
+        bounded(roots, 2 * 1024 ** 2)
+        # Independently show what was saved in SQL, even if an overlapping,
+        # blocked or unknown capture prevents claiming complete coverage.
+        # This does NOT re-fetch the private archive or qualify a source.
+        from re import fullmatch
+        complete = [row for row in roots if row.get('state') == 'COMPLETE']
+        observed = dict(council=council, complete_capture_roots=len(complete),
+                        other_capture_roots=len(roots)-len(complete),
+                        distinct_references=None, receipt_rows=None,
+                        duplicate_reference_rows=None,
+                        state='NO_COMPLETE_SQL_CAPTURE')
+        if complete:
+            references = []
+            for root in complete:
+                receipt, outcome = root.get('checkpoint'), root.get('outcome')
+                subject = root.get('subject')
+                if not isinstance(receipt, dict) or not isinstance(outcome, dict) or not isinstance(subject, dict):
+                    observed['state'] = 'SQL_RECEIPT_METADATA_UNVERIFIED'
+                    break
+                archive, records = receipt.get('durable_archive'), receipt.get('records')
+                source_sha = receipt.get('source_sha256')
+                # Digest agreement alone does not make incomplete source
+                # accounting, an unsuccessful terminal outcome, or a foreign
+                # contract an independently trusted retained identity.
+                legacy_received_basis = (
+                    root.get('contract') == 'bolton-received-idox-coordinator-v1'
+                    and council == 'bolton'
+                    and subject.get('semantics') == 'RECEIVED'
+                    and 'date_semantics' not in receipt
+                )
+                if (root.get('task') != 'DISCOVERY'
+                        or receipt.get('kind') != 'LISTING_RECEIPT_V1'
+                        or subject.get('kind') != 'DISCOVERY_SCOPE'
+                        or receipt.get('council') != council
+                        or subject.get('council') != council
+                        or receipt.get('contract') != root.get('contract')
+                        or (receipt.get('date_semantics') != subject.get('semantics')
+                            and not legacy_received_basis)
+                        or receipt.get('interval') != [subject.get('start'), subject.get('end')]
+                        or receipt.get('accounting_complete') is not True
+                        or receipt.get('cleanup') != 'CLOSED'
+                        or outcome.get('outcome') != 'ENUMERATED_METADATA_RETAINED'
+                        or type(source_sha) is not str
+                        or fullmatch(r'[a-f0-9]{64}', source_sha) is None
+                        or not isinstance(archive, dict)
+                        or archive.get('sha256') != source_sha
+                        or archive.get('readback_verified') is not True
+                        or outcome.get('source_sha256') != source_sha
+                        or not isinstance(records, list) or len(records) > 60
+                        or any(not isinstance(record, dict)
+                               or type(record.get('reference')) is not str
+                               or not record['reference'].strip() for record in records)):
+                    observed['state'] = 'SQL_RECEIPT_METADATA_UNVERIFIED'
+                    break
+                references.extend(record['reference'] for record in records)
+            else:
+                observed.update(state='SQL_RECEIPT_METADATA_READBACK_ONLY',
+                                distinct_references=len(set(references)),
+                                receipt_rows=len(references),
+                                duplicate_reference_rows=len(references)-len(set(references)))
+        persisted_receipt_inventory.append(observed)
+        verified = ()
+        if roots:
+            try:
+                verified = persisted_council_capture_inventory(connection, council)
+            except Denied:
+                pass  # preserve unknown/failed roots; never silently omit them
+        for window in plan['windows']:
+            start, end = window['start'], window['end']
+            exact, other_overlap = [], False
+            for root in roots:
+                subject = root.get('subject')
+                if not isinstance(subject, dict):
+                    other_overlap = True
+                    continue
+                a, b = subject.get('start'), subject.get('end')
+                try:
+                    if (type(a) is not str or type(b) is not str or
+                            date.fromisoformat(a).isoformat() != a or
+                            date.fromisoformat(b).isoformat() != b or a > b):
+                        raise ValueError('bad interval')
+                except (TypeError, ValueError):
+                    other_overlap = True
+                    continue
+                if a <= end and b >= start:
+                    if (a, b) == (start, end):
+                        exact.append(root)
+                    else:
+                        other_overlap = True
+            entry = dict(council=council, start=start, end=end,
+                         source_coverage='UNKNOWN', source_qualified=False,
+                         retained_sql_records=None, screened_sql_records=None,
+                         factual_qualifications=None, newly_added=None,
+                         saved_key_facts=None, buyer_backlog=None,
+                         metadata_route_counts=None)
+            if other_overlap or len(exact) > 1:
+                entry['state'] = 'OVERLAP_OR_CONFLICT_REQUIRES_REVIEW'
+            elif not exact:
+                entry['state'] = 'NO_EXACT_PERSISTED_SQL_CAPTURE'
+            elif not verified or exact[0] not in verified:
+                entry['state'] = 'SQL_CAPTURE_UNVERIFIED'
+            else:
+                root = exact[0]
+                receipt = root['checkpoint']
+                if (root['subject'].get('kind') != 'DISCOVERY_SCOPE' or
+                        not isinstance(receipt.get('records'), list)):
+                    entry['state'] = 'SQL_CAPTURE_UNVERIFIED'
+                else:
+                    entry['state'] = 'SQL_CAPTURE_SCREENING_UNVERIFIED'
+                    entry['retained_sql_records'] = len(receipt['records'])
+                    try:
+                        binding = binding_for(council)
+                        batches, screens = _screen_items(
+                            binding, root, receipt, rule, root['limits'],
+                            capture_bound=True)
+                        expected = [*batches, *screens.values()]
+                        if len(expected) > 72:
+                            raise Denied('SHUTDOWN_SQL_SCREENING_BOUND')
+                        keys = [r['key'] for r in expected]
+                        saved = ([r[0] for r in connection.execute(
+                            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w "
+                            "WHERE w.key = ANY(%s)", (keys,),
+                        ).fetchall()] if keys else [])
+                        bounded(saved, 2 * 1024 ** 2)
+                        registration = Registration(
+                            'SCREENING', '', [], [], {}, {}, root['key'],
+                            batches=batches, screens=screens)
+                        completed_screening(registration, receipt, rule, saved)
+                        # Only fully re-derived capture-bound SQL screenings
+                        # enter this metadata routing census. No factual,
+                        # Application, or buyer-opportunity claim follows.
+                        route_counts = {}
+                        for saved_row in saved:
+                            if saved_row['task'] == 'SCREENING':
+                                route = saved_row['outcome']['outcome']
+                                route_counts[route] = route_counts.get(route, 0) + 1
+                        if sum(route_counts.values()) != len(screens):
+                            raise Denied('SHUTDOWN_SQL_SCREENING_ROUTING_SET')
+                        entry['state'] = 'SQL_CAPTURE_AND_SCREENING_READBACK'
+                        entry['screened_sql_records'] = len(screens)
+                        entry['metadata_route_counts'] = dict(sorted(route_counts.items()))
+                    except (Denied, KeyError, TypeError, ValueError, IndexError):
+                        # Unqualified source contracts and inconsistent saved
+                        # children must never be counted as screened evidence.
+                        pass
+            entries.append(entry)
+    if len(entries) != plan['total_date_scopes']:
+        raise Denied('SHUTDOWN_SQL_READBACK_LEDGER_BOUND')
+    # Summarise only exact persisted, validated screening windows.
+    # Unknown/absent council counts remain UNKNOWN rather than fake zeroes.
+    completed_routes = [e['metadata_route_counts'] for e in entries
+                        if e['state'] == 'SQL_CAPTURE_AND_SCREENING_READBACK']
+    combined_routes = {}
+    for counts in completed_routes:
+        for route, count in counts.items():
+            combined_routes[route] = combined_routes.get(route, 0) + count
+    return dict(as_of_london=plan['as_of_london'],
+                metadata_route_counts_for_readback_scopes=(
+                    dict(sorted(combined_routes.items())) if completed_routes else None),
+                fallback_is_verified_shutdown=False,
+                persisted_receipt_inventory=persisted_receipt_inventory,
+                required_date_scopes=plan['total_date_scopes'],
+                entries=entries,
+                sql_readback_scopes=sum(x['state']=='SQL_CAPTURE_AND_SCREENING_READBACK' for x in entries),
+                sql_readback_screened_records=sum(x['screened_sql_records'] or 0 for x in entries),
+                all_source_coverage_proven=False,
+                qualification_or_application_admission_proven=False)
+
+
+def prepare_admission_from_persisted_captures(connection, owner, binding, contract, root_key,
+                                               rule, detail_targets, *, revision, item_limits,
+                                               allow_test_evidence=False):
+    """Owner-side read-only admission preparation from persisted SQL history.
+
+    The caller may choose a stored root, but CANNOT hand-pick the history or
+    omit conflicting captures. Fetch all complete, verified persisted roots of
+    that council and the exact saved screening children before deriving
+    nominees. No issuer/worker capability or factual write is provided.
+    SQL membership does not authenticate source enumeration or archive bytes.
+    """
+    roots = persisted_council_capture_inventory(connection, binding.council)
+    selected = [r for r in roots if r['key'] == root_key]
+    if len(selected) != 1:
+        raise Denied('PERSISTED_ADMISSION_ROOT_NOT_FOUND')
+    root = selected[0]
+    receipt = root['checkpoint']
+    receipts = tuple(r['checkpoint'] for r in roots)
+    nomination = derive_nominees(receipts, rule, allow_test_evidence=allow_test_evidence,
+                                  capture_bound=True)
+    nominees = tuple(n for n in nomination.nominees if n.capture_sha256 == digest(receipt))
+    screening = screening_registration(owner, binding, contract, root, receipt, rule,
+                                       revision=revision, item_limits=item_limits,
+                                       _completed=True, allow_test_evidence=allow_test_evidence,
+                                       capture_bound=True)
+    required = [r['key'] for r in [*screening.batches, *screening.screens.values()]]
+    if len(required) > 72:
+        raise Denied('PERSISTED_ADMISSION_SCREENING_BOUND')
+    # Protect a candidate from a mutable saved screening row between its
+    # initial read and return. This is only an owner-side optimistic fence:
+    # a future issuer must still revalidate under its own execution lock.
+    from app.ingestion.ledger import bounded
+    def read_screening_children():
+        rows = ([row[0] for row in connection.execute(
+            "SELECT row_to_json(w) FROM public.ingestion_work_items AS w WHERE w.key = ANY(%s)",
+            (required,),
+        ).fetchall()] if required else [])
+        bounded(rows, 2 * 1024 ** 2)
+        return sorted(rows, key=lambda row: row['key'])
+    saved = read_screening_children()
+    registration = admission_registration(
+        owner, binding, contract, root, receipt, nominees, rule, detail_targets,
+        revision=revision, item_limits=item_limits, screening_rows=saved,
+        allow_test_evidence=allow_test_evidence, capture_bound=True,
+        other_receipts=tuple(r['checkpoint'] for r in roots if r['key'] != root_key),
+    )
+    # Do not claim a single snapshot from a caller-owned connection which may
+    # be autocommit/READ COMMITTED. An optimistic second independent read must
+    # agree before a preparation candidate is returned; the eventual issuer
+    # must still revalidate current durable state at its own execution fence.
+    if persisted_council_capture_inventory(connection, binding.council) != roots:
+        raise Denied('PERSISTED_ADMISSION_INVENTORY_CHANGED')
+    if read_screening_children() != saved:
+        raise Denied('PERSISTED_ADMISSION_SCREENING_CHANGED')
+    return registration, nomination
 
 
 def _capture_inputs(binding,contract,root,receipt,item_limits):
@@ -158,10 +496,10 @@ def completed_screening(registration,receipt,rule,rows):
     return digest(sorted(rows,key=lambda r:r['key']))
 
 
-def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False):
-    screen=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,_completed=True,allow_test_evidence=allow_test_evidence)
+def admission_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,*,revision,item_limits,screening_rows,allow_test_evidence=False,capture_bound=False,other_receipts=()):
+    screen=screening_registration(owner,binding,contract,root,receipt,rule,revision=revision,item_limits=item_limits,_completed=True,allow_test_evidence=allow_test_evidence,capture_bound=capture_bound)
     seal=completed_screening(screen,receipt,rule,screening_rows)
-    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True)
+    reg=chain_registration(owner,binding,contract,root,receipt,nominees,rule,detail_targets,revision=revision,item_limits=item_limits,allow_test_evidence=allow_test_evidence,_pending_admission=True,capture_bound=capture_bound,other_receipts=other_receipts)
     reg.kind='ADMISSION';reg.authority=authority_name(binding,'ADMISSION',revision)
     reg.insert=list(reg.facts.values());reg.screening_sha256=seal
     return reg

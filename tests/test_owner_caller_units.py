@@ -120,9 +120,13 @@ def test_a_contract_must_be_the_families_own_for_exactly_this_scope_and_budget()
 @pytest.mark.parametrize('change', [dict(council='bury'), dict(reference='OTHER/1/26'), dict(source_url='https://example.invalid/x'), dict(source_identifier='K999')])
 def test_a_detail_target_must_name_exactly_the_nominated_record(change):
     binding = binding_for('tameside')
-    record = dict(reference='E2E/1/26', source_url='https://u/1', source_record_id='K1')
+    record = dict(reference='E2E/1/26', source_url='https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=K1', source_record_id='K1')
     target = idox_detail_target('tameside', record)
     assert check_detail_target(binding, record, target) is target
+    # The old four-field-era synthetic case must not bypass the sealed owner
+    # nomination, even when the official URL and record identity match.
+    with pytest.raises(Denied, match='SCOPE_DETAIL_TARGET_MISMATCH'):
+        check_detail_target(binding, record, dict(target, case='e2e_idox_detail'))
     with pytest.raises(Denied, match='SCOPE_DETAIL_TARGET_MISMATCH'):
         check_detail_target(binding, record, dict(target, **change))
     with pytest.raises(Denied, match='SCOPE_DETAIL_TARGET_MISMATCH'):

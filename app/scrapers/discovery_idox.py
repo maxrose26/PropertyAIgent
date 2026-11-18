@@ -11,7 +11,9 @@ from urllib.parse import urljoin, urlsplit, parse_qsl
 from bs4 import BeautifulSoup
 from app.pipeline.discovery_contract import SOURCE_ROOTS, Literal
 
-IDOX = frozenset({'bolton','bury','oldham','stockport','tameside','wigan'})
+IDOX = frozenset({'bolton','bury','oldham','stockport','tameside','wigan','trafford'})
+# Trafford shares only the pure *synthetic parser* contract at this checkpoint.
+# The networked window reader and Stage4 admission remain explicitly gated.
 MAX_BODY = 500_000
 MAX_ROWS = 100
 
@@ -81,8 +83,8 @@ def literal(elements, locator):
     return Literal('PRESENT_VALUE' if v else 'PRESENT_BLANK',v,locator)
 
 
-def parse_page(body: bytes, council: str, ordinal: int, start: date, end: date, semantics='RECEIVED'):
-    require(council in IDOX and type(ordinal) is int and ordinal>=1, 'page identity')
+def _listing_rows(body, council, start, end, semantics):
+    require(council in IDOX, 'council')
     require(start<=end and semantics in {'RECEIVED','VALIDATED'}, 'interval')
     require(type(body) is bytes and 0<len(body)<=MAX_BODY, 'body bound')
     try: html=body.decode('utf-8',errors='strict')
@@ -134,6 +136,18 @@ def parse_page(body: bytes, council: str, ordinal: int, start: date, end: date, 
     for r in rows:
         if r.reference is not None: ref_keys.setdefault(r.reference,set()).add(r.source_key)
     rows=[replace(r,reference=None,identity_state='CONFLICTING') if len(ref_keys.get(r.reference,set()))>1 else r for r in rows]
+    return rows,size,soup
+
+
+def observe_listing_rows(body, council, start, end, semantics='RECEIVED'):
+    """Row facts only, with no count, navigation or window-acceptance claim."""
+    rows,size,_=_listing_rows(body,council,start,end,semantics)
+    return tuple(rows),size,hashlib.sha256(body).hexdigest()
+
+
+def parse_page(body: bytes, council: str, ordinal: int, start: date, end: date, semantics='RECEIVED'):
+    require(council in IDOX and type(ordinal) is int and ordinal>=1, 'page identity')
+    rows,size,soup=_listing_rows(body,council,start,end,semantics)
     pagers=soup.select('p.pager')
     markers=[]
     for p in pagers:

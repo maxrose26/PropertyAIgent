@@ -1,0 +1,57 @@
+{
+  "batch": {
+    "council": "tameside",
+    "end": "2026-09-21",
+    "max_runs": 1,
+    "pages": 6,
+    "records_per_page": 5,
+    "requests": 10,
+    "retries": 0,
+    "semantics": "RECEIVED",
+    "source_bytes": 3000000,
+    "source_seconds": 45,
+    "start": "2026-09-15",
+    "supervisor_seconds": 60
+  },
+  "binding": {
+    "automatic_extension": false,
+    "cleanup_offset_seconds": 2100,
+    "latest_bound_at": "2026-11-18T19:25:00+00:00",
+    "outer_expiry": "2026-11-18T20:00:00+00:00",
+    "runtime_offset_seconds": 1915,
+    "submission_offset_seconds": 600
+  },
+  "decision_id": "PA-TAM002",
+  "elapsed_manifest_sha256": "dd4d381be32c592bf8346172c538305662953beb259b1fe7b6d880acd2f46e54",
+  "files": {
+    "docs/design/pa-tam002-stop15/README.md": {
+      "bytes": 12327,
+      "sha256": "9dd11486fa0f0fc435363fe6f937d30081d9b75d007b71e922cbeeb6c98f7764"
+    },
+    "docs/design/pa-tam002-stop15/focused.json": {
+      "bytes": 355,
+      "sha256": "5f1698164d1ab815e1dd2e55beefdad623959b4a93093f511b1e4b14be185cdd"
+    },
+    "docs/design/pa-tam002-stop15/joined-final.json": {
+      "bytes": 3149,
+      "sha256": "3cc59be9793985f5d39f8914461ef71abf23e4e974102f6b1e27de25cc7e2580"
+    },
+    "docs/design/pa-tam002-stop15/missing-job-fault.json": {
+      "bytes": 1851,
+      "sha256": "05f9d27df73d2f6be637c67d3e967fc288b376d6f01453f664c5546aef6c8e4d"
+    },
+    "docs/design/pa-tam002-stop15/submission-restoration-fault.json": {
+      "bytes": 3227,
+      "sha256": "04eaae62d2e0b23c0362e498a0ade37353f964a257c9e9c1a9cb1cf3943f7cb4"
+    }
+  },
+  "frozen_owner_revision": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+  "owner_revision": "f816a81ed725db0503f16ce1d39cff8c42c7e5e3",
+  "prior_checkpoint_ordinal": 18,
+  "prior_checkpoint_sha256": "0e6d08aa0b6e04c669998a828924e30322bab4ac73a0cf157a9d63b5fac955af",
+  "prior_runtime_revision": "9524503fa90228f31d48d16a58121c45d3eb90b8",
+  "runtime_revision": "dd36ba711932e9f831daf7e885e40447be43d41d",
+  "state": "INACTIVE_REQUIRES_REVIEW_AND_OWNER_AMENDMENT",
+  "tested_sequence_revision": "45de739c620d8d235d852de92991b62c251a2487",
+  "version": "1.5"
+}

@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from app.scrapers.discovery_idox import ListingError, MAX_BODY
 
 
-def sort_payload(body, base):
+def sort_payload(body, base, *, calibration_five=False):
     if not isinstance(body,bytes) or not 0<len(body)<=MAX_BODY: raise ListingError('sort body bound')
     soup=BeautifulSoup(body.decode('utf-8','strict'),'html.parser')
     selects=soup.select('select[name="orderBy"]')
@@ -13,7 +13,8 @@ def sort_payload(body, base):
     if form is None or str(form.get('method','')).lower()!='post': raise ListingError('sort form')
     target=urljoin(base+'/',form.get('action',''))
     if target!=base+'/pagedSearchResults.do': raise ListingError('sort target')
-    wanted={'orderBy':'Reference','orderByDirection':'Descending','searchCriteria.resultsPerPage':'10'}
+    if type(calibration_five) is not bool:raise ListingError('calibration selection')
+    wanted={'orderBy':'Reference','orderByDirection':'Descending','searchCriteria.resultsPerPage':'5' if calibration_five else '10'}
     payload={}
     for c in form.select('input,select,textarea,button'):
         name=c.get('name',''); kind=c.get('type','').lower()

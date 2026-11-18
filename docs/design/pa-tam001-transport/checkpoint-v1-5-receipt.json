@@ -1,0 +1,121 @@
+{
+  "ack": {
+    "accepted_at": "2026-11-17T17:18:33.100732+00:00",
+    "approval_required": true,
+    "core_sha256": "cfd1ff3ec774d1144c1be4e44624a818e06b5d957d6b1c45ebcde95671c2505f",
+    "database_result": "UNKNOWN",
+    "decision_id": "PA-TAM001 v1.5",
+    "expected_deployment": "2fa0f07cfdfb56a27243ebff18110d441f9da04d",
+    "expected_service": "srv-d9qbl7qjnfac73d8nieg",
+    "instance": "srv-d9qbl7qjnfac73d8nieg-8684bcc77c-xgxgz",
+    "invocation_id": "pa-tam001-v1-5-owner-checkpoint-01",
+    "kind": "INVOCATION_ACCEPTED_PRE_DATABASE",
+    "launcher_sha256": "e0d6837dde8a6ac9cc2d2beb1e032af019411ad9df101dd31c4aaf117c6c5a71",
+    "owner_adapter_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+    "retry": false,
+    "started_monotonic": 7107044.310330377
+  },
+  "ack_sha256": "0d0740eadd4292e9067e52a0aaea327b14da850a412189680379a5e55635e7d6",
+  "completion": {
+    "ack_sha256": "0d0740eadd4292e9067e52a0aaea327b14da850a412189680379a5e55635e7d6",
+    "core_sha256": "cfd1ff3ec774d1144c1be4e44624a818e06b5d957d6b1c45ebcde95671c2505f",
+    "decision_id": "PA-TAM001 v1.5",
+    "expected_deployment": "2fa0f07cfdfb56a27243ebff18110d441f9da04d",
+    "expected_service": "srv-d9qbl7qjnfac73d8nieg",
+    "finished_at": "2026-11-17T17:18:35.667006+00:00",
+    "instance": "srv-d9qbl7qjnfac73d8nieg-8684bcc77c-xgxgz",
+    "invocation_id": "pa-tam001-v1-5-owner-checkpoint-01",
+    "kind": "BOUNDED_READ_RESULT",
+    "launcher_sha256": "e0d6837dde8a6ac9cc2d2beb1e032af019411ad9df101dd31c4aaf117c6c5a71",
+    "overall_elapsed_ms": 2967,
+    "owner_adapter_pin": "f027ba28af69ae70208eab5ed047e4a8a81c6337",
+    "result": {
+      "checkpoint_ordinal": 55,
+      "checkpoint_sha256": "a5ba6be74c47eea89bd5068111bf3bc65198c8b4fd54c5036394a2c512f55c52",
+      "connection_closed": true,
+      "connections_attempted": 1,
+      "connections_opened": 1,
+      "elapsed_ms": 2967,
+      "execution_id": "pa-tam001-v1-5-owner-checkpoint-01",
+      "observations": {
+        "binding": {
+          "credential_policy": "STABLE_RESTRICTED_V1",
+          "hostaddr": "18.169.28.97",
+          "owner_hostaddr": "18.169.28.97",
+          "render_config_sha256": "78b5f3a8f5b2730f5d675d214192b53e339edb07ceeb14e188ed1d2c3ab14257",
+          "retained_deployment": "dep-dbmq3d3rjlhs73c6t2dg",
+          "route": "POOLER",
+          "runtime_deadline": 1793960537.2588818,
+          "valid_until": 1793960722.2588818
+        },
+        "bound_profile": {
+          "aggregate_bytes": 2147483648,
+          "browser_path": "/opt/render/project/src/.venv/lib/python3.14/site-packages/playwright/driver/package/.local-browsers",
+          "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+          "controller_rss_bytes": 268435456,
+          "mode": "render-intake-v1",
+          "reserve_bytes": 536870912,
+          "revision": "ee9dbb7b9dccca161aad46526248f14a9661ce9c",
+          "service_id": "crn-d9sv93vavr4c73f98rb0",
+          "source_rss_bytes": 1073741824,
+          "source_seconds": 75
+        },
+        "bound_verifier_equal": true,
+        "closure_verification": {
+          "authorities_closed": true,
+          "configuration_equal": true,
+          "environment_equal": true,
+          "runtime_memberships": 0,
+          "sessions": 0,
+          "stable_verifiers": "MATCH",
+          "status": "VERIFIED",
+          "suspended": true,
+          "temporary_owner_absent": true
+        },
+        "execution_binding": {
+          "manifest_sha256": "570b020ca03ad47a2d00c265f1a752cd39c0eb70d91c1071f70ffed17de07eba",
+          "revision": "ee9dbb7b9dccca161aad46526248f14a9661ce9c",
+          "workflow_sha256": "946258265cf2e7f346ef57b18c7a7bb5056600581cf51ba4b595459c12c367b9"
+        },
+        "final_service": {
+          "configuration_equal": true,
+          "environment_equal": true,
+          "suspended": true
+        },
+        "historical_only": true,
+        "job_id": "job-dbmq5qutlv9c73bn1rm0",
+        "job_terminal": "failed",
+        "missing_fields": [],
+        "period": "b-bolton-20261103-1105-01",
+        "profile": {
+          "aggregate_bytes": 2147483648,
+          "browser_path": "/opt/render/project/src/.venv/lib/python3.14/site-packages/playwright/driver/package/.local-browsers",
+          "browser_sha256": "ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e",
+          "controller_rss_bytes": 268435456,
+          "mode": "render-intake-v1",
+          "reserve_bytes": 536870912,
+          "revision": "ee9dbb7b9dccca161aad46526248f14a9661ce9c",
+          "service_id": "crn-d9sv93vavr4c73f98rb0",
+          "source_rss_bytes": 1073741824,
+          "source_seconds": 75
+        },
+        "profile_copies_equal": true,
+        "stable_configuration_present": true,
+        "stable_credential_verifier_present": true,
+        "status": "CLOSED"
+      },
+      "result_bytes_with_metadata_reserve": 27012,
+      "retry": false,
+      "returned_value_bytes": 22916,
+      "rollback_acknowledged": true,
+      "rollback_attempted": true,
+      "scope": "PA-TAM001 v1.5",
+      "statements_attempted": 6,
+      "statements_completed": 6,
+      "status": "READ_COMPLETED_REVIEW_REQUIRED"
+    },
+    "retry": false
+  },
+  "completion_sha256": "8675b698b6f3eed8a9927095f23155b560b1c2ac050a09355f9747efb5491259",
+  "verification": "RECEIPT_INTEGRITY_VERIFIED_NOT_CURRENT_RUNTIME_ACCEPTANCE"
+}

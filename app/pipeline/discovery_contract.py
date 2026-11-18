@@ -24,6 +24,9 @@ SOURCE_ROOTS = {
     'oldham': ('planningpa.oldham.gov.uk', '/online-applications/'),
     'stockport': ('planning.stockport.gov.uk', '/PlanningData-live/'),
     'tameside': ('publicaccess.tameside.gov.uk', '/online-applications/'),
+    # Repository-listed Trafford Idox hint; parser use only until its actual
+    # source/terminal contract is independently qualified and issuer-bound.
+    'trafford': ('pa.trafford.gov.uk', '/online-applications/'),
     'wigan': ('planning.wigan.gov.uk', '/online-applications/'),
     'manchester': ('arcusbe.manchester.gov.uk', '/pr/'),
     'rochdale': ('account.rochdale.gov.uk', '/pr/'),

@@ -1,0 +1,156 @@
+{
+  "bodies": [
+    {
+      "complete": true,
+      "name": "01-FORM.body",
+      "observed_bytes": 51044,
+      "observed_sha256": "3790d9df416a54f33e8fd4278817daf06d0b088d5ce9775c7f9237826630d8a6",
+      "operation": "FORM",
+      "retained_bytes": 51044,
+      "retained_sha256": "3790d9df416a54f33e8fd4278817daf06d0b088d5ce9775c7f9237826630d8a6",
+      "sequence": 1,
+      "status": "COMPLETE"
+    },
+    {
+      "complete": true,
+      "name": "02-SEARCH.body",
+      "observed_bytes": 55233,
+      "observed_sha256": "bf8dc6966e0a082381bbd124cc017c7925c798ba647832cc954c13cb68c05d89",
+      "operation": "SEARCH",
+      "retained_bytes": 55233,
+      "retained_sha256": "bf8dc6966e0a082381bbd124cc017c7925c798ba647832cc954c13cb68c05d89",
+      "sequence": 2,
+      "status": "COMPLETE"
+    },
+    {
+      "complete": true,
+      "name": "03-SORT.body",
+      "observed_bytes": 41579,
+      "observed_sha256": "67e7e2a5d0e40044ac8626dea65f7b454a4dabebc466dd15f627e4dd0fa9efa3",
+      "operation": "SORT",
+      "retained_bytes": 41579,
+      "retained_sha256": "67e7e2a5d0e40044ac8626dea65f7b454a4dabebc466dd15f627e4dd0fa9efa3",
+      "sequence": 3,
+      "status": "COMPLETE"
+    },
+    {
+      "complete": true,
+      "name": "04-PAGE.body",
+      "observed_bytes": 37777,
+      "observed_sha256": "c255b214f1f9542d807b4a6ed7087cc9887d44f4cee7dc8c6bb3df668f11808b",
+      "operation": "PAGE",
+      "retained_bytes": 37777,
+      "retained_sha256": "c255b214f1f9542d807b4a6ed7087cc9887d44f4cee7dc8c6bb3df668f11808b",
+      "sequence": 4,
+      "status": "COMPLETE"
+    },
+    {
+      "complete": true,
+      "name": "05-REFINE.body",
+      "observed_bytes": 51064,
+      "observed_sha256": "70a9cdf92b2331eb64ef29626f2a5e351045d9d75e19f26fa148d615b1cec89b",
+      "operation": "REFINE",
+      "retained_bytes": 51064,
+      "retained_sha256": "70a9cdf92b2331eb64ef29626f2a5e351045d9d75e19f26fa148d615b1cec89b",
+      "sequence": 5,
+      "status": "COMPLETE"
+    }
+  ],
+  "consumption_sha256": "a1494c04fd6744aa12c4aaf4087f58f7b31e2bbfd3721c4fb897f943d3036b10",
+  "council": "tameside",
+  "criteria": {
+    "method": "SAME_SESSION_POST_ENUMERATION_REFINE_NO_RESUBMIT",
+    "same_non_server_state_controls": true,
+    "sha256": "70a9cdf92b2331eb64ef29626f2a5e351045d9d75e19f26fa148d615b1cec89b",
+    "verified": true
+  },
+  "files": {
+    "CONSUMED": "78091c84efbc41332ef6aa66c8933c83a2f17a46f8d2d784cee2ae22155ee3a8",
+    "calibration-progress.json": "11f305eefd002eb7b60eb7f5efbe170475190fbf8b6eb45e8bc0b562e263c516",
+    "calibration-summary.json": "e7302afd1674b57946a35cb76bc76ce7d998df72750e285821711f02a707a7ea",
+    "outer.json": "dce0493b82ccec8692f26f34ec7f4f4a0c78ca786ac6613f963580f92164ac45",
+    "owned/supervisor.json": "8e2a1349409557bf8e062723083844c27d7d7594351627d1fac49fc25cb429d1",
+    "plan.json": "e4fbb95858655830fb0cc06b1e73bd727b9829d97dfa8b47975ed4e036ef2b2f",
+    "qualification-outcome.json": "30b0c92aea2a362dba141d0e5dd811e9e59eb9f70b6b0f50ccc5330c17ef7c29",
+    "raw-bodies/01-FORM.body": "3790d9df416a54f33e8fd4278817daf06d0b088d5ce9775c7f9237826630d8a6",
+    "raw-bodies/02-SEARCH.body": "bf8dc6966e0a082381bbd124cc017c7925c798ba647832cc954c13cb68c05d89",
+    "raw-bodies/03-SORT.body": "67e7e2a5d0e40044ac8626dea65f7b454a4dabebc466dd15f627e4dd0fa9efa3",
+    "raw-bodies/04-PAGE.body": "c255b214f1f9542d807b4a6ed7087cc9887d44f4cee7dc8c6bb3df668f11808b",
+    "raw-bodies/05-REFINE.body": "70a9cdf92b2331eb64ef29626f2a5e351045d9d75e19f26fa148d615b1cec89b",
+    "raw-bodies/index.json": "b3de4f587a5ff662f6c9b60ea5d336b5f16a31a938d9a446495f0a2fa8b134e8",
+    "source.json": "8f285f773a6acfa14ee2b3a1656e5343b5b9f141c2f44b5416a8bd1385db70c0"
+  },
+  "historical_original": {
+    "acceptance_enabled": false,
+    "assessment_created": false,
+    "completeness": "UNKNOWN"
+  },
+  "kind": "TAMESIDE_LISTING_MECHANISM_QUALIFICATION_V1",
+  "limitations": [
+    "One nonzero two-page owner-Ubuntu window; not Render connectivity",
+    "No observed explicit-zero case; empty/unsupported results refuse",
+    "Future windows may exceed finite bounds and must refuse without retry",
+    "No new B execution receipt or acceptance/period/authority",
+    "Full-window criteria is same-session echo, not immutable portal snapshot",
+    "Other councils and ten-per-page route are not qualified by this sample"
+  ],
+  "limits": {
+    "bytes": 3000000,
+    "pages": 6,
+    "requests": 10,
+    "rows": 60,
+    "source_seconds": 45
+  },
+  "metadata": {
+    "address": 9,
+    "application_type": "UNKNOWN",
+    "proposal": 9,
+    "received_date": 9,
+    "validated_date": 9
+  },
+  "requested_page_size": 5,
+  "runtime_contract": "tameside-screening-metadata-five-v1",
+  "runtime_mode": "TAMESIDE_FIVE_COUNT_V1",
+  "segments": [
+    {
+      "body_sha256": "67e7e2a5d0e40044ac8626dea65f7b454a4dabebc466dd15f627e4dd0fa9efa3",
+      "first": 1,
+      "last": 5,
+      "ordinal": 1,
+      "page_size": 5,
+      "rows": 5,
+      "terminal": null,
+      "total": 9
+    },
+    {
+      "body_sha256": "c255b214f1f9542d807b4a6ed7087cc9887d44f4cee7dc8c6bb3df668f11808b",
+      "first": 6,
+      "last": 9,
+      "ordinal": 2,
+      "page_size": 5,
+      "rows": 4,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 9
+    }
+  ],
+  "semantics": "RECEIVED",
+  "source_sha256": "8f285f773a6acfa14ee2b3a1656e5343b5b9f141c2f44b5416a8bd1385db70c0",
+  "status": "REVIEW_RECOMMENDED_NOT_INDEPENDENT_ACCEPTANCE",
+  "tested_code": "83a0cc23d30ef80bf0e307aaa09742cf15800d3c",
+  "tested_files": {
+    "verification/discovery/finite_acceptance.py": "0b8cc87d1a8a97e7b825a2ce497be91a2e99a5ac9342105650f92dc5ebad2030",
+    "verification/discovery/four_council_proof.py": "24982b385ec926377351fb3c2f84ae86dfdda9a01eb199dd4ecdcb761d960baf",
+    "verification/discovery/idox_sort.py": "dd10cf22e09d469d8b5d9d349b13402d6a2f3318367760bd6fb9ab53503fa114",
+    "verification/discovery/idox_window.py": "7d06ddbbc5bea52e591ac40d5f29adef10715938358655b2a25c9200056a1921",
+    "verification/discovery/pagination_calibration.py": "afeffe283971eca67eef3d2a9875c80b6a3b134eba8682dba35d0216098b66b4",
+    "verification/discovery/source_profiles.py": "9f94ea56d1e290be9bd39805bedc9704f93469c30307011dd74ebec553e9eed3",
+    "verification/discovery/tameside_qualification.py": "562c4147263e3c72976f516455d72ceea647abcd8e6703a78067544ad7ce0aae",
+    "verification/ingestion_storage/daily_intake_runtime.py": "6838247c4b269197770964cb4f7a0e8a0f81eaa21b1aa69c5118906ca7f73052"
+  },
+  "tested_tree": "03913ea94debef54cffb4ac2c6d54b8dc52161a9",
+  "tested_window": [
+    "2026-10-24",
+    "2026-10-30"
+  ],
+  "unique_identities": 9
+}

@@ -182,7 +182,7 @@ def main():
     profile=json.loads(a.collection_profile) if a.collection_profile else None
     if profile is not None and selected is None:raise ValueError('PROFILE_REQUIRES_CAMPAIGN_SCOPE')
     with manifest_scope(selected,profile) if selected is not None else contextlib.nullcontext():
-        result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}))
+        result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1,max_rows=60 if a.fixed_four_row_limit else None),**({'retain_proof':True} if a.retain_four_council_proof else {}),**({'pagination_mode':profile['idox_pagination']} if profile is not None and profile.get('idox_pagination') else {}))
         if profile is not None:
             from .source_profiles import bind_audit
             result=bind_audit(profile,result)

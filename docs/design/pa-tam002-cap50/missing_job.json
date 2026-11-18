@@ -1,0 +1,38 @@
+{
+  "evidence_kind": "DISPOSABLE_POSTGRES_SIMULATED_PROVIDER_SOURCE",
+  "live_requests": 0,
+  "original_history_preserved": true,
+  "owner_revision": "d79d29c138a8414ab40b52e02f9f8c749b6b695a",
+  "package_cli": "ACTUAL_CLI_DISPOSABLE_TRANSPORT_ONLY",
+  "preparation": {
+    "boundaries": 0,
+    "deployment_submissions": 1,
+    "drift_refusals": 0,
+    "live_requests": 0,
+    "normal_last_ordinal": 47,
+    "old_ordinal": 55,
+    "original_history_preserved": true,
+    "provider_submissions": 0,
+    "recovery_commits": 1,
+    "recovery_readback": {
+      "period": "b-bolton-20261103-1105-01",
+      "receipt_sha256": "4a6c6ff149ba2b39979688cc8c3a35ce2d59fce8a55bd260e687d7c136955978",
+      "retry": false,
+      "run_id": "ee7cf0d9bc714f56951527b940937054",
+      "status": "COMMITTED_STATE_VERIFIED_READ_ONLY",
+      "stop": {
+        "global_stop": {
+          "reason": "DAILY_INTAKE_SHARED_FAILURE"
+        },
+        "hard_stop_generation": 15,
+        "last_hard_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP",
+        "manual_stop": "ABANDONED_EFFECT_OR_UNCERTAIN_CLEANUP"
+      },
+      "transaction": "ROLLED_BACK"
+    }
+  },
+  "provider_handoff_restore": "ACTUAL_ADAPTER_SIMULATED_RENDER",
+  "provider_posts": 1,
+  "status": "UNKNOWN_SUBMISSION_CONTAINED_NO_RETRY",
+  "worker_logins": false
+}

@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-from app.ingestion.ledger import Denied
+from app.ingestion.ledger import Denied, digest
 
 MAX_WINDOW_DAYS = 7      # the finite acceptance manifest's own window length (`verification.discovery.finite_acceptance.manifest`)
 
@@ -102,6 +102,29 @@ def check_detail_target(binding, record, target):
     if binding.council in COUNCILS:
         if target!=derive(binding.council,record):raise Denied('SCOPE_DETAIL_TARGET_MISMATCH')
         return validate(target)
+    if binding.family == 'idox':
+        # Tameside's screened listing is not sufficient to make an executable
+        # factual target. The legacy four-key identity was accepted for offline
+        # admission *preparation*, but the existing Idox detail projector requires
+        # a sealed case and an exact supported official-summary destination.
+        # This is a restrictive, offline-only contract check: no source is read,
+        # no authority issued and no council capability is enabled.
+        from verification.direct_reference.refresh import validate_destination
+        from verification.stage26b_l1.request_boundary import BoundaryFailure
+        expected = dict(admission='ADMITTED_DIRECT_ROUTE', platform_family='IDOX',
+                        application_id=None, application_role='UNKNOWN',
+                        site_relationship='UNKNOWN',
+                        case=f'chain_idox_{binding.council}_{digest(record)}',
+                        council=binding.council, reference=record['reference'],
+                        source_identifier=record['source_record_id'],
+                        source_url=record['source_url'])
+        if target != expected:
+            raise Denied('SCOPE_DETAIL_TARGET_MISMATCH')
+        try:
+            validate_destination(target)
+        except (BoundaryFailure, ValueError, KeyError, TypeError):
+            raise Denied('SCOPE_DETAIL_TARGET_MISMATCH') from None
+        return target
     if (not isinstance(target, dict) or target.get('council') != binding.council or target.get('reference') != record['reference']
             or target.get('source_url') != record['source_url'] or target.get('source_identifier') != record['source_record_id']):
         raise Denied('SCOPE_DETAIL_TARGET_MISMATCH')

@@ -31,7 +31,8 @@ class NomineeSet:
     completeness_bases:tuple=()      # (council, capture_sha256, basis, owner_acceptance_sha256) for every receipt whose completeness is OWNER-accepted rather than source-terminal; empty means every receipt is source-terminal
 
 
-def derive_nominees(receipts,rule,*,allow_test_evidence=False):
+def derive_nominees(receipts,rule,*,allow_test_evidence=False,capture_bound=False):
+    if type(capture_bound) is not bool:raise Denied('NOMINATION_SCREENING_SCOPE')
     if rule.rule_version!=RULE_V3:raise Denied('V3_RULE_REQUIRED')
     receipts=list(receipts)
     for rc in receipts:
@@ -52,9 +53,14 @@ def derive_nominees(receipts,rule,*,allow_test_evidence=False):
         _,capture,r=seen[0]      # identical observations: the lexicographically first capture digest binds, so the choice is deterministic
         outcome=routing_of(rule.screen(r))[1]
         if outcome in IDENTITY_ELIGIBLE[RULE_V3]:
-            nominees.append(Nominee(council,reference,r['source_url'],r['source_record_id'],digest(r),assessment_identity(r,rule)[3],capture,outcome))
+            screening_revision=assessment_identity(r,rule)[3]
+            if capture_bound:
+                from .observation_screening import observation_revision
+                screening_revision=observation_revision(screening_revision,capture)
+            nominees.append(Nominee(council,reference,r['source_url'],r['source_record_id'],digest(r),screening_revision,capture,outcome))
         else:retained.append((council,reference,outcome))
     sealed=dict(configuration=digest(rule.config()),nominees=[asdict(n) for n in nominees],retained=[list(x) for x in retained],conflicts=conflicts)
+    if capture_bound:sealed['screening_scope']='CAPTURE_BOUND'  # separate seal; historical default hashes unchanged
     bases=tuple(sorted({(rc['council'],digest(rc),rc['completeness_basis'],rc['owner_acceptance']['sha256']) for rc in receipts if rc.get('completeness_basis')}))
     if bases:sealed['completeness_bases']=[list(b) for b in bases]      # named in the seal only when non-default, so every historical nominee-set digest is unchanged
     return NomineeSet(tuple(nominees),tuple(retained),tuple(conflicts),digest(sealed),bases)

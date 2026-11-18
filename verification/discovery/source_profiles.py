@@ -1,6 +1,7 @@
 """Closed collection profiles, not source qualification or operational authority."""
 from contextlib import contextmanager
 from contextvars import ContextVar
+from datetime import date
 from urllib.parse import urlsplit
 from app.pipeline.discovery_contract import SOURCE_ROOTS
 from . import finite_acceptance as finite
@@ -11,7 +12,7 @@ MODES = frozenset({'IDENTITY_ONLY', 'SCREENING_METADATA'})
 _active = ContextVar('collection_profile', default=None)
 
 
-def profile(row, mode):
+def profile(row, mode, *, idox_pagination=None):
     from .campaign_manifest import require_row
     require_row(row, profiled=True)
     if mode not in MODES:raise ValueError('COLLECTION_MODE')
@@ -23,6 +24,9 @@ def profile(row, mode):
         family='ARCUS_UI' if arc else 'IDOX',case=case,destination=destination,host=urlsplit(destination).hostname,
         collection_mode=mode,execution_budget='BROWSER_SOURCE_V2' if arc else None,
         validator='ARCUS_UI_AUDIT_V1' if arc else 'IDOX_COUNT_RECONCILED_V1',proof='FOUR_COUNCIL_STRUCTURAL_PROOF_V1')
+    if idox_pagination is not None:
+        if idox_pagination!='TAMESIDE_FIVE_COUNT_V1' or council!='tameside' or mode!='SCREENING_METADATA' or (date.fromisoformat(row['end'])-date.fromisoformat(row['start'])).days!=6:raise ValueError('IDOX_PAGINATION_PROFILE')
+        value.update(idox_pagination=idox_pagination,page_size=5)
     return dict(value,sha256=finite.digest(value))
 
 
@@ -31,7 +35,7 @@ def validate(value, row=None):
     if row is None:
         row=dict(council=value.get('council'),semantics=value.get('semantics'),
             start=value.get('interval',[None,None])[0],end=value.get('interval',[None,None])[1])
-    if value!=profile(row,value.get('collection_mode')):raise ValueError('COLLECTION_PROFILE_BINDING')
+    if value!=profile(row,value.get('collection_mode'),idox_pagination=value.get('idox_pagination')):raise ValueError('COLLECTION_PROFILE_BINDING')
     return value
 
 
@@ -76,6 +80,7 @@ def bind_audit(value, audit):
     else:
         if audit.get('execution_budget') is not None:raise ValueError('PROFILE_AUDIT_BUDGET')
         if audit.get('council')!=value['council']:raise ValueError('PROFILE_AUDIT_ROUTE')
+        if value.get('idox_pagination') and 'calibration' not in audit and audit.get('pagination_mode')!=value['idox_pagination']:raise ValueError('PROFILE_AUDIT_PAGINATION')
         from datetime import date
         from app.ingestion.idox_adapter import validate_listing_record
         from .idox_window import WindowConfig

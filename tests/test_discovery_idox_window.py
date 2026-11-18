@@ -45,6 +45,62 @@ def test_page_failure_retains_partial_without_completion():
     assert len(c)==4
 
 
+
+def test_bolton_two_pages_twelve_results_complete_enumeration_without_source_admission():
+    """Owner-observed 1-10, 11-12 of 12 pattern; synthetic HTML, never live proof."""
+    echo = FORM.replace(b'name="date(applicationReceivedStart)" value=""', b'name="date(applicationReceivedStart)" value="28/09/2026"').replace(
+        b'name="date(applicationReceivedEnd)" value=""', b'name="date(applicationReceivedEnd)" value="04/10/2026"')
+    first = page(first=1, last=10, total=12,
+                 refs=tuple(f'{n:05d}/26' for n in range(1, 11)), next_page=2)
+    second = page(first=11, last=12, total=12, refs=('00011/26', '00012/26'))
+    second = second.replace(b'keyVal=K0', b'keyVal=L0').replace(b'keyVal=K1', b'keyVal=L1')
+    audit, calls = perform([FORM, first, first, second, echo])
+    assert len(calls) == 5
+    assert calls[3][0] == 'GET' and 'searchCriteria.page=2' in calls[3][1]
+    assert audit['failure'] is None
+    assert audit['enumeration_evidence'] == 'COUNT_RECONCILED'
+    assert audit['unique_references'] == len(audit['records']) == 12
+    assert len({r['reference'] for r in audit['records']}) == 12
+    assert len({r['source_key'] for r in audit['records']}) == 12
+    assert [(p['first'], p['last'], p['total']) for p in audit['pages']] == [(1, 10, 12), (11, 12, 12)]
+    assert audit['pages'][-1]['terminal'] == 'EXPLICIT_LAST_EQUALS_TOTAL'
+    assert audit['applied_interval'] == audit['requested_interval']
+    assert audit['completeness'] == 'UNKNOWN' and audit['persistence'] is False
+
+
+def test_bolton_seven_observed_of_twelve_never_promotes_missing_page_to_complete():
+    """An interrupted seven-row observation is evidence, not a complete 12-row window."""
+    first = page(first=1, last=7, total=12,
+                 refs=tuple(f'{n:05d}/26' for n in range(1, 8)), next_page=2)
+    audit, calls = perform([FORM, first, first, b'<html>truncated'])
+    assert len(calls) == 4
+    assert audit['completeness'] == 'INCOMPLETE'
+    assert audit['failure'] is not None
+    assert len(audit['records']) == 7
+    assert len(audit['pages']) == 1 and audit['pages'][0]['total'] == 12
+    assert audit.get('enumeration_evidence') != 'COUNT_RECONCILED'
+    assert audit['persistence'] is False
+    assert audit['applied_interval'] is None
+
+
+def test_bolton_second_page_count_or_navigation_conflict_refuses_completion():
+    """Count drift, missing count or impossible Next must not self-certify coverage."""
+    first = page(first=1, last=10, total=12,
+                 refs=tuple(f'{n:05d}/26' for n in range(1, 11)), next_page=2)
+    valid = page(first=11, last=12, total=12, refs=('00011/26', '00012/26'))
+    valid = valid.replace(b'keyVal=K0', b'keyVal=L0').replace(b'keyVal=K1', b'keyVal=L1')
+    for changed in (valid.replace(b'of 12', b'of 13'),
+                    valid.replace(b'<p class="pager">', b'<p class="other">'),
+                    valid.replace(b'</p><ul id="searchresults">',
+                                  b'<a class="next" href="pagedSearchResults.do?action=page&amp;searchCriteria.page=3">Next</a></p><ul id="searchresults">')):
+        audit, calls = perform([FORM, first, first, changed])
+        assert len(calls) == 4
+        assert audit['completeness'] == 'INCOMPLETE' and audit['failure'] is not None
+        assert len(audit['records']) == 10
+        assert audit.get('enumeration_evidence') != 'COUNT_RECONCILED'
+        assert audit['persistence'] is False
+
+
 def test_duplicate_reference_across_pages_fails_closed():
     first=page(first=1,last=10,total=12,refs=tuple(f'{i}/26' for i in range(10)),next_page=2)
     second=page(first=11,last=12,total=12,refs=('1/26','11/26')).replace(b'keyVal=K0',b'keyVal=L0').replace(b'keyVal=K1',b'keyVal=L1')

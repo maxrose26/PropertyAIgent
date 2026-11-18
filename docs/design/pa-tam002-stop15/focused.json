@@ -1,0 +1,11 @@
+{
+  "errors": 0,
+  "failures": 0,
+  "junit_sha256": "ab2258d70d5594c54fd2a2d2fa344ff18fe7f75399b72ac3fae3259a0c9193e2",
+  "kind": "OFFLINE_FOCUSED_TEST_RESULTS",
+  "owner_revision": "45de739c620d8d235d852de92991b62c251a2487",
+  "production_actions": false,
+  "runtime_revision": "dd36ba711932e9f831daf7e885e40447be43d41d",
+  "skipped": 0,
+  "tests": 39
+}

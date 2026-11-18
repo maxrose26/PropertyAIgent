@@ -1,0 +1,46 @@
+{
+  "checkpoint": {
+    "ordinal": 34,
+    "sha256": "fe492bc56569239083643df8e9f0e2304965e545fe3f54ec2a32e491c84bdac5"
+  },
+  "cleanup": {
+    "consumed": 7,
+    "remaining": 9,
+    "total": 16
+  },
+  "decision_id": "PA-TAM002-CONT001",
+  "files": {
+    "README.md": {
+      "bytes": 7804,
+      "sha256": "155588e06be8f24ef5bf781e9dae3eaf30b730c69c89e18ae1167c6293f06ad7"
+    },
+    "focused.json": {
+      "bytes": 151,
+      "sha256": "737c758c7fda7a4d94b79a00b2e6f6887ce8dc4f4ac6fb1b1394625a7ed607a2"
+    },
+    "none.json": {
+      "bytes": 7501,
+      "sha256": "4fd4011745ca6b6b504a597cd5aae251d479fc0c3580bc2c7f293e8c7180055a"
+    },
+    "submission_restore.json": {
+      "bytes": 7654,
+      "sha256": "22113e0169d5bb603e57de45842d3d26178ede7e6706244c40c20310ef9b9ec5"
+    }
+  },
+  "owner_files": {
+    "release_candidate.py": "5833a1d87d15b4f2984160e9d00e1bc6740f79cac74de134d7601b655ad40dad",
+    "stop15_replacement.py": "4965090ea9b93e906125ac4d74bea0c9865055942de5a30c534b388be76d2a31",
+    "tameside_contained.py": "831b43571104ce539a2e886a32c84f5795bde69e2ed3858ef9cb503697d42605",
+    "tameside_journal_capacity.py": "149afb9f4ec15b56f78e16a44bcb4b40c7b78606f4be83fc5f4c132fad21b644",
+    "tameside_owner_access.py": "4263fc180e3d782e15b97ead8a653dc05b98dc051df9adcfefdd3fc6871adba6",
+    "tameside_owner_journal.py": "19ae9c92a2b052a7bf97e947b345d53fdc6521a0d8d8c88a834ba6f11ca0d06a",
+    "tameside_stop15.py": "cbae8e7527e07aef597241a2ec4175ec6d36034f16a4a3e063fcd069154e29a4",
+    "tameside_stop15_run.py": "e06fc88af27c305fb2154072b3b3a981576ef1b19016bcda48ccd3510dab428e"
+  },
+  "owner_revision": "4e349f7b1d44ee4b12e6375efc8e80c1674112df",
+  "proposal_version": "1.0",
+  "retained_deployment": "dep-dbukble7bikc73a7jad0",
+  "state": "INACTIVE_AWAITING_OWNER_ACCEPTANCE",
+  "version": 1,
+  "worker_revision": "dd36ba711932e9f831daf7e885e40447be43d41d"
+}
