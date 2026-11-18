@@ -303,6 +303,7 @@ jobs:
           S4_TAMESIDE_RUNTIME_CHECKOUT: ${{ github.workspace }}/.s4-pinned-tameside
           S4_STOP15_OWNER_ROOT: ${{ github.workspace }}
           S4_STOP15_FULL_RUN: '1'
+          S4_STOP15_SIZE_DIAGNOSTIC: '1'
         run: timeout --kill-after=2s 260s "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_release_candidate_pg.py::test_pinned_guard_actual_recovery_entrypoint -q --basetemp="$RUNNER_TEMP/stop15-retained" --junitxml="$RUNNER_TEMP/stop15-retained.xml"
       - uses: actions/upload-artifact@v4
         if: always()
