@@ -14,6 +14,7 @@ from .tameside_owner_database import database_type
 from .tameside_preparation import pinned_modules, original_checkpoint, installed_journal, require
 from .tameside_package import PERIOD
 from .tameside_candidate import EXPIRY
+from . import tameside_journal_capacity as capacity50
 
 
 RELEASE_ROOT='/tmp/pa-tam002-stop15-01'
@@ -104,13 +105,17 @@ class Continuation:
         """Dated receipts do not substitute for these current independent reads."""
         self.phase()
         current=plan.read_journal(self.journal)
-        plan.retained_start(current,ordinal=self.journal.ordinal,sha256=self.journal.previous)
+        _,_,source=pinned_modules(self.frozen_root)
+        capacity50.prebind_state(self.journal,current,source,self.approval_ref,self.review_ref)
         require(current==self.state,'STOP15_JOURNAL_DRIFT')
         original=original_checkpoint(self.pinned,self.db)
         require(original['original_environment']==current['original_environment']
             and original['original_service']==current['original_service'],'STOP15_ORIGINAL_BASELINE')
         _,_,source=pinned_modules(self.frozen_root)
-        require(installed_journal(self.db,source),'STOP15_NAMESPACE')
+        upgraded=capacity50.observe(self.db,source)
+        require(not upgraded or 'capacity_upgrade' in current,'STOP15_UNRECORDED_UPGRADE')
+        require(capacity50.FIELD not in current or upgraded,'STOP15_CAPACITY_DOWNGRADE')
+        self.journal.capacity_verified=upgraded
         proposal=json.loads((Path(__file__).parent.parent.parent/'docs/design/pa-tam001-transport/release-proposal.json').read_text())
         def observe(c):
             manifest=plan.release_candidate.manifest_from_readback(c,proposal,
@@ -135,6 +140,7 @@ class Continuation:
 
     def bind(self, bound_at=None):
         original,source,manifest=self.inspect()
+        require(capacity50.FIELD in self.state,'STOP15_CAPACITY_UPGRADE_REQUIRED')
         if bound_at is None:bound_at=time.time()
         require(time.time()-5<=bound_at<=time.time()+5 and bound_at+2100<=EXPIRY,'STOP15_FRESH_FINITE_TIME')
         self.files=plan.compile_remaining(self.runtime_root,manifest,bound_at=bound_at,owner_journal_source=source)
@@ -176,9 +182,8 @@ class Continuation:
             self.state=plan.read_journal(op.journal);self.journal=op.journal
             require(self.state['status']=='STOPPED_BUILD_READY','STOP15_REPLACEMENT_UNKNOWN')
             self.phase();self.provider()
-            self.state['binding']['retained_deployment']=self.state['deployment']
+            require(self.state['binding']['retained_deployment']==self.state['deployment'],'STOP15_DEPLOYMENT_BINDING_READBACK')
             require(time.time()<self.state['bound_at']+600 and time.time()+1145<self.state['binding']['valid_until'],'STOP15_POST_BUILD_TIME')
-            self.save()
         except BaseException:
             self.state=plan.read_journal(op.journal);self.journal=op.journal
             # Existing containment inspects terminal deployments before restore;
@@ -228,13 +233,14 @@ class Continuation:
         # Bound the stored outcome summary separately; raw evidence stays in DB.
         projected['independent_result']={'bounded_projection':''.join(hashlib.sha256(str(i).encode()).hexdigest() for i in range(16))}
         projected['continuation_capacity']={'projection':'x'*1024}
-        proof=plan.capacity(self.journal,self.state,[copy.deepcopy(projected) for _ in range(29)])
+        proof=plan.capacity(self.journal,self.state,[copy.deepcopy(projected) for _ in range(47-self.journal.ordinal)])
         probe=copy.copy(self.journal);probe.state=copy.deepcopy(projected);probe.ordinal=47;probe.cleanup_mode=True
         for key,n in self.pinned.CLEANUP_RECORD_LIMITS.items():projected[key]='x'*(n-2)
         sizes=[]
         for _ in range(16):
             v=copy.deepcopy(projected);sizes.append(probe.save(v,validate_only=True));probe.ordinal+=1;probe.state=v;projected=v
         proof.update(complete_projection_verified=True,cleanup_ciphertext_bytes=sizes,projected_last_cleanup_ordinal=probe.ordinal)
+        require(len(plan.canonical(proof))<=len(plan.canonical(projected['continuation_capacity'])),'STOP15_CAPACITY_PROOF_BOUND')
         return proof
 
     def outcome(self):
@@ -407,9 +413,16 @@ class Continuation:
             for _ in range(32):
                 self.sleep(30);job=self.api('GET','/jobs/'+job['id'])
                 if job.get('status') in ('succeeded','failed','canceled') and job.get('finishedAt'):break
-            self.state['job_terminal']={k:job.get(k) for k in ('id','serviceId','status','createdAt','startedAt','finishedAt')};self.save()
+            self.state['job_terminal']={k:job.get(k) for k in ('id','serviceId','status','createdAt','startedAt','finishedAt')}
+            # Terminal observation and independent outcome share one checkpoint;
+            # no provider/database effect occurs between them. On failure retain
+            # the observed terminal job in the existing cleanup reserve.
+            if job.get('status')!='succeeded' or not job.get('finishedAt'):self.save(cleanup=True)
             require(job.get('status')=='succeeded' and job.get('finishedAt'),'STOP15_JOB_NOT_SUCCESSFUL')
-            result=self.outcome()
+            try:result=self.outcome()
+            except BaseException:
+                self.save(cleanup=True)
+                raise
             self.state['independent_result']=dict(status=result['status'],run_id=result['run_id'],sha256=hashlib.sha256(plan.canonical(result)).hexdigest(),retained=sum(x['record_count'] for x in result['captures']),screened=sum(x['screening_complete'] for x in result['captures']),screening_outcomes=result['screening_outcomes'],backlog=result['backlog_records'],new_unique=result['newly_retained_unique_references'],qualification='NOT_CONNECTED',saved_facts='NOT_CONNECTED')
             require(len(plan.canonical(self.state['independent_result']))<=1024,'STOP15_JOURNAL_OUTCOME_BOUND')
             self.save()
@@ -431,14 +444,18 @@ class Continuation:
 
 def main(argv=None):
     p=argparse.ArgumentParser()
-    p.add_argument('--action',choices=('inspect','prepare','run','cleanup'),required=True)
+    p.add_argument('--action',choices=('inspect','upgrade','prepare','run','cleanup'),required=True)
     p.add_argument('--runtime-root',required=True);p.add_argument('--frozen-root',required=True)
     p.add_argument('--approval-ref',required=True);p.add_argument('--review-ref',required=True)
     p.add_argument('--observation-file',required=True)
     args=p.parse_args(argv)
     frozen,_,_=pinned_modules(args.frozen_root)
     db=database_type(args.frozen_root)()
-    journal,state=journal_module.reconcile(frozen,db)
+    journal,state=journal_module.reconcile(frozen,db,capacity50=True)
+    if capacity50.FIELD in state:
+        _,_,source=pinned_modules(args.frozen_root)
+        require(capacity50.observe(db,source),'CAPACITY_INSTALL_LOST')
+        journal.capacity_verified=True
     def observation(operation,binding):
         # Existing trusted provider observation, not evidence inferred from DB
         # sessions. Must be freshly completed by the existing owner route.
@@ -470,7 +487,13 @@ def main(argv=None):
         runner.access=access_module.lifecycle(args.frozen_root,policy=state['policy'],manifest=state['manifest'])
         runner.io=access_module.provider_io(args.frozen_root,runner.access)
         runner.cleanup();print(json.dumps(dict(status=runner.state['status'])))
+    elif args.action=='upgrade':
+        _,_,source=pinned_modules(args.frozen_root)
+        capacity50.upgrade(runner,source)
+        print(json.dumps(dict(status='STOP15_CAPACITY_UPGRADED',ordinal=runner.journal.ordinal,sha256=runner.journal.previous)))
     elif args.action=='prepare':
+        _,_,source=pinned_modules(args.frozen_root)
+        capacity50.upgrade(runner,source)
         runner.bind();runner.replacement()
         print(json.dumps(dict(status='STOP15_PREPARED_READBACK',ordinal=runner.journal.ordinal,sha256=runner.journal.previous,deployment=runner.state['deployment'],latest_submission=runner.state['bound_at']+600)))
     else:

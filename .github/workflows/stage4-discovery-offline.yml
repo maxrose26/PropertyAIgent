@@ -294,6 +294,11 @@ jobs:
           ref: dd36ba711932e9f831daf7e885e40447be43d41d
           path: .s4-pinned-tameside
           persist-credentials: false
+      - name: Scoped checkpoint codec boundaries (frozen owner; no production)
+        env:
+          S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
+        run: >-
+          "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_tameside_journal_capacity.py -q
       - name: Retained STOP15 full continuation — 78 deployments, 29 normal and 16 reserved cleanup snapshots (disposable only)
         if: ${{ !cancelled() }}
         env:

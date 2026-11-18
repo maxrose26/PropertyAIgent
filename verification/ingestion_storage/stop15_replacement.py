@@ -31,6 +31,19 @@ def operation(runner):
     p.clock=time.time;p.interrupt=lambda _:None
     p.provider_calls=0;p.provider_bytes=0;p.provider_started=time.monotonic()
     p.journal=runner.journal;p.state=state
+    # Keep the same scoped codec during independent reopen/readback. The
+    # generic pre-upgrade deployment path must retain its original 32KiB reader.
+    def save(self):
+        from .tameside_stop15 import read_journal
+        if self.state.get('status')=='STOPPED_BUILD_READY':
+            self.state['binding']['retained_deployment']=self.state['deployment']
+        wanted=copy.deepcopy(self.state)
+        try:self.journal.save(wanted)
+        except Exception:
+            preparation.require(read_journal(self.journal)==wanted,'PREPARATION_CHECKPOINT_ACK_UNKNOWN')
+        preparation.require(read_journal(self.journal)==wanted,'PREPARATION_CHECKPOINT_READBACK')
+        self.state=wanted
+    p.save=save.__get__(p,type(p))
     runner.phase();p.call=runner.api
     # Use the original restore baseline, but compare new deployments against
     # the independently observed pre-correction inventory. The old list is

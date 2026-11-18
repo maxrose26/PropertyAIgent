@@ -43,7 +43,7 @@ SET LOCAL ROLE ingestion_storage_owner;
     return PRELUDE+checks+revised+'\nRESET ROLE;\nREVOKE CREATE ON SCHEMA public FROM ingestion_storage_owner;\nDO $restored$ BEGIN IF has_schema_privilege(\'ingestion_storage_owner\',\'public\',\'CREATE\') THEN RAISE EXCEPTION \'TAMESIDE_JOURNAL_SCHEMA_REMAINS\'; END IF; END $restored$;\n'+EPILOGUE
 
 
-def _bound_journal(pinned_owner_module,db):
+def _bound_journal(pinned_owner_module,db, *, capacity50=False):
     """Existing Vault codec and CAS journal, separate new operation namespace.
 
     Caller verifies exact pinned module/build and installed function before use.
@@ -53,6 +53,10 @@ def _bound_journal(pinned_owner_module,db):
         raise ValueError('TAMESIDE_PINNED_JOURNAL_CODEC')
     journal=pinned_owner_module.Journal(db,period=pinned_owner_module.PERIOD)
     journal.period=PERIOD;journal.owner_period=JOURNAL;journal.owner_run=RUN
+    if capacity50:
+        from .tameside_journal_capacity import journal_type
+        journal.__class__=journal_type(pinned_owner_module)
+        journal.pinned=pinned_owner_module
     return journal
 
 
@@ -62,13 +66,13 @@ def fresh(pinned_owner_module,db):
     return journal
 
 
-def reconcile(pinned_owner_module,db):
+def reconcile(pinned_owner_module,db, *, capacity50=False):
     """Independent decrypting read after uncertain ACK; never repeats a write.
 
     Compare returned state with the retained intended state before any next
     action. Missing state is UNKNOWN, not permission to start another operation.
     """
-    journal=_bound_journal(pinned_owner_module,db)
+    journal=_bound_journal(pinned_owner_module,db,capacity50=capacity50)
     class ReadOnly:
         key=db.key
         @contextmanager

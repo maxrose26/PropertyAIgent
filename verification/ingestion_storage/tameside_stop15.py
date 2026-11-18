@@ -29,7 +29,7 @@ DEPLOYMENT = 'dep-dbud93o8v5cc738opj1g'
 COMPLETED = ('BUILD_CONFIGURATION','BUILD_ENVIRONMENT','ONE_RESUME_BUILD',
     'RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT',
     'DISPOSITIONS','WRITER')
-OWNER_FILES = ('release_candidate.py','tameside_owner_access.py','tameside_stop15.py','tameside_stop15_run.py','stop15_replacement.py')
+OWNER_FILES = ('release_candidate.py','tameside_owner_access.py','tameside_stop15.py','tameside_stop15_run.py','stop15_replacement.py','tameside_owner_journal.py','tameside_journal_capacity.py')
 
 
 def canonical(value):
@@ -159,9 +159,9 @@ def read_journal(journal):
 
 def capacity(journal, retained, projected_states):
     """Validate actual encrypted sizes using the frozen journal without writes."""
-    require(journal.ordinal==18 and retained['cleanup_reserve']['cleanup_writes']==0,
+    require(18<=journal.ordinal<=20 and retained['cleanup_reserve']['cleanup_writes']==0,
         'STOP15_CAPACITY_BASELINE')
-    require(0<len(projected_states)<=29,'STOP15_NORMAL_ROW_BUDGET')
+    require(0<len(projected_states)<=47-journal.ordinal,'STOP15_NORMAL_ROW_BUDGET')
     import copy
     probe=copy.copy(journal);probe.state=copy.deepcopy(retained)
     sizes=[]
@@ -171,6 +171,6 @@ def capacity(journal, retained, projected_states):
         probe.ordinal+=1;probe.state=state
     # The original journal reserves these bytes for closure. Do not substitute
     # only row arithmetic for the existing exact encryption/byte ceiling.
-    return dict(start_ordinal=18,normal_remaining=29,cleanup_reserved=16,
+    return dict(start_ordinal=journal.ordinal,normal_remaining=47-journal.ordinal,cleanup_reserved=16,
         projected_last_normal_ordinal=probe.ordinal,
         projected_normal_writes=len(projected_states),projected_ciphertext_bytes=sizes)
