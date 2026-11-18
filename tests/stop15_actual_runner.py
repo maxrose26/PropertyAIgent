@@ -130,6 +130,25 @@ def exercise(w, prior, manifest, root):
     runner.inspect()
     run.RELEASE_ROOT=str(root/'owner')
     DB.lose_journal=fault=='submission_restore'
+    # Synthetic-data-only diagnostic: measure the exact frozen-serializer
+    # projected normal state before its mandatory refusal. Do not print values.
+    if os.environ.get('S4_STOP15_SIZE_DIAGNOSTIC')=='1':
+        original_capacity=plan.capacity
+        def capacity_with_sizes(journal,starting,projections):
+            try:return original_capacity(journal,starting,projections)
+            except Exception as exc:
+                if str(exc)!='OWNER_CLEANUP_RESERVE_BYTE_BOUND':raise
+                future=projections[0]
+                ceiling=pinned.cleanup_reserve_policy()['normal_plaintext_ceiling']
+                observed=pinned.state_size(future)
+                parts=sorted(((k,len(pinned.canonical(v))) for k,v in future.items()),
+                             key=lambda pair:pair[1],reverse=True)
+                report=dict(normal_ceiling=ceiling,projected_normal_bytes=observed,
+                            excess_bytes=observed-ceiling,starting_state_bytes=pinned.state_size(starting),
+                            top_fields_bytes=parts[:20],field_count=len(parts),
+                            values_disclosed=False,synthetic_only=True)
+                raise AssertionError('STOP15_SIZE_ONLY_DIAGNOSTIC '+json.dumps(report,sort_keys=True)) from exc
+        plan.capacity=capacity_with_sizes
     runner.bind()
     runner.replacement()
     runner.state=plan.read_journal(runner.journal)
