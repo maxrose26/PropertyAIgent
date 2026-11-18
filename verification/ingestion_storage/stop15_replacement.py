@@ -5,6 +5,24 @@ from . import tameside_preparation as preparation
 NAMES=('BUILD_ENVIRONMENT','BUILD_CONFIGURATION','ONE_RESUME_BUILD','RESUSPEND',
        'RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT')
 
+def prior_deploy_reference(state,pinned):
+    """Exact old deploy membership is immutable in retained STOP15 row18.
+
+    Store a digest-checked location, not a second copy of its full ID list.
+    The currently observed deployment inventory remains in original_deploy_ids
+    for the frozen stopped-deployment overlap and restoration guards.
+    """
+    from . import tameside_stop15 as plan
+    original=state['elapsed_package']
+    preparation.require(original['ordinal']==18 and original['sha256']==plan.CHECKPOINT,
+                        'STOP15_OLD_DEPLOYMENT_ARCHIVE')
+    ids=state['original_deploy_ids']
+    preparation.require(isinstance(ids,list) and all(isinstance(x,str) for x in ids),
+                        'STOP15_OLD_DEPLOYMENT_IDENTITIES')
+    return dict(ordinal=18,checkpoint_sha256=plan.CHECKPOINT,
+                count=len(ids),members_sha256=hashlib.sha256(pinned.canonical(ids)).hexdigest())
+
+
 def operation(runner):
     state=copy.deepcopy(runner.state)
     p=preparation.StoppedDeployment.__new__(preparation.StoppedDeployment)
@@ -24,7 +42,7 @@ def operation(runner):
         configured=copy.deepcopy(current)
         configured['branch']='pa-tam002/'+p.revision
         configured['serviceDetails']['envSpecificDetails'].update(buildCommand=preparation.BUILD_COMMAND,startCommand='/bin/true')
-        state['replacement_deployment']=dict(prior_revision=state['source_revision'],prior_deployment=state['deployment'],prior_deploy_ids=state['original_deploy_ids'],revision=p.revision)
+        state['replacement_deployment']=dict(prior_revision=state['source_revision'],prior_deployment=state['deployment'],prior_deploy_ids_ref=prior_deploy_reference(state,runner.pinned),revision=p.revision)
         state['original_deploy_ids']=[x['id'] for x in deps]
         state['build_guard']=runner.pinned.service_guard(configured)
         p.save()
