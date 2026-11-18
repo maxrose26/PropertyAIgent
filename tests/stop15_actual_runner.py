@@ -13,6 +13,7 @@ import pytest
 def exercise(w, prior, manifest, root):
     root.mkdir(exist_ok=True)
     fault=os.environ.get('S4_STOP15_FAULT','none')
+    contained_mode=os.environ.get('S4_CONTAINED_RUN')=='1'
     plan=importlib.import_module('_stop15_corrected_owner.tameside_stop15')
     run=importlib.import_module('_stop15_corrected_owner.tameside_stop15_run')
     prep=importlib.import_module('_stop15_corrected_owner.tameside_preparation')
@@ -22,7 +23,7 @@ def exercise(w, prior, manifest, root):
     class DB:
         key=hashlib.sha256(b'disposable-encryption-fixture-only').hexdigest()
         lose_install=True;install_calls=0;raw_mode=False;lose_journal=False;journal_lost=False
-        upgrade_calls=0;upgrade_ack_lost=False;fail_upgrade_checkpoint=True
+        upgrade_calls=0;upgrade_ack_lost=False;fail_upgrade_checkpoint=True;bind_ack_lost=False;rebase_ack_lost=False;contained_faults=False
         @contextmanager
         def connection(self):
             with w['actor']() as c:
@@ -36,6 +37,13 @@ def exercise(w, prior, manifest, root):
                             DB.fail_upgrade_checkpoint=False
                             raise RuntimeError('DISPOSABLE_UPGRADE_CHECKPOINT_NOT_WRITTEN')
                         value=c.execute(q,args)
+                        if DB.contained_faults and fault=='submission_restore' and isinstance(q,str) and 'ingestion_intake_owner_state' in q and args and len(args)==4 and args[3] is not None:
+                            decoded=journal._vault(raw=bytes(args[3]))
+                            marker=decoded.get('contained_continuation',{})
+                            if marker.get('phase')=='NORMAL' and not DB.bind_ack_lost:
+                                DB.bind_ack_lost=True;raise RuntimeError('DISPOSABLE_BIND_COMMIT_ACK_LOST')
+                            if marker.get('phase')=='CLEANUP' and decoded['cleanup_reserve']['cleanup_writes']==8 and not DB.rebase_ack_lost:
+                                DB.rebase_ack_lost=True;raise RuntimeError('DISPOSABLE_FIRST_CLEANUP_ACK_LOST')
                         if isinstance(q,str) and 'DO $capacity_upgrade_guard$' in q:
                             DB.upgrade_calls+=1;DB.upgrade_ack_lost=True
                             raise RuntimeError('DISPOSABLE_UPGRADE_SQL_COMMIT_ACK_LOST')
@@ -80,7 +88,7 @@ def exercise(w, prior, manifest, root):
     w['boot'].execute('REVOKE EXECUTE ON FUNCTION ingestion_register_disposable_catchup(jsonb) FROM ingestion_worker')
     fixture=prior['preparation']['provider_fixture']
     class Provider:
-        calls=0;posts=0;puts=0;restore_lost=False;pending_reads=0
+        calls=0;posts=0;puts=0;restore_lost=False;pending_reads=0;pending=contained_mode;resumes=0
         service=copy.deepcopy(fixture['service']);env=copy.deepcopy(fixture['environment']);jobs=[]
         deployments=([dict(deploy=dict(id=item,status='deactivated',commit=dict(id='historic-revision'),
                         createdAt='2026-11-16T21:00:00Z',finishedAt='2026-11-16T21:01:00Z'))
@@ -94,6 +102,7 @@ def exercise(w, prior, manifest, root):
                 self.service['branch']=body['branch'];self.service['serviceDetails']['envSpecificDetails'].update(body['serviceDetails']['envSpecificDetails'])
                 return copy.deepcopy(self.service)
             if method=='POST' and path=='/resume':
+                self.resumes+=1
                 self.service['suspended']='not_suspended'
                 next(item for item in self.deployments if item['deploy']['status']=='live')['deploy']['status']='deactivated'
                 self.deployments.append(dict(deploy=dict(id='dep-corrected',status='live',commit=dict(id=plan.RUNTIME),createdAt='2026-11-17T23:45:00Z',finishedAt='2026-11-17T23:46:00Z')))
@@ -110,7 +119,9 @@ def exercise(w, prior, manifest, root):
                 if path=='/jobs?limit=100':return copy.deepcopy(self.jobs)
                 if path=='/deploys?limit=100':
                     rows=copy.deepcopy(self.deployments)
-                    if fault=='submission_restore' and any(x['deploy']['id']=='dep-corrected' for x in rows) and self.pending_reads==0:
+                    if self.pending and self.resumes:
+                        rows[-1]['deploy']['status']='build_in_progress';rows[-1]['deploy']['finishedAt']=None
+                    if not self.pending and fault=='submission_restore' and any(x['deploy']['id']=='dep-corrected' for x in rows) and self.pending_reads==0:
                         self.pending_reads+=1;rows[-1]['deploy']['status']='build_in_progress';rows[-1]['deploy']['finishedAt']=None
                     return rows
                 if path.startswith('/jobs/'):return copy.deepcopy(self.jobs[0]['job'])
@@ -191,7 +202,33 @@ def exercise(w, prior, manifest, root):
     writer_probe('unapproved_owner','0'*32,'',51200,'OWNER_STATE_EXACT_PILOT')
     assert cap.observe(db,source)
     runner.bind()
-    runner.replacement()
+    if contained_mode:
+        # Actual owner path exits while provider remains pending; initial and
+        # containment outcomes must remain distinct and no POST can repeat.
+        with pytest.raises(Exception) as failure:runner.replacement()
+        assert hasattr(failure.value,'preparation_failure')
+        assert hasattr(failure.value,'containment_failure')
+        assert provider.resumes==1 and provider.pending
+        runner.state=plan.read_journal(runner.journal)
+        assert runner.journal.ordinal==27
+        assert runner.state['intents']['STOP15_REPLACEMENT_ONE_RESUME_BUILD']['state']=='INTENT'
+        provider.pending=False;provider.pending_reads=1
+        replacement=importlib.import_module('_stop15_corrected_owner.stop15_replacement')
+        op=replacement.operation(runner);op.contain()
+        runner.journal,runner.state=ja.reconcile(pinned,db,capacity50=True)
+        assert runner.journal.ordinal==34 and runner.state['cleanup_reserve']['cleanup_writes']==7
+        contained=run.contained
+        contained.CHECKPOINT=runner.journal.previous;contained.DEPLOYMENT='dep-corrected';contained.RELEASE_ROOT=str(root/'contained')
+        contained_state=copy.deepcopy(runner.state)
+        runner.approval_ref='https://github.com/maxrose26/PropertyAIgent/issues/214#issuecomment-9990000001'
+        runner.review_ref='https://github.com/maxrose26/PropertyAIgent/pull/227#issuecomment-9990000002'
+        DB.contained_faults=True
+        runner.bind(contained_start=True)
+        assert runner.journal.ordinal==35 and runner.state['cleanup_reserve']['cleanup_writes']==7
+        assert provider.resumes==1
+        with pytest.raises(ValueError,match='CONTAINED_CHECKPOINT'):runner.bind(contained_start=True)
+        assert runner.state['contained_continuation']['old_cleanup_base_access_bytes']==contained_state['cleanup_reserve']['cleanup_base_access_bytes']
+    else:runner.replacement()
     runner.state=plan.read_journal(runner.journal)
     historical=runner.state['replacement_deployment']
     assert 'prior_deploy_ids' not in historical
@@ -319,12 +356,18 @@ def exercise(w, prior, manifest, root):
     for name,body in w['boot'].execute("SELECT name,body FROM ingestion_run_evidence WHERE period=%s AND run_id=%s AND name>='owner/state-018' ORDER BY name",(ja.JOURNAL,ja.RUN)):
         decoded=runner.journal._vault(raw=bytes(body));ordinal=int(name[-3:])
         measured.append(dict(ordinal=ordinal,serialized_bytes=pinned.state_size(decoded),ciphertext_bytes=len(body),cleanup_writes=decoded['cleanup_reserve']['cleanup_writes']))
-        if ordinal>20:
-            maximum=max(capacity['cleanup_ciphertext_bytes'] if decoded['cleanup_reserve']['cleanup_writes'] else capacity['projected_ciphertext_bytes'])
+        if ordinal>(34 if contained_mode else 20):
+            maximum=max(capacity['cleanup_ciphertext_bytes'] if decoded['cleanup_reserve']['cleanup_writes']>(7 if contained_mode else 0) else capacity['projected_ciphertext_bytes'])
             assert len(body)<=maximum,(ordinal,len(body),maximum)
     capacity['actual_saved_states']=measured
     capacity['actual_report_serialized_bytes']=len(plan.canonical(runner.state.get('continuation_capacity',{})))
-    capacity['total_remaining_normal_projections']=2+capacity['projected_normal_writes']
+    capacity['total_remaining_normal_projections']=(0 if contained_mode else 2)+capacity['projected_normal_writes']
     capacity['upgrade_normal_projections']=[dict(ordinal=m['ordinal'],ciphertext_bytes=m['ciphertext_bytes']) for m in measured if m['ordinal'] in (19,20)]
-    assert capacity['total_remaining_normal_projections']==29
-    return dict(status='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED',period=plan.PERIOD,synthetic_listing_records=1,screening='COMPLETE',backlog_records=1,cleanup='CLOSED',live_requests=0,continuation='ACTUAL_STOP15_RUNNER',partial_start_ordinal=18,final_ordinal=runner.journal.ordinal,cleanup_writes=runner.state['cleanup_reserve']['cleanup_writes'],fault=fault,private_final_refusals=final_refusals[0],capacity=capacity,upgrade_sql_calls=DB.upgrade_calls,upgrade_ack_lost_reconciled=DB.upgrade_ack_lost,old_intent_plaintext_bytes=old_intent_bytes,worker_revision=plan.RUNTIME,provider_posts=provider.posts,original_history_preserved=True)
+    assert capacity['total_remaining_normal_projections']==(13 if contained_mode else 29)
+    if contained_mode:
+        if fault=='submission_restore':assert DB.bind_ack_lost and DB.rebase_ack_lost
+        assert runner.state['cleanup_reserve']['cleanup_writes'] <=16
+        assert runner.state['contained_continuation']['phase']=='CLEANUP'
+        with pytest.raises(Exception,match='OWNER_NO_NORMAL_AFTER_CLEANUP'):
+            runner.journal.cleanup_mode=False;runner.journal.save(copy.deepcopy(runner.state),validate_only=True)
+    return dict(status='SYNTHETIC_RELEASE_RUNTIME_READBACK_PASSED',period=plan.PERIOD,synthetic_listing_records=1,screening='COMPLETE',backlog_records=1,cleanup='CLOSED',live_requests=0,continuation='ACTUAL_STOP15_RUNNER',partial_start_ordinal=34 if contained_mode else 18,final_ordinal=runner.journal.ordinal,cleanup_writes=runner.state['cleanup_reserve']['cleanup_writes'],fault=fault,private_final_refusals=final_refusals[0],capacity=capacity,upgrade_sql_calls=DB.upgrade_calls,upgrade_ack_lost_reconciled=DB.upgrade_ack_lost,old_intent_plaintext_bytes=old_intent_bytes,contained_binding_ack_lost=DB.bind_ack_lost,first_cleanup_ack_lost=DB.rebase_ack_lost,worker_revision=plan.RUNTIME,provider_posts=provider.posts,original_history_preserved=True)

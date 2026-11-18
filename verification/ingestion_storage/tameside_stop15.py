@@ -29,7 +29,7 @@ DEPLOYMENT = 'dep-dbud93o8v5cc738opj1g'
 COMPLETED = ('BUILD_CONFIGURATION','BUILD_ENVIRONMENT','ONE_RESUME_BUILD',
     'RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT',
     'DISPOSITIONS','WRITER')
-OWNER_FILES = ('release_candidate.py','tameside_owner_access.py','tameside_stop15.py','tameside_stop15_run.py','stop15_replacement.py','tameside_owner_journal.py','tameside_journal_capacity.py')
+OWNER_FILES = ('release_candidate.py','tameside_owner_access.py','tameside_stop15.py','tameside_stop15_run.py','stop15_replacement.py','tameside_owner_journal.py','tameside_journal_capacity.py','tameside_contained.py')
 
 
 def canonical(value):
@@ -69,7 +69,7 @@ def worker_command(root, code, value):
     return json.loads(result.stdout)
 
 
-def compile_remaining(runtime_root, manifest, *, bound_at, owner_journal_source):
+def compile_remaining(runtime_root, manifest, *, bound_at, owner_journal_source, contained_start=False):
     """Corrected runtime seals its own identity; corrected owner supplies only install.
 
     No repeated recovery or completed installation artifact appears in the returned set.
@@ -96,6 +96,10 @@ print(json.dumps({k:base64.b64encode(b).decode() for k,b in f.items()}))
         elapsed=dict(manifest_sha256=OLD_MANIFEST,package_sha256=OLD_INDEX,bound_at=OLD_BOUND),
         bound_at=bound_at,latest_submission=bound_at+600,access_deadline=bound_at+2100,
         files={k:dict(sha256=hashlib.sha256(v).hexdigest(),bytes=len(v)) for k,v in files.items()})
+    if contained_start:
+        from . import tameside_contained as contained
+        index.update(kind='CONTAINED_STOP15_CONTINUATION_INACTIVE',prior_checkpoint=dict(ordinal=34,sha256=contained.CHECKPOINT),retained_deployment=contained.DEPLOYMENT,replacement_required=False,cleanup_consumed=contained.USED)
+        index.pop('replacement_revision');index.pop('prior_deployment')
     files['continuation.json']=json.dumps(index,sort_keys=True,indent=2).encode()
     return files
 
@@ -159,7 +163,8 @@ def read_journal(journal):
 
 def capacity(journal, retained, projected_states):
     """Validate actual encrypted sizes using the frozen journal without writes."""
-    require(18<=journal.ordinal<=20 and retained['cleanup_reserve']['cleanup_writes']==0,
+    from . import tameside_contained as contained
+    require((18<=journal.ordinal<=20 and retained['cleanup_reserve']['cleanup_writes']==0) or contained.projectable(journal,retained),
         'STOP15_CAPACITY_BASELINE')
     require(0<len(projected_states)<=47-journal.ordinal,'STOP15_NORMAL_ROW_BUDGET')
     import copy
@@ -171,6 +176,6 @@ def capacity(journal, retained, projected_states):
         probe.ordinal+=1;probe.state=state
     # The original journal reserves these bytes for closure. Do not substitute
     # only row arithmetic for the existing exact encryption/byte ceiling.
-    return dict(start_ordinal=journal.ordinal,normal_remaining=47-journal.ordinal,cleanup_reserved=16,
+    return dict(start_ordinal=journal.ordinal,normal_remaining=47-journal.ordinal,cleanup_reserved=16-retained['cleanup_reserve']['cleanup_writes'],
         projected_last_normal_ordinal=probe.ordinal,
         projected_normal_writes=len(projected_states),projected_ciphertext_bytes=sizes)

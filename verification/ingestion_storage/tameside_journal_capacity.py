@@ -77,8 +77,12 @@ def journal_type(pinned):
     methods = dict(pinned.Journal._vault.__globals__, Vault=vault)
     exec(compile(textwrap.dedent(inspect.getsource(pinned.Journal._vault)), '<scoped-tameside-journal>', 'exec'), methods)
     adapted_vault = methods['_vault']
-    saves = dict(pinned.Journal.save.__globals__, cleanup_reserve_policy=lambda: policy(pinned))
-    exec(compile(textwrap.dedent(inspect.getsource(pinned.Journal.save)), '<scoped-tameside-reserve>', 'exec'), saves)
+    from . import tameside_contained as contained
+    saves = dict(pinned.Journal.save.__globals__, cleanup_reserve_policy=lambda: policy(pinned), contained=contained)
+    save_source=textwrap.dedent(inspect.getsource(pinned.Journal.save))
+    save_source=save_source.replace("op.require(used==0,'OWNER_NO_NORMAL_AFTER_CLEANUP')","op.require(used==0 or contained.normal_allowed(self,state),'OWNER_NO_NORMAL_AFTER_CLEANUP')").replace("reserve['cleanup_writes']=0","reserve['cleanup_writes']=used")
+    save_source=save_source.replace("if 'cleanup_base_bytes' not in prior:","if contained.begin_cleanup(self,state) or 'cleanup_base_bytes' not in prior:")
+    exec(compile(save_source, '<scoped-tameside-reserve>', 'exec'), saves)
     adapted_save = saves['save']
 
     class ScopedJournal(pinned.Journal):

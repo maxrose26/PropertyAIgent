@@ -298,8 +298,8 @@ jobs:
         env:
           S4_BOLTON_PINNED_CHECKOUT: ${{ github.workspace }}/.s4-pinned-bolton
         run: >-
-          "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_tameside_journal_capacity.py -q
-      - name: Retained STOP15 full continuation — 78 deployments, 29 normal and 16 reserved cleanup snapshots (disposable only)
+          "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_tameside_journal_capacity.py tests/test_tameside_contained.py -q
+      - name: Contained STOP15 continuation — 13 normal and 9 remaining cleanup snapshots (disposable only)
         if: ${{ !cancelled() }}
         env:
           DATABASE_URL: 'sqlite:///:memory:'
@@ -309,6 +309,8 @@ jobs:
           S4_STOP15_OWNER_ROOT: ${{ github.workspace }}
           S4_STOP15_FULL_RUN: '1'
           S4_STOP15_SIZE_DIAGNOSTIC: '1'
+          S4_CONTAINED_RUN: '1'
+          S4_STOP15_FAULT: submission_restore
         run: timeout --kill-after=2s 260s "$RUNNER_TEMP/e2e-venv/bin/python" -m pytest tests/test_release_candidate_pg.py::test_pinned_guard_actual_recovery_entrypoint -q --basetemp="$RUNNER_TEMP/stop15-retained" --junitxml="$RUNNER_TEMP/stop15-retained.xml"
       - uses: actions/upload-artifact@v4
         if: always()

@@ -15,6 +15,7 @@ from .tameside_preparation import pinned_modules, original_checkpoint, installed
 from .tameside_package import PERIOD
 from .tameside_candidate import EXPIRY
 from . import tameside_journal_capacity as capacity50
+from . import tameside_contained as contained
 
 
 RELEASE_ROOT='/tmp/pa-tam002-stop15-01'
@@ -97,16 +98,17 @@ class Continuation:
         require(s.get('suspended')=='suspended' and self.pinned.service_guard(s)==self.state['original_guard']
             and env==self.state['original_environment'],'STOP15_PROVIDER_RESTORATION')
         live=[d for d in deps if d['status']=='live']
-        require(len(live)==1 and live[0]['id']==self.state.get('deployment',plan.DEPLOYMENT) and live[0]['commit']['id']==(plan.RUNTIME if self.state.get('replacement_deployment') else plan.BASE_RUNTIME)
-            and max(deps,key=lambda d:d['createdAt'])['id']==self.state.get('deployment',plan.DEPLOYMENT),'STOP15_DEPLOYMENT')
+        require(len(live)==1 and live[0]['id']==(contained.DEPLOYMENT if self.state.get('status')=='PREPARATION_CONTAINED_NO_SUBMISSION' else self.state.get('deployment',plan.DEPLOYMENT)) and live[0]['commit']['id']==(plan.RUNTIME if self.state.get('replacement_deployment') else plan.BASE_RUNTIME)
+            and max(deps,key=lambda d:d['createdAt'])['id']==(contained.DEPLOYMENT if self.state.get('status')=='PREPARATION_CONTAINED_NO_SUBMISSION' else self.state.get('deployment',plan.DEPLOYMENT)),'STOP15_DEPLOYMENT')
         return s,env,jobs,deps
 
-    def inspect(self):
+    def inspect(self, *, contained_start=False):
         """Dated receipts do not substitute for these current independent reads."""
         self.phase()
         current=plan.read_journal(self.journal)
         _,_,source=pinned_modules(self.frozen_root)
-        capacity50.prebind_state(self.journal,current,source,self.approval_ref,self.review_ref)
+        if contained_start:contained.start(self.journal,current,self.approval_ref,self.review_ref)
+        else:capacity50.prebind_state(self.journal,current,source,self.approval_ref,self.review_ref)
         require(current==self.state,'STOP15_JOURNAL_DRIFT')
         original=original_checkpoint(self.pinned,self.db)
         require(original['original_environment']==current['original_environment']
@@ -138,12 +140,13 @@ class Continuation:
         manifest=self.read(observe);self.provider()
         return original,source,manifest
 
-    def bind(self, bound_at=None):
-        original,source,manifest=self.inspect()
+    def bind(self, bound_at=None, *, contained_start=False):
+        original,source,manifest=self.inspect(contained_start=contained_start)
+        if contained_start:contained.admit(self)
         require(capacity50.FIELD in self.state,'STOP15_CAPACITY_UPGRADE_REQUIRED')
         if bound_at is None:bound_at=time.time()
         require(time.time()-5<=bound_at<=time.time()+5 and bound_at+2100<=EXPIRY,'STOP15_FRESH_FINITE_TIME')
-        self.files=plan.compile_remaining(self.runtime_root,manifest,bound_at=bound_at,owner_journal_source=source)
+        self.files=plan.compile_remaining(self.runtime_root,manifest,bound_at=bound_at,owner_journal_source=source,contained_start=contained_start)
         policy=json.loads(self.files['policy.json'])
         # Immutable row18 remains the archive; do not duplicate its obsolete
         # policy/manifest/index and consume the original cleanup byte reserve.
@@ -159,10 +162,13 @@ class Continuation:
             credential_policy='STABLE_RESTRICTED_V1',credential_verifier_sha256=stable['verifier_sha256'],runtime_deadline=policy['expires_at'],
             valid_until=policy['expires_at']+185,render_config_sha256=self.state['original_guard'],retained_deployment=plan.DEPLOYMENT,
             timing_policy=dict(version='SEPARATE_EXPIRY_V2_RESERVE',bound_at=bound_at),release_root=RELEASE_ROOT,submission_intent_path=str(Path(RELEASE_ROOT)/'submission.intent'))
+        if contained_start:b.update(retained_deployment=contained.DEPLOYMENT,release_root=contained.RELEASE_ROOT,submission_intent_path=str(Path(contained.RELEASE_ROOT)/'submission.intent'))
         self.state['binding']=b
         self.passwords=stable['passwords']
         # Caller must prove full projected remaining-state capacity before this
         # binding is durable. This is intentionally a fail-closed prerequisite.
+        if contained_start:
+            self.state.update(deployment=contained.DEPLOYMENT,source_revision=plan.RUNTIME,status='STOPPED_BUILD_READY')
         self.state['continuation_capacity']=self.capacity_projection()
         self.save()
         Path(b['release_root']).mkdir(mode=0o700,exist_ok=False)
@@ -184,11 +190,18 @@ class Continuation:
             self.phase();self.provider()
             require(self.state['binding']['retained_deployment']==self.state['deployment'],'STOP15_DEPLOYMENT_BINDING_READBACK')
             require(time.time()<self.state['bound_at']+600 and time.time()+1145<self.state['binding']['valid_until'],'STOP15_POST_BUILD_TIME')
-        except BaseException:
-            self.state=plan.read_journal(op.journal);self.journal=op.journal
-            # Existing containment inspects terminal deployments before restore;
-            # a pending deployment stays UNKNOWN and must be inspected, not resumed.
-            self.phase();op.contain();self.state=plan.read_journal(op.journal)
+        except BaseException as initial:
+            first=self.pinned.bounded_failure(initial,'RUN')
+            initial.preparation_failure=first
+            # Preserve initial diagnostic even if checkpoint reopening or
+            # terminal-only containment also fails. The CLI receipt persists both.
+            try:
+                self.state=plan.read_journal(op.journal);self.journal=op.journal
+                op.state=copy.deepcopy(self.state)
+                op.state.setdefault('first_failure',first)
+                self.phase();op.contain();self.state=plan.read_journal(op.journal)
+            except BaseException as secondary:
+                initial.containment_failure=self.pinned.bounded_failure(secondary,'CLEANUP')
             raise
 
     def prepared(self):
@@ -198,7 +211,7 @@ class Continuation:
         require(time.time()<self.state['bound_at']+600 and time.time()+1145<self.state['binding']['valid_until'],'STOP15_PREPARED_TIME')
         original=original_checkpoint(self.pinned,self.db)
         _,_,source=pinned_modules(self.frozen_root)
-        self.files=plan.compile_remaining(self.runtime_root,self.state['manifest'],bound_at=self.state['bound_at'],owner_journal_source=source)
+        self.files=plan.compile_remaining(self.runtime_root,self.state['manifest'],bound_at=self.state['bound_at'],owner_journal_source=source,contained_start=contained.FIELD in self.state)
         require(json.loads(self.files['continuation.json'])==self.state['package_index'],'STOP15_PREPARED_ARTIFACT_DRIFT')
         require(self.state['binding']['retained_deployment']==self.state['deployment'],'STOP15_PREPARED_DEPLOYMENT')
         self.phase();self.provider()
@@ -237,7 +250,7 @@ class Continuation:
         probe=copy.copy(self.journal);probe.state=copy.deepcopy(projected);probe.ordinal=47;probe.cleanup_mode=True
         for key,n in self.pinned.CLEANUP_RECORD_LIMITS.items():projected[key]='x'*(n-2)
         sizes=[]
-        for _ in range(16):
+        for _ in range(16-self.state['cleanup_reserve']['cleanup_writes']):
             v=copy.deepcopy(projected);sizes.append(probe.save(v,validate_only=True));probe.ordinal+=1;probe.state=v;projected=v
         proof.update(complete_projection_verified=True,cleanup_ciphertext_bytes=sizes,projected_last_cleanup_ordinal=probe.ordinal)
         require(len(plan.canonical(proof))<=len(plan.canonical(projected['continuation_capacity'])),'STOP15_CAPACITY_PROOF_BOUND')
@@ -444,7 +457,7 @@ class Continuation:
 
 def main(argv=None):
     p=argparse.ArgumentParser()
-    p.add_argument('--action',choices=('inspect','upgrade','prepare','run','cleanup'),required=True)
+    p.add_argument('--action',choices=('inspect','upgrade','prepare','resume-contained','run','cleanup'),required=True)
     p.add_argument('--runtime-root',required=True);p.add_argument('--frozen-root',required=True)
     p.add_argument('--approval-ref',required=True);p.add_argument('--review-ref',required=True)
     p.add_argument('--observation-file',required=True)
@@ -491,6 +504,9 @@ def main(argv=None):
         _,_,source=pinned_modules(args.frozen_root)
         capacity50.upgrade(runner,source)
         print(json.dumps(dict(status='STOP15_CAPACITY_UPGRADED',ordinal=runner.journal.ordinal,sha256=runner.journal.previous)))
+    elif args.action=='resume-contained':
+        runner.bind(contained_start=True)
+        print(json.dumps(dict(status='CONTAINED_CONTINUATION_BOUND',ordinal=runner.journal.ordinal,sha256=runner.journal.previous,deployment=runner.state['deployment'],latest_submission=runner.state['bound_at']+600)))
     elif args.action=='prepare':
         _,_,source=pinned_modules(args.frozen_root)
         capacity50.upgrade(runner,source)
@@ -506,5 +522,5 @@ if __name__=='__main__':
     try:main()
     except (Exception,KeyboardInterrupt) as exc:
         # Never emit driver SQL/parameters, URLs or credentials in a traceback.
-        print(json.dumps(dict(status='STOP_RECONCILE',reason='STOP15_EXECUTION_REFUSED_OR_UNCERTAIN',exception_class=type(exc).__name__)))
+        print(json.dumps(dict(status='STOP_RECONCILE',reason='STOP15_EXECUTION_REFUSED_OR_UNCERTAIN',exception_class=type(exc).__name__,first_failure=getattr(exc,'preparation_failure',None),containment_failure=getattr(exc,'containment_failure',None))))
         raise SystemExit(1) from None
