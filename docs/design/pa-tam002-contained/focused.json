@@ -1,0 +1,6 @@
+{
+  "status": "PASSED",
+  "tests": 9,
+  "source": "tests/test_tameside_contained.py + tests/test_tameside_journal_capacity.py",
+  "live_requests": 0
+}
