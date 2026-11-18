@@ -218,7 +218,8 @@ class Continuation:
             render=dict(original=self.state['original_environment'],expected=expected,guard=self.state['original_guard'],state='PUT_ACKNOWLEDGED',publication_token=None,publication_state='NOT_REQUESTED',mapped_at=9999999999.999998,handoff_observation_sha256='f'*64,submission_state='SUBMISSION_INTENT_NO_RETRY'))
         for name in ('CAMPAIGN','RELEASE','PERIOD','JOB'):
             projected['intents']['STOP15_'+name]=dict(state='ACKNOWLEDGED',sql_sha256='f'*64,command_sha256='f'*64)
-        projected['replacement_deployment']=dict(prior_revision=plan.BASE_RUNTIME,prior_deployment=plan.DEPLOYMENT,prior_deploy_ids=self.state['original_deploy_ids'],revision=plan.RUNTIME)
+        from .stop15_replacement import prior_deploy_reference
+        projected['replacement_deployment']=dict(prior_revision=plan.BASE_RUNTIME,prior_deployment=plan.DEPLOYMENT,prior_deploy_ids_ref=prior_deploy_reference(self.state,self.pinned),revision=plan.RUNTIME)
         projected['original_deploy_ids']=[d['id'] for d in self.provider()[3]]
         for name in ('BUILD_ENVIRONMENT','BUILD_CONFIGURATION','ONE_RESUME_BUILD','RESUSPEND','RESTORE_BUILD_CONFIGURATION','RESTORE_BUILD_ENVIRONMENT'):
             projected['intents']['STOP15_REPLACEMENT_'+name]=dict(state='ACKNOWLEDGED',at=9999999999.999998)
